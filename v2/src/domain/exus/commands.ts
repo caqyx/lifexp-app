@@ -10,7 +10,7 @@ import { dateFrom, fold, oneOf } from './recognizers';
 /** read: runs at once; write: runs, with undo; destructive: asks first (6.6). */
 export type Risk = 'read' | 'write' | 'destructive';
 
-export type CommandId = 'help' | 'today' | 'create-task';
+export type CommandId = 'help' | 'today' | 'undo' | 'create-task';
 
 export interface CommandSpec {
   id: CommandId;
@@ -38,6 +38,14 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['dzis'],
     module: null,
     risk: 'read',
+    slots: () => [],
+  },
+  {
+    // Takes back the last write of this Ex-us session (PLAN.md 6.6).
+    id: 'undo',
+    aliases: ['cofnij'],
+    module: null,
+    risk: 'write',
     slots: () => [],
   },
   {

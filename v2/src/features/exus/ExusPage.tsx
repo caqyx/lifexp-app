@@ -2,24 +2,22 @@
 // the AI later (5b). A command is read locally (domain/exus) and run through the
 // same services as the screens, so it obeys the same limits. The conversation
 // lives in memory for now; history on the device comes with the full UI (6.10).
-import { effect } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { availableCommands, findCommand, palette, parseInput, type CommandSpec } from '@/domain/exus/commands';
-import { DAILY_LIMIT_DEFAULT } from '@/domain/points';
-import { TASKS_MAX, type Task, type TaskSize } from '@/domain/tasks';
-import { isModuleOn } from '@/domain/modules';
-import { language, locale, t } from '@/i18n';
-import { formatDayMonth, localDayKey, utcDayKey } from '@/lib/dates';
-import { formatInteger } from '@/lib/format';
-import { formatMoney } from '@/lib/money';
-import { createTask, removeCreatedTask } from '@/services/tasks';
+import { availableCommands, palette, parseInput, type CommandSpec } from '@/domain/exus/commands';
+import { whatToDo } from '@/domain/exus/policy';
+import { t } from '@/i18n';
+import { localDayKey } from '@/lib/dates';
 import { account } from '@/stores/session';
-import { tasks, watchTasks } from '@/stores/tasks';
-import { today as todaySources, watchToday } from '@/stores/today';
+import { watchTasks } from '@/stores/tasks';
+import { watchToday } from '@/stores/today';
 import { Button } from '@/ui/components/Button';
+import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 import { TextField } from '@/ui/components/Fields';
 import { Card, Page, Stack } from '@/ui/components/Layout';
-import { showToast } from '@/ui/toast';
+import type { HandlerContext } from './handlers';
+import { effectOf, runCommand } from './pipeline';
+import { commandName, syntax } from './syntax';
+import { createUndoStack } from './undo';
 import './exus.css';
 
 interface Message {
@@ -28,40 +26,15 @@ interface Message {
   text: string;
 }
 
+/** A destructive command waiting for "yes" in the dialog. */
+interface Pending {
+  spec: CommandSpec;
+  args: Record<string, unknown>;
+  ctx: HandlerContext;
+  effect: string;
+}
+
 let nextId = 1;
-
-/** The task list once the listener has it; rejects when it cannot be read. */
-function loadedTasks(): Promise<readonly Task[]> {
-  return new Promise((resolve, reject) => {
-    const stop = effect(() => {
-      const { list, failed } = tasks.value;
-      if (!list && !failed) return;
-      queueMicrotask(() => stop());
-      if (list) resolve(list);
-      else reject(new Error('tasks'));
-    });
-  });
-}
-
-/** The command's name and arguments; the name is the Polish alias, or the id in English. */
-function commandName(spec: CommandSpec): string {
-  return language.value === 'en' ? spec.id : (spec.aliases[0] ?? spec.id);
-}
-
-function syntax(spec: CommandSpec): string {
-  const name = commandName(spec);
-  if (spec.id === 'today') return `/${name}`;
-  return `/${name} ${t(`exus.args.${spec.id}`)}`;
-}
-
-function helpText(commands: readonly CommandSpec[], about: string | undefined): string {
-  if (about) {
-    const spec = findCommand(about.replace(/^\//, ''), commands);
-    if (!spec) return t('exus.unknown', { name: about.replace(/^\//, '') });
-    return `${t(`exus.commands.${spec.id}`)}\n${syntax(spec)}`;
-  }
-  return [t('exus.helpIntro'), ...commands.map((c) => `${syntax(c)} — ${t(`exus.commands.${c.id}`)}`)].join('\n');
-}
 
 export default function ExusPage() {
   const current = account.value;
@@ -72,6 +45,11 @@ export default function ExusPage() {
   const [draft, setDraft] = useState('');
   const log = useRef<HTMLDivElement>(null);
   const form = useRef<HTMLFormElement>(null);
+  // The undo stack lives as long as this conversation (PLAN.md 6.6).
+  const [undoStack] = useState(createUndoStack);
+  // The last destructive command asked about; it stays while the dialog closes.
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [confirming, setConfirming] = useState(false);
   useEffect(() => {
     log.current?.lastElementChild?.scrollIntoView({ block: 'end' });
   }, [messages.length]);
@@ -82,63 +60,22 @@ export default function ExusPage() {
 
   const say = (text: string) => setMessages((m) => [...m, { id: nextId++, from: 'exus', text }]);
 
-  const summary = (): string => {
-    const lang = locale();
-    const earned = todaySources.value.days?.get(utcDayKey(new Date()))?.pointsEarned ?? 0;
-    const lines = [
-      t('exus.today.points', {
-        total: formatInteger(profile.points.total, lang),
-        earned: formatInteger(earned, lang),
-        limit: formatInteger(profile.dailyLimit ?? DAILY_LIMIT_DEFAULT, lang),
-      }),
-    ];
-    const balance = todaySources.value.balance;
-    if (isModuleOn('money', profile) && typeof balance === 'number') lines.push(t('exus.today.balance', { amount: formatMoney(balance, lang) }));
-    const list = tasks.value.list;
-    if (list) {
-      const day = localDayKey(new Date());
-      const due = list.filter((task) => !task.done && task.dueDate !== null && task.dueDate <= day).length;
-      lines.push(t('exus.today.tasks', { count: due }));
-    }
-    return lines.join('\n');
-  };
-
-  const createFromCommand = async (args: Record<string, unknown>) => {
-    // A command typed before the list arrived waits for it instead of asking to try again.
-    const list = await loadedTasks().catch(() => null);
-    if (!list) return say(t('exus.tasksFailed'));
-    const day = localDayKey(new Date());
-    const text = String(args.text);
-    const dueDate = String(args.due);
-    const size = (args.size as TaskSize | undefined) ?? 'M';
-    const result = createTask(uid, { text, dueDate, size }, list, profile.pcBuild !== null, day);
-    if (!result.ok) {
-      return say(result.problem === 'limit' ? t('tasks.maxTasks', { max: TASKS_MAX }) : t(`exus.taskProblem.${result.problem}`));
-    }
-    const failed = () => showToast({ message: t('tasks.saveFailed'), tone: 'negative' });
-    result.saved.catch(failed);
-    say(t('exus.taskCreated', { text, date: formatDayMonth(dueDate, locale()), size }));
-    showToast({
-      message: t('tasks.saved'),
-      tone: 'positive',
-      action: {
-        label: t('ui.undo'),
-        onAction: () =>
-          void removeCreatedTask(uid, result.id).then(() => say(t('exus.undone')), failed),
-      },
-    });
-  };
+  const run = (spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext) =>
+    void runCommand(spec, args, ctx, say).then(say, () => say(t('exus.failed')));
 
   const send = () => {
     const input = draft.trim();
     if (!input) return;
     setDraft('');
     setMessages((m) => [...m, { id: nextId++, from: 'me', text: input }]);
-    const parsed = parseInput(input, localDayKey(new Date()), commands);
+    const today = localDayKey(new Date());
+    const parsed = parseInput(input, today, commands);
     if (parsed.kind === 'text') return say(t('exus.aiLater'));
     if (parsed.kind === 'unknown') return say(t('exus.unknown', { name: parsed.name }));
     const { spec, args, missing } = parsed;
-    if (missing.length > 0) {
+    const ctx: HandlerContext = { uid, profile, today, commands, undo: undoStack };
+    const decision = whatToDo(spec.risk, missing);
+    if (decision === 'ask-missing') {
       return say(
         t('exus.missing', {
           fields: missing.map((name) => t(`exus.slots.${name as 'text' | 'due'}`)).join(', '),
@@ -146,9 +83,11 @@ export default function ExusPage() {
         }),
       );
     }
-    if (spec.id === 'help') return say(helpText(commands, args.command as string | undefined));
-    if (spec.id === 'today') return say(summary());
-    if (spec.id === 'create-task') return void createFromCommand(args);
+    if (decision === 'confirm') {
+      setPending({ spec, args, ctx, effect: effectOf(spec, args, ctx) });
+      return setConfirming(true);
+    }
+    run(spec, args, ctx);
   };
 
   const pal = palette(draft, commands);
@@ -206,6 +145,21 @@ export default function ExusPage() {
           </form>
         </Card>
       </Stack>
+      <ConfirmDialog
+        open={confirming}
+        title={pending ? t('exus.confirmTitle', { name: commandName(pending.spec) }) : ''}
+        body={pending?.effect}
+        confirmLabel={t('exus.confirm')}
+        danger
+        onConfirm={() => {
+          setConfirming(false);
+          if (pending) run(pending.spec, pending.args, pending.ctx);
+        }}
+        onCancel={() => {
+          setConfirming(false);
+          say(t('exus.cancelled'));
+        }}
+      />
     </Page>
   );
 }

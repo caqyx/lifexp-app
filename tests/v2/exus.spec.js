@@ -25,6 +25,7 @@ test('the menu opens Ex-us; /pomoc lists the commands, other text and unknown co
   await send(page, '/pomoc');
   await expect(log(page)).toContainText('/zadanie <treść> <termin> [S/M/L] — Nowe zadanie');
   await expect(log(page)).toContainText('/dzis — Podsumowanie dnia');
+  await expect(log(page)).toContainText('/cofnij — Cofnij ostatni zapis z tej rozmowy');
   await send(page, 'odłóż 50 zł na rower');
   await expect(log(page)).toContainText('Rozmowa z AI dojdzie w następnym kroku.');
   await send(page, '/latanie');
@@ -50,8 +51,43 @@ test('/zadanie creates the task in any argument order; "Cofnij" takes it back', 
     expect.objectContaining({ text: 'Kupić mleko', dueDate: tomorrow, size: 'L', done: false }),
   ]);
   await page.getByRole('button', { name: 'Cofnij' }).click();
-  await expect(log(page)).toContainText('Cofnięto.');
+  await expect(log(page)).toContainText('Cofnięto: zadanie „Kupić mleko”.');
   await expect.poll(() => tasksOf(account.uid)).toEqual([]);
+});
+
+test('/cofnij takes back the last writes one by one; the toast and /cofnij never undo the same one twice', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-undo' });
+  await openSignedIn(page, account, '#/exus');
+  const texts = async () => (await tasksOf(account.uid)).map((task) => task.text).sort();
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/zadanie Pierwsze jutro');
+  await expect(log(page)).toContainText('Dodano zadanie „Pierwsze”');
+  await send(page, '/zadanie Drugie jutro');
+  await expect(log(page)).toContainText('Dodano zadanie „Drugie”');
+  await expect.poll(texts).toEqual(['Drugie', 'Pierwsze']);
+
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Cofnięto: zadanie „Drugie”.');
+  await expect.poll(texts).toEqual(['Pierwsze']);
+  await send(page, '/COFNIJ');
+  await expect(replies.last()).toHaveText('Cofnięto: zadanie „Pierwsze”.');
+  await expect.poll(texts).toEqual([]);
+  // The toasts of the writes undone go with them.
+  await expect(page.getByRole('button', { name: 'Cofnij' })).toHaveCount(0);
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Nie ma nic do cofnięcia.');
+
+  // "Cofnij" on the toast takes the entry off the stack: /cofnij then has nothing left.
+  await send(page, '/zadanie Trzecie jutro');
+  await expect(log(page)).toContainText('Dodano zadanie „Trzecie”');
+  await expect.poll(texts).toEqual(['Trzecie']);
+  await page.getByRole('button', { name: 'Cofnij' }).click();
+  await expect(replies.last()).toHaveText('Cofnięto: zadanie „Trzecie”.');
+  await expect.poll(texts).toEqual([]);
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Nie ma nic do cofnięcia.');
+  await expect(replies.filter({ hasText: 'Cofnięto: zadanie „Trzecie”.' })).toHaveCount(1);
 });
 
 test('/dzis sums the day up from the account', async ({ page }) => {
@@ -79,7 +115,7 @@ test('typing "/" opens the command palette; a tap puts the command in the field 
   const field = page.getByLabel('Wiadomość do Ex-us');
   const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
   await field.fill('/');
-  await expect(list.getByRole('button')).toHaveCount(3);
+  await expect(list.getByRole('button')).toHaveCount(4);
   await field.fill('/za');
   await expect(list.getByRole('button')).toHaveCount(1);
   await list.getByRole('button', { name: /Nowe zadanie/ }).click();

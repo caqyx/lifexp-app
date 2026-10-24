@@ -1224,6 +1224,7 @@
     "commands": {
       "help": "The commands, or one of them explained",
       "today": "The day in short",
+      "undo": "Undo the last change made in this conversation",
       "create-task": "A new task"
     },
     "missing": "Missing: {{fields}}.\n{{syntax}}",
@@ -1245,12 +1246,22 @@
       "dueRequired": "Give a due date, e.g. tomorrow or fri.",
       "dueInPast": "The due date cannot be in the past."
     },
-    "undone": "Undone.",
     "args": {
       "help": "[command]",
       "create-task": "<text> <due date> [S/M/L]"
     },
     "paletteLabel": "Commands matching what is typed",
-    "tasksFailed": "Could not load the tasks. Check the connection and try again."
+    "tasksFailed": "Could not load the tasks. Check the connection and try again.",
+    "undoneWhat": "Undone: {{what}}.",
+    "undoWhat": {
+      "create-task": "the task \"{{text}}\""
+    },
+    "nothingToUndo": "There is nothing to undo.",
+    "undoFailed": "Could not undo. Check the connection and try again.",
+    "saved": "Saved.",
+    "failed": "Could not run the command. Try again.",
+    "confirmTitle": "Run /{{name}}?",
+    "confirm": "Run",
+    "cancelled": "Cancelled, nothing has changed."
   }
 }
