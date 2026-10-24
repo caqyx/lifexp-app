@@ -13,9 +13,11 @@ html {
 }
 
 /* A modal layer on its way out (components/useModal.ts): the page can be typed into
-   already, but taps land nowhere, not on what slides past. */
-html[data-modal-closing] {
-  pointer-events: none;
+   already, but a tap lands on this guard, not on what slides past. */
+.ui-modal-guard {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
 }
 
 body {

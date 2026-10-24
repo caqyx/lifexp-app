@@ -309,6 +309,9 @@ test('/usun-cel asks first; Anuluj changes nothing, Wykonaj deletes the goal and
 test('a message sent while the confirmation is still closing is not lost', async ({ page }) => {
   const account = await goalsAccount('exus-dialog-closing', [rower]);
   await openSignedIn(page, account, '#/exus');
+  // A slow machine: rendering and effects lag behind the test's next command.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 8 });
   const replies = page.locator('.exus-msg--exus');
   const mine = page.locator('.exus-msg--me');
 

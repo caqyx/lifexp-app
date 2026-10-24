@@ -98,7 +98,11 @@ export const HANDLERS: Record<CommandId, CommandHandler> = {
   },
 
   today: {
-    run: async (_args, ctx) => ({ reply: summary(ctx) }),
+    run: async (_args, ctx) => {
+      // A /dzis typed before the task list arrived waits for it (or goes without it when it cannot be read).
+      await loadedTasks().catch(() => null);
+      return { reply: summary(ctx) };
+    },
   },
 
   undo: {

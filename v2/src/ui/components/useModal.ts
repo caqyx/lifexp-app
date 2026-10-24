@@ -14,12 +14,24 @@ import { useEffect, useRef } from 'preact/hooks';
 
 const HISTORY_KEY = 'lifexpModal';
 let counter = 0;
-/** Layers on their way out; while any is, taps are held off the page (ui/base.css). */
+/** Layers on their way out; while any is, a transparent guard takes the taps (ui/base.css). */
 let leaving = 0;
+let guard: HTMLElement | null = null;
 
+/**
+ * A real element, not `pointer-events: none` on the page: a tap on it is seen (and
+ * a test or a script clicking the page waits until it is gone) instead of vanishing.
+ */
 function leave(delta: 1 | -1) {
   leaving += delta;
-  document.documentElement.toggleAttribute('data-modal-closing', leaving > 0);
+  if (leaving > 0 && !guard) {
+    guard = document.createElement('div');
+    guard.className = 'ui-modal-guard';
+    document.body.append(guard);
+  } else if (leaving <= 0 && guard) {
+    guard.remove();
+    guard = null;
+  }
 }
 
 function topEntryId(): string | null {
@@ -76,7 +88,7 @@ export function useModal(open: boolean, onClose: () => void) {
       // stays on screen for its exit: `transition: overlay, display … allow-discrete`
       // in its CSS holds it (and its backdrop) in the top layer until the animation
       // is over, where that is supported; elsewhere it just goes. Taps are held off
-      // the page meanwhile (ui/base.css), so one lands nowhere, not on what slides past.
+      // the page meanwhile by a guard (ui/base.css), so one lands nowhere, not on what slides past.
       closingOurselves.current = true;
       dialog.close();
       leave(1);
