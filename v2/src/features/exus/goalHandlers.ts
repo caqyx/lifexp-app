@@ -79,9 +79,10 @@ export const GOAL_HANDLERS = {
       try {
         const result = await saveGoal(uid, { type: target.type, name, target: target.target }, profile.goals, null);
         if (!result.ok) return { reply: saveProblem(result.problem) };
-        const { id } = result;
+        // The count is the transaction's, not the profile snapshot's: two quick /cel would both see the old list.
+        const { id, count } = result;
         return {
-          reply: t('exus.goal.created', { name, target: goalAmount(target.type, target.target, locale()), count: profile.goals.length + 1, max: GOALS_MAX }),
+          reply: t('exus.goal.created', { name, target: goalAmount(target.type, target.target, locale()), count, max: GOALS_MAX }),
           write: done(t('goals.added')),
           // A new goal has put aside nothing, so deleting it gives back nothing: no side effects.
           undo: { what: t('exus.undoWhat.create-goal', { name }), run: () => removeGoal(uid, { id }).then(() => undefined) },

@@ -17,6 +17,8 @@ import { formatMoney } from '@/lib/money';
 import { createTask, removeCreatedTask } from '@/services/tasks';
 import { tasks } from '@/stores/tasks';
 import { today as todaySources } from '@/stores/today';
+import { ACTIVITY_HANDLERS } from './activityHandlers';
+import { CHORE_HANDLERS } from './choreHandlers';
 import { GOAL_HANDLERS } from './goalHandlers';
 import { MONEY_HANDLERS } from './moneyHandlers';
 import { syntax } from './syntax';
@@ -142,4 +144,8 @@ export const HANDLERS: Record<CommandId, CommandHandler> = {
   ...GOAL_HANDLERS,
 
   ...MONEY_HANDLERS,
+
+  ...CHORE_HANDLERS,
+
+  ...ACTIVITY_HANDLERS,
 };

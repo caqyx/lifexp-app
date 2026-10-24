@@ -26,8 +26,8 @@ import {
 } from '@/domain/activity';
 
 export type SaveActivityResult =
-  | { ok: true; points: number; earned: number }
-  | { ok: false; problem: ActivityProblem | 'dailyLimit' };
+  | { ok: true; points: number; earned: number; id: string; limit: number }
+  | { ok: false; problem: ActivityProblem | 'dailyLimit'; limit?: number };
 
 /** v1 logActivity(): the chosen definition's rate, the time, an optional note. */
 export async function saveActivity(
@@ -62,7 +62,7 @@ export async function saveActivity(
 }
 
 /** G11: the entry goes and its points come back off; resolves to the points taken back. */
-export function removeActivity(uid: string, activity: Activity): Promise<number> {
+export function removeActivity(uid: string, activity: Pick<Activity, 'id'>): Promise<number> {
   return deleteActivity(uid, activity.id);
 }
 

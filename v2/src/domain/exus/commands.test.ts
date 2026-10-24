@@ -127,7 +127,7 @@ describe('the money commands', () => {
     ['/wydatek 5 jedzenie obiad', { amount: 500, rest: 'jedzenie obiad' }, []],
     ['/wydatek obiad jedzenie 12,50', { amount: 1250, rest: 'obiad jedzenie' }, []],
     ['/wydatek 20 zł gry wczoraj', { amount: 2000, date: '2026-10-08', rest: 'gry' }, []],
-    ['/wplyw 1 500 PLN kieszonkowe 12.10', { amount: 150000, date: '2026-10-12', rest: 'kieszonkowe' }, []],
+    ['/wplyw 1 500 PLN kieszonkowe 12.10.2026', { amount: 150000, date: '2026-10-12', rest: 'kieszonkowe' }, []],
     ['/wydatek 5 kategoria="Nowa rzecz" kupno', { amount: 500, category: 'Nowa rzecz', rest: 'kupno' }, []],
     ['/wydatek 5 pkt gry', { rest: '5pkt gry' }, ['amount']],
     ['/wydatek jedzenie', { rest: 'jedzenie' }, ['amount']],
@@ -136,11 +136,111 @@ describe('the money commands', () => {
     expect(parse(input)).toMatchObject({ args, missing });
   });
 
+  // 2026-10-09 is a Friday. A bare N.NN is an amount in a command with a money slot, never 5 October.
+  it.each([
+    ['/wydatek 5.10 jedzenie', { amount: 510, rest: 'jedzenie' }],
+    ['/wydatek jedzenie 5.1', { amount: 510, rest: 'jedzenie' }],
+    ['/wydatek 12.10 gry', { amount: 1210, rest: 'gry' }],
+    ['/wplyw 31.12', { amount: 3112 }],
+    ['/wplyw 5.10zł', { amount: 510 }],
+    ['/wydatek 5 gry dziś', { amount: 500, date: '2026-10-09', rest: 'gry' }],
+    ['/wydatek 5 gry wczoraj', { amount: 500, date: '2026-10-08', rest: 'gry' }],
+    ['/wydatek 5 gry pojutrze', { amount: 500, date: '2026-10-11', rest: 'gry' }],
+    ['/wydatek 5 gry pn', { amount: 500, date: '2026-10-12', rest: 'gry' }],
+    ['/wydatek 5 gry 12.10.2026', { amount: 500, date: '2026-10-12', rest: 'gry' }],
+    ['/wydatek 5 gry 2026-10-12', { amount: 500, date: '2026-10-12', rest: 'gry' }],
+    ['/wydatek 5 gry +3d', { amount: 500, date: '2026-10-12', rest: 'gry' }],
+    ['/wydatek 5.10 gry 12.10.2026', { amount: 510, date: '2026-10-12', rest: 'gry' }],
+  ])('%s', (input, args) => {
+    const parsed = parse(input);
+    expect(parsed.args).toEqual(args);
+    expect(parsed.missing).toEqual([]);
+  });
+
+  it('keeps "12.10" a date in a command without a money slot', () => {
+    expect(parse('/zadanie Kupić mleko 12.10')).toMatchObject({ args: { text: 'Kupić mleko', due: '2026-10-12' }, missing: [] });
+  });
+
+  it('never reads the short day-month in any command that has both a money and a date slot', () => {
+    const withBoth = COMMANDS.filter((c) => {
+      const slots = c.slots(TODAY);
+      return slots.some((s) => s.type === 'money') && slots.some((s) => s.type === 'date');
+    });
+    expect(withBoth.map((c) => c.id)).toEqual(expect.arrayContaining(['add-money', 'remove-money']));
+    for (const spec of withBoth) {
+      for (const slot of spec.slots(TODAY).filter((s) => s.type === 'date')) {
+        for (const token of ['5.10', '5.1', '12.10', '1.1']) expect(slot.recognize?.(token), `${spec.id} ${token}`).toBeUndefined();
+        expect(slot.recognize?.('12.10.2026')).toBe('2026-10-12');
+      }
+    }
+  });
+
   it('/usun-transakcje takes nothing, "ostatnia" or a text; /kategoria needs a name', () => {
     expect(parse('/usun-transakcje')).toMatchObject({ args: {}, missing: [] });
     expect(parse('/usun-transakcje ostatnia')).toMatchObject({ args: { ref: 'ostatnia' }, missing: [] });
     expect(parse('/kategoria Sport')).toMatchObject({ args: { name: 'Sport' }, missing: [] });
     expect(parse('/kategoria')).toMatchObject({ missing: ['name'] });
+  });
+});
+
+describe('the chore and XP commands', () => {
+  const parse = (input: string) => {
+    const parsed = parseInput(input, TODAY, COMMANDS);
+    if (parsed.kind !== 'command') throw new Error(input);
+    return parsed;
+  };
+  const MODULES = { enabledModules: null, disabledModules: null };
+
+  it('are found by id and alias, with and without Polish letters, in their modules and risks', () => {
+    for (const [name, id, module, risk] of [
+      ['obowiazek', 'complete-chore', 'chores', 'write'],
+      ['OBOWIĄZEK', 'complete-chore', 'chores', 'write'],
+      ['obowiazki', 'chores', 'chores', 'read'],
+      ['rozlicz', 'settle-chores', 'chores', 'destructive'],
+      ['settle-chores', 'settle-chores', 'chores', 'destructive'],
+      ['aktywność', 'log-activity', 'stats', 'write'],
+      ['seria', 'streak', 'stats', 'read'],
+      ['statystyki', 'stats', 'stats', 'read'],
+      ['co-teraz', 'what-now', 'stats', 'read'],
+      ['what-now', 'what-now', 'stats', 'read'],
+    ] as const) {
+      expect(findCommand(name, COMMANDS), name).toMatchObject({ id, module, risk });
+    }
+  });
+
+  it('vanish with their module', () => {
+    const ALL = ['chores', 'money', 'games', 'stats', 'notes', 'aichat'];
+    const ids = (off: string) => availableCommands({ enabledModules: ALL.filter((m) => m !== off), disabledModules: [off] }).map((c) => c.id);
+    expect(ids('chores')).toEqual(expect.arrayContaining(['log-activity', 'streak', 'stats', 'what-now', 'add-money']));
+    for (const gone of ['complete-chore', 'chores', 'settle-chores']) expect(ids('chores')).not.toContain(gone);
+    for (const gone of ['log-activity', 'streak', 'stats', 'what-now']) expect(ids('stats')).not.toContain(gone);
+    expect(availableCommands(MODULES).map((c) => c.id)).toEqual(COMMANDS.map((c) => c.id));
+  });
+
+  it.each([
+    ['/obowiazek zmywarki', { chore: 'zmywarki' }, []],
+    ['/obowiazek zmywarki wczoraj', { chore: 'zmywarki', when: 'yesterday' }, []],
+    ['/obowiazek wczoraj Odkurzanie schodów', { chore: 'Odkurzanie schodów', when: 'yesterday' }, []],
+    ['/obowiazek "Opróżnienie zmywarki" dzis', { chore: 'Opróżnienie zmywarki', when: 'today' }, []],
+    ['/obowiazek', {}, ['chore']],
+    ['/aktywnosc nauka 60', { type: 'nauka', duration: 60 }, []],
+    ['/aktywnosc 1h30 cwiczenia trening nóg', { type: 'cwiczenia trening nóg', duration: 90 }, []],
+    ['/aktywnosc nauka', { type: 'nauka' }, ['duration']],
+    ['/aktywnosc 60', { duration: 60 }, ['type']],
+    ['/aktywnosc', {}, ['type', 'duration']],
+    ['/statystyki', {}, []],
+    ['/statystyki 30d', { period: 30 }, []],
+    ['/statystyki 7D', { period: 7 }, []],
+    ['/co-teraz 30', { duration: 30 }, []],
+    ['/co-teraz 1,5h', { duration: 90 }, []],
+    ['/co-teraz', {}, ['duration']],
+    ['/seria', {}, []],
+    ['/rozlicz', {}, []],
+    ['/obowiazki', {}, []],
+  ])('%s', (input, args, missing) => {
+    const parsed = parse(input);
+    expect(parsed.args).toEqual(args);
+    expect(parsed.missing).toEqual(missing);
   });
 });
 

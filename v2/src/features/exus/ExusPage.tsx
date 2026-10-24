@@ -10,6 +10,7 @@ import { t } from '@/i18n';
 import { localDayKey } from '@/lib/dates';
 import { prepareMoney } from '@/services/money';
 import { watchMoney } from '@/stores/money';
+import { watchStats } from '@/stores/stats';
 import { account } from '@/stores/session';
 import { watchTasks } from '@/stores/tasks';
 import { watchToday } from '@/stores/today';
@@ -38,7 +39,7 @@ interface Pending {
 }
 
 /** The slots a reply can name as missing (exus.slots). */
-type SlotName = 'text' | 'due' | 'name' | 'target' | 'goal' | 'amount';
+type SlotName = 'text' | 'due' | 'name' | 'target' | 'goal' | 'amount' | 'chore' | 'type' | 'duration';
 
 let nextId = 1;
 
@@ -51,6 +52,9 @@ export default function ExusPage() {
   const moneyOn = current ? isModuleOn('money', current.profile) : false;
   const incomeCounted = current ? current.profile.moneyIncomeAllTime !== null : true;
   useEffect(() => (uid && moneyOn ? watchMoney(uid) : undefined), [uid, moneyOn]);
+  // /statystyki reads what the Stats screen reads (the newest 50 activities and their type names).
+  const statsOn = current ? isModuleOn('stats', current.profile) : false;
+  useEffect(() => (uid && statsOn ? watchStats(uid) : undefined), [uid, statsOn]);
   useEffect(() => {
     if (uid && moneyOn) prepareMoney(uid, incomeCounted).catch(() => {});
   }, [uid, moneyOn]);

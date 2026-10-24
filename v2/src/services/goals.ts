@@ -13,10 +13,10 @@ import {
   type GoalProblem,
 } from '@/domain/goals';
 
-/** `id`: the goal that was made or changed (Ex-us undoes a new goal by it). */
-export type GoalSaveResult = { ok: true; id: string } | { ok: false; problem: GoalProblem | 'notEnoughBalance' };
+/** `id`: the goal that was made or changed (Ex-us undoes a new goal by it); `count`: the goals the account has now, as the transaction saw them. */
+export type GoalSaveResult = { ok: true; id: string; count: number } | { ok: false; problem: GoalProblem | 'notEnoughBalance' };
 
-const outcome = (result: GoalOutcome, id: string): GoalSaveResult => (result.ok ? { ok: true, id } : result);
+const outcome = (result: GoalOutcome, id: string): GoalSaveResult => (result.ok ? { ok: true, id, count: result.count } : result);
 
 /** v1 saveGoal(): a new goal, or a new name and amount for an existing one (its type stays). */
 export async function saveGoal(uid: string, draft: GoalDraft, goals: readonly Goal[], editing: Goal | null): Promise<GoalSaveResult> {

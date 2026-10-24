@@ -21,7 +21,8 @@ function rawGoals(data: DocumentData | undefined): DocumentData[] {
 
 const indexOf = (goals: DocumentData[], id: string) => goals.findIndex((g) => g?.id === id);
 
-export type GoalOutcome = { ok: true } | { ok: false; problem: 'limit' | 'notEnoughBalance' };
+/** `count`: how many goals the account has once the transaction is done (the server's list, not a snapshot). */
+export type GoalOutcome = { ok: true; count: number } | { ok: false; problem: 'limit' | 'notEnoughBalance' };
 
 /** G7.1: a new goal at the end, at most three (checked against the server's list). */
 export function addGoal(uid: string, goal: { id: string; name: string; type: GoalType; target: number }): Promise<GoalOutcome> {
@@ -30,7 +31,7 @@ export function addGoal(uid: string, goal: { id: string; name: string; type: Goa
     const goals = rawGoals(user.data());
     if (goals.length >= GOALS_MAX) return { ok: false, problem: 'limit' };
     tx.update(userOf(uid), { goals: [...goals, newGoalData(goal)] });
-    return { ok: true };
+    return { ok: true, count: goals.length + 1 };
   });
 }
 
@@ -40,11 +41,11 @@ export function editGoal(uid: string, id: string, change: { name: string; target
     const user = await tx.get(userOf(uid));
     const goals = rawGoals(user.data());
     const i = indexOf(goals, id);
-    if (i < 0) return { ok: true };
+    if (i < 0) return { ok: true, count: goals.length };
     const type: GoalType = goals[i]?.type === 'money' ? 'money' : 'points';
     goals[i] = { ...goals[i], name: change.name, amount: goalAmountData(type, change.target), celebrated: false };
     tx.update(userOf(uid), { goals });
-    return { ok: true };
+    return { ok: true, count: goals.length };
   });
 }
 
@@ -56,14 +57,14 @@ export function depositToGoal(uid: string, id: string, grosze: number): Promise<
     const balance = await tx.get(balanceRef);
     const goals = rawGoals(user.data());
     const i = indexOf(goals, id);
-    if (i < 0 || goals[i]?.type !== 'money') return { ok: true };
+    if (i < 0 || goals[i]?.type !== 'money') return { ok: true, count: goals.length };
     const current = balanceIn(balance);
     if (!depositFits(current, grosze)) return { ok: false, problem: 'notEnoughBalance' };
     const saved = groszeFromZloty(numberOr(goals[i]?.saved));
     goals[i] = { ...goals[i], saved: zlotyFromGrosze(saved + grosze) };
     tx.update(userOf(uid), { goals });
     writeBalance(tx, balanceRef, balance, current - grosze);
-    return { ok: true };
+    return { ok: true, count: goals.length };
   });
 }
 
@@ -75,12 +76,12 @@ export function deleteGoal(uid: string, id: string): Promise<GoalOutcome> {
     const balance = await tx.get(balanceRef);
     const goals = rawGoals(user.data());
     const i = indexOf(goals, id);
-    if (i < 0) return { ok: true };
+    if (i < 0) return { ok: true, count: goals.length };
     const [goal] = goalsFromData([goals[i]]);
     const refund = goal ? refundOnDelete(goal) : 0;
     tx.update(userOf(uid), { goals: goals.filter((_, j) => j !== i) });
     if (refund > 0) writeBalance(tx, balanceRef, balance, balanceIn(balance) + refund);
-    return { ok: true };
+    return { ok: true, count: goals.length - 1 };
   });
 }
 
