@@ -43,6 +43,14 @@ describe('parseInput', () => {
     if (parsed.kind === 'command') expect(parsed.spec.id).toBe('create-task');
   });
 
+  it('reads /cofnij, in any case and as /undo', () => {
+    for (const input of ['/cofnij', '/COFNIJ', '/undo']) {
+      const parsed = parseInput(input, TODAY, COMMANDS);
+      expect(parsed).toMatchObject({ kind: 'command', args: {}, missing: [] });
+      if (parsed.kind === 'command') expect(parsed.spec).toMatchObject({ id: 'undo', risk: 'write', module: null });
+    }
+  });
+
   it('reads /pomoc with the command asked about', () => {
     expect(parseInput('/pomoc zadanie', TODAY, COMMANDS)).toMatchObject({ kind: 'command', args: { command: 'zadanie' }, missing: [] });
   });
@@ -52,7 +60,7 @@ describe('palette', () => {
   const ids = (draft: string) => palette(draft, COMMANDS).suggestions.map((c) => c.id);
 
   it('shows every command for a bare "/", nothing for plain text', () => {
-    expect(ids('/')).toEqual(['help', 'today', 'create-task']);
+    expect(ids('/')).toEqual(['help', 'today', 'undo', 'create-task']);
     expect(ids('zadanie')).toEqual([]);
   });
 
@@ -60,6 +68,7 @@ describe('palette', () => {
     expect(ids('/za')).toEqual(['create-task']);
     expect(ids('/DZ')).toEqual(['today']);
     expect(ids('/task')).toEqual(['create-task']);
+    expect(ids('/cof')).toEqual(['undo']);
     expect(ids('/xyz')).toEqual([]);
   });
 

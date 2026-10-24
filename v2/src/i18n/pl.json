@@ -1224,6 +1224,7 @@
     "commands": {
       "help": "Lista komend albo opis jednej",
       "today": "Podsumowanie dnia",
+      "undo": "Cofnij ostatni zapis z tej rozmowy",
       "create-task": "Nowe zadanie"
     },
     "missing": "Brakuje: {{fields}}.\n{{syntax}}",
@@ -1245,12 +1246,22 @@
       "dueRequired": "Podaj termin, np. jutro albo pt.",
       "dueInPast": "Termin nie może być w przeszłości."
     },
-    "undone": "Cofnięto.",
     "args": {
       "help": "[komenda]",
       "create-task": "<treść> <termin> [S/M/L]"
     },
     "paletteLabel": "Komendy pasujące do wpisu",
-    "tasksFailed": "Nie udało się wczytać zadań. Sprawdź połączenie i spróbuj ponownie."
+    "tasksFailed": "Nie udało się wczytać zadań. Sprawdź połączenie i spróbuj ponownie.",
+    "undoneWhat": "Cofnięto: {{what}}.",
+    "undoWhat": {
+      "create-task": "zadanie „{{text}}”"
+    },
+    "nothingToUndo": "Nie ma nic do cofnięcia.",
+    "undoFailed": "Nie udało się cofnąć. Sprawdź połączenie i spróbuj ponownie.",
+    "saved": "Zapisano.",
+    "failed": "Nie udało się wykonać komendy. Spróbuj ponownie.",
+    "confirmTitle": "Wykonać /{{name}}?",
+    "confirm": "Wykonaj",
+    "cancelled": "Anulowano, nic się nie zmieniło."
   }
 }
