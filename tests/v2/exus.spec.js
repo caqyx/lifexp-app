@@ -1399,6 +1399,8 @@ test('/modul pieniadze off hides Money and its commands; "Cofnij" brings it back
   await expect(tabbar.getByRole('link', { name: 'Pieniądze' })).toHaveCount(0);
   await send(page, '/modul money on');
   await expect(replies(page).last()).toHaveText('Moduł Pieniądze jest włączony.');
+  // The commands follow the profile, which arrives a moment after the reply.
+  await expect(tabbar.getByRole('link', { name: 'Pieniądze' })).toBeVisible();
   await send(page, '/saldo');
   await expect(replies(page).last()).toContainText('Saldo');
 });
