@@ -8,6 +8,11 @@
   background: var(--color-surface);
   color: var(--color-text);
   box-shadow: var(--shadow-2);
+  /* Closing closes the dialog at once (the page is usable again); these hold it, in the
+     top layer, on screen for its exit animation. */
+  transition:
+    overlay var(--duration-base) allow-discrete,
+    display var(--duration-base) allow-discrete;
 }
 
 .ui-confirm::backdrop {

@@ -13,9 +13,10 @@ import {
   type GoalProblem,
 } from '@/domain/goals';
 
-export type GoalSaveResult = { ok: true } | { ok: false; problem: GoalProblem | 'notEnoughBalance' };
+/** `id`: the goal that was made or changed (Ex-us undoes a new goal by it). */
+export type GoalSaveResult = { ok: true; id: string } | { ok: false; problem: GoalProblem | 'notEnoughBalance' };
 
-const outcome = (result: GoalOutcome): GoalSaveResult => result;
+const outcome = (result: GoalOutcome, id: string): GoalSaveResult => (result.ok ? { ok: true, id } : result);
 
 /** v1 saveGoal(): a new goal, or a new name and amount for an existing one (its type stays). */
 export async function saveGoal(uid: string, draft: GoalDraft, goals: readonly Goal[], editing: Goal | null): Promise<GoalSaveResult> {
@@ -23,19 +24,20 @@ export async function saveGoal(uid: string, draft: GoalDraft, goals: readonly Go
   if (problem) return { ok: false, problem };
   const name = draft.name.trim();
   const target = draft.target ?? 0;
-  if (editing) return outcome(await editGoal(uid, editing.id, { name, target }));
+  if (editing) return outcome(await editGoal(uid, editing.id, { name, target }), editing.id);
   if (!canAddGoal(goals)) return { ok: false, problem: 'limit' };
-  return outcome(await addGoal(uid, { id: newGoalId(), name, type: draft.type, target }));
+  const id = newGoalId();
+  return outcome(await addGoal(uid, { id, name, type: draft.type, target }), id);
 }
 
 /** G7.2: grosze from the Money balance onto a money goal. */
 export async function depositGoal(uid: string, goal: Goal, grosze: number | null): Promise<GoalSaveResult> {
   if (grosze === null || grosze <= 0) return { ok: false, problem: 'targetRequired' };
-  return outcome(await depositToGoal(uid, goal.id, grosze));
+  return outcome(await depositToGoal(uid, goal.id, grosze), goal.id);
 }
 
 /** G7.3: what was put aside goes back to the balance. */
-export function removeGoal(uid: string, goal: Goal): Promise<GoalOutcome> {
+export function removeGoal(uid: string, goal: Pick<Goal, 'id'>): Promise<GoalOutcome> {
   return deleteGoal(uid, goal.id);
 }
 

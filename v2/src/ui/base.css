@@ -12,6 +12,14 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* A modal layer on its way out (components/useModal.ts): the page can be typed into
+   already, but a tap lands on this guard, not on what slides past. */
+.ui-modal-guard {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+}
+
 body {
   margin: 0;
   background: var(--color-bg);

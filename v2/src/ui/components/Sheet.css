@@ -15,7 +15,12 @@
   color: var(--color-text);
   box-shadow: var(--shadow-2);
   transform: translateY(var(--drag-offset));
-  transition: transform var(--duration-base) var(--ease-standard);
+  transition:
+    transform var(--duration-base) var(--ease-standard),
+    /* Closing closes the dialog at once (the page is usable again); these hold it, in the
+       top layer, on screen for its exit animation. */
+    overlay var(--duration-base) allow-discrete,
+    display var(--duration-base) allow-discrete;
 }
 
 .ui-sheet.is-dragging {

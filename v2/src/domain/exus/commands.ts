@@ -4,13 +4,22 @@
 // text is read. Grows a few commands per PR (stage 5a).
 import { isModuleOn, type ModuleChoice, type OptionalModule } from '../modules';
 import { TASK_SIZES, type TaskSize } from '../tasks';
-import { fillSlots, missingSlots, tokenize, type SlotDef } from './parse';
-import { dateFrom, fold, oneOf } from './recognizers';
+import { fillSlots, missingSlots, tokenize, unreadNamed, type SlotDef } from './parse';
+import { amount, dateFrom, fold, oneOf } from './recognizers';
 
 /** read: runs at once; write: runs, with undo; destructive: asks first (6.6). */
 export type Risk = 'read' | 'write' | 'destructive';
 
-export type CommandId = 'help' | 'today' | 'undo' | 'create-task';
+export type CommandId =
+  | 'help'
+  | 'today'
+  | 'undo'
+  | 'create-task'
+  | 'create-goal'
+  | 'deposit-goal'
+  | 'goals'
+  | 'edit-goal'
+  | 'delete-goal';
 
 export interface CommandSpec {
   id: CommandId;
@@ -59,6 +68,53 @@ export const COMMANDS: readonly CommandSpec[] = [
       { name: 'size', type: 'enum', required: false, recognize: SIZE },
     ],
   },
+  {
+    // The unit decides the kind: "1500 zł" a money goal, "5000 pkt" a points goal.
+    id: 'create-goal',
+    aliases: ['cel'],
+    module: null,
+    risk: 'write',
+    slots: () => [
+      { name: 'name', type: 'text', required: true },
+      { name: 'target', type: 'money', required: true, recognize: amount, fromEnd: true },
+    ],
+  },
+  {
+    id: 'deposit-goal',
+    aliases: ['wplac'],
+    module: null,
+    risk: 'write',
+    slots: () => [
+      { name: 'goal', type: 'entity', required: true },
+      { name: 'amount', type: 'money', required: true, recognize: amount, fromEnd: true },
+    ],
+  },
+  {
+    id: 'goals',
+    aliases: ['cele'],
+    module: null,
+    risk: 'read',
+    slots: () => [],
+  },
+  {
+    id: 'edit-goal',
+    aliases: ['edytuj-cel'],
+    module: null,
+    risk: 'write',
+    slots: () => [
+      { name: 'goal', type: 'entity', required: true },
+      { name: 'name', type: 'text', required: false, keys: ['nazwa', 'name'], namedOnly: true },
+      { name: 'target', type: 'money', required: false, recognize: amount, keys: ['kwota', 'amount'], namedOnly: true },
+    ],
+  },
+  {
+    // Gives the money put aside back to the balance, so it asks first.
+    id: 'delete-goal',
+    aliases: ['usun-cel'],
+    module: null,
+    risk: 'destructive',
+    slots: () => [{ name: 'goal', type: 'entity', required: true }],
+  },
 ];
 
 /** The commands of the modules that are on. */
@@ -75,7 +131,14 @@ export function findCommand(name: string, commands: readonly CommandSpec[]): Com
 export type Parsed =
   | { kind: 'text'; text: string }
   | { kind: 'unknown'; name: string }
-  | { kind: 'command'; spec: CommandSpec; args: Record<string, unknown>; missing: string[] };
+  | {
+      kind: 'command';
+      spec: CommandSpec;
+      args: Record<string, unknown>;
+      missing: string[];
+      /** Slots whose `key=value` was written but could not be read. */
+      unread: string[];
+    };
 
 /** What the person typed: plain text (for the AI, stage 5b), an unknown command, or a command with its slots. */
 export function parseInput(input: string, today: string, commands: readonly CommandSpec[]): Parsed {
@@ -84,8 +147,8 @@ export function parseInput(input: string, today: string, commands: readonly Comm
   const spec = findCommand(tokenized.command, commands);
   if (!spec) return { kind: 'unknown', name: tokenized.command };
   const slots = spec.slots(today);
-  const args = fillSlots(tokenized.tokens, slots);
-  return { kind: 'command', spec, args, missing: missingSlots(slots, args) };
+  const args = fillSlots(tokenized.tokens, slots, tokenized.named);
+  return { kind: 'command', spec, args, missing: missingSlots(slots, args), unread: unreadNamed(slots, tokenized.named, args) };
 }
 
 export interface Palette {

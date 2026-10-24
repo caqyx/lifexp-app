@@ -17,6 +17,7 @@ import { formatMoney } from '@/lib/money';
 import { createTask, removeCreatedTask } from '@/services/tasks';
 import { tasks } from '@/stores/tasks';
 import { today as todaySources } from '@/stores/today';
+import { GOAL_HANDLERS } from './goalHandlers';
 import { syntax } from './syntax';
 import type { Undo, UndoStack } from './undo';
 
@@ -41,6 +42,8 @@ export interface HandlerResult {
 }
 
 export interface CommandHandler {
+  /** Asked before the confirmation: the reply when the command cannot run at all (e.g. no such goal), else null. */
+  check?: (args: Record<string, unknown>, ctx: HandlerContext) => string | null;
   run: (args: Record<string, unknown>, ctx: HandlerContext) => Promise<HandlerResult>;
   /** Destructive commands: the effect, spelled out in the confirmation dialog. */
   effect?: (args: Record<string, unknown>, ctx: HandlerContext) => string;
@@ -95,7 +98,11 @@ export const HANDLERS: Record<CommandId, CommandHandler> = {
   },
 
   today: {
-    run: async (_args, ctx) => ({ reply: summary(ctx) }),
+    run: async (_args, ctx) => {
+      // A /dzis typed before the task list arrived waits for it (or goes without it when it cannot be read).
+      await loadedTasks().catch(() => null);
+      return { reply: summary(ctx) };
+    },
   },
 
   undo: {
@@ -128,4 +135,6 @@ export const HANDLERS: Record<CommandId, CommandHandler> = {
       };
     },
   },
+
+  ...GOAL_HANDLERS,
 };
