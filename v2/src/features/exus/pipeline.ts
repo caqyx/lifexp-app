@@ -58,3 +58,8 @@ export function effectOf(spec: CommandSpec, args: Record<string, unknown>, ctx: 
 export function blockedBy(spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext): string | null {
   return HANDLERS[spec.id].check?.(args, ctx) ?? null;
 }
+
+/** Waits for the data a destructive command's question reads (a store that has not loaded yet). */
+export function readyFor(spec: CommandSpec, ctx: HandlerContext): Promise<void> {
+  return HANDLERS[spec.id].ready?.(ctx) ?? Promise.resolve();
+}

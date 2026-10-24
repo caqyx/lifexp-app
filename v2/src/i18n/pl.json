@@ -1230,7 +1230,12 @@
       "deposit-goal": "Wpłać z salda na cel pieniężny",
       "goals": "Cele i postęp",
       "edit-goal": "Zmień nazwę albo kwotę celu",
-      "delete-goal": "Usuń cel (odłożone pieniądze wracają na saldo)"
+      "delete-goal": "Usuń cel (odłożone pieniądze wracają na saldo)",
+      "add-money": "Zapisz wpływ: kwota, kategoria, notatka, data",
+      "remove-money": "Zapisz wydatek (kosztuje punkty według przelicznika)",
+      "balance": "Saldo, wydatki w tym miesiącu i pieniądze w celach",
+      "create-category": "Nowa kategoria transakcji",
+      "delete-transaction": "Usuń transakcję (saldo i punkty wracają)"
     },
     "missing": "Brakuje: {{fields}}.\n{{syntax}}",
     "slots": {
@@ -1261,14 +1266,21 @@
       "create-goal": "<nazwa> <kwota zł|pkt>",
       "deposit-goal": "<cel> <kwota>",
       "edit-goal": "<cel> [nazwa=…] [kwota=…]",
-      "delete-goal": "<cel>"
+      "delete-goal": "<cel>",
+      "add-money": "<kwota> [kategoria] [notatka] [data]",
+      "remove-money": "<kwota> [kategoria] [notatka] [data]",
+      "create-category": "<nazwa>",
+      "delete-transaction": "[ostatnia|tekst]"
     },
     "paletteLabel": "Komendy pasujące do wpisu",
     "tasksFailed": "Nie udało się wczytać zadań. Sprawdź połączenie i spróbuj ponownie.",
     "undoneWhat": "Cofnięto: {{what}}.",
     "undoWhat": {
       "create-task": "zadanie „{{text}}”",
-      "create-goal": "cel „{{name}}”"
+      "create-goal": "cel „{{name}}”",
+      "add-money": "wpływ {{amount}} ({{category}})",
+      "remove-money": "wydatek {{amount}} ({{category}})",
+      "create-category": "kategoria „{{name}}”"
     },
     "nothingToUndo": "Nie ma nic do cofnięcia.",
     "undoFailed": "Nie udało się cofnąć. Sprawdź połączenie i spróbuj ponownie.",
@@ -1296,6 +1308,32 @@
       "deleteEffectRefund": "Cel „{{name}}” zniknie z listy, a odłożone {{amount}} wróci na saldo w Pieniądzach.",
       "deleted": "Usunięto cel „{{name}}”.",
       "deletedRefund": "Usunięto cel „{{name}}”. Odłożone {{amount}} wróciło na saldo."
+    },
+    "money": {
+      "incomeSaved": "Zapisano wpływ {{amount}} w kategorii „{{category}}” ({{date}}).",
+      "incomeSavedNote": "Zapisano wpływ {{amount}} w kategorii „{{category}}” ({{date}}), notatka: „{{note}}”.",
+      "expenseSaved": "Zapisano wydatek {{amount}} w kategorii „{{category}}” ({{date}}).",
+      "expenseSavedNote": "Zapisano wydatek {{amount}} w kategorii „{{category}}” ({{date}}), notatka: „{{note}}”.",
+      "categoryCreated": "Utworzono nową kategorię „{{name}}”.",
+      "pointsLine": "Koszt w punktach: −{{points}} pkt.",
+      "categoryAmbiguous": "Pasuje kilka kategorii: {{names}}. Napisz dokładniej.",
+      "needCategory": "Podaj kategorię: {{names}}. Nową utworzysz zapisem kategoria=nazwa.",
+      "needCategoryNone": "Nie ma jeszcze żadnej kategorii. Utwórz ją zapisem kategoria=nazwa albo komendą /kategoria.",
+      "categoryTooLong": "Nazwa kategorii ma najwyżej {{max}} znaków.",
+      "noteTooLong": "Notatka ma najwyżej {{max}} znaków.",
+      "monthLimit": "Wydatki w tym miesiącu: {{spent}} z limitu {{limit}}.",
+      "monthNoLimit": "Wydatki w tym miesiącu: {{spent}} (bez limitu).",
+      "overLimit": "Limit przekroczony.",
+      "txNone": "Nie ma transakcji „{{name}}”. Wpisz „ostatnia” albo część kategorii lub notatki.",
+      "noTransactions": "Nie ma żadnych transakcji.",
+      "txAmbiguous": "Pasuje kilka transakcji. Napisz dokładniej albo wpisz „ostatnia”:",
+      "kindIncome": "wpływ",
+      "kindExpense": "wydatek",
+      "deleteWhat": "Usuniesz: {{what}}.",
+      "deleteIncomeEffect": "Saldo zmaleje o {{amount}}.",
+      "deleteExpenseEffect": "Saldo wzrośnie o {{amount}}.",
+      "deletePoints": "{{points}} pkt wróci na konto.",
+      "deleted": "Usunięto: {{what}}."
     }
   }
 }

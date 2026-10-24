@@ -18,6 +18,7 @@ import { createTask, removeCreatedTask } from '@/services/tasks';
 import { tasks } from '@/stores/tasks';
 import { today as todaySources } from '@/stores/today';
 import { GOAL_HANDLERS } from './goalHandlers';
+import { MONEY_HANDLERS } from './moneyHandlers';
 import { syntax } from './syntax';
 import type { Undo, UndoStack } from './undo';
 
@@ -42,6 +43,8 @@ export interface HandlerResult {
 }
 
 export interface CommandHandler {
+  /** Resolves once the data `check` and `effect` read has loaded (they are synchronous); rejects when it cannot. */
+  ready?: (ctx: HandlerContext) => Promise<void>;
   /** Asked before the confirmation: the reply when the command cannot run at all (e.g. no such goal), else null. */
   check?: (args: Record<string, unknown>, ctx: HandlerContext) => string | null;
   run: (args: Record<string, unknown>, ctx: HandlerContext) => Promise<HandlerResult>;
@@ -137,4 +140,6 @@ export const HANDLERS: Record<CommandId, CommandHandler> = {
   },
 
   ...GOAL_HANDLERS,
+
+  ...MONEY_HANDLERS,
 };
