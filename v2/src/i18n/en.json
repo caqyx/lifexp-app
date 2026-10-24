@@ -1230,7 +1230,12 @@
       "deposit-goal": "Put money from the balance onto a money goal",
       "goals": "The goals and how far they are",
       "edit-goal": "Change the name or the amount of a goal",
-      "delete-goal": "Delete a goal (money put aside goes back to the balance)"
+      "delete-goal": "Delete a goal (money put aside goes back to the balance)",
+      "add-money": "Record an income: amount, category, note, date",
+      "remove-money": "Record an expense (it costs points at the general rate)",
+      "balance": "The balance, this month's expenses and money put aside in goals",
+      "create-category": "A new transaction category",
+      "delete-transaction": "Delete a transaction (balance and points come back)"
     },
     "missing": "Missing: {{fields}}.\n{{syntax}}",
     "slots": {
@@ -1261,14 +1266,21 @@
       "create-goal": "<name> <amount zł|pkt>",
       "deposit-goal": "<goal> <amount>",
       "edit-goal": "<goal> [name=…] [amount=…]",
-      "delete-goal": "<goal>"
+      "delete-goal": "<goal>",
+      "add-money": "<amount> [category] [note] [date]",
+      "remove-money": "<amount> [category] [note] [date]",
+      "create-category": "<name>",
+      "delete-transaction": "[last|text]"
     },
     "paletteLabel": "Commands matching what is typed",
     "tasksFailed": "Could not load the tasks. Check the connection and try again.",
     "undoneWhat": "Undone: {{what}}.",
     "undoWhat": {
       "create-task": "the task \"{{text}}\"",
-      "create-goal": "the goal \"{{name}}\""
+      "create-goal": "the goal \"{{name}}\"",
+      "add-money": "the income {{amount}} ({{category}})",
+      "remove-money": "the expense {{amount}} ({{category}})",
+      "create-category": "the category \"{{name}}\""
     },
     "nothingToUndo": "There is nothing to undo.",
     "undoFailed": "Could not undo. Check the connection and try again.",
@@ -1296,6 +1308,32 @@
       "deleteEffectRefund": "The goal \"{{name}}\" will leave the list and the {{amount}} put aside goes back to the Money balance.",
       "deleted": "Deleted the goal \"{{name}}\".",
       "deletedRefund": "Deleted the goal \"{{name}}\". The {{amount}} put aside went back to the balance."
+    },
+    "money": {
+      "incomeSaved": "Recorded an income of {{amount}} in \"{{category}}\" ({{date}}).",
+      "incomeSavedNote": "Recorded an income of {{amount}} in \"{{category}}\" ({{date}}), note: \"{{note}}\".",
+      "expenseSaved": "Recorded an expense of {{amount}} in \"{{category}}\" ({{date}}).",
+      "expenseSavedNote": "Recorded an expense of {{amount}} in \"{{category}}\" ({{date}}), note: \"{{note}}\".",
+      "categoryCreated": "Created the new category \"{{name}}\".",
+      "pointsLine": "Cost in points: −{{points}} pkt.",
+      "categoryAmbiguous": "Several categories fit: {{names}}. Be more precise.",
+      "needCategory": "Give a category: {{names}}. Create a new one by writing category=name.",
+      "needCategoryNone": "There are no categories yet. Create one by writing category=name or with the /create-category command.",
+      "categoryTooLong": "A category name has at most {{max}} characters.",
+      "noteTooLong": "A note has at most {{max}} characters.",
+      "monthLimit": "Expenses this month: {{spent}} of the {{limit}} limit.",
+      "monthNoLimit": "Expenses this month: {{spent}} (no limit).",
+      "overLimit": "The limit is exceeded.",
+      "txNone": "There is no transaction \"{{name}}\". Type \"last\" or part of a category or note.",
+      "noTransactions": "There are no transactions.",
+      "txAmbiguous": "Several transactions fit. Be more precise or type \"last\":",
+      "kindIncome": "income",
+      "kindExpense": "expense",
+      "deleteWhat": "You are deleting: {{what}}.",
+      "deleteIncomeEffect": "The balance will go down by {{amount}}.",
+      "deleteExpenseEffect": "The balance will go up by {{amount}}.",
+      "deletePoints": "{{points}} pkt will come back to your account.",
+      "deleted": "Deleted: {{what}}."
     }
   }
 }

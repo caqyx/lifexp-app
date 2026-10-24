@@ -13,6 +13,7 @@ import {
   restoreMoneyCategory,
   seedMoneyCategoriesIfEmpty,
   setMonthlyLimit,
+  type AddTxOutcome,
   type TxOutcome,
 } from '@/data/repos/money';
 import {
@@ -31,7 +32,7 @@ import {
 } from '@/domain/money';
 import { utcDayKey } from '@/lib/dates';
 
-export type TxSaveResult = { ok: true; pointsCost: number } | { ok: false; problem: TxProblem };
+export type TxSaveResult = Extract<AddTxOutcome, { ok: true }> | { ok: false; problem: TxProblem };
 
 /**
  * v1 saveMoneyTx(): checked, then saved with its category (an existing one of the
@@ -62,8 +63,13 @@ export function removeTransaction(uid: string, tx: MoneyTx): Promise<TxOutcome> 
   return deleteMoneyTx(uid, tx.id);
 }
 
-/** Accounts already prepared since the app started (v1: once per page load). */
-const prepared = new Set<string>();
+/** Deletes a transaction by id (undoing one just added); same rules as removeTransaction(). */
+export function removeTransactionById(uid: string, id: string): Promise<TxOutcome> {
+  return deleteMoneyTx(uid, id);
+}
+
+/** Accounts already prepared since the app started (v1: once per page load); a call while one is running shares it. */
+const prepared = new Map<string, Promise<void>>();
 
 /**
  * v1 loadMoney() on opening Money: the settings and balance documents, the starting
@@ -71,16 +77,17 @@ const prepared = new Set<string>();
  * start; a failure (offline) leaves it for the next time.
  */
 export async function prepareMoney(uid: string, incomeCounted: boolean): Promise<void> {
-  if (prepared.has(uid)) return;
-  prepared.add(uid);
-  try {
+  const running = prepared.get(uid);
+  if (running) return running;
+  const job = (async () => {
     await ensureMoneyDocs(uid);
     await seedMoneyCategoriesIfEmpty(uid);
     if (!incomeCounted) await backfillMoneyIncome(uid);
-  } catch (error) {
-    prepared.delete(uid);
-    throw error;
-  }
+  })();
+  prepared.set(uid, job);
+  // Nobody waiting is not an unhandled rejection; the callers see it through `job`.
+  job.catch(() => prepared.delete(uid));
+  return job;
 }
 
 // ── Categories and the limit (single documents: queued offline like any write) ──
@@ -95,14 +102,19 @@ export function saveMonthlyLimit(
   return { ok: true, limit, saved: setMonthlyLimit(uid, limit) };
 }
 
-export type CategorySaveResult = { ok: true; saved: Promise<void> } | { ok: false; problem: CategoryProblem };
+export type CategorySaveResult = { ok: true; id: string; saved: Promise<void> } | { ok: false; problem: CategoryProblem };
 
 /** v1 addMoneyCategory(): a new name gets the next colour. */
 export function createCategory(uid: string, name: string, categories: readonly MoneyCategory[]): CategorySaveResult {
   const problem = categoryProblem(name, categories);
   if (problem) return { ok: false, problem };
-  const { saved } = addMoneyCategory(uid, { name: name.trim(), color: nextCategoryColor(categories) });
-  return { ok: true, saved };
+  const { id, saved } = addMoneyCategory(uid, { name: name.trim(), color: nextCategoryColor(categories) });
+  return { ok: true, id, saved };
+}
+
+/** Undo of createCategory(): transactions keep category names, so nothing else changes. */
+export function removeCreatedCategory(uid: string, id: string): Promise<void> {
+  return removeMoneyCategory(uid, id);
 }
 
 /** v1 deleteMoneyCategory() (there behind a confirmation; here with undo, D8). */

@@ -46,6 +46,11 @@ test('the menu opens Ex-us; /pomoc lists the commands, other text and unknown co
   await expect(log(page)).toContainText('/cele — Cele i postęp');
   await expect(log(page)).toContainText('/edytuj-cel <cel> [nazwa=…] [kwota=…] — Zmień nazwę albo kwotę celu');
   await expect(log(page)).toContainText('/usun-cel <cel> — Usuń cel');
+  await expect(log(page)).toContainText('/wplyw <kwota> [kategoria] [notatka] [data] — Zapisz wpływ');
+  await expect(log(page)).toContainText('/wydatek <kwota> [kategoria] [notatka] [data] — Zapisz wydatek');
+  await expect(log(page)).toContainText('/saldo — Saldo, wydatki w tym miesiącu i pieniądze w celach');
+  await expect(log(page)).toContainText('/kategoria <nazwa> — Nowa kategoria transakcji');
+  await expect(log(page)).toContainText('/usun-transakcje [ostatnia|tekst] — Usuń transakcję');
   await send(page, 'odłóż 50 zł na rower');
   await expect(log(page)).toContainText('Rozmowa z AI dojdzie w następnym kroku.');
   await send(page, '/latanie');
@@ -135,7 +140,7 @@ test('typing "/" opens the command palette; a tap puts the command in the field 
   const field = page.getByLabel('Wiadomość do Ex-us');
   const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
   await field.fill('/');
-  await expect(list.getByRole('button')).toHaveCount(9);
+  await expect(list.getByRole('button')).toHaveCount(14);
   await field.fill('/za');
   await expect(list.getByRole('button')).toHaveCount(1);
   await list.getByRole('button', { name: /Nowe zadanie/ }).click();
@@ -327,4 +332,242 @@ test('a message sent while the confirmation is still closing is not lost', async
     await expect(page.getByLabel('Wiadomość do Ex-us')).toHaveValue('');
   }
   await expect.poll(() => goalsOf(account.uid)).toEqual([]);
+});
+
+// ── Money commands (stage 5a-6): the same services and rules as the Money screen ──
+
+const utcToday = () => new Date().toISOString().slice(0, 10);
+const localToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const MONEY_CATEGORIES = [
+  ['cat-pocket', 'kieszonkowe', '#6c63ff'],
+  ['cat-games', 'gry', '#6c63ff'],
+  ['cat-food', 'jedzenie', '#4ecca3'],
+];
+
+/** As the Money tests: 50 zł on the balance, 120 points, three categories, the income counter at 0 (no M2). */
+async function moneyAccount(tag, { profile = {}, limit = 200 } = {}) {
+  const account = await createUser({
+    tag,
+    profile: { points: { total: 120, earnedAllTime: 300, spentAllTime: 10 }, moneyIncomeAllTime: 0, ...profile },
+  });
+  const user = db.doc(`users/${account.uid}`);
+  await user.collection('money').doc('balance').set({ current: 50 });
+  await user.collection('money').doc('settings').set({ monthlyLimit: limit, currency: 'PLN' });
+  for (const [id, name, color] of MONEY_CATEGORIES) await user.collection('moneyCategories').doc(id).set({ name, color, icon: '' });
+  return account;
+}
+
+/** Everything a transaction touches, ids and creation times aside. */
+async function moneyState(uid) {
+  const user = db.doc(`users/${uid}`);
+  const profile = (await user.get()).data();
+  const strip = (docs) =>
+    docs
+      .map((d) => {
+        const { createdAt, ...rest } = d.data();
+        return rest;
+      })
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  return {
+    balance: (await user.collection('money').doc('balance').get()).data(),
+    points: profile.points,
+    moneyIncomeAllTime: profile.moneyIncomeAllTime ?? null,
+    transactions: strip((await user.collection('moneyTransactions').get()).docs),
+    categories: strip((await user.collection('moneyCategories').get()).docs).map((c) => c.name).sort(),
+  };
+}
+
+const lunch = () => ({ type: 'expense', amount: 5, category: 'jedzenie', note: 'obiad', date: utcToday(), source: 'manual', pointsCost: 50 });
+const afterLunch = (before) => ({
+  ...before,
+  balance: { current: 45 },
+  points: { total: 70, earnedAllTime: 300, spentAllTime: 60 },
+  transactions: [lunch()],
+});
+
+test('/wydatek 5 jedzenie obiad leaves what the Money screen leaves (G5.1); /cofnij reverses it exactly', async ({ page }) => {
+  const account = await moneyAccount('exus-expense');
+  const before = await moneyState(account.uid);
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  // Typed at once, before anything has loaded: the command waits for the categories.
+  await send(page, '/wydatek obiad 5 jedzenie');
+  await expect(replies.last()).toContainText('Zapisano wydatek 5,00 zł w kategorii „jedzenie”');
+  await expect(replies.last()).toContainText('notatka: „obiad”');
+  await expect(replies.last()).toContainText('−50 pkt');
+  await expect(page.getByText('Transakcja zapisana. −50 pkt')).toBeVisible();
+  expect(await moneyState(account.uid)).toEqual(afterLunch(before));
+
+  await send(page, '/cofnij');
+  await expect(log(page)).toContainText('Cofnięto: wydatek 5,00 zł (jedzenie).');
+  await expect.poll(() => moneyState(account.uid)).toEqual(before);
+});
+
+test('/wydatek: above the balance is refused; the category is asked for; a new one is written kategoria=nazwa', async ({ page }) => {
+  const account = await moneyAccount('exus-expense-rules');
+  const before = await moneyState(account.uid);
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/wydatek 60 gry');
+  await expect(replies.last()).toHaveText('Za mało środków na saldzie.');
+  expect(await moneyState(account.uid)).toEqual(before);
+
+  await send(page, '/wydatek obiad w szkole');
+  await expect(replies.last()).toContainText('Brakuje: kwota.');
+  await send(page, '/wydatek 5 obiad w szkole');
+  await expect(replies.last()).toContainText('Podaj kategorię: ');
+  await expect(replies.last()).toContainText('kategoria=nazwa');
+  await send(page, '/wydatek 0 gry');
+  await expect(replies.last()).toHaveText('Podaj kwotę większą od zera.');
+  expect(await moneyState(account.uid)).toEqual(before);
+
+  // A word that names no category is never turned into one; an explicit name is.
+  await send(page, '/wydatek 12,50 kategoria=Sport piłka wczoraj');
+  await expect(replies.last()).toContainText('Zapisano wydatek 12,50 zł w kategorii „Sport”');
+  await expect(replies.last()).toContainText('Utworzono nową kategorię „Sport”.');
+  await expect(replies.last()).toContainText('−120 pkt');
+  await expect.poll(async () => (await moneyState(account.uid)).categories).toEqual(['Sport', 'gry', 'jedzenie', 'kieszonkowe'].sort());
+  const state = await moneyState(account.uid);
+  expect(state.balance).toEqual({ current: 37.5 });
+  expect(state.transactions).toEqual([{ type: 'expense', amount: 12.5, category: 'Sport', note: 'piłka', date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), source: 'manual', pointsCost: 120 }]);
+});
+
+test('/wplyw adds an income and the income counter; /cofnij takes it back', async ({ page }) => {
+  const account = await moneyAccount('exus-income');
+  const before = await moneyState(account.uid);
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/wplyw 20 kieszonkowe');
+  await expect(log(page)).toContainText('Zapisano wpływ 20,00 zł w kategorii „kieszonkowe”');
+  await expect.poll(() => moneyState(account.uid)).toEqual({
+    ...before,
+    balance: { current: 70 },
+    moneyIncomeAllTime: 20,
+    transactions: [{ type: 'income', amount: 20, category: 'kieszonkowe', note: '', date: utcToday(), source: 'manual', pointsCost: 0 }],
+  });
+
+  await send(page, '/cofnij');
+  await expect(log(page)).toContainText('Cofnięto: wpływ 20,00 zł (kieszonkowe).');
+  await expect.poll(() => moneyState(account.uid)).toEqual(before);
+});
+
+test('/wydatek under a CPU 6 times slower, from a cold start, still waits for the data', async ({ page }) => {
+  const account = await moneyAccount('exus-expense-slow');
+  const before = await moneyState(account.uid);
+  await openSignedIn(page, account, '#/exus');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+  await send(page, '/wydatek 5 jedzenie obiad');
+  await expect(page.getByText('Transakcja zapisana. −50 pkt')).toBeVisible();
+  await expect.poll(() => moneyState(account.uid)).toEqual(afterLunch(before));
+});
+
+test('/saldo gives the balance, this month against the limit, and what is put aside in goals', async ({ page }) => {
+  const account = await moneyAccount('exus-balance', { profile: { goals: [{ ...rower, saved: 20 }] }, limit: 20 });
+  await db.collection(`users/${account.uid}/moneyTransactions`).add({ ...lunch(), amount: 30, date: localToday(), createdAt: new Date() });
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/saldo');
+  const reply = page.locator('.exus-msg--exus').last();
+  await expect(reply).toContainText('Saldo: 50,00 zł.');
+  await expect(reply).toContainText('Wydatki w tym miesiącu: 30,00 zł z limitu 20,00 zł. Limit przekroczony.');
+  await expect(reply).toContainText('W celach: 20,00 zł');
+});
+
+test('/kategoria adds a category through the service, refuses a duplicate, and /cofnij removes it', async ({ page }) => {
+  const account = await moneyAccount('exus-category');
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/kategoria Sport');
+  await expect(replies.last()).toHaveText('Kategoria dodana: Sport');
+  await expect.poll(async () => (await moneyState(account.uid)).categories).toEqual(['Sport', 'gry', 'jedzenie', 'kieszonkowe'].sort());
+  await send(page, '/kategoria sport');
+  await expect(replies.last()).toHaveText('Taka kategoria już istnieje.');
+  await send(page, '/kategoria');
+  await expect(replies.last()).toContainText('Brakuje: nazwa.');
+  expect((await moneyState(account.uid)).categories).toHaveLength(4);
+
+  await send(page, '/cofnij');
+  await expect(log(page)).toContainText('Cofnięto: kategoria „Sport”.');
+  await expect.poll(async () => (await moneyState(account.uid)).categories).toEqual(['gry', 'jedzenie', 'kieszonkowe']);
+});
+
+test('/usun-transakcje asks first; Anuluj changes nothing, Wykonaj deletes the newest and reverses it', async ({ page }) => {
+  const account = await moneyAccount('exus-delete-tx');
+  const user = db.doc(`users/${account.uid}`);
+  const before = await moneyState(account.uid);
+  // The state after a lunch of 5 zł that cost 50 points, as the screen leaves it.
+  await user.collection('moneyTransactions').add({ ...lunch(), createdAt: new Date() });
+  await user.collection('money').doc('balance').set({ current: 45 });
+  await user.update({ 'points.total': 70, 'points.spentAllTime': 60 });
+  await openSignedIn(page, account, '#/exus');
+  const dialog = page.getByRole('alertdialog');
+
+  await send(page, '/usun-transakcje');
+  await expect(dialog).toContainText('Wykonać /usun-transakcje?');
+  await expect(dialog).toContainText('Usuniesz: wydatek 5,00 zł (jedzenie, obiad)');
+  await expect(dialog).toContainText('Saldo wzrośnie o 5,00 zł. 50 pkt wróci na konto.');
+  await dialog.getByRole('button', { name: 'Anuluj' }).click();
+  await expect(log(page)).toContainText('Anulowano, nic się nie zmieniło.');
+  expect(await moneyState(account.uid)).toEqual(afterLunch(before));
+
+  await send(page, '/usun-transakcje ostatnia');
+  await dialog.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(log(page)).toContainText('Usunięto: wydatek 5,00 zł (jedzenie, obiad)');
+  await expect.poll(() => moneyState(account.uid)).toEqual(before);
+});
+
+test('/usun-transakcje with no transactions says so at once, without a question', async ({ page }) => {
+  const account = await moneyAccount('exus-delete-none');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/usun-transakcje');
+  await expect(log(page)).toContainText('Nie ma żadnych transakcji.');
+  await expect(page.getByRole('alertdialog')).toBeHidden();
+  await send(page, '/cofnij');
+  await expect(log(page)).toContainText('Nie ma nic do cofnięcia.');
+});
+
+test('/usun-transakcje takes a text for the transaction; an income that the balance no longer covers stays', async ({ page }) => {
+  const account = await moneyAccount('exus-delete-income');
+  const user = db.doc(`users/${account.uid}`);
+  await user.collection('moneyTransactions').add({ type: 'income', amount: 80, category: 'kieszonkowe', note: 'babcia', date: utcToday(), source: 'manual', pointsCost: 0, createdAt: new Date(1000) });
+  await user.collection('moneyTransactions').add({ ...lunch(), createdAt: new Date(2000) });
+  await user.update({ moneyIncomeAllTime: 80 });
+  await openSignedIn(page, account, '#/exus');
+  const dialog = page.getByRole('alertdialog');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/usun-transakcje czwartek');
+  await expect(replies.last()).toContainText('Nie ma transakcji „czwartek”.');
+  await send(page, '/usun-transakcje babcia');
+  await expect(dialog).toContainText('Usuniesz: wpływ 80,00 zł (kieszonkowe, babcia)');
+  await expect(dialog).toContainText('Saldo zmaleje o 80,00 zł.');
+  await dialog.getByRole('button', { name: 'Wykonaj' }).click();
+  // The balance is 50 zł: the income cannot be taken back, as on the screen.
+  await expect(replies.last()).toHaveText('Nie można usunąć tego wpływu: saldo spadłoby poniżej zera.');
+  expect((await moneyState(account.uid)).transactions).toHaveLength(2);
+});
+
+test('with Money off, the money commands are gone from the palette and unknown to Ex-us', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-no-money', profile: { enabledModules: ['chores', 'stats', 'notes', 'aichat'] } });
+  await openSignedIn(page, account, '#/exus');
+  const field = page.getByLabel('Wiadomość do Ex-us');
+  const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
+  await field.fill('/');
+  await expect(list.getByRole('button')).toHaveCount(9);
+  await field.fill('/wyd');
+  await expect(list).toHaveCount(0);
+  for (const command of ['/wydatek 5 gry', '/wplyw 5 gry', '/saldo', '/kategoria Sport', '/usun-transakcje']) {
+    await send(page, command);
+    await expect(page.locator('.exus-msg--exus').last()).toContainText(`Nie znam komendy ${command.split(' ')[0]}.`);
+  }
+  await send(page, '/pomoc');
+  await expect(log(page)).toContainText('/cele — Cele i postęp');
+  await expect(log(page)).not.toContainText('Saldo, wydatki');
 });

@@ -98,6 +98,52 @@ describe('the goal commands', () => {
   });
 });
 
+describe('the money commands', () => {
+  const parse = (input: string) => {
+    const parsed = parseInput(input, TODAY, COMMANDS);
+    if (parsed.kind !== 'command') throw new Error(input);
+    return parsed;
+  };
+
+  it('are found by id and alias, and belong to the Money module', () => {
+    for (const [name, id] of [['wplyw', 'add-money'], ['WPŁYW', 'add-money'], ['wydatek', 'remove-money'], ['saldo', 'balance'], ['kategoria', 'create-category'], ['usuń-transakcje', 'delete-transaction'], ['delete-transaction', 'delete-transaction']]) {
+      const spec = findCommand(name!, COMMANDS);
+      expect(spec?.id).toBe(id);
+      expect(spec?.module).toBe('money');
+    }
+    expect(findCommand('wydatek', availableCommands({ enabledModules: ['chores'], disabledModules: ['money'] }))).toBeNull();
+    expect(findCommand('wydatek', availableCommands({ enabledModules: null, disabledModules: null }))?.id).toBe('remove-money');
+  });
+
+  it('have the risks of PLAN.md 6.5', () => {
+    expect(parse('/wplyw 5').spec.risk).toBe('write');
+    expect(parse('/wydatek 5').spec.risk).toBe('write');
+    expect(parse('/saldo').spec.risk).toBe('read');
+    expect(parse('/kategoria x').spec.risk).toBe('write');
+    expect(parse('/usun-transakcje').spec.risk).toBe('destructive');
+  });
+
+  it.each([
+    ['/wydatek 5 jedzenie obiad', { amount: 500, rest: 'jedzenie obiad' }, []],
+    ['/wydatek obiad jedzenie 12,50', { amount: 1250, rest: 'obiad jedzenie' }, []],
+    ['/wydatek 20 zł gry wczoraj', { amount: 2000, date: '2026-10-08', rest: 'gry' }, []],
+    ['/wplyw 1 500 PLN kieszonkowe 12.10', { amount: 150000, date: '2026-10-12', rest: 'kieszonkowe' }, []],
+    ['/wydatek 5 kategoria="Nowa rzecz" kupno', { amount: 500, category: 'Nowa rzecz', rest: 'kupno' }, []],
+    ['/wydatek 5 pkt gry', { rest: '5pkt gry' }, ['amount']],
+    ['/wydatek jedzenie', { rest: 'jedzenie' }, ['amount']],
+    ['/wplyw', {}, ['amount']],
+  ])('%s', (input, args, missing) => {
+    expect(parse(input)).toMatchObject({ args, missing });
+  });
+
+  it('/usun-transakcje takes nothing, "ostatnia" or a text; /kategoria needs a name', () => {
+    expect(parse('/usun-transakcje')).toMatchObject({ args: {}, missing: [] });
+    expect(parse('/usun-transakcje ostatnia')).toMatchObject({ args: { ref: 'ostatnia' }, missing: [] });
+    expect(parse('/kategoria Sport')).toMatchObject({ args: { name: 'Sport' }, missing: [] });
+    expect(parse('/kategoria')).toMatchObject({ missing: ['name'] });
+  });
+});
+
 describe('palette', () => {
   const ids = (draft: string) => palette(draft, COMMANDS).suggestions.map((c) => c.id);
 
@@ -113,7 +159,8 @@ describe('palette', () => {
     expect(ids('/cof')).toEqual(['undo']);
     expect(ids('/xyz')).toEqual([]);
     expect(ids('/cel')).toEqual(['create-goal', 'goals', 'edit-goal', 'delete-goal']);
-    expect(ids('/wpl')).toEqual(['deposit-goal']);
+    expect(ids('/wpl')).toEqual(['deposit-goal', 'add-money']);
+    expect(ids('/sal')).toEqual(['balance']);
   });
 
   it('once a space follows the name, offers its syntax instead of a list', () => {

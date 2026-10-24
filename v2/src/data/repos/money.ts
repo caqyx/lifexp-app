@@ -129,14 +129,18 @@ export interface AddTxInput {
 }
 
 export type TxOutcome = { ok: true; pointsCost: number } | { ok: false; problem: 'notEnoughBalance' };
+/** A saved transaction also names its document (Ex-us undoes a command by deleting it). */
+export type AddTxOutcome = { ok: true; pointsCost: number; id: string } | { ok: false; problem: 'notEnoughBalance' };
 
 /**
  * v1 saveMoneyTx() as one transaction: the balance check against the server's
  * balance (G5.5), a new category if one was typed, the transaction, the balance,
  * and on the profile the income counter or the points an expense costs (G5.1–G5.6).
  */
-export function addMoneyTx(uid: string, input: AddTxInput): Promise<TxOutcome> {
-  return runTransaction(db, async (tx): Promise<TxOutcome> => {
+export function addMoneyTx(uid: string, input: AddTxInput): Promise<AddTxOutcome> {
+  // The id is chosen once, so a retried transaction writes the same document.
+  const txRef = doc(txsOf(uid));
+  return runTransaction(db, async (tx): Promise<AddTxOutcome> => {
     const balanceRef = moneyDoc(uid, 'balance');
     const balance = await tx.get(balanceRef);
     const user = await tx.get(userOf(uid));
@@ -148,7 +152,7 @@ export function addMoneyTx(uid: string, input: AddTxInput): Promise<TxOutcome> {
     const cost = pointsCost(input.type, input.grosze, input.rate, numberOr(points?.total));
     if (input.category.create) tx.set(doc(categoriesOf(uid)), moneyCategoryData(input.category.create));
     tx.set(
-      doc(txsOf(uid)),
+      txRef,
       newMoneyTxData({
         type: input.type,
         grosze: input.grosze,
@@ -167,7 +171,7 @@ export function addMoneyTx(uid: string, input: AddTxInput): Promise<TxOutcome> {
       profile['points.spentAllTime'] = increment(cost);
     }
     if (Object.keys(profile).length) tx.update(userOf(uid), profile);
-    return { ok: true, pointsCost: cost };
+    return { ok: true, pointsCost: cost, id: txRef.id };
   });
 }
 

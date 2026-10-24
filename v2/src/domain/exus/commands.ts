@@ -5,7 +5,7 @@
 import { isModuleOn, type ModuleChoice, type OptionalModule } from '../modules';
 import { TASK_SIZES, type TaskSize } from '../tasks';
 import { fillSlots, missingSlots, tokenize, unreadNamed, type SlotDef } from './parse';
-import { amount, dateFrom, fold, oneOf } from './recognizers';
+import { amount, dateFrom, fold, money, oneOf } from './recognizers';
 
 /** read: runs at once; write: runs, with undo; destructive: asks first (6.6). */
 export type Risk = 'read' | 'write' | 'destructive';
@@ -19,7 +19,12 @@ export type CommandId =
   | 'deposit-goal'
   | 'goals'
   | 'edit-goal'
-  | 'delete-goal';
+  | 'delete-goal'
+  | 'add-money'
+  | 'remove-money'
+  | 'balance'
+  | 'create-category'
+  | 'delete-transaction';
 
 export interface CommandSpec {
   id: CommandId;
@@ -33,6 +38,18 @@ export interface CommandSpec {
 }
 
 const SIZE = oneOf<TaskSize>(Object.fromEntries(TASK_SIZES.map((s) => [s, s])) as Record<string, TaskSize>);
+
+/** "5", "12,50", "20 zł" in grosze; a "pkt" amount is not money. */
+const grosze = (token: string) => money(token)?.grosze;
+
+/** /wplyw and /wydatek read the same text: amount, day, then "category note" (domain/exus/money). */
+const txSlots = (today: string): SlotDef[] => [
+  { name: 'amount', type: 'money', required: true, recognize: grosze },
+  { name: 'date', type: 'date', required: false, recognize: dateFrom(today) },
+  // A category that may not exist yet: `kategoria=nazwa` creates it, as the Money sheet's "Nowa kategoria…".
+  { name: 'category', type: 'text', required: false, keys: ['kategoria', 'category'], namedOnly: true },
+  { name: 'rest', type: 'text', required: false },
+];
 
 export const COMMANDS: readonly CommandSpec[] = [
   {
@@ -114,6 +131,42 @@ export const COMMANDS: readonly CommandSpec[] = [
     module: null,
     risk: 'destructive',
     slots: () => [{ name: 'goal', type: 'entity', required: true }],
+  },
+  {
+    id: 'add-money',
+    aliases: ['wplyw'],
+    module: 'money',
+    risk: 'write',
+    slots: txSlots,
+  },
+  {
+    id: 'remove-money',
+    aliases: ['wydatek'],
+    module: 'money',
+    risk: 'write',
+    slots: txSlots,
+  },
+  {
+    id: 'balance',
+    aliases: ['saldo'],
+    module: 'money',
+    risk: 'read',
+    slots: () => [],
+  },
+  {
+    id: 'create-category',
+    aliases: ['kategoria'],
+    module: 'money',
+    risk: 'write',
+    slots: () => [{ name: 'name', type: 'text', required: true }],
+  },
+  {
+    // Gives the balance and the points of the transaction back, so it asks first.
+    id: 'delete-transaction',
+    aliases: ['usun-transakcje'],
+    module: 'money',
+    risk: 'destructive',
+    slots: () => [{ name: 'ref', type: 'entity', required: false }],
   },
 ];
 

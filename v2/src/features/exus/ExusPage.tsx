@@ -5,8 +5,11 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { availableCommands, palette, parseInput, type CommandSpec } from '@/domain/exus/commands';
 import { whatToDo } from '@/domain/exus/policy';
+import { isModuleOn } from '@/domain/modules';
 import { t } from '@/i18n';
 import { localDayKey } from '@/lib/dates';
+import { prepareMoney } from '@/services/money';
+import { watchMoney } from '@/stores/money';
 import { account } from '@/stores/session';
 import { watchTasks } from '@/stores/tasks';
 import { watchToday } from '@/stores/today';
@@ -15,7 +18,7 @@ import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 import { TextField } from '@/ui/components/Fields';
 import { Card, Page, Stack } from '@/ui/components/Layout';
 import type { HandlerContext } from './handlers';
-import { blockedBy, effectOf, runCommand } from './pipeline';
+import { blockedBy, effectOf, readyFor, runCommand } from './pipeline';
 import { commandName, syntax } from './syntax';
 import { createUndoStack } from './undo';
 import './exus.css';
@@ -44,6 +47,13 @@ export default function ExusPage() {
   const uid = current?.user.uid;
   useEffect(() => (uid ? watchTasks(uid) : undefined), [uid]);
   useEffect(() => (uid ? watchToday(uid) : undefined), [uid]);
+  // The money commands read the Money data and need the account prepared, as opening Money does.
+  const moneyOn = current ? isModuleOn('money', current.profile) : false;
+  const incomeCounted = current ? current.profile.moneyIncomeAllTime !== null : true;
+  useEffect(() => (uid && moneyOn ? watchMoney(uid) : undefined), [uid, moneyOn]);
+  useEffect(() => {
+    if (uid && moneyOn) prepareMoney(uid, incomeCounted).catch(() => {});
+  }, [uid, moneyOn]);
   const [messages, setMessages] = useState<Message[]>(() => [{ id: nextId++, from: 'exus', text: t('exus.hello') }]);
   const [draft, setDraft] = useState('');
   const log = useRef<HTMLDivElement>(null);
@@ -90,10 +100,17 @@ export default function ExusPage() {
       );
     }
     if (decision === 'confirm') {
-      const blocked = blockedBy(spec, args, ctx);
-      if (blocked) return say(blocked);
-      setPending({ spec, args, ctx, effect: effectOf(spec, args, ctx) });
-      return setConfirming(true);
+      // The question reads stores that may still be loading: it waits for them (or says it cannot).
+      void readyFor(spec, ctx).then(
+        () => {
+          const blocked = blockedBy(spec, args, ctx);
+          if (blocked) return say(blocked);
+          setPending({ spec, args, ctx, effect: effectOf(spec, args, ctx) });
+          setConfirming(true);
+        },
+        () => say(t('exus.failed')),
+      );
+      return;
     }
     run(spec, args, ctx);
   };
