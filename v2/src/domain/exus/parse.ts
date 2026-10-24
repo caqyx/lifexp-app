@@ -113,6 +113,16 @@ export interface SlotDef<T = unknown> {
   namedOnly?: boolean;
   /** A text slot that takes the first loose token (quote it for several words); the next text slot gets the rest. */
   leading?: boolean;
+  /** Set by `--flag` (lower-case, without dashes): true when any of these was written. */
+  flags?: readonly string[];
+  /** The one text slot that gets everything after the command as typed, untouched (spacing, quotes, `a=b`, units). */
+  raw?: boolean;
+}
+
+/** What `fillSlots` reads besides the tokens: the `--flags`, and the text after the command as typed. */
+export interface Extras {
+  flags?: readonly string[];
+  rest?: string;
 }
 
 /** Most specific first: a date never ends up as part of a task's text. */
@@ -122,9 +132,20 @@ export function fillSlots(
   tokens: readonly string[],
   slots: readonly SlotDef[],
   named: Readonly<Record<string, string>> = {},
+  extras: Extras = {},
 ): Record<string, unknown> {
   const used = new Set<number>();
   const out: Record<string, unknown> = {};
+  // A raw slot is the whole text as typed; a flag slot is true when its flag was written.
+  const raw = slots.find((s) => s.raw);
+  if (raw) {
+    const rest = extras.rest?.trim();
+    if (rest) out[raw.name] = rest;
+    return out;
+  }
+  for (const slot of slots) {
+    if (slot.flags?.some((f) => extras.flags?.includes(f))) out[slot.name] = true;
+  }
   const ordered = [...slots].sort((a, b) => SPECIFICITY.indexOf(a.type) - SPECIFICITY.indexOf(b.type));
   // `key=value` first: it is explicit, so it never competes with a loose token.
   const byKey = new Map(Object.entries(named).map(([k, v]) => [fold(k), v]));

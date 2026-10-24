@@ -12,6 +12,7 @@ import type { RouteProps } from '@/lib/route-match';
 import { prepareMoney } from '@/services/money';
 import { watchMoney } from '@/stores/money';
 import { watchNotes } from '@/stores/notes';
+import { watchMyReportsState } from '@/stores/reports';
 import { watchStats } from '@/stores/stats';
 import { account } from '@/stores/session';
 import { watchTasks } from '@/stores/tasks';
@@ -61,7 +62,11 @@ type SlotName =
   | 'lang'
   | 'module'
   | 'state'
-  | 'screen';
+  | 'screen'
+  | 'person'
+  | 'loan'
+  | 'points'
+  | 'report';
 
 let nextId = 1;
 
@@ -70,6 +75,8 @@ export default function ExusPage({ navigate }: RouteProps) {
   const uid = current?.user.uid;
   useEffect(() => (uid ? watchTasks(uid) : undefined), [uid]);
   useEffect(() => (uid ? watchToday(uid) : undefined), [uid]);
+  // /blad counts the person's own reports (the bonus one), as the Reports screen does.
+  useEffect(() => (uid ? watchMyReportsState(uid) : undefined), [uid]);
   // The money commands read the Money data and need the account prepared, as opening Money does.
   const moneyOn = current ? isModuleOn('money', current.profile) : false;
   const incomeCounted = current ? current.profile.moneyIncomeAllTime !== null : true;
@@ -100,6 +107,12 @@ export default function ExusPage({ navigate }: RouteProps) {
   const { profile } = current;
   const commands = availableCommands(profile);
 
+  // /nowy: the chat and the undo stack start over; the reply that follows is the first message.
+  const newChat = () => {
+    undoStack.clear();
+    setMessages([]);
+  };
+
   const say = (text: string) => setMessages((m) => [...m, { id: nextId++, from: 'exus', text }]);
 
   const run = (spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext) =>
@@ -115,7 +128,7 @@ export default function ExusPage({ navigate }: RouteProps) {
     if (parsed.kind === 'text') return say(t('exus.aiLater'));
     if (parsed.kind === 'unknown') return say(t('exus.unknown', { name: parsed.name }));
     const { spec, args, missing, unread } = parsed;
-    const ctx: HandlerContext = { uid, profile, today, commands, navigate, undo: undoStack };
+    const ctx: HandlerContext = { uid, profile, today, commands, navigate, undo: undoStack, newChat };
     if (unread.length > 0) {
       return say(t('exus.unread', { fields: unread.map((name) => t(`exus.slots.${name as SlotName}`)).join(', '), syntax: syntax(spec) }));
     }

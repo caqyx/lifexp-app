@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChoreDef, ChoreEntry } from '../chores';
-import { CHORE_DAY, choreDayKey, choresOverview } from './chores';
+import { CHORE_DAY, choreDayKey, choresOverview, findChoreEntry } from './chores';
 import { matchEntity } from './entities';
 
 const def = (id: string, name: string, order: number, points = 10): ChoreDef => ({ id, name, desc: '', emoji: '🧹', points, oneTime: false, order });
@@ -87,5 +87,39 @@ describe('choresOverview', () => {
   it('keeps an entry whose definition is gone', () => {
     const overview = choresOverview([], [entry('gone', TODAY, 20)], TODAY, 0.45);
     expect(overview.done.map((r) => r.name)).toEqual(['gone']);
+  });
+});
+
+describe('findChoreEntry', () => {
+  const at = (e: ChoreEntry, ms: number | null): ChoreEntry => ({ ...e, createdAt: ms === null ? null : new Date(ms) });
+  const old = at(entry('d', '2026-10-01', 15), 1000);
+  const stairs = at(entry('b', '2026-10-02', 5), 2000);
+  const newest = at(entry('d', '2026-10-03', 15), 3000);
+  const ENTRIES = [stairs, newest, old];
+
+  it('nothing or "ostatni" is the newest entry', () => {
+    for (const ref of [undefined, '', '  ', 'ostatni', 'OSTATNIA', 'last']) {
+      expect(findChoreEntry(ref, ENTRIES)).toEqual({ kind: 'found', entry: newest });
+    }
+  });
+
+  it('a name gives the newest entry of that chore', () => {
+    expect(findChoreEntry('zmywarki', ENTRIES)).toEqual({ kind: 'found', entry: newest });
+    expect(findChoreEntry('schodow', ENTRIES)).toEqual({ kind: 'found', entry: stairs });
+  });
+
+  it('an entry not yet confirmed by the server (no time) counts as the newest', () => {
+    const pending = at(entry('b', '2026-10-04', 5), null);
+    expect(findChoreEntry(undefined, [...ENTRIES, pending])).toEqual({ kind: 'found', entry: pending });
+  });
+
+  it('lists the chores a text fits when several do, and says when none or no entries', () => {
+    expect(findChoreEntry('odkurzanie', [at(entry('a', '2026-10-01', 10), 1), stairs])).toEqual({
+      kind: 'ambiguous',
+      names: ['Odkurzanie schodów', 'Odkurzanie wiatrołapu (buty, kurtki)'],
+    });
+    expect(findChoreEntry('latanie', ENTRIES)).toEqual({ kind: 'none' });
+    expect(findChoreEntry(undefined, [])).toEqual({ kind: 'none' });
+    expect(findChoreEntry('ostatni', [])).toEqual({ kind: 'none' });
   });
 });

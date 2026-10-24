@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ACTIVITY_SEEDS, type GeneratorPick } from '../activity';
-import { splitTypeDesc, whatNow } from './activities';
+import type { Activity } from '../activity';
+import { findActivity, splitTypeDesc, whatNow } from './activities';
 
 const DEFS = ACTIVITY_SEEDS;
 const split = (text: string) => splitTypeDesc(text.split(/\s+/).filter(Boolean), DEFS);
@@ -66,5 +67,47 @@ describe('whatNow', () => {
   it('gives nothing for a time below the minimum or an empty pool', () => {
     expect(whatNow(pool, 4, 0, 150)).toBeNull();
     expect(whatNow([], 30, 0, 150)).toBeNull();
+  });
+});
+
+describe('findActivity', () => {
+  const names = new Map([['learning', 'Nauka (JS, Unity, C#)'], ['reading', 'Czytanie / kurs']]);
+  const act = (id: string, type: string, desc: string, hour: number): Activity => ({
+    id,
+    type,
+    typeName: null,
+    desc,
+    duration: 60,
+    points: 40,
+    at: new Date(Date.UTC(2026, 9, 12, hour)),
+  });
+  const ACTIVITIES = [act('a1', 'learning', 'rozdział 3', 8), act('a2', 'reading', '', 10), act('a3', 'learning', 'testy', 9)];
+
+  it('nothing or "ostatnia" is the newest', () => {
+    for (const ref of [undefined, '', 'ostatnia', 'Ostatni', 'last']) {
+      expect(findActivity(ref, ACTIVITIES, names)).toMatchObject({ kind: 'found', activity: { id: 'a2' } });
+    }
+  });
+
+  it('a text is matched with the type and the note', () => {
+    expect(findActivity('czytanie', ACTIVITIES, names)).toMatchObject({ kind: 'found', activity: { id: 'a2' } });
+    expect(findActivity('nauka rozdzial', ACTIVITIES, names)).toMatchObject({ kind: 'found', activity: { id: 'a1' } });
+    expect(findActivity('testy', ACTIVITIES, names)).toMatchObject({ kind: 'found', activity: { id: 'a3' } });
+  });
+
+  it('lists the activities a text fits when several do, newest first', () => {
+    const got = findActivity('nauka', ACTIVITIES, names);
+    expect(got.kind).toBe('ambiguous');
+    if (got.kind === 'ambiguous') expect(got.activities.map((a) => a.id)).toEqual(['a3', 'a1']);
+  });
+
+  it('says when nothing fits or there is nothing', () => {
+    expect(findActivity('latanie', ACTIVITIES, names)).toEqual({ kind: 'none' });
+    expect(findActivity(undefined, [], names)).toEqual({ kind: 'none' });
+  });
+
+  it('uses the name saved with the entry before the definition', () => {
+    const saved = { ...act('a4', 'gone', '', 11), typeName: 'Spacer' };
+    expect(findActivity('spacer', [...ACTIVITIES, saved], names)).toMatchObject({ kind: 'found', activity: { id: 'a4' } });
   });
 });

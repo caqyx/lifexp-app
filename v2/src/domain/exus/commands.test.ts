@@ -9,6 +9,23 @@ describe('the registry', () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
+  it('says which commands the AI may propose: all but /pomoc, /cofnij, /nowy, /motyw, /jezyk and /modul (PLAN.md 6.5)', () => {
+    expect(COMMANDS.filter((c) => !c.aiExposed).map((c) => c.id).sort()).toEqual(['help', 'lang', 'module', 'new-chat', 'theme', 'undo']);
+    expect(COMMANDS.filter((c) => c.aiExposed)).toHaveLength(COMMANDS.length - 6);
+  });
+
+  it('has every command of PLAN.md 6.5 but edit-pending (AI only, 5b) and log-gaming (no gaming sessions in v2)', () => {
+    expect(COMMANDS.map((c) => c.id).sort()).toEqual(
+      [
+        'add-money', 'archive-note', 'balance', 'borrow', 'chores', 'complete-chore', 'complete-task', 'create-category', 'create-chore',
+        'create-goal', 'create-note', 'create-task', 'daily-limit', 'delete-activity', 'delete-chore', 'delete-chore-entry', 'delete-goal',
+        'delete-task', 'delete-transaction', 'deposit-goal', 'edit-goal', 'edit-task', 'find-note', 'go', 'goals', 'help', 'lang', 'lend',
+        'loans', 'module', 'money-limit', 'new-chat', 'remove-money', 'repay', 'report-bug', 'settle-chores', 'stats', 'streak', 'tasks',
+        'theme', 'today', 'undo', 'what-now', 'log-activity',
+      ].sort(),
+    );
+  });
+
   it('finds a command by id or alias, in any case and without Polish letters', () => {
     expect(findCommand('ZADANIE', COMMANDS)?.id).toBe('create-task');
     expect(findCommand('create-task', COMMANDS)?.id).toBe('create-task');
@@ -17,7 +34,7 @@ describe('the registry', () => {
   });
 
   it("leaves out a module's commands while it is off", () => {
-    const money: CommandSpec = { id: 'today', aliases: ['saldo'], module: 'money', risk: 'read', slots: () => [] };
+    const money: CommandSpec = { id: 'today', aliases: ['saldo'], module: 'money', risk: 'read', aiExposed: true, slots: () => [] };
     expect(availableCommands({ enabledModules: ['chores'], disabledModules: ['money'] }, [money])).toEqual([]);
     expect(availableCommands({ enabledModules: null, disabledModules: null }, [money])).toEqual([money]);
   });
@@ -390,7 +407,7 @@ describe('palette', () => {
   });
 
   it('puts names starting with what is typed first, then names containing it', () => {
-    expect(ids('/za')).toEqual(['create-task', 'tasks', 'edit-task', 'delete-task']);
+    expect(ids('/za')).toEqual(['create-task', 'tasks', 'edit-task', 'delete-task', 'lend', 'borrow']);
     expect(ids('/DZ')).toEqual(['today', 'go']);
     expect(ids('/task')).toEqual(['tasks', 'create-task', 'complete-task', 'edit-task', 'delete-task']);
     expect(ids('/szu')).toEqual(['find-note']);
@@ -405,5 +422,84 @@ describe('palette', () => {
   it('once a space follows the name, offers its syntax instead of a list', () => {
     expect(palette('/zadanie ', COMMANDS)).toMatchObject({ suggestions: [], current: { id: 'create-task' } });
     expect(palette('/nic ', COMMANDS)).toEqual({ suggestions: [], current: null });
+  });
+});
+
+describe('the loan, limit, chore, activity, report and chat commands (5a-9)', () => {
+  const parse = (input: string) => {
+    const parsed = parseInput(input, TODAY, COMMANDS);
+    if (parsed.kind !== 'command') throw new Error(input);
+    return parsed;
+  };
+
+  it('are found by id and alias, with their module and risk', () => {
+    for (const [name, id, module, risk] of [
+      ['pozyczam', 'lend', 'money', 'write'],
+      ['POŻYCZAM', 'lend', 'money', 'write'],
+      ['pozyczam-od', 'borrow', 'money', 'write'],
+      ['splata', 'repay', 'money', 'write'],
+      ['spłata', 'repay', 'money', 'write'],
+      ['pozyczki', 'loans', 'money', 'read'],
+      ['limit-wydatkow', 'money-limit', 'money', 'write'],
+      ['nowy-obowiazek', 'create-chore', 'chores', 'write'],
+      ['usun-obowiazek', 'delete-chore', 'chores', 'destructive'],
+      ['usun-wpis', 'delete-chore-entry', 'chores', 'destructive'],
+      ['usun-aktywnosc', 'delete-activity', 'stats', 'destructive'],
+      ['blad', 'report-bug', null, 'write'],
+      ['błąd', 'report-bug', null, 'write'],
+      ['nowy', 'new-chat', null, 'read'],
+      ['new-chat', 'new-chat', null, 'read'],
+    ] as const) {
+      expect(findCommand(name, COMMANDS), name).toMatchObject({ id, module, risk });
+    }
+  });
+
+  it('vanish with their module; /blad and /nowy never do', () => {
+    const ALL = ['chores', 'money', 'games', 'stats', 'notes', 'aichat'];
+    const ids = (off: string) => availableCommands({ enabledModules: ALL.filter((m) => m !== off), disabledModules: [off] }).map((c) => c.id);
+    for (const gone of ['lend', 'borrow', 'repay', 'loans', 'money-limit']) expect(ids('money')).not.toContain(gone);
+    for (const gone of ['create-chore', 'delete-chore', 'delete-chore-entry']) expect(ids('chores')).not.toContain(gone);
+    expect(ids('stats')).not.toContain('delete-activity');
+    for (const off of ALL) for (const kept of ['report-bug', 'new-chat']) expect(ids(off)).toContain(kept);
+  });
+
+  it.each([
+    ['/pozyczam Ola 20', { person: 'Ola', amount: 2000 }, []],
+    ['/pozyczam Ola 20 zł na kino', { person: 'Ola', amount: 2000, note: 'na kino' }, []],
+    ['/pozyczam 12,50 Tata', { person: 'Tata', amount: 1250 }, []],
+    ['/pozyczam "Ciocia Ania" 100', { person: 'Ciocia Ania', amount: 10000 }, []],
+    ['/pozyczam Ola', { person: 'Ola' }, ['amount']],
+    ['/pozyczam', {}, ['amount', 'person']],
+    ['/pozyczam-od Tata 40 na buty', { person: 'Tata', amount: 4000, note: 'na buty' }, []],
+    ['/splata Ola 10', { loan: 'Ola', amount: 1000 }, []],
+    ['/splata Ola 2 20 zł', { loan: 'Ola 2', amount: 2000 }, []],
+    ['/splata Ola', { loan: 'Ola' }, ['amount']],
+    ['/pozyczki', {}, []],
+    ['/limit-wydatkow 300', { amount: 30000 }, []],
+    ['/limit-wydatkow 0', { amount: 0 }, []],
+    ['/limit-wydatkow', {}, ['amount']],
+    ['/nowy-obowiazek Mycie okien 30', { name: 'Mycie okien', points: 30 }, []],
+    ['/nowy-obowiazek Mycie okien 2 30 pkt --jednorazowy', { name: 'Mycie okien 2', points: 30, once: true }, []],
+    ['/nowy-obowiazek --once Okna 30', { name: 'Okna', points: 30, once: true }, []],
+    ['/nowy-obowiazek Okna', { name: 'Okna' }, ['points']],
+    ['/nowy-obowiazek', {}, ['name', 'points']],
+    ['/usun-obowiazek okna', { chore: 'okna' }, []],
+    ['/usun-obowiazek', {}, ['chore']],
+    ['/usun-wpis', {}, []],
+    ['/usun-wpis ostatni', { ref: 'ostatni' }, []],
+    ['/usun-wpis zmywarki', { ref: 'zmywarki' }, []],
+    ['/usun-aktywnosc', {}, []],
+    ['/usun-aktywnosc nauka rozdział 3', { ref: 'nauka rozdział 3' }, []],
+    ['/nowy', {}, []],
+  ])('%s', (input, args, missing) => {
+    const parsed = parse(input);
+    expect(parsed.args).toEqual(args);
+    expect(parsed.missing).toEqual(missing);
+  });
+
+  it('/blad takes the text as typed, with its bars, quotes, units and key=value', () => {
+    expect(parse('/blad Saldo | Pieniądze | Cena 12 zł, a=b, "tak"').args).toEqual({ report: 'Saldo | Pieniądze | Cena 12 zł, a=b, "tak"' });
+    expect(parse('/blad').missing).toEqual(['report']);
+    expect(parse('/blad    ').missing).toEqual(['report']);
   });
 });

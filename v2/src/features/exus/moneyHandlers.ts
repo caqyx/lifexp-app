@@ -30,15 +30,16 @@ import {
   removeCreatedCategory,
   removeTransaction,
   removeTransactionById,
+  saveMonthlyLimit,
   saveTransaction,
 } from '@/services/money';
 import { money, type MoneyState } from '@/stores/money';
 import type { CommandHandler, HandlerContext, HandlerResult } from './handlers';
 
-type Part = 'txs' | 'categories' | 'limit' | 'balance';
+type Part = 'txs' | 'categories' | 'limit' | 'balance' | 'loans';
 
 /** The Money data once the listeners have the parts asked for; rejects when it cannot be read. */
-function loadedMoney(...parts: Part[]): Promise<MoneyState> {
+export function loadedMoney(...parts: Part[]): Promise<MoneyState> {
   return new Promise((resolve, reject) => {
     const stop = effect(() => {
       const state = money.value;
@@ -52,7 +53,7 @@ function loadedMoney(...parts: Part[]): Promise<MoneyState> {
 }
 
 /** The listeners' data needs the account prepared (documents, starting categories, M2), as opening Money does. */
-const prepared = ({ uid, profile }: HandlerContext) => prepareMoney(uid, profile.moneyIncomeAllTime !== null);
+export const prepared = ({ uid, profile }: HandlerContext) => prepareMoney(uid, profile.moneyIncomeAllTime !== null);
 
 const PROBLEM_KEY: Record<TxProblem, 'money.needAmount' | 'money.amountTooLarge' | 'money.needCategory' | 'money.notEnough'> = {
   amountRequired: 'money.needAmount',
@@ -183,6 +184,43 @@ export const MONEY_HANDLERS = {
       const aside = savedInGoals(profile.goals);
       if (aside > 0) lines.push(t('money.inGoals', { amount: formatMoney(aside, lang) }));
       return { reply: lines.join('\n') };
+    },
+  },
+
+  'money-limit': {
+    run: async (args, ctx) => {
+      const lang = locale();
+      let before: number;
+      try {
+        await prepared(ctx);
+        before = (await loadedMoney('limit')).limit ?? 0;
+      } catch {
+        return unreachable();
+      }
+      const grosze = args.amount as number;
+      const shown = (limit: number) => (limit > 0 ? formatMoney(limit, lang) : t('exus.money.noLimit'));
+      // The same service as the Money settings screen: 0 turns the limit off, too much is refused.
+      const result = saveMonthlyLimit(ctx.uid, grosze);
+      if (!result.ok) return { reply: t('money.amountTooLarge') };
+      const { limit } = result;
+      if (limit === before) return { reply: t('exus.money.limitSame', { limit: shown(limit) }) };
+      return {
+        reply: t(limit > 0 ? 'exus.money.limitSet' : 'exus.money.limitOff', { amount: shown(limit), before: shown(before) }),
+        write: {
+          saved: result.saved,
+          toast: limit > 0 ? t('money.limitSaved', { amount: formatMoney(limit, lang) }) : t('money.limitOff'),
+          failed: t('money.settingsSaveFailed'),
+        },
+        // Back to the limit it was (0 = off stays off).
+        undo: {
+          what: t('exus.undoWhat.money-limit', { limit: shown(limit), before: shown(before) }),
+          run: async () => {
+            const back = saveMonthlyLimit(ctx.uid, before);
+            if (!back.ok) throw new Error(back.problem);
+            await back.saved;
+          },
+        },
+      };
     },
   },
 

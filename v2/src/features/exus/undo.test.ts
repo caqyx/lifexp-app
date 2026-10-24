@@ -31,4 +31,16 @@ describe('the undo stack', () => {
     expect(stack.pop()?.id).toBe(a.id);
     expect(stack.take(a.id)).toBeNull();
   });
+
+  it('forgets everything on a new conversation, and the old toasts find nothing to take', () => {
+    const stack = createUndoStack();
+    const a = stack.push(undo('a'));
+    stack.push(undo('b'));
+    stack.clear();
+    expect(stack.size).toBe(0);
+    expect(stack.pop()).toBeNull();
+    expect(stack.take(a.id)).toBeNull();
+    stack.push(undo('c'));
+    expect(stack.pop()?.what).toBe('c');
+  });
 });

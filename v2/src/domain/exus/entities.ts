@@ -47,17 +47,21 @@ function distance(query: string, name: string): number {
 
 /**
  * Case and Polish letters do not matter. Steps, the first with a hit decides:
- * the exact name, a name starting with the text, a name containing it, and
- * last the names closest to it (at most FUZZY_MAX away; the closest ones only).
+ * the exact name, a name starting with the text, a name containing it, a name
+ * containing every word of the text (in any order, so "nauka rozdział" finds
+ * "Nauka (JS) rozdział 3"), and last the names closest to it (at most FUZZY_MAX
+ * away; the closest ones only).
  */
 export function matchEntity<T extends Named>(query: string, items: readonly T[]): Match<T> {
   const q = key(query);
   if (!q) return { kind: 'none' };
+  const words = q.split(' ');
   const folded = items.map((item) => ({ item, name: key(item.name) }));
   const steps: ((name: string) => boolean)[] = [
     (name) => name === q,
     (name) => name.startsWith(q),
     (name) => name.includes(q),
+    (name) => words.length > 1 && words.every((w) => name.includes(w)),
   ];
   for (const step of steps) {
     const hits = folded.filter((f) => step(f.name));

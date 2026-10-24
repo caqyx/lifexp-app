@@ -215,4 +215,29 @@ describe('fillSlots', () => {
       expect(fill('/x Zakupy tresc="mleko i chleb"')).toEqual({ title: 'Zakupy', content: 'mleko i chleb' });
     });
   });
+
+  describe('a flag and a raw slot', () => {
+    const chore: SlotDef[] = [
+      { name: 'name', type: 'text', required: true },
+      { name: 'once', type: 'enum', required: false, flags: ['jednorazowy', 'once'] },
+    ];
+    const fill = (input: string) => {
+      const { tokens, named, flags } = tokenize(input);
+      return fillSlots(tokens, chore, named, { flags });
+    };
+
+    it('a flag is true when written, in any place and either spelling, and never part of the text', () => {
+      expect(fill('/x Okna --jednorazowy')).toEqual({ name: 'Okna', once: true });
+      expect(fill('/x --ONCE Okna')).toEqual({ once: true, name: 'Okna' });
+      expect(fill('/x Okna')).toEqual({ name: 'Okna' });
+      expect(fill('/x Okna --inne')).toEqual({ name: 'Okna' });
+    });
+
+    it('a raw slot gets the text after the command as typed, trimmed; empty is missing', () => {
+      const report: SlotDef[] = [{ name: 'report', type: 'text', required: true, raw: true }];
+      expect(fillSlots(['A', '|', 'B'], report, {}, { rest: '  A | "B"   12 zł a=b ' })).toEqual({ report: 'A | "B"   12 zł a=b' });
+      expect(fillSlots([], report, {}, { rest: '   ' })).toEqual({});
+      expect(missingSlots(report, {})).toEqual(['report']);
+    });
+  });
 });

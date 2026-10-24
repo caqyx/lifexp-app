@@ -71,6 +71,17 @@ test('the menu opens Ex-us; /pomoc lists the commands, other text and unknown co
   await expect(log(page)).toContainText('/motyw [lifexp|ios|gold] [jasny|ciemny|system] — Motyw');
   await expect(log(page)).toContainText('/modul <moduł> <on|off> — Włącz albo wyłącz moduł');
   await expect(log(page)).toContainText('/idz <ekran> — Przejdź do ekranu');
+  await expect(log(page)).toContainText('/pozyczam <osoba> <kwota> [notatka] — Pożycz komuś');
+  await expect(log(page)).toContainText('/pozyczam-od <osoba> <kwota> [notatka] — Pożycz od kogoś');
+  await expect(log(page)).toContainText('/splata <pożyczka|osoba> <kwota> — Spłać pożyczkę');
+  await expect(log(page)).toContainText('/pozyczki — Pożyczki: do odzyskania i do oddania');
+  await expect(log(page)).toContainText('/limit-wydatkow <kwota> — Miesięczny limit wydatków');
+  await expect(log(page)).toContainText('/nowy-obowiazek <nazwa> <pkt> [--jednorazowy] — Nowy obowiązek na liście');
+  await expect(log(page)).toContainText('/usun-obowiazek <obowiązek> — Usuń obowiązek z listy');
+  await expect(log(page)).toContainText('/usun-wpis [ostatni|obowiązek] — Usuń wpis obowiązku do wypłaty');
+  await expect(log(page)).toContainText('/usun-aktywnosc [ostatnia|tekst] — Usuń aktywność');
+  await expect(log(page)).toContainText('/blad <tytuł> | <obszar> | <opis> — Zgłoś błąd');
+  await expect(log(page)).toContainText('/nowy — Nowa rozmowa');
   await send(page, 'odłóż 50 zł na rower');
   await expect(log(page)).toContainText('Rozmowa z AI dojdzie w następnym kroku.');
   await send(page, '/latanie');
@@ -160,9 +171,9 @@ test('typing "/" opens the command palette; a tap puts the command in the field 
   const field = page.getByLabel('Wiadomość do Ex-us');
   const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
   await field.fill('/');
-  await expect(list.getByRole('button')).toHaveCount(33);
+  await expect(list.getByRole('button')).toHaveCount(44);
   await field.fill('/za');
-  await expect(list.getByRole('button')).toHaveCount(4);
+  await expect(list.getByRole('button')).toHaveCount(6);
   await list.getByRole('button', { name: /Nowe zadanie/ }).click();
   await expect(field).toHaveValue('/zadanie ');
   await expect(field).toBeFocused();
@@ -580,7 +591,7 @@ test('with Money off, the money commands are gone from the palette and unknown t
   const field = page.getByLabel('Wiadomość do Ex-us');
   const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
   await field.fill('/');
-  await expect(list.getByRole('button')).toHaveCount(28);
+  await expect(list.getByRole('button')).toHaveCount(34);
   await field.fill('/wyd');
   await expect(list).toHaveCount(0);
   for (const command of ['/wydatek 5 gry', '/wplyw 5 gry', '/saldo', '/kategoria Sport', '/usun-transakcje']) {
@@ -992,7 +1003,7 @@ test('with Chores or Statistics XP off, their commands are gone from the palette
   const field = page.getByLabel('Wiadomość do Ex-us');
   const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
   await field.fill('/');
-  await expect(list.getByRole('button')).toHaveCount(26);
+  await expect(list.getByRole('button')).toHaveCount(33);
   for (const prefix of ['/obow', '/rozl', '/akty', '/ser', '/staty', '/co-']) {
     await field.fill(prefix);
     await expect(list).toHaveCount(0);
@@ -1455,4 +1466,588 @@ test('the task, note and settings commands wait for their data under a CPU 6 tim
   await expect(log(page)).toContainText('Dzienny limit: 100 pkt (było 150 pkt).');
   await expect.poll(async () => (await task.get()).data().done).toBe(true);
   await expect.poll(async () => (await userDoc(account.uid).get()).data().dailyLimit).toBe(100);
+});
+
+// ── Stage 5a-9: loans, the spending limit, chore and activity deletion, /blad, /nowy ──
+
+const loansOf = (uid) => db.collection(`users/${uid}/moneyLoans`);
+
+/** The balance and every loan, ids and times aside (completedAt only as set or not): money.spec's loansState. */
+async function loansState(uid) {
+  const balance = (await db.doc(`users/${uid}/money/balance`).get()).data();
+  const loans = (await loansOf(uid).get()).docs
+    .map((d) => {
+      const { createdAt, completedAt, ...rest } = d.data();
+      return { ...rest, completed: completedAt !== null && completedAt !== undefined };
+    })
+    .sort((a, b) => a.person.localeCompare(b.person));
+  return { balance, loans, transactions: (await db.collection(`users/${uid}/moneyTransactions`).get()).size };
+}
+
+let loanOrder = 0;
+function seedLoan(uid, { person, amount, repaidAmount = 0, direction, note = '' }) {
+  return loansOf(uid).add({
+    person,
+    amount,
+    repaidAmount,
+    direction,
+    note,
+    date: utcToday(),
+    createdAt: new Date(Date.now() + (loanOrder += 1)),
+    completedAt: null,
+  });
+}
+
+const loan = (person, amount, direction, { repaidAmount = 0, note = '', completed = false } = {}) => ({
+  person,
+  amount,
+  repaidAmount,
+  direction,
+  note,
+  date: utcToday(),
+  completed,
+});
+
+test('/pozyczam writes the loan and the balance the Loans view writes (G6.1), and the Loans view lists it', async ({ page }) => {
+  const account = await moneyAccount('exus-lend');
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  // Typed at once, before the Money data has loaded.
+  await send(page, '/pozyczam Ola 20 zł na kino');
+  await expect(replies.last()).toHaveText('Zapisano pożyczkę dla: Ola, 20,00 zł. Saldo zmalało o tę kwotę. Notatka: „na kino”.');
+  await expect(page.getByText('Pożyczka dodana.')).toBeVisible();
+  // The document of money.spec's G6.1 test.
+  expect(await loansState(account.uid)).toEqual({ balance: { current: 30 }, loans: [loan('Ola', 20, 'lent', { note: 'na kino' })], transactions: 0 });
+
+  await page.evaluate(() => (location.hash = '#/money/loans'));
+  const row = page.getByRole('list', { name: 'Pożyczki' }).getByRole('listitem');
+  await expect(row).toHaveCount(1);
+  await expect(row.first()).toContainText('Pożyczka dla: Ola');
+  await expect(row.first()).toContainText('Spłacono 0,00 zł z 20,00 zł (0%) · na kino');
+});
+
+test('/pozyczam: /cofnij deletes the loan and the balance is back exactly', async ({ page }) => {
+  const account = await moneyAccount('exus-lend-undo');
+  const before = await loansState(account.uid);
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/pozyczam Ola 20');
+  await expect(page.locator('.exus-msg--exus').last()).toHaveText('Zapisano pożyczkę dla: Ola, 20,00 zł. Saldo zmalało o tę kwotę.');
+  await expect.poll(async () => (await loansState(account.uid)).balance).toEqual({ current: 30 });
+  await page.getByRole('button', { name: 'Cofnij' }).click();
+  await expect(page.locator('.exus-msg--exus').last()).toHaveText('Cofnięto: pożyczka dla: Ola (20,00 zł).');
+  await expect.poll(() => loansState(account.uid)).toEqual(before);
+});
+
+test('/pozyczam above the balance is refused (G6.1); the person, the amount and the limits are asked for', async ({ page }) => {
+  const account = await moneyAccount('exus-lend-rules');
+  const before = await loansState(account.uid);
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/pozyczam Ola 60');
+  await expect(replies.last()).toHaveText('Za mało środków na saldzie.');
+  await send(page, '/pozyczam Ola');
+  await expect(replies.last()).toContainText('Brakuje: kwota.');
+  await send(page, '/pozyczam 20');
+  await expect(replies.last()).toContainText('Brakuje: osoba.');
+  await send(page, '/pozyczam Ola 0');
+  await expect(replies.last()).toHaveText('Podaj kwotę większą od zera.');
+  await send(page, `/pozyczam ${'x'.repeat(41)} 5`);
+  await expect(replies.last()).toHaveText('Nazwa osoby ma najwyżej 40 znaków.');
+  await send(page, `/pozyczam Ola 5 ${'n'.repeat(101)}`);
+  await expect(replies.last()).toHaveText('Notatka ma najwyżej 100 znaków.');
+  expect(await loansState(account.uid)).toEqual(before);
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Nie ma nic do cofnięcia.');
+});
+
+test('/pozyczam-od adds to the balance (G6.2) and the person may be quoted; /cofnij deletes the loan', async ({ page }) => {
+  const account = await moneyAccount('exus-borrow');
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/pozyczam-od "Ciocia Ania" 40 buty');
+  await expect(replies.last()).toHaveText('Zapisano pożyczkę od: Ciocia Ania, 40,00 zł. Saldo wzrosło o tę kwotę. Notatka: „buty”.');
+  expect(await loansState(account.uid)).toEqual({ balance: { current: 90 }, loans: [loan('Ciocia Ania', 40, 'borrowed', { note: 'buty' })], transactions: 0 });
+
+  // The money was spent since: the loan cannot be deleted below zero, so /cofnij says it could not and changes nothing.
+  await db.doc(`users/${account.uid}/money/balance`).set({ current: 10 });
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Cofnięto: pożyczka od: Ciocia Ania (40,00 zł).');
+  await expect(page.getByText('Nie udało się cofnąć.')).toBeVisible();
+  expect((await loansState(account.uid)).loans).toHaveLength(1);
+});
+
+test('/splata is capped at what is left and settles once (G6.3); a repayment has no undo', async ({ page }) => {
+  const account = await moneyAccount('exus-repay');
+  await seedLoan(account.uid, { person: 'Ola', amount: 20, repaidAmount: 5, direction: 'lent' });
+  await seedLoan(account.uid, { person: 'Tata', amount: 40, direction: 'borrowed' });
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/splata ola 25');
+  await expect(replies.last()).toHaveText('Pożyczka dla: Ola rozliczona. Spłacono 15,00 zł, saldo wzrosło. Spłata ograniczona do tego, co zostało.');
+  await expect(page.getByText('Pożyczka rozliczona: Ola.')).toBeVisible();
+  // The state of money.spec's G6.3 test.
+  expect((await loansState(account.uid)).balance).toEqual({ current: 65 });
+  expect((await loansState(account.uid)).loans.find((l) => l.person === 'Ola')).toEqual(loan('Ola', 20, 'lent', { repaidAmount: 20, completed: true }));
+
+  // A settled loan is no longer there to repay.
+  await send(page, '/splata ola 5');
+  await expect(replies.last()).toContainText('Nie ma niespłaconej pożyczki „ola”.');
+
+  await send(page, '/splata Tata 15');
+  await expect(replies.last()).toHaveText('Spłacono 15,00 zł pożyczki od: Tata. Zostało 25,00 zł. Saldo zmalało.');
+  await expect(page.getByText('Spłacono 15,00 zł.')).toBeVisible();
+  await expect.poll(async () => (await loansState(account.uid)).balance).toEqual({ current: 50 });
+  expect((await loansState(account.uid)).loans.find((l) => l.person === 'Tata')).toEqual(loan('Tata', 40, 'borrowed', { repaidAmount: 15 }));
+
+  await expect(page.getByRole('button', { name: 'Cofnij' })).toHaveCount(0);
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Nie ma nic do cofnięcia.');
+  await send(page, '/splata Tata');
+  await expect(replies.last()).toContainText('Brakuje: kwota.');
+});
+
+test('/splata with the balance too low changes nothing (G6.4); several loans of one person are told apart by the note', async ({ page }) => {
+  const account = await moneyAccount('exus-repay-rules');
+  await db.doc(`users/${account.uid}/money/balance`).set({ current: 10 });
+  await seedLoan(account.uid, { person: 'Tata', amount: 40, direction: 'borrowed' });
+  await seedLoan(account.uid, { person: 'Ola', amount: 20, direction: 'lent', note: 'na kino' });
+  await seedLoan(account.uid, { person: 'Ola', amount: 8, direction: 'lent', note: 'buty' });
+  const before = await loansState(account.uid);
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/splata Tata 15');
+  await expect(replies.last()).toHaveText('Za mało środków na saldzie.');
+  expect(await loansState(account.uid)).toEqual(before);
+
+  await send(page, '/splata Ola 5');
+  await expect(replies.last()).toContainText('Pasuje kilka pożyczek: Ola, na kino (20,00 zł); Ola, buty (8,00 zł).');
+  expect(await loansState(account.uid)).toEqual(before);
+
+  await send(page, '/splata ola buty 5');
+  await expect(replies.last()).toHaveText('Spłacono 5,00 zł pożyczki dla: Ola. Zostało 3,00 zł. Saldo wzrosło.');
+  await expect.poll(async () => (await loansState(account.uid)).balance).toEqual({ current: 15 });
+});
+
+test('/pozyczki tells what is owed to me and what I owe, per person, settled loans left out', async ({ page }) => {
+  const account = await moneyAccount('exus-loans');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/pozyczki');
+  await expect(page.locator('.exus-msg--exus').last()).toHaveText('Brak pożyczek.');
+
+  await seedLoan(account.uid, { person: 'Ola', amount: 20, repaidAmount: 5, direction: 'lent' });
+  await seedLoan(account.uid, { person: 'Ola', amount: 10, direction: 'lent', note: 'buty' });
+  await seedLoan(account.uid, { person: 'Kasia', amount: 8, repaidAmount: 8, direction: 'lent' });
+  await seedLoan(account.uid, { person: 'Tata', amount: 40, direction: 'borrowed' });
+  // The four documents arrive one by one; ask again until the listener has all of them.
+  await expect
+    .poll(async () => {
+      await send(page, '/pozyczki');
+      return (await page.locator('.exus-msg--exus').last().innerText()).replace(/\u00a0/g, ' ');
+    })
+    .toBe('Do odzyskania: 25,00 zł.\n• Ola: 25,00 zł\nDo oddania: 40,00 zł.\n• Tata: 40,00 zł');
+});
+
+test('/limit-wydatkow sets the monthly limit as the Money settings do; 0 turns it off; /cofnij restores the one before', async ({ page }) => {
+  const account = await moneyAccount('exus-money-limit');
+  const settings = async () => (await db.doc(`users/${account.uid}/money/settings`).get()).data();
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/limit-wydatkow 150,5');
+  await expect(replies.last()).toHaveText('Miesięczny limit wydatków: 150,50 zł (było: 200,00 zł).');
+  await expect(page.getByText('Limit zapisany: 150,50 zł.')).toBeVisible();
+  await expect.poll(settings).toEqual({ monthlyLimit: 150.5, currency: 'PLN' });
+
+  await send(page, '/limit-wydatkow 150,50');
+  await expect(replies.last()).toHaveText('Limit wydatków już wynosi: 150,50 zł.');
+
+  await send(page, '/limit-wydatkow 0');
+  await expect(replies.last()).toHaveText('Limit wydatków wyłączony (było: 150,50 zł).');
+  await expect.poll(settings).toEqual({ monthlyLimit: 0, currency: 'PLN' });
+  await send(page, '/saldo');
+  await expect(replies.last()).toContainText('(bez limitu)');
+
+  // /cofnij takes the off back to 150,50, then the 150,50 back to 200.
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Cofnięto: limit wydatków brak limitu (wraca 150,50 zł).');
+  await expect.poll(settings).toEqual({ monthlyLimit: 150.5, currency: 'PLN' });
+  await send(page, '/cofnij');
+  await expect.poll(settings).toEqual({ monthlyLimit: 200, currency: 'PLN' });
+
+  await send(page, '/limit-wydatkow');
+  await expect(replies.last()).toContainText('Brakuje: kwota.');
+  await send(page, '/limit-wydatkow 2000000');
+  await expect(replies.last()).toHaveText('Najwięcej 1 000 000 zł.');
+});
+
+test('/nowy-obowiazek writes the definition the Chores list writes, one-time with --jednorazowy; /cofnij removes it', async ({ page }) => {
+  const account = await choresAccount('exus-create-chore');
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+  const defOf = async (name) => (await choreDefsOf(account.uid).where('name', '==', name).get()).docs.map((d) => d.data());
+
+  await send(page, '/nowy-obowiazek Wyniesienie śmieci 12');
+  await expect(replies.last()).toHaveText('Dodano obowiązek „Wyniesienie śmieci” do listy: 12 pkt.');
+  await expect(page.getByText('Dodano do listy: Wyniesienie śmieci')).toBeVisible();
+  // After the last one (order 4), no emoji, no description: the document of the sheet.
+  await expect.poll(() => defOf('Wyniesienie śmieci')).toEqual([{ name: 'Wyniesienie śmieci', desc: '', emoji: '', points: 12, oneTime: false, order: 4 }]);
+
+  await send(page, '/nowy-obowiazek --jednorazowy Mycie okien 2 30 pkt');
+  await expect(replies.last()).toHaveText('Dodano jednorazowy obowiązek „Mycie okien 2”: 30 pkt. Zniknie z listy po pierwszym zapisaniu.');
+  await expect.poll(() => defOf('Mycie okien 2')).toEqual([{ name: 'Mycie okien 2', desc: '', emoji: '', points: 30, oneTime: true, order: 5 }]);
+
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Cofnięto: obowiązek „Mycie okien 2” na liście.');
+  await expect.poll(() => defOf('Mycie okien 2')).toEqual([]);
+  expect(await defOf('Wyniesienie śmieci')).toHaveLength(1);
+
+  await send(page, '/nowy-obowiazek Okna');
+  await expect(replies.last()).toContainText('Brakuje: punkty.');
+  await send(page, '/nowy-obowiazek Okna 20000');
+  await expect(replies.last()).toHaveText('Najwięcej 10000 pkt.');
+  await send(page, `/nowy-obowiazek ${'x'.repeat(61)} 5`);
+  await expect(replies.last()).toHaveText('Nazwa obowiązku ma najwyżej 60 znaków.');
+  expect(await defOf('Okna')).toEqual([]);
+});
+
+test('/usun-obowiazek asks first; Anuluj changes nothing, Wykonaj removes the definition and leaves the entries; /cofnij brings it back', async ({ page }) => {
+  const account = await choresAccount('exus-delete-chore');
+  await addChoreEntry(account.uid, 'dishwasher', localDay(0));
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+  const dialog = page.getByRole('alertdialog');
+  const hasDef = async (id) => (await choreDefsOf(account.uid).doc(id).get()).exists;
+
+  // Typed at once, before the chores have loaded.
+  await send(page, '/usun-obowiazek zmywarki');
+  await expect(dialog).toContainText('Wykonać /usun-obowiazek?');
+  await expect(dialog).toContainText('Obowiązek „Opróżnienie zmywarki” zniknie z listy. Zapisane wpisy zostają z dawną nazwą i punktami.');
+  await dialog.getByRole('button', { name: 'Anuluj' }).click();
+  await expect(replies.last()).toHaveText('Anulowano, nic się nie zmieniło.');
+  expect(await hasDef('dishwasher')).toBe(true);
+
+  await send(page, '/usun-obowiazek zmywarki');
+  await dialog.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(replies.last()).toHaveText('Usunięto obowiązek „Opróżnienie zmywarki” z listy.');
+  await expect(page.getByText('Usunięto z listy: Opróżnienie zmywarki')).toBeVisible();
+  await expect.poll(() => hasDef('dishwasher')).toBe(false);
+  expect(await choreEntries(account.uid)).toEqual([choreEntry('dishwasher', localDay(0))]);
+
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Cofnięto: usunięcie obowiązku „Opróżnienie zmywarki”.');
+  await expect.poll(() => hasDef('dishwasher')).toBe(true);
+  expect((await choreDefsOf(account.uid).doc('dishwasher').get()).data()).toEqual({ name: 'Opróżnienie zmywarki', desc: '', emoji: '🍽️', points: 15, oneTime: false, order: 0 });
+
+  // No such chore and several fits are said before any question.
+  await send(page, '/usun-obowiazek latanie');
+  await expect(replies.last()).toContainText('Nie ma obowiązku „latanie”.');
+  await send(page, '/usun-obowiazek odkurzanie');
+  await expect(replies.last()).toContainText('Pasuje kilka obowiązków: „Odkurzanie schodów”, „Odkurzanie przedpokoju”.');
+  await expect(dialog).toBeHidden();
+  await send(page, '/usun-obowiazek');
+  await expect(replies.last()).toContainText('Brakuje: obowiązek.');
+});
+
+test('/usun-wpis deletes the newest unpaid entry or the newest of a chore, after asking; /cofnij writes the same entry back', async ({ page }) => {
+  const account = await choresAccount('exus-delete-entry');
+  const now = Date.now();
+  const add = (choreId, dateISO, ago) => {
+    const [, name, emoji, points] = CHORE_DEFS.find((d) => d[0] === choreId);
+    return choreEntriesOf(account.uid).add({ choreId, choreName: name, choreEmoji: emoji, points, dateISO, monthKey: dateISO.slice(0, 7), createdAt: new Date(now - ago) });
+  };
+  await add('dishwasher', localDay(-2), 3000);
+  await add('vacuum_stairs', localDay(-1), 2000);
+  await add('dishwasher', localDay(0), 1000);
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+  const dialog = page.getByRole('alertdialog');
+
+  await send(page, '/usun-wpis');
+  await expect(dialog).toContainText(`Usuniesz wpis „Opróżnienie zmywarki” z dnia`);
+  await expect(dialog).toContainText('(+15 pkt). Te punkty nie trafią do wypłaty.');
+  await dialog.getByRole('button', { name: 'Anuluj' }).click();
+  await expect(replies.last()).toHaveText('Anulowano, nic się nie zmieniło.');
+  expect(await choreEntries(account.uid)).toHaveLength(3);
+
+  await send(page, '/usun-wpis ostatni');
+  await dialog.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(replies.last()).toContainText('Usunięto wpis „Opróżnienie zmywarki” z dnia');
+  await expect(page.getByText('Wpis usunięty.')).toBeVisible();
+  await expect.poll(async () => (await choreEntries(account.uid)).length).toBe(2);
+  expect(await choreEntries(account.uid)).not.toContainEqual(choreEntry('dishwasher', localDay(0)));
+
+  // The same entry, with its time, comes back.
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Cofnięto: usunięcie wpisu „Opróżnienie zmywarki”.');
+  await expect.poll(async () => (await choreEntries(account.uid)).length).toBe(3);
+  expect(await choreEntries(account.uid)).toContainEqual(choreEntry('dishwasher', localDay(0)));
+
+  // A name takes the newest entry of that chore.
+  await send(page, '/usun-wpis schodow');
+  await dialog.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(replies.last()).toContainText('Usunięto wpis „Odkurzanie schodów” z dnia');
+  await expect.poll(async () => (await choreEntries(account.uid)).length).toBe(2);
+
+  await send(page, '/usun-wpis latanie');
+  await expect(replies.last()).toContainText('Nie ma wpisu „latanie” do wypłaty.');
+  await expect(dialog).toBeHidden();
+});
+
+test('/usun-wpis with no entries says so at once, without a question', async ({ page }) => {
+  const account = await choresAccount('exus-delete-entry-none');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/usun-wpis');
+  await expect(page.locator('.exus-msg--exus').last()).toHaveText('Nie ma żadnych wpisów do wypłaty.');
+  await expect(page.getByRole('alertdialog')).toBeHidden();
+});
+
+/** An account with two logged activities (Nauka 40 pts, Czytanie 25 pts) and the totals and today's log they left. */
+async function twoActivities(tag) {
+  const account = await createUser({ tag, profile: { points: { total: 120, earnedAllTime: 620, spentAllTime: 0 }, dailyLimit: 150 } });
+  const user = db.doc(`users/${account.uid}`);
+  await user.collection('dailyLog').doc(todayUtcKey()).set({ pointsEarned: 65, gamingMinutes: 0 });
+  await user.collection('activityDefs').doc('learning').set({ name: 'Nauka', points: 40, color: '#6c63ff', icon: 'ti-book', order: 0 });
+  await user.collection('activityDefs').doc('reading').set({ name: 'Czytanie', points: 25, color: '#ffd700', icon: 'ti-book-2', order: 1 });
+  const at = (minutes) => Timestamp.fromDate(new Date(Date.now() - minutes * 60000));
+  await user.collection('activities').add({ type: 'learning', duration: 60, points: 40, desc: 'rozdział 3', timestamp: at(30) });
+  await user.collection('activities').add({ type: 'reading', duration: 60, points: 25, desc: '', timestamp: at(10) });
+  return account;
+}
+
+test('/usun-aktywnosc asks first; Wykonaj deletes the newest and takes its points back exactly (G11)', async ({ page }) => {
+  const account = await twoActivities('exus-delete-activity');
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+  const dialog = page.getByRole('alertdialog');
+
+  await send(page, '/usun-aktywnosc');
+  await expect(dialog).toContainText('Usuniesz aktywność „Czytanie” (1 h,');
+  await expect(dialog).toContainText('Odejmiemy 25 pkt z punktów i z dnia, w którym ją zapisano.');
+  await dialog.getByRole('button', { name: 'Anuluj' }).click();
+  await expect(replies.last()).toHaveText('Anulowano, nic się nie zmieniło.');
+  expect((await activityState(account.uid)).activities).toHaveLength(2);
+
+  await send(page, '/usun-aktywnosc ostatnia');
+  await dialog.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(replies.last()).toHaveText('Usunięto aktywność „Czytanie”. Odjęto 25 pkt.');
+  await expect(page.getByText('Usunięto aktywność. −25 pkt')).toBeVisible();
+  await expect.poll(() => activityState(account.uid)).toMatchObject({
+    points: { total: 95, earnedAllTime: 595, spentAllTime: 0 },
+    day: { pointsEarned: 40, gamingMinutes: 0 },
+    activities: [{ type: 'learning', duration: 60, points: 40, desc: 'rozdział 3' }],
+  });
+  // Nothing writes an activity back with its credit: no undo.
+  await expect(page.getByRole('button', { name: 'Cofnij' })).toHaveCount(0);
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Nie ma nic do cofnięcia.');
+
+  // A text names it by type and note; the last one goes, then there is nothing.
+  await send(page, '/usun-aktywnosc nauka rozdzial');
+  await dialog.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(replies.last()).toHaveText('Usunięto aktywność „Nauka”. Odjęto 40 pkt.');
+  await expect.poll(() => activityState(account.uid)).toMatchObject({
+    points: { total: 55, earnedAllTime: 555, spentAllTime: 0 },
+    day: { pointsEarned: 0, gamingMinutes: 0 },
+    activities: [],
+  });
+  await send(page, '/usun-aktywnosc');
+  await expect(replies.last()).toHaveText('Nie ma żadnych aktywności do usunięcia.');
+  await expect(dialog).toBeHidden();
+});
+
+test('/usun-aktywnosc lists several fits and says when nothing fits, before any question', async ({ page }) => {
+  const account = await twoActivities('exus-delete-activity-text');
+  await db.collection(`users/${account.uid}/activities`).add({
+    type: 'learning',
+    duration: 30,
+    points: 20,
+    desc: 'testy',
+    timestamp: Timestamp.fromDate(new Date(Date.now() - 20 * 60000)),
+  });
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/usun-aktywnosc nauka');
+  await expect(replies.last()).toContainText('Pasuje kilka aktywności. Napisz dokładniej albo wpisz „ostatnia”:');
+  await expect(replies.last()).toContainText('• Nauka testy (30 min,');
+  await expect(replies.last()).toContainText('• Nauka rozdział 3 (1 h,');
+  await send(page, '/usun-aktywnosc latanie');
+  await expect(replies.last()).toContainText('Nie ma aktywności „latanie” wśród ostatnich.');
+  await expect(page.getByRole('alertdialog')).toBeHidden();
+  expect((await activityState(account.uid)).activities).toHaveLength(3);
+});
+
+// The reports of this account as the Reports screen's tests read them.
+const reportsOf = async (uid) => (await db.collection('bugReports').where('reporterUid', '==', uid).get()).docs.map((d) => d.data());
+
+test('/blad sends the report the Reports screen sends (title, area by name, description); the second one the same day is refused', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-report', profile: { name: 'Ola' } });
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  // Typed at once, before the reports have loaded.
+  await send(page, '/blad Saldo | pieniadze | Saldo nie działa po wypłacie, "a=b"');
+  await expect(replies.last()).toHaveText('Zgłoszenie wysłane. Dzięki! „Saldo”, obszar: Pieniądze.');
+  await expect(page.getByRole('status')).toContainText('Zgłoszenie wysłane. Dzięki!');
+  await expect.poll(async () => (await reportsOf(account.uid)).length).toBe(1);
+  const { createdAt, ...report } = (await reportsOf(account.uid))[0];
+  expect(createdAt).toBeInstanceOf(Timestamp);
+  expect(report).toEqual({
+    reporterUid: account.uid,
+    reporterName: 'Ola',
+    title: 'Saldo',
+    area: 'money',
+    description: 'Saldo nie działa po wypłacie, "a=b"',
+    status: 'new',
+    messages: [],
+  });
+  expect((await db.doc(`users/${account.uid}`).get()).data().lastBugReportAt.slice(0, 10)).toBe(todayUtcKey());
+
+  // One a day: the second is refused and writes nothing; it cannot be undone either.
+  await send(page, '/blad Inne | inne | Przycisk nie działa');
+  await expect(replies.last()).toHaveText('Możesz wysłać jedno zgłoszenie dziennie. Spróbuj jutro.');
+  expect(await reportsOf(account.uid)).toHaveLength(1);
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Nie ma nic do cofnięcia.');
+
+  // The Reports screen lists it, and its button is used up for today.
+  await page.evaluate(() => (location.hash = '#/reports'));
+  await expect(page.getByRole('list', { name: 'Moje zgłoszenia' }).getByRole('listitem')).toContainText('Saldo');
+  await expect(page.getByRole('button', { name: 'Zgłoś błąd' })).toBeDisabled();
+});
+
+test('/blad: the format, the area, the length and the spam filter work as on the Reports screen', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-report-rules', profile: { name: 'Ola' } });
+  await db.doc('bugReportsConfig/keywords').set({ words: ['nie działa', 'błąd'] });
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/blad');
+  await expect(replies.last()).toContainText('Brakuje: tytuł | obszar | opis.');
+  await send(page, '/blad Saldo');
+  await expect(replies.last()).toHaveText('Napisz zgłoszenie tak: tytuł | obszar | opis. Obszary: Dziś, Pieniądze, Obowiązki, Historia, Statystyki, Ustawienia, Inne.');
+  await send(page, '/blad Saldo | latanie | opis');
+  await expect(replies.last()).toHaveText('Nie znam obszaru „latanie”. Obszary: Dziś, Pieniądze, Obowiązki, Historia, Statystyki, Ustawienia, Inne.');
+  await send(page, `/blad ${'t'.repeat(81)} | inne | opis`);
+  await expect(replies.last()).toHaveText('Tytuł ma najwyżej 80 znaków.');
+  await send(page, `/blad Tytuł | inne | ${'o'.repeat(401)}`);
+  await expect(replies.last()).toHaveText('Opis ma najwyżej 400 znaków.');
+  expect(await reportsOf(account.uid)).toEqual([]);
+
+  // None of the admin's words: it goes to spam, and the reporter is told only that it was sent.
+  await send(page, '/blad Hej | Inne | Fajna apka');
+  await expect(replies.last()).toHaveText('Zgłoszenie wysłane. Dzięki! „Hej”, obszar: Inne.');
+  await expect.poll(async () => (await reportsOf(account.uid)).map((r) => r.status)).toEqual(['spam']);
+});
+
+test('/blad uses the bonus report of an accepted one when today is used up', async ({ page }) => {
+  const sentToday = `${todayUtcKey()}T08:00:00.000Z`;
+  const account = await createUser({ tag: 'exus-report-bonus', profile: { name: 'Ola', lastBugReportAt: sentToday } });
+  await db.collection('bugReports').doc(`bonus-${account.uid}`).set({
+    reporterUid: account.uid,
+    reporterName: 'Ola',
+    title: 'Stare',
+    area: 'other',
+    description: 'Przycisk nie działa',
+    status: 'accepted',
+    messages: [],
+    createdAt: Timestamp.fromDate(new Date(Date.now() - 86400000)),
+    bonusGranted: true,
+  });
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+  await send(page, '/blad Saldo | Pieniądze | Saldo nie działa');
+  await expect(replies.last()).toHaveText('Zgłoszenie wysłane. Dzięki! „Saldo”, obszar: Pieniądze.');
+  await expect.poll(async () => (await db.doc(`bugReports/bonus-${account.uid}`).get()).data().bonusUsed).toBe(true);
+  await send(page, '/blad Jeszcze | Inne | Przycisk nie działa');
+  await expect(replies.last()).toHaveText('Możesz wysłać jedno zgłoszenie dziennie. Spróbuj jutro.');
+});
+
+test('/nowy empties the chat and the undo list; the work already done stays', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-new-chat' });
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+  const mine = page.locator('.exus-msg--me');
+
+  await send(page, '/zadanie Kupić mleko jutro');
+  await expect(log(page)).toContainText('Dodano zadanie „Kupić mleko”');
+  await send(page, '/pomoc');
+  await expect(mine).toHaveCount(2);
+
+  await send(page, '/nowy');
+  await expect(replies).toHaveCount(1);
+  await expect(replies.first()).toHaveText('Zaczynamy od nowa. Wpisz /pomoc, żeby zobaczyć komendy.');
+  await expect(mine).toHaveCount(0);
+  await expect(log(page)).not.toContainText('Kupić mleko');
+  await expect(page.getByLabel('Wiadomość do Ex-us')).toHaveValue('');
+
+  // The undo list is empty now, and the task is still there.
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Nie ma nic do cofnięcia.');
+  await expect.poll(async () => (await tasksOf(account.uid)).map((task) => task.text)).toEqual(['Kupić mleko']);
+  // The chat works as before.
+  await send(page, '/nowy');
+  await expect(replies).toHaveCount(1);
+});
+
+test('with Money, Chores or Statistics XP off, their new commands are gone; /blad and /nowy stay', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-no-modules-5a9', profile: { enabledModules: ['notes', 'aichat', 'games'] } });
+  await openSignedIn(page, account, '#/exus');
+  const field = page.getByLabel('Wiadomość do Ex-us');
+  const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
+  for (const prefix of ['/pozycz', '/splat', '/limit-w', '/nowy-ob', '/usun-ob', '/usun-wp', '/usun-ak']) {
+    await field.fill(prefix);
+    await expect(list).toHaveCount(0);
+  }
+  await field.fill('/bla');
+  await expect(list.getByRole('button')).toHaveCount(1);
+  await field.fill('/nowy');
+  await expect(list.getByRole('button')).toHaveCount(1);
+  await field.fill('');
+  for (const command of ['/pozyczam Ola 5', '/pozyczam-od Ola 5', '/splata Ola 5', '/pozyczki', '/limit-wydatkow 5', '/nowy-obowiazek Okna 5', '/usun-obowiazek okna', '/usun-wpis', '/usun-aktywnosc']) {
+    await send(page, command);
+    await expect(page.locator('.exus-msg--exus').last()).toContainText(`Nie znam komendy ${command.split(' ')[0]}.`);
+  }
+  await send(page, '/pomoc');
+  const help = page.locator('.exus-msg--exus').last();
+  await expect(help).toContainText('/blad <tytuł> | <obszar> | <opis>');
+  await expect(help).toContainText('/nowy — Nowa rozmowa');
+  await expect(help).not.toContainText('/pozyczam');
+  await expect(help).not.toContainText('/usun-wpis');
+  await send(page, '/blad Saldo | Inne | Saldo nie działa');
+  await expect(page.locator('.exus-msg--exus').last()).toContainText('Zgłoszenie wysłane. Dzięki!');
+});
+
+test('the 5a-9 commands wait for their data under a CPU 6 times slower, from a cold start', async ({ page }) => {
+  const account = await choresAccount('exus-5a9-slow', { name: 'Ola' });
+  await db.doc(`users/${account.uid}/money/balance`).set({ current: 50 });
+  await db.doc(`users/${account.uid}/money/settings`).set({ monthlyLimit: 200, currency: 'PLN' });
+  await seedLoan(account.uid, { person: 'Ola', amount: 20, repaidAmount: 5, direction: 'lent' });
+  await addChoreEntry(account.uid, 'dishwasher', localDay(0));
+  await openSignedIn(page, account, '#/exus');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+
+  await send(page, '/pozyczki');
+  await send(page, '/splata ola 5');
+  await send(page, '/limit-wydatkow 100');
+  await send(page, '/nowy-obowiazek Okna 20');
+  await send(page, '/blad Wolno | Inne | Strona nie działa');
+  await expect(log(page)).toContainText('Do odzyskania: 15,00 zł.');
+  await expect(log(page)).toContainText('Spłacono 5,00 zł pożyczki dla: Ola. Zostało 10,00 zł. Saldo wzrosło.');
+  await expect(log(page)).toContainText('Miesięczny limit wydatków: 100,00 zł (było: 200,00 zł).');
+  await expect(log(page)).toContainText('Dodano obowiązek „Okna” do listy: 20 pkt.');
+  await expect(log(page)).toContainText('Zgłoszenie wysłane. Dzięki! „Wolno”, obszar: Inne.');
+
+  await send(page, '/usun-wpis');
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(log(page)).toContainText('Usunięto wpis „Opróżnienie zmywarki” z dnia');
+  await expect.poll(async () => (await loansState(account.uid)).balance).toEqual({ current: 55 });
+  await expect.poll(() => choreEntries(account.uid)).toEqual([]);
+  await expect.poll(async () => (await reportsOf(account.uid)).length).toBe(1);
 });

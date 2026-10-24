@@ -5,7 +5,7 @@ import { addLoan, deleteLoan, repayLoan, type LoanOutcome, type RepayOutcome } f
 import { loanProblem, type Loan, type LoanDraft, type LoanProblem } from '@/domain/loans';
 import { utcDayKey } from '@/lib/dates';
 
-export type LoanSaveResult = { ok: true } | { ok: false; problem: LoanProblem };
+export type LoanSaveResult = { ok: true; id: string } | { ok: false; problem: LoanProblem };
 
 /** v1 saveLoan(): checked, then saved, dated today (UTC, G13) unless a date was picked. */
 export async function createLoan(uid: string, draft: LoanDraft, now = new Date()): Promise<LoanSaveResult> {
@@ -26,6 +26,7 @@ export function repay(uid: string, loan: Loan, grosze: number, now = new Date())
   return repayLoan(uid, loan.id, grosze, now);
 }
 
-export function removeLoan(uid: string, loan: Loan): Promise<LoanOutcome> {
+/** The loan goes and what is still outstanding on it goes back to the balance; also the undo of createLoan(). */
+export function removeLoan(uid: string, loan: Pick<Loan, 'id'>): Promise<LoanOutcome> {
   return deleteLoan(uid, loan.id);
 }

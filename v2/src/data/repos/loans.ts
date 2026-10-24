@@ -26,6 +26,9 @@ export function watchLoans(uid: string, onChange: (loans: Loan[]) => void, onErr
 
 export type LoanOutcome = { ok: true } | { ok: false; problem: 'notEnoughBalance' };
 
+/** A new loan also says which document it is, so its creation can be taken back. */
+export type AddLoanOutcome = { ok: true; id: string } | { ok: false; problem: 'notEnoughBalance' };
+
 export interface AddLoanInput {
   direction: LoanDirection;
   person: string;
@@ -36,16 +39,17 @@ export interface AddLoanInput {
 }
 
 /** v1 saveLoan(): the loan and its effect on the balance (G6.1, G6.2). */
-export function addLoan(uid: string, input: AddLoanInput): Promise<LoanOutcome> {
-  return runTransaction(db, async (tx): Promise<LoanOutcome> => {
+export function addLoan(uid: string, input: AddLoanInput): Promise<AddLoanOutcome> {
+  return runTransaction(db, async (tx): Promise<AddLoanOutcome> => {
     const balanceRef = moneyDoc(uid, 'balance');
     const balance = await tx.get(balanceRef);
     const current = balanceIn(balance);
     const delta = newLoanDelta(input.direction, input.grosze);
     if (!fitsBalance(current, delta)) return { ok: false, problem: 'notEnoughBalance' };
-    tx.set(doc(loansOf(uid)), newLoanData(input));
+    const ref = doc(loansOf(uid));
+    tx.set(ref, newLoanData(input));
     writeBalance(tx, balanceRef, balance, current + delta);
-    return { ok: true };
+    return { ok: true, id: ref.id };
   });
 }
 

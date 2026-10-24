@@ -7,7 +7,9 @@ import { today as todaySources } from '@/stores/today';
 import { stats as statsSources, type StatsSources } from '@/stores/stats';
 import type { Note } from '@/domain/notes';
 import type { Task } from '@/domain/tasks';
+import type { BugReport } from '@/domain/reports';
 import { notes } from '@/stores/notes';
+import { myReports } from '@/stores/reports';
 import { tasks } from '@/stores/tasks';
 
 export function waitFor<T>(pick: () => T | undefined, failed: () => boolean, timeoutMs = 0): Promise<T> {
@@ -43,6 +45,13 @@ export const loadedNotes = (): Promise<readonly Note[]> =>
   waitFor(
     () => notes.value.list,
     () => notes.value.failed,
+  );
+
+/** The person's own bug reports once the listener has them (the bonus report counts on them); rejects when they cannot be read. */
+export const loadedReports = (): Promise<readonly BugReport[]> =>
+  waitFor(
+    () => myReports.value.reports,
+    () => myReports.value.failed,
   );
 
 /** One part of Today's data (days, activity types, chores …) once the listener has it. */

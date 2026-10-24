@@ -47,7 +47,18 @@ export type CommandId =
   | 'lang'
   | 'theme'
   | 'module'
-  | 'go';
+  | 'go'
+  | 'lend'
+  | 'borrow'
+  | 'repay'
+  | 'loans'
+  | 'money-limit'
+  | 'create-chore'
+  | 'delete-chore'
+  | 'delete-chore-entry'
+  | 'delete-activity'
+  | 'report-bug'
+  | 'new-chat';
 
 export interface CommandSpec {
   id: CommandId;
@@ -56,6 +67,8 @@ export interface CommandSpec {
   /** Gone while this module is off; null = always there. */
   module: OptionalModule | null;
   risk: Risk;
+  /** May the AI propose this command (PLAN.md 6.4, 6.5 column "AI")? Nothing reads it before stage 5b. */
+  aiExposed: boolean;
   /** Slots read from the text; dates count from `today` (local day key). */
   slots: (today: string) => SlotDef[];
 }
@@ -87,6 +100,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['pomoc'],
     module: null,
     risk: 'read',
+    aiExposed: false,
     slots: () => [{ name: 'command', type: 'text', required: false }],
   },
   {
@@ -94,6 +108,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['dzis'],
     module: null,
     risk: 'read',
+    aiExposed: true,
     slots: () => [],
   },
   {
@@ -102,6 +117,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['cofnij'],
     module: null,
     risk: 'write',
+    aiExposed: false,
     slots: () => [],
   },
   {
@@ -109,6 +125,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['zadanie'],
     module: null,
     risk: 'write',
+    aiExposed: true,
     slots: (today) => [
       { name: 'text', type: 'text', required: true },
       { name: 'due', type: 'date', required: true, recognize: dateFrom(today) },
@@ -121,6 +138,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['zrobione'],
     module: null,
     risk: 'write',
+    aiExposed: true,
     slots: () => [{ name: 'task', type: 'entity', required: true }],
   },
   {
@@ -128,6 +146,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['zadania'],
     module: null,
     risk: 'read',
+    aiExposed: true,
     slots: () => [{ name: 'scope', type: 'enum', required: false, recognize: TASKS_SCOPE }],
   },
   {
@@ -136,6 +155,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['edytuj-zadanie'],
     module: null,
     risk: 'write',
+    aiExposed: true,
     slots: (today) => [
       { name: 'task', type: 'entity', required: true },
       { name: 'text', type: 'text', required: false, keys: ['tresc', 'text'], namedOnly: true },
@@ -148,6 +168,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['usun-zadanie'],
     module: null,
     risk: 'destructive',
+    aiExposed: true,
     slots: () => [{ name: 'task', type: 'entity', required: true }],
   },
   {
@@ -156,6 +177,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['cel'],
     module: null,
     risk: 'write',
+    aiExposed: true,
     slots: () => [
       { name: 'name', type: 'text', required: true },
       { name: 'target', type: 'money', required: true, recognize: amount, fromEnd: true },
@@ -166,6 +188,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['wplac'],
     module: null,
     risk: 'write',
+    aiExposed: true,
     slots: () => [
       { name: 'goal', type: 'entity', required: true },
       { name: 'amount', type: 'money', required: true, recognize: amount, fromEnd: true },
@@ -176,6 +199,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['cele'],
     module: null,
     risk: 'read',
+    aiExposed: true,
     slots: () => [],
   },
   {
@@ -183,6 +207,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['edytuj-cel'],
     module: null,
     risk: 'write',
+    aiExposed: true,
     slots: () => [
       { name: 'goal', type: 'entity', required: true },
       { name: 'name', type: 'text', required: false, keys: ['nazwa', 'name'], namedOnly: true },
@@ -195,6 +220,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['usun-cel'],
     module: null,
     risk: 'destructive',
+    aiExposed: true,
     slots: () => [{ name: 'goal', type: 'entity', required: true }],
   },
   {
@@ -202,6 +228,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['wplyw'],
     module: 'money',
     risk: 'write',
+    aiExposed: true,
     slots: txSlots,
   },
   {
@@ -209,6 +236,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['wydatek'],
     module: 'money',
     risk: 'write',
+    aiExposed: true,
     slots: txSlots,
   },
   {
@@ -216,6 +244,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['saldo'],
     module: 'money',
     risk: 'read',
+    aiExposed: true,
     slots: () => [],
   },
   {
@@ -223,6 +252,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['kategoria'],
     module: 'money',
     risk: 'write',
+    aiExposed: true,
     slots: () => [{ name: 'name', type: 'text', required: true }],
   },
   {
@@ -231,6 +261,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['usun-transakcje'],
     module: 'money',
     risk: 'destructive',
+    aiExposed: true,
     slots: () => [{ name: 'ref', type: 'entity', required: false }],
   },
   {
@@ -239,6 +270,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['obowiazek'],
     module: 'chores',
     risk: 'write',
+    aiExposed: true,
     slots: () => [
       { name: 'chore', type: 'entity', required: true },
       { name: 'when', type: 'enum', required: false, recognize: CHORE_DAY },
@@ -249,6 +281,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['obowiazki'],
     module: 'chores',
     risk: 'read',
+    aiExposed: true,
     slots: () => [],
   },
   {
@@ -257,6 +290,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['rozlicz'],
     module: 'chores',
     risk: 'destructive',
+    aiExposed: true,
     slots: () => [],
   },
   {
@@ -265,6 +299,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['aktywnosc'],
     module: 'stats',
     risk: 'write',
+    aiExposed: true,
     slots: () => [
       { name: 'type', type: 'text', required: true },
       { name: 'duration', type: 'duration', required: true, recognize: duration },
@@ -275,6 +310,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['seria'],
     module: 'stats',
     risk: 'read',
+    aiExposed: true,
     slots: () => [],
   },
   {
@@ -282,6 +318,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['statystyki'],
     module: 'stats',
     risk: 'read',
+    aiExposed: true,
     slots: () => [{ name: 'period', type: 'enum', required: false, recognize: STATS_PERIOD }],
   },
   {
@@ -290,6 +327,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['co-teraz'],
     module: 'stats',
     risk: 'read',
+    aiExposed: true,
     slots: () => [{ name: 'duration', type: 'duration', required: true, recognize: duration }],
   },
   {
@@ -298,6 +336,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['notatka'],
     module: 'notes',
     risk: 'write',
+    aiExposed: true,
     slots: () => [
       { name: 'title', type: 'text', required: true, leading: true, keys: ['tytul', 'title'] },
       { name: 'content', type: 'text', required: false, keys: ['tresc', 'content'] },
@@ -308,6 +347,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['archiwizuj'],
     module: 'notes',
     risk: 'write',
+    aiExposed: true,
     slots: () => [{ name: 'note', type: 'entity', required: true }],
   },
   {
@@ -315,6 +355,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['szukaj'],
     module: 'notes',
     risk: 'read',
+    aiExposed: true,
     slots: () => [{ name: 'query', type: 'text', required: true }],
   },
   {
@@ -322,6 +363,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['limit'],
     module: null,
     risk: 'write',
+    aiExposed: true,
     slots: () => [{ name: 'limit', type: 'number', required: true, recognize: limitValue }],
   },
   {
@@ -329,6 +371,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['jezyk'],
     module: null,
     risk: 'write',
+    aiExposed: false,
     slots: () => [{ name: 'lang', type: 'enum', required: true, recognize: LANG_WORD }],
   },
   {
@@ -337,6 +380,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['motyw'],
     module: null,
     risk: 'write',
+    aiExposed: false,
     slots: () => [
       { name: 'family', type: 'enum', required: false, recognize: THEME_FAMILY_WORD },
       { name: 'mode', type: 'enum', required: false, recognize: THEME_MODE_WORD },
@@ -347,6 +391,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['modul'],
     module: null,
     risk: 'write',
+    aiExposed: false,
     slots: () => [
       { name: 'module', type: 'enum', required: true, recognize: MODULE_WORD },
       { name: 'state', type: 'enum', required: true, recognize: SWITCH_WORD },
@@ -358,9 +403,122 @@ export const COMMANDS: readonly CommandSpec[] = [
     aliases: ['idz'],
     module: null,
     risk: 'read',
+    aiExposed: true,
     slots: () => [{ name: 'screen', type: 'text', required: true }],
   },
+  {
+    // "person amount note": the person is the first word (quote it for several), the amount is read from anywhere.
+    id: 'lend',
+    aliases: ['pozyczam'],
+    module: 'money',
+    risk: 'write',
+    aiExposed: true,
+    slots: () => loanSlots(),
+  },
+  {
+    id: 'borrow',
+    aliases: ['pozyczam-od'],
+    module: 'money',
+    risk: 'write',
+    aiExposed: true,
+    slots: () => loanSlots(),
+  },
+  {
+    // The loan is found by the person (or "person note" when there are several).
+    id: 'repay',
+    aliases: ['splata'],
+    module: 'money',
+    risk: 'write',
+    aiExposed: true,
+    slots: () => [
+      { name: 'loan', type: 'entity', required: true },
+      { name: 'amount', type: 'money', required: true, recognize: grosze, fromEnd: true },
+    ],
+  },
+  {
+    id: 'loans',
+    aliases: ['pozyczki'],
+    module: 'money',
+    risk: 'read',
+    aiExposed: true,
+    slots: () => [],
+  },
+  {
+    // 0 turns the limit off, as on the Money settings screen.
+    id: 'money-limit',
+    aliases: ['limit-wydatkow'],
+    module: 'money',
+    risk: 'write',
+    aiExposed: true,
+    slots: () => [{ name: 'amount', type: 'money', required: true, recognize: grosze }],
+  },
+  {
+    // The points are the last number ("Mycie okien 2 30"), the flag makes it a one-time chore.
+    id: 'create-chore',
+    aliases: ['nowy-obowiazek'],
+    module: 'chores',
+    risk: 'write',
+    aiExposed: true,
+    slots: () => [
+      { name: 'name', type: 'text', required: true },
+      { name: 'points', type: 'number', required: true, recognize: limitValue, fromEnd: true },
+      { name: 'once', type: 'enum', required: false, flags: ['jednorazowy', 'once'] },
+    ],
+  },
+  {
+    id: 'delete-chore',
+    aliases: ['usun-obowiazek'],
+    module: 'chores',
+    risk: 'destructive',
+    aiExposed: true,
+    slots: () => [{ name: 'chore', type: 'entity', required: true }],
+  },
+  {
+    // Nothing or "ostatni" = the newest unpaid entry; a name = the newest entry of that chore.
+    id: 'delete-chore-entry',
+    aliases: ['usun-wpis'],
+    module: 'chores',
+    risk: 'destructive',
+    aiExposed: true,
+    slots: () => [{ name: 'ref', type: 'entity', required: false }],
+  },
+  {
+    // Nothing or "ostatnia" = the newest; a text is matched with the type and the note.
+    id: 'delete-activity',
+    aliases: ['usun-aktywnosc'],
+    module: 'stats',
+    risk: 'destructive',
+    aiExposed: true,
+    slots: () => [{ name: 'ref', type: 'entity', required: false }],
+  },
+  {
+    // "title | area | description": the text as typed, split on "|" by the handler (domain/exus/reports).
+    id: 'report-bug',
+    aliases: ['blad'],
+    module: null,
+    risk: 'write',
+    aiExposed: true,
+    slots: () => [{ name: 'report', type: 'text', required: true, raw: true }],
+  },
+  {
+    // Starts a new conversation: the chat and its undo stack are emptied.
+    id: 'new-chat',
+    aliases: ['nowy'],
+    module: null,
+    risk: 'read',
+    aiExposed: false,
+    slots: () => [],
+  },
 ];
+
+/** /pozyczam and /pozyczam-od read the same text: the person, the amount, then the note. */
+function loanSlots(): SlotDef[] {
+  return [
+    { name: 'amount', type: 'money', required: true, recognize: grosze },
+    { name: 'person', type: 'text', required: true, leading: true },
+    { name: 'note', type: 'text', required: false },
+  ];
+}
 
 /** The commands of the modules that are on. */
 export function availableCommands(choice: ModuleChoice, all: readonly CommandSpec[] = COMMANDS): CommandSpec[] {
@@ -392,7 +550,8 @@ export function parseInput(input: string, today: string, commands: readonly Comm
   const spec = findCommand(tokenized.command, commands);
   if (!spec) return { kind: 'unknown', name: tokenized.command };
   const slots = spec.slots(today);
-  const args = fillSlots(tokenized.tokens, slots, tokenized.named);
+  const rest = input.trim().replace(/^\/\S*\s*/, '');
+  const args = fillSlots(tokenized.tokens, slots, tokenized.named, { flags: tokenized.flags, rest });
   return { kind: 'command', spec, args, missing: missingSlots(slots, args), unread: unreadNamed(slots, tokenized.named, args) };
 }
 

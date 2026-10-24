@@ -3,11 +3,13 @@
 // sheet (services/activity: one transaction, the daily limit read on the server),
 // the reads use the same domain functions as Today's streak card and the Stats
 // screen. Whatever they read is awaited first.
-import { splitTypeDesc, whatNow } from '@/domain/exus/activities';
+import { activityLabel, findActivity, splitTypeDesc, whatNow } from '@/domain/exus/activities';
 import { periodStats, type StatsPeriod } from '@/domain/exus/stats';
 import {
   ACTIVITY_MIN_MINUTES,
+  activityName,
   generatorPool,
+  type Activity,
   type ActivityDef,
   type ActivityDraft,
 } from '@/domain/activity';
@@ -15,9 +17,10 @@ import { levelOf, levelTitleIndex } from '@/domain/points';
 import { FREEZE_COOLDOWN_DAYS, streakOf } from '@/domain/streak';
 import { formatDuration } from '@/features/shared/activity';
 import { locale, t } from '@/i18n';
-import { utcDayKey } from '@/lib/dates';
+import { formatDayMonth, localDayKey, utcDayKey } from '@/lib/dates';
 import { formatInteger } from '@/lib/format';
 import { ensureActivityDefs, removeActivity, saveActivity } from '@/services/activity';
+import { stats as statsSources } from '@/stores/stats';
 import { today as todaySources } from '@/stores/today';
 import type { CommandHandler } from './handlers';
 import { loadedStats, loadedToday, seeded } from './loaded';
@@ -35,6 +38,33 @@ function creditLine(points: number, earned: number, limit: number): string {
     return t('activity.willEarnCapped', { points: formatInteger(points, lang), earned: formatInteger(earned, lang), limit: formatInteger(limit, lang) });
   }
   return t('activity.willEarn', { points: formatInteger(points, lang) });
+}
+
+const NO_NAMES: ReadonlyMap<string, string> = new Map();
+
+/** "Nauka (JS, Unity, C#), 1 h, 12 paź, 40 pkt" for the lists of activities that fit. */
+function listLine(activity: Activity, names: ReadonlyMap<string, string>, lang: string): string {
+  return t('exus.activity.line', {
+    name: activityLabel(activity, names),
+    time: formatDuration(activity.duration),
+    date: formatDayMonth(localDayKey(activity.at), lang),
+    points: formatInteger(activity.points, lang),
+  });
+}
+
+/** The activity a /usun-aktywnosc names among the newest ones the Stats screen reads, or what to answer. */
+function findOne(args: Record<string, unknown>): { activity: Activity; names: ReadonlyMap<string, string> } | { reply: string } {
+  const { latest, activityNames } = statsSources.value;
+  const names = activityNames ?? NO_NAMES;
+  const ref = typeof args.ref === 'string' ? args.ref : undefined;
+  const match = findActivity(ref, latest ?? [], names);
+  if (match.kind === 'found') return { activity: match.activity, names };
+  if (match.kind === 'ambiguous') {
+    const lang = locale();
+    return { reply: [t('exus.activity.deleteAmbiguous'), ...match.activities.slice(0, 5).map((a) => listLine(a, names, lang))].join('\n') };
+  }
+  const named = ref !== undefined && ref.trim() !== '' && !/^(ostatni[ae]?|last|latest)$/i.test(ref.trim());
+  return { reply: named ? t('exus.activity.deleteNone', { name: ref }) : t('exus.activity.noActivities') };
 }
 
 export const ACTIVITY_HANDLERS = {
@@ -88,6 +118,50 @@ export const ACTIVITY_HANDLERS = {
         };
       } catch {
         return { reply: t('activity.saveFailed') };
+      }
+    },
+  },
+
+  'delete-activity': {
+    ready: async () => {
+      await Promise.all([loadedStats('latest'), loadedStats('activityNames')]);
+    },
+    check: (args) => {
+      const found = findOne(args);
+      return 'reply' in found ? found.reply : null;
+    },
+    effect: (args) => {
+      const found = findOne(args);
+      if ('reply' in found) return found.reply;
+      const { activity, names } = found;
+      const lang = locale();
+      return t('exus.activity.deleteEffect', {
+        name: activityName(activity, names),
+        time: formatDuration(activity.duration),
+        date: formatDayMonth(localDayKey(activity.at), lang),
+        points: formatInteger(activity.points, lang),
+      });
+    },
+    run: async (args, { uid }) => {
+      try {
+        await Promise.all([loadedStats('latest'), loadedStats('activityNames')]);
+      } catch {
+        return { reply: t('stats.loadFailed') };
+      }
+      // Read again: the list may have changed while the dialog was open.
+      const found = findOne(args);
+      if ('reply' in found) return found;
+      const { activity, names } = found;
+      try {
+        // The same service as the History view: the entry goes, its points come off the day and the totals (G11).
+        const points = await removeActivity(uid, activity);
+        // No undo: nothing writes an activity back with its time and credit.
+        return {
+          reply: t('exus.activity.deleted', { name: activityName(activity, names), points: formatInteger(points, locale()) }),
+          write: { saved: Promise.resolve(), toast: t('activity.deleted', { points }), failed: t('activity.deleteFailed') },
+        };
+      } catch {
+        return { reply: t('activity.deleteFailed') };
       }
     },
   },
