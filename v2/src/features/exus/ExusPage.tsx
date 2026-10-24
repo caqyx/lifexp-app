@@ -8,8 +8,10 @@ import { whatToDo } from '@/domain/exus/policy';
 import { isModuleOn } from '@/domain/modules';
 import { t } from '@/i18n';
 import { localDayKey } from '@/lib/dates';
+import type { RouteProps } from '@/lib/route-match';
 import { prepareMoney } from '@/services/money';
 import { watchMoney } from '@/stores/money';
+import { watchNotes } from '@/stores/notes';
 import { watchStats } from '@/stores/stats';
 import { account } from '@/stores/session';
 import { watchTasks } from '@/stores/tasks';
@@ -39,11 +41,31 @@ interface Pending {
 }
 
 /** The slots a reply can name as missing (exus.slots). */
-type SlotName = 'text' | 'due' | 'name' | 'target' | 'goal' | 'amount' | 'chore' | 'type' | 'duration';
+type SlotName =
+  | 'text'
+  | 'due'
+  | 'size'
+  | 'name'
+  | 'target'
+  | 'goal'
+  | 'amount'
+  | 'chore'
+  | 'type'
+  | 'duration'
+  | 'task'
+  | 'title'
+  | 'content'
+  | 'note'
+  | 'query'
+  | 'limit'
+  | 'lang'
+  | 'module'
+  | 'state'
+  | 'screen';
 
 let nextId = 1;
 
-export default function ExusPage() {
+export default function ExusPage({ navigate }: RouteProps) {
   const current = account.value;
   const uid = current?.user.uid;
   useEffect(() => (uid ? watchTasks(uid) : undefined), [uid]);
@@ -55,6 +77,9 @@ export default function ExusPage() {
   // /statystyki reads what the Stats screen reads (the newest 50 activities and their type names).
   const statsOn = current ? isModuleOn('stats', current.profile) : false;
   useEffect(() => (uid && statsOn ? watchStats(uid) : undefined), [uid, statsOn]);
+  // /szukaj and the other note commands read the notes the Notes screen reads.
+  const notesOn = current ? isModuleOn('notes', current.profile) : false;
+  useEffect(() => (uid && notesOn ? watchNotes(uid) : undefined), [uid, notesOn]);
   useEffect(() => {
     if (uid && moneyOn) prepareMoney(uid, incomeCounted).catch(() => {});
   }, [uid, moneyOn]);
@@ -90,7 +115,7 @@ export default function ExusPage() {
     if (parsed.kind === 'text') return say(t('exus.aiLater'));
     if (parsed.kind === 'unknown') return say(t('exus.unknown', { name: parsed.name }));
     const { spec, args, missing, unread } = parsed;
-    const ctx: HandlerContext = { uid, profile, today, commands, undo: undoStack };
+    const ctx: HandlerContext = { uid, profile, today, commands, navigate, undo: undoStack };
     if (unread.length > 0) {
       return say(t('exus.unread', { fields: unread.map((name) => t(`exus.slots.${name as SlotName}`)).join(', '), syntax: syntax(spec) }));
     }

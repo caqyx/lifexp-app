@@ -59,6 +59,18 @@ test('the menu opens Ex-us; /pomoc lists the commands, other text and unknown co
   await expect(log(page)).toContainText('/seria — Seria dni z punktami');
   await expect(log(page)).toContainText('/statystyki [7d|30d] — Punkty i czas aktywności');
   await expect(log(page)).toContainText('/co-teraz <czas> — Co teraz?');
+  await expect(log(page)).toContainText('/zrobione <zadanie> — Oznacz zadanie jako zrobione');
+  await expect(log(page)).toContainText('/zadania [dzis|zalegle|wszystkie] — Zadania');
+  await expect(log(page)).toContainText('/edytuj-zadanie <zadanie> [tresc=…] [termin=…] [rozmiar=…] — Zmień treść, termin albo rozmiar zadania');
+  await expect(log(page)).toContainText('/usun-zadanie <zadanie> — Usuń zadanie');
+  await expect(log(page)).toContainText('/notatka <tytuł> [treść] — Nowa notatka');
+  await expect(log(page)).toContainText('/archiwizuj <notatka> — Przenieś notatkę do archiwum');
+  await expect(log(page)).toContainText('/szukaj <fraza> — Szukaj w tytułach i treści notatek');
+  await expect(log(page)).toContainText('/limit <pkt> — Dzienny limit punktów');
+  await expect(log(page)).toContainText('/jezyk <pl|en> — Język aplikacji');
+  await expect(log(page)).toContainText('/motyw [lifexp|ios|gold] [jasny|ciemny|system] — Motyw');
+  await expect(log(page)).toContainText('/modul <moduł> <on|off> — Włącz albo wyłącz moduł');
+  await expect(log(page)).toContainText('/idz <ekran> — Przejdź do ekranu');
   await send(page, 'odłóż 50 zł na rower');
   await expect(log(page)).toContainText('Rozmowa z AI dojdzie w następnym kroku.');
   await send(page, '/latanie');
@@ -148,9 +160,9 @@ test('typing "/" opens the command palette; a tap puts the command in the field 
   const field = page.getByLabel('Wiadomość do Ex-us');
   const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
   await field.fill('/');
-  await expect(list.getByRole('button')).toHaveCount(21);
+  await expect(list.getByRole('button')).toHaveCount(33);
   await field.fill('/za');
-  await expect(list.getByRole('button')).toHaveCount(1);
+  await expect(list.getByRole('button')).toHaveCount(4);
   await list.getByRole('button', { name: /Nowe zadanie/ }).click();
   await expect(field).toHaveValue('/zadanie ');
   await expect(field).toBeFocused();
@@ -568,7 +580,7 @@ test('with Money off, the money commands are gone from the palette and unknown t
   const field = page.getByLabel('Wiadomość do Ex-us');
   const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
   await field.fill('/');
-  await expect(list.getByRole('button')).toHaveCount(16);
+  await expect(list.getByRole('button')).toHaveCount(28);
   await field.fill('/wyd');
   await expect(list).toHaveCount(0);
   for (const command of ['/wydatek 5 gry', '/wplyw 5 gry', '/saldo', '/kategoria Sport', '/usun-transakcje']) {
@@ -980,7 +992,7 @@ test('with Chores or Statistics XP off, their commands are gone from the palette
   const field = page.getByLabel('Wiadomość do Ex-us');
   const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
   await field.fill('/');
-  await expect(list.getByRole('button')).toHaveCount(14);
+  await expect(list.getByRole('button')).toHaveCount(26);
   for (const prefix of ['/obow', '/rozl', '/akty', '/ser', '/staty', '/co-']) {
     await field.fill(prefix);
     await expect(list).toHaveCount(0);
@@ -1012,4 +1024,433 @@ test('with only Statistics XP off, the chore commands stay', async ({ page }) =>
   await expect(page.locator('.exus-msg--exus').last()).toContainText('Dziś nic jeszcze nie zapisano.');
   await send(page, '/seria');
   await expect(page.locator('.exus-msg--exus').last()).toContainText('Nie znam komendy /seria.');
+});
+
+// ── Stage 5a-8: tasks, notes, settings and navigation ──
+
+const ORDER = ['case', 'motherboard', 'gpu', 'cpu', 'psu', 'ram'];
+const build = (pieces, current) => ({
+  componentOrder: ORDER,
+  progress: Object.fromEntries(ORDER.map((c, i) => [c, pieces[i] ?? 0])),
+  currentComponentIndex: current,
+});
+const userDoc = (uid) => db.doc(`users/${uid}`);
+const pcBuildOf = async (uid) => (await userDoc(uid).get()).data().pcBuild;
+
+function seedTask(uid, patch) {
+  return db.collection(`users/${uid}/todos`).add({
+    text: 'Zadanie',
+    dueDate: localDay(0),
+    size: 'S',
+    done: false,
+    createdAt: new Date().toISOString(),
+    penaltyApplied: false,
+    ...patch,
+  });
+}
+
+const replies = (page) => page.locator('.exus-msg--exus');
+
+test('/zrobione writes what the Tasks screen writes: done, and the pieces of the PC build', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-complete', profile: { pcBuild: build([2], 0) } });
+  const task = await seedTask(account.uid, { text: 'Duże zadanie', size: 'L' });
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/zrobione duże');
+  await expect(replies(page).last()).toHaveText('Zrobione: „Duże zadanie”. Nieźle — +3 kawałki do budowy.');
+  await expect.poll(async () => (await task.get()).data().done).toBe(true);
+  expect(await pcBuildOf(account.uid)).toEqual(build([3, 0], 1));
+  // Done is final: there is nothing to take it back with.
+  await expect(page.getByRole('button', { name: 'Cofnij' })).toHaveCount(0);
+  await send(page, '/cofnij');
+  await expect(replies(page).last()).toHaveText('Nie ma nic do cofnięcia.');
+
+  // A done task is no longer there to be done again; a name no task has is said.
+  await send(page, '/zrobione duże');
+  await expect(replies(page).last()).toContainText('Nie ma otwartego zadania „duże”.');
+  await send(page, '/zrobione statek');
+  await expect(replies(page).last()).toContainText('Nie ma otwartego zadania „statek”.');
+  await send(page, '/zrobione');
+  await expect(replies(page).last()).toContainText('Brakuje: zadanie.');
+});
+
+test('/zrobione after the due day gives no pieces (G9.3); several fits are listed', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-complete-late', profile: { pcBuild: build([3, 1], 1) } });
+  const late = await seedTask(account.uid, { text: 'Kupić mleko', dueDate: localDay(-2), penaltyApplied: true });
+  await seedTask(account.uid, { text: 'Kupić chleb' });
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/zrobione kupić');
+  await expect(replies(page).last()).toContainText('Pasuje kilka zadań: ');
+  await expect(replies(page).last()).toContainText('„Kupić mleko”');
+  await expect(replies(page).last()).toContainText('„Kupić chleb”');
+  await send(page, '/zrobione mleko');
+  await expect(replies(page).last()).toHaveText('Zrobione: „Kupić mleko”. Zrobione, ale po terminie — tym razem bez kawałków.');
+  await expect.poll(async () => (await late.get()).data().done).toBe(true);
+  expect(await pcBuildOf(account.uid)).toEqual(build([3, 1], 1));
+});
+
+test('/zadania lists the open tasks of today and overdue by default, or by word, with due dates and sizes', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-tasks-list' });
+  await seedTask(account.uid, { text: 'Zaległe', dueDate: localDay(-2) });
+  await seedTask(account.uid, { text: 'Na dziś', size: 'L' });
+  await seedTask(account.uid, { text: 'Za trzy dni', dueDate: localDay(3), size: 'M' });
+  await seedTask(account.uid, { text: 'Skończone', dueDate: localDay(-5), done: true });
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/zadania');
+  const reply = replies(page).last();
+  await expect(reply).toContainText('Na dziś i zaległe (2):');
+  await expect(reply).toContainText('• Zaległe — zaległe od');
+  await expect(reply).toContainText('• Na dziś — na dziś, L');
+  await expect(reply).not.toContainText('Za trzy dni');
+  await expect(reply).not.toContainText('Skończone');
+
+  await send(page, '/zadania wszystkie');
+  await expect(replies(page).last()).toContainText('Otwarte zadania (3):');
+  await expect(replies(page).last()).toContainText('• Za trzy dni — do');
+  await expect(replies(page).last()).not.toContainText('Skończone');
+  await send(page, '/zadania zalegle');
+  await expect(replies(page).last()).toContainText('Zaległe (1):');
+  await send(page, '/zadania dzis');
+  await expect(replies(page).last()).toContainText('Na dziś (1):');
+  await expect(replies(page).last()).not.toContainText('Zaległe —');
+});
+
+test('/zadania on a clean account says there is nothing', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-tasks-none' });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/zadania');
+  await expect(replies(page).last()).toHaveText('Nic na dziś ani zaległego.');
+  await send(page, '/zadania wszystkie');
+  await expect(replies(page).last()).toHaveText('Nie ma otwartych zadań.');
+});
+
+test('/edytuj-zadanie changes what is named through the same checks; "Cofnij" restores the old values', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-edit-task' });
+  const ref = await seedTask(account.uid, { text: 'Stary opis', dueDate: localDay(3), size: 'S' });
+  const original = (await ref.get()).data();
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/edytuj-zadanie stary');
+  await expect(replies(page).last()).toContainText('Podaj, co zmienić: treść, termin albo rozmiar.');
+  await send(page, '/edytuj-zadanie stary termin=2020-01-01');
+  await expect(replies(page).last()).toHaveText('Termin nie może być w przeszłości.');
+  await send(page, '/edytuj-zadanie stary rozmiar=XL');
+  await expect(replies(page).last()).toContainText('Nie rozumiem: rozmiar.');
+  expect((await ref.get()).data()).toEqual(original);
+
+  await send(page, '/edytuj-zadanie stary tresc="Nowy opis" termin=+4d rozmiar=l');
+  await expect(replies(page).last()).toContainText('Zmieniono zadanie „Nowy opis”');
+  await expect(replies(page).last()).toContainText('rozmiar L.');
+  await expect.poll(async () => (await ref.get()).data()).toEqual({ ...original, text: 'Nowy opis', dueDate: localDay(4), size: 'L' });
+  await page.getByRole('button', { name: 'Cofnij' }).click();
+  await expect(log(page)).toContainText('Cofnięto: zmiana zadania „Stary opis”.');
+  await expect.poll(async () => (await ref.get()).data()).toEqual(original);
+});
+
+test('/edytuj-zadanie on an overdue task asks for a new due date, as the sheet does', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-edit-overdue' });
+  const ref = await seedTask(account.uid, { text: 'Zaległe', dueDate: localDay(-1), penaltyApplied: true });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/edytuj-zadanie zaległe rozmiar=M');
+  await expect(replies(page).last()).toContainText('to zadanie jest zaległe. Podaj nowy termin, np. termin=jutro.');
+  expect((await ref.get()).data().size).toBe('S');
+
+  await send(page, '/edytuj-zadanie zaległe termin=jutro rozmiar=M');
+  await expect.poll(async () => (await ref.get()).data()).toMatchObject({ dueDate: localDay(1), size: 'M' });
+  // The old due date has passed, so the service would refuse to put it back: no undo is offered.
+  await expect(page.getByRole('button', { name: 'Cofnij' })).toHaveCount(0);
+});
+
+test('/usun-zadanie asks first; Anuluj changes nothing, Wykonaj deletes the task and leaves the PC build', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-delete-task', profile: { pcBuild: build([2], 0) } });
+  const ref = await seedTask(account.uid, { text: 'Do usunięcia' });
+  await openSignedIn(page, account, '#/exus');
+  const dialog = page.getByRole('alertdialog');
+
+  await send(page, '/usun-zadanie usun');
+  await expect(dialog).toContainText('Wykonać /usun-zadanie?');
+  await expect(dialog).toContainText('Zadanie „Do usunięcia” zniknie z listy. Budowa PC zostaje bez zmian.');
+  await dialog.getByRole('button', { name: 'Anuluj' }).click();
+  await expect(log(page)).toContainText('Anulowano, nic się nie zmieniło.');
+  expect((await ref.get()).exists).toBe(true);
+
+  await send(page, '/usun-zadanie "do usunięcia"');
+  await dialog.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(log(page)).toContainText('Usunięto zadanie „Do usunięcia”.');
+  await expect.poll(async () => (await ref.get()).exists).toBe(false);
+  expect(await pcBuildOf(account.uid)).toEqual(build([2], 0));
+  // A destructive command asked first and is not on the undo stack.
+  await expect(page.getByRole('button', { name: 'Cofnij' })).toHaveCount(0);
+  await send(page, '/cofnij');
+  await expect(replies(page).last()).toHaveText('Nie ma nic do cofnięcia.');
+
+  await send(page, '/usun-zadanie statek');
+  await expect(replies(page).last()).toContainText('Nie ma otwartego zadania „statek”.');
+  await expect(dialog).toBeHidden();
+});
+
+const notesOf = async (uid) => (await db.collection(`users/${uid}/notes`).get()).docs.map((d) => ({ id: d.id, ...d.data() }));
+const withoutId = ({ id, createdAt, ...rest }) => rest;
+
+test('/notatka writes a note like the editor; /szukaj finds it; /archiwizuj archives it and "Cofnij" restores it', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-notes' });
+  await db.collection(`users/${account.uid}/notes`).add({
+    title: 'Żółw',
+    content: 'Pancerz i **sałata**',
+    icon: '',
+    color: '',
+    createdAt: new Date().toISOString(),
+    archived: false,
+  });
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/notatka');
+  await expect(replies(page).last()).toContainText('Brakuje: tytuł.');
+  await send(page, '/notatka Zakupy mleko i chleb');
+  await expect(replies(page).last()).toHaveText('Dodano notatkę „Zakupy” (aktywnych: 2 z 30).');
+  await expect.poll(async () => (await notesOf(account.uid)).length).toBe(2);
+  const note = (await notesOf(account.uid)).find((n) => n.title === 'Zakupy');
+  expect(withoutId(note)).toEqual({ title: 'Zakupy', content: 'mleko i chleb', icon: '', color: '', archived: false });
+  expect(Number.isNaN(Date.parse(note.createdAt))).toBe(false);
+
+  await send(page, '/szukaj CHLEB');
+  await expect(replies(page).last()).toContainText('Pasujące notatki: 1.');
+  await expect(replies(page).last()).toContainText('• Zakupy — mleko i chleb');
+  await send(page, '/szukaj zolw salata');
+  await expect(replies(page).last()).toContainText('• Żółw — Pancerz i sałata');
+  await send(page, '/szukaj kosmos');
+  await expect(replies(page).last()).toHaveText('Żadna notatka nie pasuje do „kosmos”.');
+  await send(page, '/szukaj');
+  await expect(replies(page).last()).toContainText('Brakuje: fraza.');
+
+  await send(page, '/archiwizuj zakup');
+  await expect(replies(page).last()).toHaveText('Zarchiwizowano notatkę „Zakupy”.');
+  await expect.poll(async () => (await notesOf(account.uid)).find((n) => n.title === 'Zakupy').archived).toBe(true);
+  await send(page, '/szukaj chleb');
+  await expect(replies(page).last()).toContainText('• Zakupy [W archiwum] — mleko i chleb');
+  await send(page, '/archiwizuj zakupy');
+  await expect(replies(page).last()).toContainText('Nie ma aktywnej notatki „zakupy”.');
+  await page.locator('.ui-toast').filter({ hasText: 'Notatka zarchiwizowana.' }).getByRole('button', { name: 'Cofnij' }).click();
+  await expect(log(page)).toContainText('Cofnięto: archiwizacja notatki „Zakupy”.');
+  await expect.poll(async () => (await notesOf(account.uid)).find((n) => n.title === 'Zakupy').archived).toBe(false);
+});
+
+test('/notatka with the title in quotes; /cofnij removes the new note, unless it was edited since', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-note-undo' });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/notatka "Lista zakupów" mleko');
+  await expect(replies(page).last()).toContainText('Dodano notatkę „Lista zakupów”');
+  await expect.poll(async () => (await notesOf(account.uid)).map(withoutId)).toEqual([
+    { title: 'Lista zakupów', content: 'mleko', icon: '', color: '', archived: false },
+  ]);
+  await send(page, '/cofnij');
+  await expect(replies(page).last()).toHaveText('Cofnięto: notatka „Lista zakupów”.');
+  await expect.poll(async () => (await notesOf(account.uid)).length).toBe(0);
+
+  await send(page, '/notatka Szkic');
+  await expect.poll(async () => (await notesOf(account.uid)).length).toBe(1);
+  const [{ id }] = await notesOf(account.uid);
+  // Edited elsewhere in the meantime: the undo leaves the note alone.
+  await db.doc(`users/${account.uid}/notes/${id}`).update({ content: 'dopisane gdzie indziej' });
+  // Wait until Ex-us has seen the edit (the search reads the same notes as the undo does).
+  await expect
+    .poll(async () => {
+      await send(page, '/szukaj dopisane');
+      return replies(page).last().innerText();
+    })
+    .toContain('Pasujące notatki: 1');
+  await send(page, '/cofnij');
+  await expect(page.getByText('Nie udało się cofnąć.').first()).toBeVisible();
+  expect((await notesOf(account.uid)).map(withoutId)).toEqual([
+    { title: 'Szkic', content: 'dopisane gdzie indziej', icon: '', color: '', archived: false },
+  ]);
+});
+
+test('the note commands are gone with Notes off', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-no-notes', profile: { enabledModules: ['chores', 'money', 'stats', 'aichat'] } });
+  await openSignedIn(page, account, '#/exus');
+  for (const command of ['/notatka Zakupy', '/archiwizuj zakupy', '/szukaj zakupy']) {
+    await send(page, command);
+    await expect(replies(page).last()).toContainText(`Nie znam komendy ${command.split(' ')[0]}.`);
+  }
+  await send(page, '/pomoc');
+  await expect(replies(page).last()).not.toContainText('/szukaj');
+  await expect(replies(page).last()).toContainText('/limit <pkt>');
+});
+
+test('/limit writes dailyLimit through the settings rule (50–500); "Cofnij" restores the old value', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-limit', profile: { dailyLimit: 150 } });
+  const limitOf = async () => (await userDoc(account.uid).get()).data().dailyLimit;
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/limit 20');
+  await expect(replies(page).last()).toHaveText('Wpisz liczbę od 50 do 500.');
+  await send(page, '/limit 501');
+  await expect(replies(page).last()).toHaveText('Wpisz liczbę od 50 do 500.');
+  await send(page, '/limit');
+  await expect(replies(page).last()).toContainText('Brakuje: limit (pkt).');
+  expect(await limitOf()).toBe(150);
+
+  await send(page, '/limit 120');
+  await expect(replies(page).last()).toHaveText('Dzienny limit: 120 pkt (było 150 pkt).');
+  await expect.poll(limitOf).toBe(120);
+  await send(page, '/limit 120 pkt');
+  await expect(replies(page).last()).toHaveText('Dzienny limit to już 120 pkt.');
+  await send(page, '/limit 500');
+  await expect.poll(limitOf).toBe(500);
+  // Two in a row: each undo goes back to the value before its own command.
+  await send(page, '/cofnij');
+  await expect(replies(page).last()).toContainText('Cofnięto: limit 500 pkt (wraca 120 pkt).');
+  await expect.poll(limitOf).toBe(120);
+  await send(page, '/cofnij');
+  await expect.poll(limitOf).toBe(150);
+  await send(page, '/dzis');
+  await expect(replies(page).last()).toContainText('limitu 150');
+});
+
+test('/jezyk en switches the whole app and the profile; the reply is in the new language', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-lang', profile: { lang: 'pl' } });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/jezyk en');
+  await expect(replies(page).last()).toHaveText('Language changed: English.');
+  await expect(page.getByLabel('Message to Ex-us')).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect.poll(async () => (await userDoc(account.uid).get()).data().lang).toBe('en');
+  expect(await page.evaluate(() => localStorage.getItem('lifexp-lang'))).toBe('en');
+
+  await page.getByLabel('Message to Ex-us').fill('/lang en');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(replies(page).last()).toHaveText('The language is already English.');
+  await page.getByLabel('Message to Ex-us').fill('/lang pl');
+  await page.getByRole('button', { name: 'Send' }).click();
+  await expect(replies(page).last()).toHaveText('Język zmieniony: Polski.');
+  await expect(page.getByLabel('Wiadomość do Ex-us')).toBeVisible();
+  await expect.poll(async () => (await userDoc(account.uid).get()).data().lang).toBe('pl');
+});
+
+test('/motyw sets the family and the mode like Wygląd, Gold stays dark, nothing named gets the syntax', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-theme' });
+  await openSignedIn(page, account, '#/exus');
+  const html = page.locator('html');
+  const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem('lifexp-v2-theme')));
+
+  await send(page, '/motyw jasny');
+  await expect(html).toHaveAttribute('data-mode', 'light');
+  await expect(html).toHaveAttribute('data-theme', 'lifexp');
+  await expect(replies(page).last()).toHaveText('Motyw: LifeXP, Jasny. Wybór zostaje na tym urządzeniu.');
+  expect(await stored()).toEqual({ family: 'lifexp', mode: 'light' });
+
+  await send(page, '/motyw ios');
+  await expect(html).toHaveAttribute('data-theme', 'ios');
+  expect((await stored()).family).toBe('ios');
+  await send(page, '/motyw ciemny ios');
+  await expect(html).toHaveAttribute('data-mode', 'dark');
+
+  await send(page, '/motyw gold jasny');
+  await expect(replies(page).last()).toContainText('Motyw Gold nie ma trybu „Jasny”.');
+  await expect(html).toHaveAttribute('data-theme', 'ios');
+  await send(page, '/motyw gold');
+  await expect(html).toHaveAttribute('data-theme', 'gold');
+  await expect(html).toHaveAttribute('data-mode', 'dark');
+  await send(page, '/motyw system');
+  await expect(replies(page).last()).toContainText('Motyw Gold nie ma trybu „Jak system”.');
+
+  await send(page, '/motyw');
+  await expect(replies(page).last()).toContainText('Podaj motyw');
+  // A theme is the device's own: nothing goes to the profile.
+  expect((await userDoc(account.uid).get()).data().theme).toBeUndefined();
+});
+
+test('/modul pieniadze off hides Money and its commands; "Cofnij" brings it back; Ex-us stays', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-module' });
+  await openSignedIn(page, account, '#/exus');
+  const tabbar = page.locator('.tabbar');
+  const modulesOf = async () => {
+    const data = (await userDoc(account.uid).get()).data();
+    return { enabled: data.enabledModules, disabled: data.disabledModules };
+  };
+
+  await send(page, '/modul pieniadze on');
+  await expect(replies(page).last()).toHaveText('Moduł Pieniądze jest już włączony.');
+  await send(page, '/modul pieniadze');
+  await expect(replies(page).last()).toContainText('Brakuje: on albo off.');
+  await send(page, '/modul ex-us off');
+  await expect(replies(page).last()).toContainText('Ex-us nie wyłączy się sam z poziomu rozmowy.');
+  await send(page, '/modul statek on');
+  await expect(replies(page).last()).toContainText('Brakuje: moduł.');
+
+  await send(page, '/modul Pieniądze off');
+  await expect(replies(page).last()).toContainText('Moduł Pieniądze jest wyłączony. Dane zostają');
+  await expect(tabbar.getByRole('link', { name: 'Pieniądze' })).toHaveCount(0);
+  await expect.poll(async () => (await modulesOf()).disabled).toContain('money');
+  expect((await modulesOf()).enabled).not.toContain('money');
+  await send(page, '/saldo');
+  await expect(replies(page).last()).toContainText('Nie znam komendy /saldo.');
+  await send(page, '/modul pieniadze off');
+  await expect(replies(page).last()).toHaveText('Moduł Pieniądze jest już wyłączony.');
+
+  await page.getByRole('button', { name: 'Cofnij' }).click();
+  await expect(log(page)).toContainText('Cofnięto: przełączenie modułu Pieniądze.');
+  await expect(tabbar.getByRole('link', { name: 'Pieniądze' })).toBeVisible();
+  await expect.poll(async () => (await modulesOf()).enabled).toContain('money');
+  await send(page, '/modul pieniadze off');
+  await expect(tabbar.getByRole('link', { name: 'Pieniądze' })).toHaveCount(0);
+  await send(page, '/modul money on');
+  await expect(replies(page).last()).toHaveText('Moduł Pieniądze jest włączony.');
+  await send(page, '/saldo');
+  await expect(replies(page).last()).toContainText('Saldo');
+});
+
+test('/idz opens a screen by name, with or without Polish letters, and honours the modules that are off', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-go', profile: { enabledModules: ['chores', 'notes', 'stats', 'aichat'] } });
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/idz kosmos');
+  await expect(replies(page).last()).toContainText('Nie znam ekranu „kosmos”.');
+  await send(page, '/idz');
+  await expect(replies(page).last()).toContainText('Brakuje: ekran.');
+  await send(page, '/idz z');
+  await expect(replies(page).last()).toContainText('Pasuje kilka ekranów: „Zadania”, „Zgłoszenia i aktualizacje”.');
+  await send(page, '/idz pieniądze');
+  await expect(replies(page).last()).toContainText('Ekran „Pieniądze” jest wyłączony.');
+  await expect(page).toHaveURL(/#\/exus$/);
+
+  await send(page, '/idz zadania');
+  await expect(page).toHaveURL(/#\/tasks$/);
+  await expect(page.getByRole('heading', { name: 'Zadania', level: 1 })).toBeVisible();
+  await page.evaluate(() => (location.hash = '#/exus'));
+  await send(page, '/idz obowiazki');
+  await expect(page).toHaveURL(/#\/chores$/);
+  await page.evaluate(() => (location.hash = '#/exus'));
+  await send(page, '/idz ustawienia');
+  await expect(page).toHaveURL(/#\/settings$/);
+});
+
+test('the task, note and settings commands wait for their data under a CPU 6 times slower, from a cold start', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-5a8-slow', profile: { pcBuild: build([0], 0), dailyLimit: 150 } });
+  const task = await seedTask(account.uid, { text: 'Powolne zadanie', size: 'M' });
+  await db.collection(`users/${account.uid}/notes`).add({
+    title: 'Powolna notatka',
+    content: 'treść',
+    icon: '',
+    color: '',
+    createdAt: new Date().toISOString(),
+    archived: false,
+  });
+  await openSignedIn(page, account, '#/exus');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+
+  await send(page, '/szukaj powolna');
+  await send(page, '/zadania');
+  await send(page, '/zrobione powolne');
+  await send(page, '/limit 100');
+  await expect(log(page)).toContainText('• Powolna notatka — treść');
+  await expect(log(page)).toContainText('• Powolne zadanie — na dziś, M');
+  await expect(log(page)).toContainText('Zrobione: „Powolne zadanie”. Nieźle — +2 kawałki do budowy.');
+  await expect(log(page)).toContainText('Dzienny limit: 100 pkt (było 150 pkt).');
+  await expect.poll(async () => (await task.get()).data().done).toBe(true);
+  await expect.poll(async () => (await userDoc(account.uid).get()).data().dailyLimit).toBe(100);
 });

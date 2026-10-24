@@ -111,6 +111,8 @@ export interface SlotDef<T = unknown> {
   keys?: readonly string[];
   /** Takes only its `key=value`, never a loose token. */
   namedOnly?: boolean;
+  /** A text slot that takes the first loose token (quote it for several words); the next text slot gets the rest. */
+  leading?: boolean;
 }
 
 /** Most specific first: a date never ends up as part of a task's text. */
@@ -144,6 +146,15 @@ export function fillSlots(
         out[slot.name] = value;
         break;
       }
+    }
+  }
+  // A leading slot ("title") takes the first token that is left; quotes keep several words together.
+  for (const slot of slots) {
+    if (!slot.leading || slot.name in out) continue;
+    const j = tokens.findIndex((_, i) => !used.has(i));
+    if (j >= 0) {
+      used.add(j);
+      out[slot.name] = tokens[j];
     }
   }
   // Whatever is left is the one free-text slot (or the entity, named by its words).

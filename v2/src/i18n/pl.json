@@ -1242,7 +1242,19 @@
       "log-activity": "Zapisz aktywność: rodzaj, czas, opis (punkty z dziennym limitem)",
       "streak": "Seria dni z punktami i zamrożenie serii",
       "stats": "Punkty i czas aktywności z 7 albo 30 dni",
-      "what-now": "Co teraz? Losuje pomysł na podany czas, niczego nie zapisuje"
+      "what-now": "Co teraz? Losuje pomysł na podany czas, niczego nie zapisuje",
+      "complete-task": "Oznacz zadanie jako zrobione (kawałki budowy PC tylko w terminie)",
+      "tasks": "Zadania: domyślnie na dziś i zaległe, albo dzis, zalegle, wszystkie",
+      "edit-task": "Zmień treść, termin albo rozmiar zadania",
+      "delete-task": "Usuń zadanie (budowa PC zostaje bez zmian)",
+      "create-note": "Nowa notatka: pierwsze słowo (albo słowa w cudzysłowie) to tytuł, reszta to treść",
+      "archive-note": "Przenieś notatkę do archiwum",
+      "find-note": "Szukaj w tytułach i treści notatek",
+      "daily-limit": "Dzienny limit punktów (50–500)",
+      "lang": "Język aplikacji: pl albo en",
+      "theme": "Motyw: lifexp, ios, gold oraz jasny, ciemny, system (zostaje na tym urządzeniu)",
+      "module": "Włącz albo wyłącz moduł: obowiązki, pieniądze, notatki, statystyki, gry",
+      "go": "Przejdź do ekranu: dziś, zadania, cele, obowiązki, pieniądze, notatki, statystyki, zgłoszenia, ustawienia"
     },
     "missing": "Brakuje: {{fields}}.\n{{syntax}}",
     "slots": {
@@ -1254,7 +1266,18 @@
       "amount": "kwota",
       "chore": "obowiązek",
       "type": "rodzaj aktywności",
-      "duration": "czas"
+      "duration": "czas",
+      "size": "rozmiar",
+      "task": "zadanie",
+      "title": "tytuł",
+      "content": "treść",
+      "note": "notatka",
+      "query": "fraza",
+      "limit": "limit (pkt)",
+      "lang": "język",
+      "module": "moduł",
+      "state": "on albo off",
+      "screen": "ekran"
     },
     "today": {
       "points": "Punkty: {{total}} (dziś {{earned}} z limitu {{limit}}).",
@@ -1284,7 +1307,19 @@
       "complete-chore": "<obowiązek> [dzis|wczoraj]",
       "log-activity": "<rodzaj> <czas> [opis]",
       "stats": "[7d|30d]",
-      "what-now": "<czas>"
+      "what-now": "<czas>",
+      "complete-task": "<zadanie>",
+      "tasks": "[dzis|zalegle|wszystkie]",
+      "edit-task": "<zadanie> [tresc=…] [termin=…] [rozmiar=…]",
+      "delete-task": "<zadanie>",
+      "create-note": "<tytuł> [treść]",
+      "archive-note": "<notatka>",
+      "find-note": "<fraza>",
+      "daily-limit": "<pkt>",
+      "lang": "<pl|en>",
+      "theme": "[lifexp|ios|gold] [jasny|ciemny|system]",
+      "module": "<moduł> <on|off>",
+      "go": "<ekran>"
     },
     "paletteLabel": "Komendy pasujące do wpisu",
     "tasksFailed": "Nie udało się wczytać zadań. Sprawdź połączenie i spróbuj ponownie.",
@@ -1296,7 +1331,12 @@
       "remove-money": "wydatek {{amount}} ({{category}})",
       "create-category": "kategoria „{{name}}”",
       "complete-chore": "obowiązek „{{name}}”",
-      "log-activity": "aktywność „{{name}}” (−{{points}} pkt)"
+      "log-activity": "aktywność „{{name}}” (−{{points}} pkt)",
+      "edit-task": "zmiana zadania „{{text}}”",
+      "create-note": "notatka „{{title}}”",
+      "archive-note": "archiwizacja notatki „{{title}}”",
+      "daily-limit": "limit {{limit}} pkt (wraca {{before}} pkt)",
+      "module": "przełączenie modułu {{name}}"
     },
     "nothingToUndo": "Nie ma nic do cofnięcia.",
     "undoFailed": "Nie udało się cofnąć. Sprawdź połączenie i spróbuj ponownie.",
@@ -1386,6 +1426,66 @@
     },
     "whatNow": {
       "pick": "Wylosowano: {{name}} ({{time}})."
+    },
+    "task": {
+      "none": "Nie ma otwartego zadania „{{name}}”. Wpisz /zadania wszystkie, żeby zobaczyć listę.",
+      "ambiguous": "Pasuje kilka zadań: {{names}}. Napisz dokładniej.",
+      "completed": "Zrobione: „{{text}}”.",
+      "header": {
+        "due": "Na dziś i zaległe ({{count}}):",
+        "today": "Na dziś ({{count}}):",
+        "overdue": "Zaległe ({{count}}):",
+        "all": "Otwarte zadania ({{count}}):"
+      },
+      "empty": {
+        "due": "Nic na dziś ani zaległego.",
+        "today": "Nic na dziś.",
+        "overdue": "Nic zaległego.",
+        "all": "Nie ma otwartych zadań."
+      },
+      "line": "• {{text}} — {{due}}, {{size}}",
+      "overdueSince": "zaległe od {{date}}",
+      "nothingToEdit": "Podaj, co zmienić: treść, termin albo rozmiar.\n{{syntax}}",
+      "editOverdue": "Termin nie może być w przeszłości, a to zadanie jest zaległe. Podaj nowy termin, np. termin=jutro.",
+      "edited": "Zmieniono zadanie „{{text}}”: termin {{date}}, rozmiar {{size}}.",
+      "deleteEffect": "Zadanie „{{text}}” zniknie z listy. Budowa PC zostaje bez zmian.",
+      "deleted": "Usunięto zadanie „{{text}}”."
+    },
+    "note": {
+      "titleTooLong": "Tytuł notatki ma najwyżej {{max}} znaków.",
+      "created": "Dodano notatkę „{{title}}” (aktywnych: {{count}} z {{max}}).",
+      "none": "Nie ma aktywnej notatki „{{name}}”. Wpisz /szukaj, żeby ją znaleźć.",
+      "ambiguous": "Pasuje kilka notatek: {{names}}. Napisz dokładniej.",
+      "archived": "Zarchiwizowano notatkę „{{title}}”.",
+      "nothingFound": "Żadna notatka nie pasuje do „{{query}}”.",
+      "found": "Pasujące notatki: {{count}}.",
+      "more": "Pokazuję {{shown}} z {{total}}. Dopisz słowo, żeby zawęzić."
+    },
+    "limit": {
+      "set": "Dzienny limit: {{limit}} pkt (było {{before}} pkt).",
+      "same": "Dzienny limit to już {{limit}} pkt."
+    },
+    "lang": {
+      "changed": "Język zmieniony: {{name}}.",
+      "same": "Język to już {{name}}."
+    },
+    "theme": {
+      "nothing": "Podaj motyw: lifexp, ios albo gold i/lub jasny, ciemny, system.\n{{syntax}}",
+      "unsupported": "Motyw {{family}} nie ma trybu „{{mode}}”. Gold jest tylko ciemny.",
+      "set": "Motyw: {{family}}, {{mode}}. Wybór zostaje na tym urządzeniu."
+    },
+    "module": {
+      "keepExus": "Ex-us nie wyłączy się sam z poziomu rozmowy. Wyłączysz go w Ustawieniach, w sekcji Moduły.",
+      "alreadyOn": "Moduł {{name}} jest już włączony.",
+      "alreadyOff": "Moduł {{name}} jest już wyłączony.",
+      "turnedOn": "Moduł {{name}} jest włączony.",
+      "turnedOff": "Moduł {{name}} jest wyłączony. Dane zostają i wrócą po ponownym włączeniu."
+    },
+    "go": {
+      "none": "Nie znam ekranu „{{name}}”. Spróbuj: dziś, zadania, cele, obowiązki, pieniądze, notatki, statystyki, zgłoszenia, ustawienia.",
+      "ambiguous": "Pasuje kilka ekranów: {{names}}. Napisz dokładniej.",
+      "off": "Ekran „{{name}}” jest wyłączony. Włączysz go w Ustawieniach, w sekcji Moduły.",
+      "went": "Przechodzę: {{name}}."
     }
   }
 }

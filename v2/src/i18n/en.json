@@ -1242,7 +1242,19 @@
       "log-activity": "Log an activity: type, time, note (points with the daily limit)",
       "streak": "Streak of days with points and the streak freeze",
       "stats": "Points and activity time of the last 7 or 30 days",
-      "what-now": "What now? Picks an idea for the time given, saves nothing"
+      "what-now": "What now? Picks an idea for the time given, saves nothing",
+      "complete-task": "Mark a task done (PC build pieces only when on time)",
+      "tasks": "Tasks: today and overdue by default, or today, overdue, all",
+      "edit-task": "Change the text, due date or size of a task",
+      "delete-task": "Delete a task (the PC build stays as it is)",
+      "create-note": "A new note: the first word (or the quoted words) is the title, the rest is the content",
+      "archive-note": "Move a note to the archive",
+      "find-note": "Search the titles and contents of notes",
+      "daily-limit": "The daily points limit (50–500)",
+      "lang": "The app language: pl or en",
+      "theme": "Theme: lifexp, ios, gold and light, dark, system (stays on this device)",
+      "module": "Turn a module on or off: chores, money, notes, stats, games",
+      "go": "Go to a screen: today, tasks, goals, chores, money, notes, stats, reports, settings"
     },
     "missing": "Missing: {{fields}}.\n{{syntax}}",
     "slots": {
@@ -1254,7 +1266,18 @@
       "amount": "amount",
       "chore": "chore",
       "type": "activity type",
-      "duration": "time"
+      "duration": "time",
+      "size": "size",
+      "task": "task",
+      "title": "title",
+      "content": "content",
+      "note": "note",
+      "query": "phrase",
+      "limit": "limit (pts)",
+      "lang": "language",
+      "module": "module",
+      "state": "on or off",
+      "screen": "screen"
     },
     "today": {
       "points": "Points: {{total}} (today {{earned}} of the {{limit}} limit).",
@@ -1284,7 +1307,19 @@
       "complete-chore": "<chore> [today|yesterday]",
       "log-activity": "<type> <time> [note]",
       "stats": "[7d|30d]",
-      "what-now": "<time>"
+      "what-now": "<time>",
+      "complete-task": "<task>",
+      "tasks": "[today|overdue|all]",
+      "edit-task": "<task> [text=…] [due=…] [size=…]",
+      "delete-task": "<task>",
+      "create-note": "<title> [content]",
+      "archive-note": "<note>",
+      "find-note": "<phrase>",
+      "daily-limit": "<pts>",
+      "lang": "<pl|en>",
+      "theme": "[lifexp|ios|gold] [light|dark|system]",
+      "module": "<module> <on|off>",
+      "go": "<screen>"
     },
     "paletteLabel": "Commands matching what is typed",
     "tasksFailed": "Could not load the tasks. Check the connection and try again.",
@@ -1296,7 +1331,12 @@
       "remove-money": "the expense {{amount}} ({{category}})",
       "create-category": "the category \"{{name}}\"",
       "complete-chore": "chore “{{name}}”",
-      "log-activity": "activity “{{name}}” (−{{points}} pts)"
+      "log-activity": "activity “{{name}}” (−{{points}} pts)",
+      "edit-task": "the change to the task “{{text}}”",
+      "create-note": "the note “{{title}}”",
+      "archive-note": "archiving the note “{{title}}”",
+      "daily-limit": "the limit {{limit}} pts (back to {{before}} pts)",
+      "module": "switching the module {{name}}"
     },
     "nothingToUndo": "There is nothing to undo.",
     "undoFailed": "Could not undo. Check the connection and try again.",
@@ -1386,6 +1426,66 @@
     },
     "whatNow": {
       "pick": "Picked: {{name}} ({{time}})."
+    },
+    "task": {
+      "none": "There is no open task “{{name}}”. Type /tasks all to see the list.",
+      "ambiguous": "Several tasks fit: {{names}}. Be more precise.",
+      "completed": "Done: “{{text}}”.",
+      "header": {
+        "due": "Today and overdue ({{count}}):",
+        "today": "Today ({{count}}):",
+        "overdue": "Overdue ({{count}}):",
+        "all": "Open tasks ({{count}}):"
+      },
+      "empty": {
+        "due": "Nothing for today or overdue.",
+        "today": "Nothing for today.",
+        "overdue": "Nothing overdue.",
+        "all": "There are no open tasks."
+      },
+      "line": "• {{text}} — {{due}}, {{size}}",
+      "overdueSince": "overdue since {{date}}",
+      "nothingToEdit": "Say what to change: the text, the due date or the size.\n{{syntax}}",
+      "editOverdue": "The due date cannot be in the past, and this task is overdue. Give a new due date, e.g. due=tomorrow.",
+      "edited": "Changed the task “{{text}}”: due {{date}}, size {{size}}.",
+      "deleteEffect": "The task “{{text}}” will leave the list. The PC build stays as it is.",
+      "deleted": "Deleted the task “{{text}}”."
+    },
+    "note": {
+      "titleTooLong": "A note title has at most {{max}} characters.",
+      "created": "Added the note “{{title}}” (active: {{count}} of {{max}}).",
+      "none": "There is no active note “{{name}}”. Type /szukaj to find it.",
+      "ambiguous": "Several notes fit: {{names}}. Be more precise.",
+      "archived": "Archived the note “{{title}}”.",
+      "nothingFound": "No note matches “{{query}}”.",
+      "found": "Matching notes: {{count}}.",
+      "more": "Showing {{shown}} of {{total}}. Add a word to narrow it down."
+    },
+    "limit": {
+      "set": "Daily limit: {{limit}} pts (was {{before}} pts).",
+      "same": "The daily limit is already {{limit}} pts."
+    },
+    "lang": {
+      "changed": "Language changed: {{name}}.",
+      "same": "The language is already {{name}}."
+    },
+    "theme": {
+      "nothing": "Give a theme: lifexp, ios or gold and/or light, dark, system.\n{{syntax}}",
+      "unsupported": "The {{family}} theme has no “{{mode}}” mode. Gold is dark only.",
+      "set": "Theme: {{family}}, {{mode}}. The choice stays on this device."
+    },
+    "module": {
+      "keepExus": "Ex-us will not switch itself off from inside the conversation. Turn it off in Settings, under Modules.",
+      "alreadyOn": "The {{name}} module is already on.",
+      "alreadyOff": "The {{name}} module is already off.",
+      "turnedOn": "The {{name}} module is on.",
+      "turnedOff": "The {{name}} module is off. Its data stays and comes back when you turn it on again."
+    },
+    "go": {
+      "none": "I do not know a screen “{{name}}”. Try: today, tasks, goals, chores, money, notes, stats, reports, settings.",
+      "ambiguous": "Several screens fit: {{names}}. Be more precise.",
+      "off": "The screen “{{name}}” is off. Turn it on in Settings, under Modules.",
+      "went": "Going to: {{name}}."
     }
   }
 }

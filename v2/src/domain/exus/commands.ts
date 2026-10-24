@@ -7,7 +7,9 @@ import { TASK_SIZES, type TaskSize } from '../tasks';
 import { fillSlots, missingSlots, tokenize, unreadNamed, type SlotDef } from './parse';
 import { CHORE_DAY } from './chores';
 import { amount, dateFrom, duration, fold, money, oneOf } from './recognizers';
+import { LANG_WORD, limitValue, MODULE_WORD, SWITCH_WORD, THEME_FAMILY_WORD, THEME_MODE_WORD } from './settings';
 import { STATS_PERIOD } from './stats';
+import { TASKS_SCOPE } from './tasks';
 
 /** read: runs at once; write: runs, with undo; destructive: asks first (6.6). */
 export type Risk = 'read' | 'write' | 'destructive';
@@ -17,6 +19,10 @@ export type CommandId =
   | 'today'
   | 'undo'
   | 'create-task'
+  | 'complete-task'
+  | 'tasks'
+  | 'edit-task'
+  | 'delete-task'
   | 'create-goal'
   | 'deposit-goal'
   | 'goals'
@@ -33,7 +39,15 @@ export type CommandId =
   | 'log-activity'
   | 'streak'
   | 'stats'
-  | 'what-now';
+  | 'what-now'
+  | 'create-note'
+  | 'archive-note'
+  | 'find-note'
+  | 'daily-limit'
+  | 'lang'
+  | 'theme'
+  | 'module'
+  | 'go';
 
 export interface CommandSpec {
   id: CommandId;
@@ -100,6 +114,41 @@ export const COMMANDS: readonly CommandSpec[] = [
       { name: 'due', type: 'date', required: true, recognize: dateFrom(today) },
       { name: 'size', type: 'enum', required: false, recognize: SIZE },
     ],
+  },
+  {
+    // The task is found among the open ones by its text.
+    id: 'complete-task',
+    aliases: ['zrobione'],
+    module: null,
+    risk: 'write',
+    slots: () => [{ name: 'task', type: 'entity', required: true }],
+  },
+  {
+    id: 'tasks',
+    aliases: ['zadania'],
+    module: null,
+    risk: 'read',
+    slots: () => [{ name: 'scope', type: 'enum', required: false, recognize: TASKS_SCOPE }],
+  },
+  {
+    // What changes is named (`termin=jutro`), so a date in the task's own words stays in its name.
+    id: 'edit-task',
+    aliases: ['edytuj-zadanie'],
+    module: null,
+    risk: 'write',
+    slots: (today) => [
+      { name: 'task', type: 'entity', required: true },
+      { name: 'text', type: 'text', required: false, keys: ['tresc', 'text'], namedOnly: true },
+      { name: 'due', type: 'date', required: false, recognize: dateFrom(today), keys: ['termin', 'due'], namedOnly: true },
+      { name: 'size', type: 'enum', required: false, recognize: SIZE, keys: ['rozmiar', 'size'], namedOnly: true },
+    ],
+  },
+  {
+    id: 'delete-task',
+    aliases: ['usun-zadanie'],
+    module: null,
+    risk: 'destructive',
+    slots: () => [{ name: 'task', type: 'entity', required: true }],
   },
   {
     // The unit decides the kind: "1500 zł" a money goal, "5000 pkt" a points goal.
@@ -242,6 +291,74 @@ export const COMMANDS: readonly CommandSpec[] = [
     module: 'stats',
     risk: 'read',
     slots: () => [{ name: 'duration', type: 'duration', required: true, recognize: duration }],
+  },
+  {
+    // The title is the first word, or the quoted words; the rest is the content.
+    id: 'create-note',
+    aliases: ['notatka'],
+    module: 'notes',
+    risk: 'write',
+    slots: () => [
+      { name: 'title', type: 'text', required: true, leading: true, keys: ['tytul', 'title'] },
+      { name: 'content', type: 'text', required: false, keys: ['tresc', 'content'] },
+    ],
+  },
+  {
+    id: 'archive-note',
+    aliases: ['archiwizuj'],
+    module: 'notes',
+    risk: 'write',
+    slots: () => [{ name: 'note', type: 'entity', required: true }],
+  },
+  {
+    id: 'find-note',
+    aliases: ['szukaj'],
+    module: 'notes',
+    risk: 'read',
+    slots: () => [{ name: 'query', type: 'text', required: true }],
+  },
+  {
+    id: 'daily-limit',
+    aliases: ['limit'],
+    module: null,
+    risk: 'write',
+    slots: () => [{ name: 'limit', type: 'number', required: true, recognize: limitValue }],
+  },
+  {
+    id: 'lang',
+    aliases: ['jezyk'],
+    module: null,
+    risk: 'write',
+    slots: () => [{ name: 'lang', type: 'enum', required: true, recognize: LANG_WORD }],
+  },
+  {
+    // A family, a mode, or both ("ios jasny"); the choice is kept on this device.
+    id: 'theme',
+    aliases: ['motyw'],
+    module: null,
+    risk: 'write',
+    slots: () => [
+      { name: 'family', type: 'enum', required: false, recognize: THEME_FAMILY_WORD },
+      { name: 'mode', type: 'enum', required: false, recognize: THEME_MODE_WORD },
+    ],
+  },
+  {
+    id: 'module',
+    aliases: ['modul'],
+    module: null,
+    risk: 'write',
+    slots: () => [
+      { name: 'module', type: 'enum', required: true, recognize: MODULE_WORD },
+      { name: 'state', type: 'enum', required: true, recognize: SWITCH_WORD },
+    ],
+  },
+  {
+    // Takes the person to a screen of a module that is on.
+    id: 'go',
+    aliases: ['idz'],
+    module: null,
+    risk: 'read',
+    slots: () => [{ name: 'screen', type: 'text', required: true }],
   },
 ];
 
