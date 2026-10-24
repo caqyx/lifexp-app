@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import pl from '@/i18n/pl.json';
+import { SCREENS } from '@/domain/exus/screens';
 import { DEFAULT_PATH, FEATURES, featureHref, featurePath, isViewSwitch, navItems, resolveRoute, tabItems } from './registry';
 
 describe('module registry', () => {
@@ -69,5 +70,22 @@ describe('views of one screen', () => {
     expect(isViewSwitch('/chores/new', '/chores')).toBe(false);
     expect(isViewSwitch(null, '/stats')).toBe(false);
     expect(isViewSwitch('/stats', '/stats')).toBe(false);
+  });
+});
+
+describe('the screens of /idz', () => {
+  test('each leads to the module of the same id, behind the same module switch, with a menu name', () => {
+    for (const screen of SCREENS) {
+      const resolved = resolveRoute(screen.path);
+      expect(resolved?.feature.id, screen.id).toBe(screen.id);
+      expect(resolved?.feature.optional ?? null, screen.id).toBe(screen.module);
+      expect(pl.nav[screen.id], screen.id).toBeTruthy();
+    }
+  });
+
+  test('every screen of the menu that can be reached has a name, except the ones that are not there yet', () => {
+    const named = new Set(SCREENS.map((s) => s.id));
+    const missing = FEATURES.filter((f) => f.nav !== null && f.view && !named.has(f.id as never)).map((f) => f.id);
+    expect(missing).toEqual([]);
   });
 });

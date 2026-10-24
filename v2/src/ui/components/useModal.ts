@@ -34,6 +34,41 @@ function leave(delta: 1 | -1) {
   }
 }
 
+/**
+ * `history.back()` is asynchronous: it lands after whatever the page does next. A layer
+ * opened right after another closed would push its entry first, and the late Back would
+ * then pop *that* entry and close the new layer at once. So our own Backs are counted,
+ * and a layer opened meanwhile pushes its entry only after the last one has landed.
+ */
+let backsPending = 0;
+const afterBacks = new Set<() => void>();
+/** If a Back never lands (nothing to go back to), the wait ends anyway. */
+const BACK_GIVE_UP_MS = 1000;
+
+function backLanded() {
+  if (backsPending > 0) backsPending -= 1;
+  if (backsPending > 0) return;
+  const waiting = [...afterBacks];
+  afterBacks.clear();
+  for (const run of waiting) run();
+}
+addEventListener('popstate', backLanded);
+
+function ourBack() {
+  backsPending += 1;
+  history.back();
+  setTimeout(() => {
+    if (backsPending === 0) return;
+    backsPending = 0;
+    backLanded();
+  }, BACK_GIVE_UP_MS);
+}
+
+function whenBacksLanded(run: () => void) {
+  if (backsPending === 0) run();
+  else afterBacks.add(run);
+}
+
 function topEntryId(): string | null {
   const state: unknown = history.state;
   if (typeof state !== 'object' || state === null) return null;
@@ -63,9 +98,11 @@ export function useModal(open: boolean, onClose: () => void) {
 
   /** Our history entry goes with the layer (Back already took it when Back closed it). */
   const dropEntry = () => {
-    if (entryId.current && topEntryId() === entryId.current) history.back();
+    if (entryId.current && topEntryId() === entryId.current) ourBack();
     entryId.current = null;
   };
+  /** Bumped by every open and close, so a push that waited for a Back knows whether it is still wanted. */
+  const turn = useRef(0);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -76,11 +113,16 @@ export function useModal(open: boolean, onClose: () => void) {
       // previous run's cleanup has stopped its close).
       dialog.dataset.state = 'open';
       if (!dialog.open) dialog.showModal();
-      entryId.current = `m${++counter}`;
-      history.pushState({ [HISTORY_KEY]: entryId.current }, '', location.href);
+      const mine = ++turn.current;
+      whenBacksLanded(() => {
+        if (turn.current !== mine) return;
+        entryId.current = `m${++counter}`;
+        history.pushState({ [HISTORY_KEY]: entryId.current }, '', location.href);
+      });
       return;
     }
     if (dialog.open && dialog.dataset.state === 'open') {
+      turn.current += 1;
       dropEntry();
       dialog.dataset.state = 'closing';
       const duration = exitDuration(dialog);
@@ -136,6 +178,7 @@ export function useModal(open: boolean, onClose: () => void) {
       dialog?.removeEventListener('close', onNativeClose);
       removeEventListener('popstate', onPopState);
       // Unmounted while open (e.g. navigation): leave no dead history entry.
+      turn.current += 1;
       if (entryId.current && topEntryId() === entryId.current) history.back();
     };
   }, []);

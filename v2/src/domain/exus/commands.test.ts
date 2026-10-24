@@ -244,6 +244,143 @@ describe('the chore and XP commands', () => {
   });
 });
 
+describe('the task commands', () => {
+  const parse = (input: string) => {
+    const parsed = parseInput(input, TODAY, COMMANDS);
+    if (parsed.kind !== 'command') throw new Error(input);
+    return parsed;
+  };
+
+  it('are in the registry with their risk', () => {
+    for (const [name, id, risk] of [
+      ['zrobione', 'complete-task', 'write'],
+      ['zadania', 'tasks', 'read'],
+      ['edytuj-zadanie', 'edit-task', 'write'],
+      ['usun-zadanie', 'delete-task', 'destructive'],
+      ['USUŃ-ZADANIE', 'delete-task', 'destructive'],
+    ] as const) {
+      expect(findCommand(name, COMMANDS), name).toMatchObject({ id, module: null, risk });
+    }
+  });
+
+  it.each([
+    ['/zrobione mleko', { task: 'mleko' }, []],
+    ['/zrobione "Kupić mleko"', { task: 'Kupić mleko' }, []],
+    ['/zrobione', {}, ['task']],
+    ['/zadania', {}, []],
+    ['/zadania dzis', { scope: 'today' }, []],
+    ['/zadania Zaległe', { scope: 'overdue' }, []],
+    ['/zadania wszystkie', { scope: 'all' }, []],
+    ['/usun-zadanie mleko', { task: 'mleko' }, []],
+    ['/usun-zadanie', {}, ['task']],
+    ['/edytuj-zadanie mleko', { task: 'mleko' }, []],
+    ['/edytuj-zadanie mleko termin=jutro', { task: 'mleko', due: '2026-10-10' }, []],
+    ['/edytuj-zadanie mleko tresc="Kupić chleb" rozmiar=l', { task: 'mleko', text: 'Kupić chleb', size: 'L' }, []],
+    // a date or a size among the words is part of the name, not a change
+    ['/edytuj-zadanie spotkanie jutro L', { task: 'spotkanie jutro L' }, []],
+    ['/edytuj-zadanie', {}, ['task']],
+  ])('%s', (input, args, missing) => {
+    const parsed = parse(input);
+    expect(parsed.args).toEqual(args);
+    expect(parsed.missing).toEqual(missing);
+    expect(parsed.unread).toEqual([]);
+  });
+
+  it('names a due date or a size it cannot read', () => {
+    expect(parse('/edytuj-zadanie mleko termin=kiedyś').unread).toEqual(['due']);
+    expect(parse('/edytuj-zadanie mleko rozmiar=XL').unread).toEqual(['size']);
+  });
+});
+
+describe('the note commands', () => {
+  const parse = (input: string) => {
+    const parsed = parseInput(input, TODAY, COMMANDS);
+    if (parsed.kind !== 'command') throw new Error(input);
+    return parsed;
+  };
+
+  it('belong to Notes and vanish with it', () => {
+    for (const [name, id, risk] of [
+      ['notatka', 'create-note', 'write'],
+      ['archiwizuj', 'archive-note', 'write'],
+      ['szukaj', 'find-note', 'read'],
+    ] as const) {
+      expect(findCommand(name, COMMANDS), name).toMatchObject({ id, module: 'notes', risk });
+    }
+    const off = availableCommands({ enabledModules: ['chores', 'money', 'games', 'stats', 'aichat'], disabledModules: ['notes'] }).map((c) => c.id);
+    for (const gone of ['create-note', 'archive-note', 'find-note']) expect(off).not.toContain(gone);
+    expect(off).toContain('daily-limit');
+  });
+
+  it.each([
+    ['/notatka Zakupy', { title: 'Zakupy' }, []],
+    ['/notatka Zakupy mleko i chleb', { title: 'Zakupy', content: 'mleko i chleb' }, []],
+    ['/notatka "Lista zakupów" mleko i chleb', { title: 'Lista zakupów', content: 'mleko i chleb' }, []],
+    ['/notatka tytul="Lista zakupów" tresc="mleko, chleb"', { title: 'Lista zakupów', content: 'mleko, chleb' }, []],
+    // a date or a size in the content stays there
+    ['/notatka Spotkanie jutro M', { title: 'Spotkanie', content: 'jutro M' }, []],
+    ['/notatka', {}, ['title']],
+    ['/archiwizuj zakupy', { note: 'zakupy' }, []],
+    ['/archiwizuj', {}, ['note']],
+    ['/szukaj mleko chleb', { query: 'mleko chleb' }, []],
+    ['/szukaj', {}, ['query']],
+  ])('%s', (input, args, missing) => {
+    const parsed = parse(input);
+    expect(parsed.args).toEqual(args);
+    expect(parsed.missing).toEqual(missing);
+  });
+});
+
+describe('the settings and navigation commands', () => {
+  const parse = (input: string) => {
+    const parsed = parseInput(input, TODAY, COMMANDS);
+    if (parsed.kind !== 'command') throw new Error(input);
+    return parsed;
+  };
+
+  it('are always there, whatever modules are off', () => {
+    for (const [name, id, risk] of [
+      ['limit', 'daily-limit', 'write'],
+      ['jezyk', 'lang', 'write'],
+      ['język', 'lang', 'write'],
+      ['motyw', 'theme', 'write'],
+      ['modul', 'module', 'write'],
+      ['idz', 'go', 'read'],
+      ['IDŹ', 'go', 'read'],
+    ] as const) {
+      expect(findCommand(name, COMMANDS), name).toMatchObject({ id, module: null, risk });
+    }
+  });
+
+  it.each([
+    ['/limit 120', { limit: 120 }, []],
+    ['/limit 120 pkt', { limit: 120 }, []],
+    ['/limit 20', { limit: 20 }, []],
+    ['/limit', {}, ['limit']],
+    ['/limit dużo', {}, ['limit']],
+    ['/jezyk en', { lang: 'en' }, []],
+    ['/jezyk Polski', { lang: 'pl' }, []],
+    ['/jezyk', {}, ['lang']],
+    ['/motyw', {}, []],
+    ['/motyw gold', { family: 'gold' }, []],
+    ['/motyw jasny', { mode: 'light' }, []],
+    ['/motyw ios ciemny', { family: 'ios', mode: 'dark' }, []],
+    ['/motyw ciemny lifexp', { family: 'lifexp', mode: 'dark' }, []],
+    ['/modul pieniadze off', { module: 'money', state: false }, []],
+    ['/modul wlacz Notatki', { module: 'notes', state: true }, []],
+    ['/modul ex-us on', { module: 'aichat', state: true }, []],
+    ['/modul pieniadze', { module: 'money' }, ['state']],
+    ['/modul', {}, ['module', 'state']],
+    ['/idz zadania', { screen: 'zadania' }, []],
+    ['/idz "ustawienia"', { screen: 'ustawienia' }, []],
+    ['/idz', {}, ['screen']],
+  ])('%s', (input, args, missing) => {
+    const parsed = parse(input);
+    expect(parsed.args).toEqual(args);
+    expect(parsed.missing).toEqual(missing);
+  });
+});
+
 describe('palette', () => {
   const ids = (draft: string) => palette(draft, COMMANDS).suggestions.map((c) => c.id);
 
@@ -253,9 +390,11 @@ describe('palette', () => {
   });
 
   it('puts names starting with what is typed first, then names containing it', () => {
-    expect(ids('/za')).toEqual(['create-task']);
-    expect(ids('/DZ')).toEqual(['today']);
-    expect(ids('/task')).toEqual(['create-task']);
+    expect(ids('/za')).toEqual(['create-task', 'tasks', 'edit-task', 'delete-task']);
+    expect(ids('/DZ')).toEqual(['today', 'go']);
+    expect(ids('/task')).toEqual(['tasks', 'create-task', 'complete-task', 'edit-task', 'delete-task']);
+    expect(ids('/szu')).toEqual(['find-note']);
+    expect(ids('/mod')).toEqual(['module']);
     expect(ids('/cof')).toEqual(['undo']);
     expect(ids('/xyz')).toEqual([]);
     expect(ids('/cel')).toEqual(['create-goal', 'goals', 'edit-goal', 'delete-goal']);

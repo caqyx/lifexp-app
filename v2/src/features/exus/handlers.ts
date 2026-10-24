@@ -3,15 +3,15 @@
 // the same shape, run by the pipeline (pipeline.ts). A new command = a spec in
 // domain/exus/commands.ts + a handler here (+ its i18n texts), nothing else.
 // Writes go through the same services as the screens, so the same limits hold.
-import { effect } from '@preact/signals';
 import type { CommandId, CommandSpec } from '@/domain/exus/commands';
 import { findCommand } from '@/domain/exus/commands';
 import { DAILY_LIMIT_DEFAULT } from '@/domain/points';
 import { isModuleOn } from '@/domain/modules';
 import type { Profile } from '@/domain/profile';
-import { TASKS_MAX, type Task, type TaskSize } from '@/domain/tasks';
+import { TASKS_MAX, type TaskSize } from '@/domain/tasks';
 import { locale, t } from '@/i18n';
 import { formatDayMonth, utcDayKey } from '@/lib/dates';
+import type { Navigate } from '@/lib/route-match';
 import { formatInteger } from '@/lib/format';
 import { formatMoney } from '@/lib/money';
 import { createTask, removeCreatedTask } from '@/services/tasks';
@@ -20,7 +20,11 @@ import { today as todaySources } from '@/stores/today';
 import { ACTIVITY_HANDLERS } from './activityHandlers';
 import { CHORE_HANDLERS } from './choreHandlers';
 import { GOAL_HANDLERS } from './goalHandlers';
+import { loadedTasks } from './loaded';
 import { MONEY_HANDLERS } from './moneyHandlers';
+import { NOTE_HANDLERS } from './noteHandlers';
+import { SETTINGS_HANDLERS } from './settingsHandlers';
+import { TASK_HANDLERS } from './taskHandlers';
 import { syntax } from './syntax';
 import type { Undo, UndoStack } from './undo';
 
@@ -31,6 +35,8 @@ export interface HandlerContext {
   today: string;
   /** The commands of the modules that are on. */
   commands: readonly CommandSpec[];
+  /** Moves to a screen (the router's `navigate`, passed in: features cannot import the app layer). */
+  navigate: Navigate;
   /** This Ex-us session's undo stack (only /cofnij reads it; the pipeline fills it). */
   undo: UndoStack;
 }
@@ -52,19 +58,6 @@ export interface CommandHandler {
   run: (args: Record<string, unknown>, ctx: HandlerContext) => Promise<HandlerResult>;
   /** Destructive commands: the effect, spelled out in the confirmation dialog. */
   effect?: (args: Record<string, unknown>, ctx: HandlerContext) => string;
-}
-
-/** The task list once the listener has it; rejects when it cannot be read. */
-function loadedTasks(): Promise<readonly Task[]> {
-  return new Promise((resolve, reject) => {
-    const stop = effect(() => {
-      const { list, failed } = tasks.value;
-      if (!list && !failed) return;
-      queueMicrotask(() => stop());
-      if (list) resolve(list);
-      else reject(new Error('tasks'));
-    });
-  });
 }
 
 function helpText(commands: readonly CommandSpec[], about: string | undefined): string {
@@ -141,6 +134,8 @@ export const HANDLERS: Record<CommandId, CommandHandler> = {
     },
   },
 
+  ...TASK_HANDLERS,
+
   ...GOAL_HANDLERS,
 
   ...MONEY_HANDLERS,
@@ -148,4 +143,8 @@ export const HANDLERS: Record<CommandId, CommandHandler> = {
   ...CHORE_HANDLERS,
 
   ...ACTIVITY_HANDLERS,
+
+  ...NOTE_HANDLERS,
+
+  ...SETTINGS_HANDLERS,
 };

@@ -55,3 +55,27 @@ test('the next screen takes taps after a sheet opened and closed', async ({ page
   await page.getByRole('button', { name: 'Dodaj transakcję' }).tap();
   await expect(page.getByRole('dialog', { name: 'Nowa transakcja' })).toBeVisible();
 });
+
+test('a layer opened right after another closed stays open, however late the Back of the first lands', async ({ page, account }) => {
+  // The Back that takes a closed layer's history entry off is asynchronous; on a slow runner it
+  // landed after the next layer had pushed its entry and closed that one at once.
+  await page.addInitScript(() => {
+    const back = history.back.bind(history);
+    history.back = () => void setTimeout(back, 400);
+  });
+  await openSignedIn(page, account, '#/today');
+  const plus = page.locator('.tabbar').getByRole('button', { name: 'Dodaj' });
+  const sheet = page.getByRole('dialog', { name: 'Dodaj' });
+  await plus.tap();
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('button', { name: 'Zamknij' }).tap();
+  await expect(sheet).toBeHidden();
+  await plus.tap();
+  await expect(sheet).toBeVisible();
+  // Past the late Back: still open, and one Back (the system's) closes it.
+  await page.waitForTimeout(1000);
+  await expect(sheet).toBeVisible();
+  await page.goBack();
+  await expect(sheet).toBeHidden();
+  await expect(page).toHaveURL(/#\/today$/);
+});

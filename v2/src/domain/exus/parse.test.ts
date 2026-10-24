@@ -189,4 +189,30 @@ describe('fillSlots', () => {
       expect(fill('/x Rower').unread).toEqual([]);
     });
   });
+
+  describe('a leading slot', () => {
+    const note: SlotDef[] = [
+      { name: 'title', type: 'text', required: true, leading: true, keys: ['tytul', 'title'] },
+      { name: 'content', type: 'text', required: false, keys: ['tresc', 'content'] },
+    ];
+    const fill = (input: string) => {
+      const { tokens, named } = tokenize(input);
+      return fillSlots(tokens, note, named);
+    };
+
+    it.each([
+      ['/x Zakupy mleko i chleb', { title: 'Zakupy', content: 'mleko i chleb' }],
+      ['/x "Lista zakupów" mleko i chleb', { title: 'Lista zakupów', content: 'mleko i chleb' }],
+      ['/x „Lista zakupów”', { title: 'Lista zakupów' }],
+      ['/x Zakupy', { title: 'Zakupy' }],
+      ['/x', {}],
+    ])('%s', (input, expected) => {
+      expect(fill(input)).toEqual(expected);
+    });
+
+    it('a named title leaves every loose word to the content, and a named content to the title', () => {
+      expect(fill('/x tytul="Lista zakupów" mleko chleb')).toEqual({ title: 'Lista zakupów', content: 'mleko chleb' });
+      expect(fill('/x Zakupy tresc="mleko i chleb"')).toEqual({ title: 'Zakupy', content: 'mleko i chleb' });
+    });
+  });
 });

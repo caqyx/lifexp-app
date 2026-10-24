@@ -5,6 +5,10 @@ import { effect } from '@preact/signals';
 import type { TodaySources } from '@/stores/today';
 import { today as todaySources } from '@/stores/today';
 import { stats as statsSources, type StatsSources } from '@/stores/stats';
+import type { Note } from '@/domain/notes';
+import type { Task } from '@/domain/tasks';
+import { notes } from '@/stores/notes';
+import { tasks } from '@/stores/tasks';
 
 export function waitFor<T>(pick: () => T | undefined, failed: () => boolean, timeoutMs = 0): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -26,6 +30,20 @@ export function waitFor<T>(pick: () => T | undefined, failed: () => boolean, tim
     if (timeoutMs > 0 && !settled) timer = setTimeout(() => finish(() => reject(new Error('timeout'))), timeoutMs);
   });
 }
+
+/** The task list once the listener has it; rejects when it cannot be read. */
+export const loadedTasks = (): Promise<readonly Task[]> =>
+  waitFor(
+    () => tasks.value.list,
+    () => tasks.value.failed,
+  );
+
+/** The notes once the listener has them; rejects when they cannot be read. */
+export const loadedNotes = (): Promise<readonly Note[]> =>
+  waitFor(
+    () => notes.value.list,
+    () => notes.value.failed,
+  );
 
 /** One part of Today's data (days, activity types, chores …) once the listener has it. */
 export function loadedToday<K extends 'days' | 'activityDefs' | 'choreDefs' | 'choreEntries'>(key: K): Promise<NonNullable<TodaySources[K]>> {
