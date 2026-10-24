@@ -5,7 +5,9 @@
 import { isModuleOn, type ModuleChoice, type OptionalModule } from '../modules';
 import { TASK_SIZES, type TaskSize } from '../tasks';
 import { fillSlots, missingSlots, tokenize, unreadNamed, type SlotDef } from './parse';
-import { amount, dateFrom, fold, money, oneOf } from './recognizers';
+import { CHORE_DAY } from './chores';
+import { amount, dateFrom, duration, fold, money, oneOf } from './recognizers';
+import { STATS_PERIOD } from './stats';
 
 /** read: runs at once; write: runs, with undo; destructive: asks first (6.6). */
 export type Risk = 'read' | 'write' | 'destructive';
@@ -24,7 +26,14 @@ export type CommandId =
   | 'remove-money'
   | 'balance'
   | 'create-category'
-  | 'delete-transaction';
+  | 'delete-transaction'
+  | 'complete-chore'
+  | 'chores'
+  | 'settle-chores'
+  | 'log-activity'
+  | 'streak'
+  | 'stats'
+  | 'what-now';
 
 export interface CommandSpec {
   id: CommandId;
@@ -42,10 +51,17 @@ const SIZE = oneOf<TaskSize>(Object.fromEntries(TASK_SIZES.map((s) => [s, s])) a
 /** "5", "12,50", "20 zł" in grosze; a "pkt" amount is not money. */
 const grosze = (token: string) => money(token)?.grosze;
 
+/**
+ * A command with a money slot reads a bare "5.10" as the amount, never as 5 October
+ * (the date slot is filled first). Its dates are "dziś", a weekday, "12.10.2026",
+ * "2026-10-12", "+3d". Every command with a money slot and a date slot uses this.
+ */
+const dateWithMoney = (today: string) => dateFrom(today, { dayMonth: false });
+
 /** /wplyw and /wydatek read the same text: amount, day, then "category note" (domain/exus/money). */
 const txSlots = (today: string): SlotDef[] => [
   { name: 'amount', type: 'money', required: true, recognize: grosze },
-  { name: 'date', type: 'date', required: false, recognize: dateFrom(today) },
+  { name: 'date', type: 'date', required: false, recognize: dateWithMoney(today) },
   // A category that may not exist yet: `kategoria=nazwa` creates it, as the Money sheet's "Nowa kategoria…".
   { name: 'category', type: 'text', required: false, keys: ['kategoria', 'category'], namedOnly: true },
   { name: 'rest', type: 'text', required: false },
@@ -167,6 +183,65 @@ export const COMMANDS: readonly CommandSpec[] = [
     module: 'money',
     risk: 'destructive',
     slots: () => [{ name: 'ref', type: 'entity', required: false }],
+  },
+  {
+    // The chore is found by its name; the day is "dzis" (default) or "wczoraj".
+    id: 'complete-chore',
+    aliases: ['obowiazek'],
+    module: 'chores',
+    risk: 'write',
+    slots: () => [
+      { name: 'chore', type: 'entity', required: true },
+      { name: 'when', type: 'enum', required: false, recognize: CHORE_DAY },
+    ],
+  },
+  {
+    id: 'chores',
+    aliases: ['obowiazki'],
+    module: 'chores',
+    risk: 'read',
+    slots: () => [],
+  },
+  {
+    // Turns the points into złoty in Money and cannot be taken back, so it asks first.
+    id: 'settle-chores',
+    aliases: ['rozlicz'],
+    module: 'chores',
+    risk: 'destructive',
+    slots: () => [],
+  },
+  {
+    // "type note": the type is the leading words (domain/exus/activities); the duration is read from anywhere.
+    id: 'log-activity',
+    aliases: ['aktywnosc'],
+    module: 'stats',
+    risk: 'write',
+    slots: () => [
+      { name: 'type', type: 'text', required: true },
+      { name: 'duration', type: 'duration', required: true, recognize: duration },
+    ],
+  },
+  {
+    id: 'streak',
+    aliases: ['seria'],
+    module: 'stats',
+    risk: 'read',
+    slots: () => [],
+  },
+  {
+    id: 'stats',
+    aliases: ['statystyki'],
+    module: 'stats',
+    risk: 'read',
+    slots: () => [{ name: 'period', type: 'enum', required: false, recognize: STATS_PERIOD }],
+  },
+  {
+    // Picks, writes nothing.
+    id: 'what-now',
+    aliases: ['co-teraz'],
+    module: 'stats',
+    risk: 'read',
+    slots: () => [{ name: 'duration', type: 'duration', required: true, recognize: duration }],
   },
 ];
 

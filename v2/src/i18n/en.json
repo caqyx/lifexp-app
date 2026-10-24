@@ -1231,11 +1231,18 @@
       "goals": "The goals and how far they are",
       "edit-goal": "Change the name or the amount of a goal",
       "delete-goal": "Delete a goal (money put aside goes back to the balance)",
-      "add-money": "Record an income: amount, category, note, date",
-      "remove-money": "Record an expense (it costs points at the general rate)",
+      "add-money": "Record an income: amount, category, note, date (a bare 5.10 is the amount; dates: today, yesterday, fri, 12.10.2026)",
+      "remove-money": "Record an expense (it costs points at the general rate; a bare 5.10 is the amount; dates: today, yesterday, fri, 12.10.2026)",
       "balance": "The balance, this month's expenses and money put aside in goals",
       "create-category": "A new transaction category",
-      "delete-transaction": "Delete a transaction (balance and points come back)"
+      "delete-transaction": "Delete a transaction (balance and points come back)",
+      "complete-chore": "Log a finished chore (today or yesterday)",
+      "chores": "Chores: done today, to be paid out, entries this month",
+      "settle-chores": "Settle the payout: chore points go to Money as złoty",
+      "log-activity": "Log an activity: type, time, note (points with the daily limit)",
+      "streak": "Streak of days with points and the streak freeze",
+      "stats": "Points and activity time of the last 7 or 30 days",
+      "what-now": "What now? Picks an idea for the time given, saves nothing"
     },
     "missing": "Missing: {{fields}}.\n{{syntax}}",
     "slots": {
@@ -1244,7 +1251,10 @@
       "name": "name",
       "target": "amount (zł or pkt)",
       "goal": "goal",
-      "amount": "amount"
+      "amount": "amount",
+      "chore": "chore",
+      "type": "activity type",
+      "duration": "time"
     },
     "today": {
       "points": "Points: {{total}} (today {{earned}} of the {{limit}} limit).",
@@ -1270,7 +1280,11 @@
       "add-money": "<amount> [category] [note] [date]",
       "remove-money": "<amount> [category] [note] [date]",
       "create-category": "<name>",
-      "delete-transaction": "[last|text]"
+      "delete-transaction": "[last|text]",
+      "complete-chore": "<chore> [today|yesterday]",
+      "log-activity": "<type> <time> [note]",
+      "stats": "[7d|30d]",
+      "what-now": "<time>"
     },
     "paletteLabel": "Commands matching what is typed",
     "tasksFailed": "Could not load the tasks. Check the connection and try again.",
@@ -1280,7 +1294,9 @@
       "create-goal": "the goal \"{{name}}\"",
       "add-money": "the income {{amount}} ({{category}})",
       "remove-money": "the expense {{amount}} ({{category}})",
-      "create-category": "the category \"{{name}}\""
+      "create-category": "the category \"{{name}}\"",
+      "complete-chore": "chore “{{name}}”",
+      "log-activity": "activity “{{name}}” (−{{points}} pts)"
     },
     "nothingToUndo": "There is nothing to undo.",
     "undoFailed": "Could not undo. Check the connection and try again.",
@@ -1334,6 +1350,42 @@
       "deleteExpenseEffect": "The balance will go up by {{amount}}.",
       "deletePoints": "{{points}} pkt will come back to your account.",
       "deleted": "Deleted: {{what}}."
+    },
+    "chore": {
+      "none": "There is no chore “{{name}}”. The list is in the Chores view.",
+      "ambiguous": "Several chores fit: {{names}}. Be more precise.",
+      "loggedToday": "Logged the chore “{{name}}” for today (+{{points}} pts).",
+      "loggedYesterday": "Logged the chore “{{name}}” for yesterday, {{date}} (+{{points}} pts).",
+      "oneTimeGone": "It was a one-time chore, so it left the list.",
+      "doneToday": "Done today: {{list}}.",
+      "noneToday": "Nothing logged today yet.",
+      "unpaid": "To be paid out: {{points}} pts, that is {{amount}} (1 pt = {{rate}}).",
+      "month": "Entries this month: {{count}}.",
+      "nothingToSettle": "There is nothing to settle.",
+      "settleEffect": "You settle {{points}} pts from entries: {{count}}. The {{amount}} goes to the balance in Money as an income in the “{{category}}” category, and the entries leave the calendar. This cannot be undone.",
+      "settled": "Settled {{points}} pts: {{amount}} went to the balance in Money."
+    },
+    "activity": {
+      "none": "There is no activity type “{{name}}”. You have: {{names}}.",
+      "ambiguous": "Several activity types fit: {{names}}. Be more precise.",
+      "offline": "Logging an activity needs a connection to the server. Use the log on the Today screen, which keeps a draft.",
+      "nothingSaved": "Nothing was saved.",
+      "logged": "Logged the activity “{{name}}” ({{time}}): +{{points}} pts.",
+      "capped": "The time was worth {{earned}} pts, but {{points}} were left of the daily limit of {{limit}} pts.",
+      "levelUp": "New level: {{level}}, {{title}}!"
+    },
+    "streak": {
+      "freezeWaiting": "The streak freeze comes back {{days}} days after it was last used."
+    },
+    "stats": {
+      "points": "Points of the last {{days}} days: {{points}}.",
+      "activityTime": "Activity time: {{time}}.",
+      "activityTimePartial": "Activity time: at least {{time}} (from the latest 50 entries).",
+      "gaming": "Gaming: {{time}}.",
+      "top": "Most frequent activity: {{name}} ({{count}}×)."
+    },
+    "whatNow": {
+      "pick": "Picked: {{name}} ({{time}})."
     }
   }
 }

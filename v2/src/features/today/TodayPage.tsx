@@ -17,7 +17,6 @@ import {
 import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   GENERATED_TYPE,
-  activeDays,
   activityProblem,
   earnedPoints,
   generatorPool,
@@ -32,7 +31,7 @@ import { newAchievements } from '@/domain/achievements';
 import { goalProgress } from '@/domain/goals';
 import type { Profile } from '@/domain/profile';
 import { DAILY_LIMIT_DEFAULT, dailyProgress, generalRate, levelOf, levelTitleIndex, pointsToGrosze, XP_PER_LEVEL } from '@/domain/points';
-import { calculateStreak, frozenDay, isFreezeAvailable } from '@/domain/streak';
+import { streakOf } from '@/domain/streak';
 import { ActivityRow, formatDuration } from '@/features/shared/activity';
 import { goalAmount, useCelebration } from '@/features/shared/goals';
 import { locale, t } from '@/i18n';
@@ -101,13 +100,9 @@ function LevelCard({ profile }: { profile: Profile }) {
   );
 }
 
-/** G3 on Today's data: the streak, with a freeze used before still bridging its gap. */
-function streakOf(profile: Profile, days: ReadonlyMap<string, DayLog>, todayKey: string) {
-  const active = activeDays(days);
-  const freezeAvailable = isFreezeAvailable(profile.streakFreezeLastUsed, new Date());
-  const streak = calculateStreak(active, todayKey, freezeAvailable, frozenDay(active, profile.streakFreezeLastUsed));
-  return { active, freezeAvailable, streak };
-}
+/** G3 on Today's data (domain/streak). */
+const streakFor = (profile: Profile, days: ReadonlyMap<string, DayLog>, todayKey: string) =>
+  streakOf(profile.streakFreezeLastUsed, days, todayKey);
 
 interface RecordProgressProps {
   uid: string;
@@ -122,7 +117,7 @@ interface RecordProgressProps {
  * Renders nothing.
  */
 function RecordProgress({ uid, profile, days, todayKey }: RecordProgressProps) {
-  const { streak } = streakOf(profile, days, todayKey);
+  const { streak } = streakFor(profile, days, todayKey);
   useEffect(() => {
     if (streak.newFreeze) recordFreeze(uid, todayKey).catch(() => {});
   }, [uid, streak.newFreeze, todayKey]);
@@ -156,7 +151,7 @@ function RecordProgress({ uid, profile, days, todayKey }: RecordProgressProps) {
 }
 
 function StreakCard({ profile, days, todayKey }: { profile: Profile; days: ReadonlyMap<string, DayLog>; todayKey: string }) {
-  const { active, freezeAvailable, streak } = streakOf(profile, days, todayKey);
+  const { active, freezeAvailable, streak } = streakFor(profile, days, todayKey);
   const lang = locale();
   return (
     <Card>

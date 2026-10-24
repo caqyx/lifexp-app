@@ -6,6 +6,7 @@
 // (stage 3e) records the freeze through a service, once, and keeps bridging the
 // gap it covered: that day is found again from the date the freeze was used.
 import { addDays } from '@/lib/dates';
+import { activeDays, type DayLog } from './activity';
 
 /** The freeze comes back 7 days after it was last used. */
 export const FREEZE_COOLDOWN_DAYS = 7;
@@ -70,4 +71,20 @@ export function calculateStreak(
     cursor = addDays(cursor, -1);
   }
   return { days, freezeUsed, newFreeze };
+}
+
+/**
+ * G3 on the day logs the screens hold: the streak, with a freeze used before still
+ * bridging its gap. Today's streak card and Ex-us's /seria both read it from here.
+ */
+export function streakOf(
+  freezeLastUsed: string | null,
+  days: ReadonlyMap<string, DayLog>,
+  todayKey: string,
+  now: Date = new Date(),
+) {
+  const active = activeDays(days);
+  const freezeAvailable = isFreezeAvailable(freezeLastUsed, now);
+  const streak = calculateStreak(active, todayKey, freezeAvailable, frozenDay(active, freezeLastUsed));
+  return { active, freezeAvailable, streak };
 }

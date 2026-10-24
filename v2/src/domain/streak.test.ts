@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { addDays } from '@/lib/dates';
-import { calculateStreak, frozenDay, isFreezeAvailable } from './streak';
+import { calculateStreak, frozenDay, isFreezeAvailable, streakOf } from './streak';
 
 const TODAY = '2026-09-29';
 
@@ -69,5 +69,28 @@ describe('a used freeze keeps bridging its gap (v2; v1 loses it on the next rend
   test('no streak on the day it was used: nothing was bridged', () => {
     expect(frozenDay(days('···✓'), addDays(TODAY, -1))).toBeNull();
     expect(frozenDay(days('✓✓'), null)).toBeNull();
+  });
+});
+
+describe('streakOf (the streak card on Today and /seria)', () => {
+  const logs = (...keys: string[]) => new Map(keys.map((key) => [key, { pointsEarned: 10, gamingMinutes: 0 }]));
+  const NOW = new Date('2026-10-09T12:00:00Z');
+
+  test('counts the active days back from today, freeze free when never used', () => {
+    const got = streakOf(null, logs('2026-10-09', '2026-10-08', '2026-10-07'), '2026-10-09', NOW);
+    expect(got.streak.days).toBe(3);
+    expect(got.freezeAvailable).toBe(true);
+  });
+
+  test('is zero without points, and a used freeze is on cooldown for seven days', () => {
+    const got = streakOf('2026-10-05', new Map(), '2026-10-09', NOW);
+    expect(got.streak.days).toBe(0);
+    expect(got.freezeAvailable).toBe(false);
+    expect(streakOf('2026-10-01', new Map(), '2026-10-09', NOW).freezeAvailable).toBe(true);
+  });
+
+  test('bridges one gap with the freeze that is available', () => {
+    const got = streakOf(null, logs('2026-10-09', '2026-10-07', '2026-10-06'), '2026-10-09', NOW);
+    expect(got.streak).toEqual({ days: 3, freezeUsed: true, newFreeze: true });
   });
 });

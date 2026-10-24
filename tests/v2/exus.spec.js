@@ -1,6 +1,7 @@
 // Ex-us slash commands (docs/v2/PLAN.md 6, stage 5a) on the Firebase emulators:
 // read and run locally, through the same services as the screens, no backend call.
-const { createUser, db } = require('../support/emulator');
+const { Timestamp } = require('firebase-admin/firestore');
+const { createUser, db, todayUtcKey } = require('../support/emulator');
 const { test, expect, openSignedIn } = require('../support/v2');
 
 test.use({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
@@ -51,6 +52,13 @@ test('the menu opens Ex-us; /pomoc lists the commands, other text and unknown co
   await expect(log(page)).toContainText('/saldo — Saldo, wydatki w tym miesiącu i pieniądze w celach');
   await expect(log(page)).toContainText('/kategoria <nazwa> — Nowa kategoria transakcji');
   await expect(log(page)).toContainText('/usun-transakcje [ostatnia|tekst] — Usuń transakcję');
+  await expect(log(page)).toContainText('/obowiazek <obowiązek> [dzis|wczoraj] — Zapisz zrobiony obowiązek');
+  await expect(log(page)).toContainText('/obowiazki — Obowiązki: zrobione dziś');
+  await expect(log(page)).toContainText('/rozlicz — Rozlicz wypłatę');
+  await expect(log(page)).toContainText('/aktywnosc <rodzaj> <czas> [opis] — Zapisz aktywność');
+  await expect(log(page)).toContainText('/seria — Seria dni z punktami');
+  await expect(log(page)).toContainText('/statystyki [7d|30d] — Punkty i czas aktywności');
+  await expect(log(page)).toContainText('/co-teraz <czas> — Co teraz?');
   await send(page, 'odłóż 50 zł na rower');
   await expect(log(page)).toContainText('Rozmowa z AI dojdzie w następnym kroku.');
   await send(page, '/latanie');
@@ -140,7 +148,7 @@ test('typing "/" opens the command palette; a tap puts the command in the field 
   const field = page.getByLabel('Wiadomość do Ex-us');
   const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
   await field.fill('/');
-  await expect(list.getByRole('button')).toHaveCount(14);
+  await expect(list.getByRole('button')).toHaveCount(21);
   await field.fill('/za');
   await expect(list.getByRole('button')).toHaveCount(1);
   await list.getByRole('button', { name: /Nowe zadanie/ }).click();
@@ -560,7 +568,7 @@ test('with Money off, the money commands are gone from the palette and unknown t
   const field = page.getByLabel('Wiadomość do Ex-us');
   const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
   await field.fill('/');
-  await expect(list.getByRole('button')).toHaveCount(9);
+  await expect(list.getByRole('button')).toHaveCount(16);
   await field.fill('/wyd');
   await expect(list).toHaveCount(0);
   for (const command of ['/wydatek 5 gry', '/wplyw 5 gry', '/saldo', '/kategoria Sport', '/usun-transakcje']) {
@@ -570,4 +578,438 @@ test('with Money off, the money commands are gone from the palette and unknown t
   await send(page, '/pomoc');
   await expect(log(page)).toContainText('/cele — Cele i postęp');
   await expect(log(page)).not.toContainText('Saldo, wydatki');
+});
+
+// ── Stage 5a-7: /cel count, money before date, chores and XP ──
+
+test('/cel counts the goals from the transaction: two quick commands under a CPU 6 times slower say 1 and 2', async ({ page }) => {
+  const account = await goalsAccount('exus-goals-slow');
+  await openSignedIn(page, account, '#/exus');
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+
+  // The second is typed before the first has answered, so both read the same profile snapshot.
+  await send(page, '/cel Pierwszy 10 zł');
+  await send(page, '/cel Drugi 20 zł');
+  await expect(log(page)).toContainText('(celów: 1 z 3)');
+  await expect(log(page)).toContainText('(celów: 2 z 3)');
+  await expect(log(page)).not.toContainText('(celów: 3 z 3)');
+  await expect.poll(async () => (await goalsOf(account.uid)).length).toBe(2);
+});
+
+test('/wydatek 5.10 is 5,10 zł today, not 5 October; a date is written in full (12.10.2026 or 2026-10-12)', async ({ page }) => {
+  const account = await moneyAccount('exus-expense-dot');
+  const before = await moneyState(account.uid);
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/wydatek 5.10 jedzenie');
+  await expect(replies.last()).toContainText('Zapisano wydatek 5,10 zł w kategorii „jedzenie”');
+  await expect(replies.last()).toContainText('−51 pkt');
+  const after = await expect
+    .poll(async () => (await moneyState(account.uid)).transactions.length)
+    .toBe(1)
+    .then(() => moneyState(account.uid));
+  expect(after.transactions).toEqual([{ type: 'expense', amount: 5.1, category: 'jedzenie', note: '', date: utcToday(), source: 'manual', pointsCost: 51 }]);
+  expect(after.balance).toEqual({ current: 44.9 });
+  expect(after.points).toEqual({ total: 69, earnedAllTime: 300, spentAllTime: 61 });
+
+  await send(page, '/cofnij');
+  await expect.poll(() => moneyState(account.uid)).toEqual(before);
+
+  await send(page, '/wplyw 12.10 kieszonkowe 2026-10-12');
+  await expect(replies.last()).toContainText('Zapisano wpływ 12,10 zł w kategorii „kieszonkowe” (12 października)');
+  await expect.poll(async () => (await moneyState(account.uid)).transactions).toEqual([
+    { type: 'income', amount: 12.1, category: 'kieszonkowe', note: '', date: '2026-10-12', source: 'manual', pointsCost: 0 },
+  ]);
+});
+
+// ── Chores ──
+
+/** The local calendar day (v1 dateISOLocal), moved by `offset` days. */
+function localDay(offset = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const CHORE_DEFS = [
+  ['dishwasher', 'Opróżnienie zmywarki', '🍽️', 15, false],
+  ['vacuum_stairs', 'Odkurzanie schodów', '🧹', 5, false],
+  ['vacuum_hall', 'Odkurzanie przedpokoju', '🧹', 8, false],
+  ['windows_once', 'Mycie okien', '🪟', 20, true],
+];
+const choreEntriesOf = (uid) => db.collection(`users/${uid}/chores`);
+const choreDefsOf = (uid) => db.collection(`users/${uid}/choreDefs`);
+
+async function choresAccount(tag, profile = {}) {
+  const account = await createUser({ tag, profile });
+  for (const [i, [id, name, emoji, points, oneTime]] of CHORE_DEFS.entries()) {
+    await choreDefsOf(account.uid).doc(id).set({ name, desc: '', emoji, points, oneTime, order: i });
+  }
+  return account;
+}
+
+function addChoreEntry(uid, choreId, dateISO) {
+  const [, name, emoji, points] = CHORE_DEFS.find((d) => d[0] === choreId);
+  return choreEntriesOf(uid).add({ choreId, choreName: name, choreEmoji: emoji, points, dateISO, monthKey: dateISO.slice(0, 7), createdAt: new Date() });
+}
+
+/** The entries as the server has them, ids and creation times aside. */
+async function choreEntries(uid) {
+  return (await choreEntriesOf(uid).get()).docs.map((d) => {
+    const { createdAt, ...rest } = d.data();
+    return rest;
+  });
+}
+
+const choreEntry = (choreId, dateISO) => {
+  const [, choreName, choreEmoji, points] = CHORE_DEFS.find((d) => d[0] === choreId);
+  return { choreId, choreName, choreEmoji, points, dateISO, monthKey: dateISO.slice(0, 7) };
+};
+
+test('/obowiazek writes the entry the Chores screen writes, for today or yesterday; /cofnij removes it', async ({ page }) => {
+  const account = await choresAccount('exus-chore');
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  // Typed at once, before the chores have loaded: the command waits for them.
+  await send(page, '/obowiazek zmywarki');
+  await expect(replies.last()).toHaveText('Zapisano obowiązek „Opróżnienie zmywarki” na dziś (+15 pkt).');
+  await expect(page.getByText('Dodano: Opróżnienie zmywarki (+15 pkt)')).toBeVisible();
+  await expect.poll(() => choreEntries(account.uid)).toEqual([choreEntry('dishwasher', localDay(0))]);
+
+  await send(page, '/obowiazek "odkurzanie schodow" wczoraj');
+  await expect(replies.last()).toContainText('Zapisano obowiązek „Odkurzanie schodów” na wczoraj');
+  await expect.poll(async () => (await choreEntries(account.uid)).length).toBe(2);
+  expect(await choreEntries(account.uid)).toContainEqual(choreEntry('vacuum_stairs', localDay(-1)));
+
+  // /cofnij takes the newest (yesterday's) entry back and leaves the first.
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Cofnięto: obowiązek „Odkurzanie schodów”.');
+  await expect.poll(() => choreEntries(account.uid)).toEqual([choreEntry('dishwasher', localDay(0))]);
+});
+
+test('/obowiazek: a one-time chore leaves the list and /cofnij brings it back; unknown and several fits are said', async ({ page }) => {
+  const account = await choresAccount('exus-chore-once');
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/obowiazek okien');
+  await expect(replies.last()).toContainText('Zapisano obowiązek „Mycie okien” na dziś (+20 pkt). Był jednorazowy, więc zniknął z listy.');
+  await expect.poll(async () => (await choreDefsOf(account.uid).doc('windows_once').get()).exists).toBe(false);
+  await send(page, '/cofnij');
+  await expect.poll(async () => (await choreDefsOf(account.uid).doc('windows_once').get()).exists).toBe(true);
+  expect(await choreEntries(account.uid)).toEqual([]);
+
+  await send(page, '/obowiazek odkurzanie');
+  await expect(replies.last()).toContainText('Pasuje kilka obowiązków: „Odkurzanie schodów”, „Odkurzanie przedpokoju”.');
+  await send(page, '/obowiazek latanie');
+  await expect(replies.last()).toContainText('Nie ma obowiązku „latanie”.');
+  await send(page, '/obowiazek');
+  await expect(replies.last()).toContainText('Brakuje: obowiązek.');
+  expect(await choreEntries(account.uid)).toEqual([]);
+});
+
+test('/obowiazki tells what is done today, what is to be paid out at the rate, and the entries of the month', async ({ page }) => {
+  const account = await choresAccount('exus-chores-overview');
+  for (const id of ['dishwasher', 'vacuum_stairs', 'vacuum_stairs']) await addChoreEntry(account.uid, id, localDay(0));
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/obowiazki');
+  const reply = page.locator('.exus-msg--exus').last();
+  await expect(reply).toContainText('Dziś zrobione: Opróżnienie zmywarki (+15 pkt); Odkurzanie schodów ×2 (+10 pkt).');
+  await expect(reply).toContainText('Do wypłaty: 25 pkt, czyli 11,25 zł (1 pkt = 0,45 zł).');
+  await expect(reply).toContainText('Wpisy w tym miesiącu: 3.');
+});
+
+test('/obowiazki on a clean account says nothing is done', async ({ page }) => {
+  const account = await choresAccount('exus-chores-empty');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/obowiazki');
+  const reply = page.locator('.exus-msg--exus').last();
+  await expect(reply).toContainText('Dziś nic jeszcze nie zapisano.');
+  await expect(reply).toContainText('Do wypłaty: 0 pkt, czyli 0,00 zł');
+  await expect(reply).toContainText('Wpisy w tym miesiącu: 0.');
+});
+
+/** The payout test of chores.spec: two unpaid entries (10 + 30 pts), a 50,00 zł balance. */
+async function payoutAccount(tag) {
+  const account = await choresAccount(tag);
+  const user = db.doc(`users/${account.uid}`);
+  await user.collection('money').doc('balance').set({ current: 50, currency: 'PLN', monthlyLimit: 0 });
+  await choreEntriesOf(account.uid).add({
+    choreId: 'x10', choreName: 'Dziesięć', choreEmoji: '🧹', points: 10, dateISO: localDay(0), monthKey: localDay(0).slice(0, 7), createdAt: new Date(),
+  });
+  await choreEntriesOf(account.uid).add({
+    choreId: 'x30', choreName: 'Trzydzieści', choreEmoji: '🧽', points: 30, dateISO: localDay(-2), monthKey: localDay(-2).slice(0, 7), createdAt: new Date(),
+  });
+  return account;
+}
+
+async function payoutState(uid) {
+  const user = db.doc(`users/${uid}`);
+  const strip = (docs) => docs.map((d) => {
+    const { createdAt, ...rest } = d.data();
+    return rest;
+  });
+  return {
+    payouts: strip((await user.collection('chorePayouts').get()).docs),
+    entries: (await choreEntriesOf(uid).get()).size,
+    balance: (await user.collection('money').doc('balance').get()).data(),
+    transactions: strip((await user.collection('moneyTransactions').get()).docs),
+    moneyIncomeAllTime: (await user.get()).data().moneyIncomeAllTime ?? null,
+  };
+}
+
+test('/rozlicz asks first; Anuluj changes nothing, Wykonaj settles into Money in one go, with no undo', async ({ page }) => {
+  const account = await payoutAccount('exus-settle');
+  await openSignedIn(page, account, '#/exus');
+  // Opening Ex-us prepares the Money account (the income counter starts at 0, as opening Money does).
+  await expect.poll(async () => (await payoutState(account.uid)).moneyIncomeAllTime).toBe(0);
+  const before = await payoutState(account.uid);
+  const dialog = page.getByRole('alertdialog');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/rozlicz');
+  await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('Wykonać /rozlicz?');
+  await expect(dialog).toContainText('Rozliczysz 40 pkt z wpisów: 2. Kwota 18,00 zł wpłynie na saldo w Pieniądzach jako wpływ w kategorii „Obowiązki domowe”');
+  await expect(dialog).toContainText('Tego nie da się cofnąć.');
+  await dialog.getByRole('button', { name: 'Anuluj' }).click();
+  await expect(replies.last()).toContainText('Anulowano, nic się nie zmieniło.');
+  expect(await payoutState(account.uid)).toEqual(before);
+
+  await send(page, '/rozlicz');
+  await dialog.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(replies.last()).toHaveText('Rozliczono 40 pkt: 18,00 zł wpłynęło na saldo w Pieniądzach.');
+  await expect(page.getByText('Rozliczono 18,00 zł')).toBeVisible();
+  // The documents of chores.spec's payout test.
+  expect(await payoutState(account.uid)).toEqual({
+    payouts: [{ points: 40, amountPln: 18, fromISO: localDay(-2), toISO: localDay(0) }],
+    entries: 0,
+    balance: { current: 68, currency: 'PLN', monthlyLimit: 0 },
+    transactions: [{ type: 'income', amount: 18, category: 'Obowiązki domowe', note: '', date: utcToday(), source: 'chore_payout' }],
+    moneyIncomeAllTime: 18,
+  });
+  await expect(page.getByRole('button', { name: 'Cofnij' })).toHaveCount(0);
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Nie ma nic do cofnięcia.');
+
+  // Nothing left: said at once, no question.
+  await send(page, '/rozlicz');
+  await expect(replies.last()).toHaveText('Nie ma nic do rozliczenia.');
+  await expect(dialog).toBeHidden();
+});
+
+// ── XP and activities ──
+
+/** G1.2's account: 130 of the 150 points of today already earned. */
+async function cappedAccount(tag, { earnedToday = 130 } = {}) {
+  const account = await createUser({ tag, profile: { points: { total: 120, earnedAllTime: 620, spentAllTime: 0 }, dailyLimit: 150 } });
+  if (earnedToday > 0) await db.doc(`users/${account.uid}/dailyLog/${todayUtcKey()}`).set({ pointsEarned: earnedToday, gamingMinutes: 0 });
+  return account;
+}
+
+/** What an activity changes, once it reached the server (timestamps and ids aside). */
+async function activityState(uid) {
+  const user = db.doc(`users/${uid}`);
+  const activities = (await user.collection('activities').get()).docs.map((d) => {
+    const { timestamp, ...rest } = d.data();
+    expect(timestamp).toBeInstanceOf(Timestamp);
+    return rest;
+  });
+  return {
+    points: (await user.get()).data().points,
+    day: (await user.collection('dailyLog').doc(todayUtcKey()).get()).data() ?? null,
+    activities,
+    defs: (await user.collection('activityDefs').get()).docs.map((d) => d.id).sort(),
+  };
+}
+
+test('/aktywnosc nauka 60 credits what is left of the limit as G1.2 does, seeds the types, and /cofnij takes the points back', async ({ page }) => {
+  const account = await cappedAccount('exus-activity-cap');
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/aktywnosc nauka 60');
+  await expect(replies.last()).toHaveText(
+    'Zapisano aktywność „Nauka (JS, Unity, C#)” (1 h): +20 pkt. Czas był wart 40 pkt, ale do dziennego limitu 150 pkt zostało 20.',
+  );
+  await expect(page.getByText('+20 pkt za: Nauka (JS, Unity, C#)')).toBeVisible();
+  await expect.poll(() => activityState(account.uid)).toEqual({
+    points: { total: 140, earnedAllTime: 640, spentAllTime: 0 },
+    day: { pointsEarned: 150, gamingMinutes: 0 },
+    activities: [{ type: 'learning', duration: 60, points: 20, desc: '' }],
+    defs: ['exercise', 'learning', 'project', 'reading', 'school'],
+  });
+
+  // The day is full now: nothing more is credited or written.
+  await send(page, '/aktywnosc nauka 30');
+  await expect(replies.last()).toHaveText('Dzienny limit 150 pkt jest już osiągnięty. Ta aktywność nie da dziś punktów. Nic nie zapisano.');
+  expect((await activityState(account.uid)).activities).toHaveLength(1);
+
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Cofnięto: aktywność „Nauka (JS, Unity, C#)” (−20 pkt).');
+  await expect.poll(() => activityState(account.uid)).toEqual({
+    points: { total: 120, earnedAllTime: 620, spentAllTime: 0 },
+    day: { pointsEarned: 130, gamingMinutes: 0 },
+    activities: [],
+    defs: ['exercise', 'learning', 'project', 'reading', 'school'],
+  });
+});
+
+test('/aktywnosc takes the time anywhere and the rest as the note; a type, a time and 5 minutes are asked for', async ({ page }) => {
+  const account = await cappedAccount('exus-activity-note', { earnedToday: 0 });
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/aktywnosc 1h30 ćwiczenia trening nóg');
+  await expect(replies.last()).toHaveText('Zapisano aktywność „Ćwiczenia fizyczne” (1 h 30 min): +45 pkt.');
+  await expect.poll(async () => (await activityState(account.uid)).activities).toEqual([
+    { type: 'exercise', duration: 90, points: 45, desc: 'trening nóg' },
+  ]);
+  await expect(page.getByText('+45 pkt za: Ćwiczenia fizyczne')).toBeVisible();
+
+  await send(page, '/aktywnosc latanie 30');
+  await expect(replies.last()).toContainText('Nie ma rodzaju aktywności „latanie”. Masz: „Nauka (JS, Unity, C#)”');
+  await send(page, '/aktywnosc nauka');
+  await expect(replies.last()).toContainText('Brakuje: czas.');
+  await send(page, '/aktywnosc 30');
+  await expect(replies.last()).toContainText('Brakuje: rodzaj aktywności.');
+  await send(page, '/aktywnosc nauka 4');
+  await expect(replies.last()).toHaveText('Co najmniej 5 minut.');
+  expect((await activityState(account.uid)).activities).toHaveLength(1);
+});
+
+function utcDaysAgo(n) {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() - n);
+  return date.toISOString().slice(0, 10);
+}
+
+async function logDays(uid, logs) {
+  for (const [ago, [pointsEarned, gamingMinutes]] of Object.entries(logs)) {
+    await db.doc(`users/${uid}/dailyLog/${utcDaysAgo(Number(ago))}`).set({ pointsEarned, gamingMinutes });
+  }
+}
+
+test('/seria gives the days of the streak and the freeze, as the streak card on Today does', async ({ page }) => {
+  // Three days in a row; the freeze was used three days ago, so it is still waiting.
+  const account = await createUser({ tag: 'exus-streak', profile: { streakFreezeLastUsed: utcDaysAgo(3) } });
+  await logDays(account.uid, { 0: [95, 0], 1: [40, 0], 2: [30, 0] });
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/seria');
+  const reply = page.locator('.exus-msg--exus').last();
+  await expect(reply).toContainText('3 dni z rzędu');
+  await expect(reply).toContainText('Zamrożenie serii wróci po 7 dniach od ostatniego użycia.');
+
+  await page.goto(page.url().replace('#/exus', '#/today'));
+  await expect(page.getByTestId('streak')).toHaveText('3 dni z rzędu');
+});
+
+test('/seria with no points says so, and the freeze is there', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-streak-none' });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/seria');
+  const reply = page.locator('.exus-msg--exus').last();
+  await expect(reply).toContainText('Zdobądź dziś punkty, żeby zacząć serię');
+  await expect(reply).toContainText('Masz zamrożenie serii');
+});
+
+test('/statystyki gives the points, the activity time and the top activity of 7 or 30 days', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-stats', profile: { dailyLimit: 150 } });
+  const user = db.doc(`users/${account.uid}`);
+  await logDays(account.uid, { 0: [95, 45], 1: [40, 0], 2: [30, 0], 4: [20, 0], 10: [50, 0] });
+  await user.collection('activityDefs').doc('learning').set({ name: 'Nauka', points: 40, color: '#6c63ff', icon: 'ti-book', order: 0 });
+  const at = (ms) => Timestamp.fromDate(new Date(Date.now() - ms));
+  await user.collection('activities').add({ type: 'learning', duration: 60, points: 40, desc: '', timestamp: at(60 * 60 * 1000) });
+  await user.collection('activities').add({ type: 'custom_type', duration: 30, points: 15, desc: 'rozdział 3', timestamp: at(2 * 60 * 60 * 1000) });
+  await user.collection('activities').add({ type: 'learning', duration: 45, points: 30, desc: '', timestamp: at(10 * 24 * 60 * 60 * 1000) });
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/statystyki');
+  await expect(replies.last()).toHaveText(
+    'Punkty z ostatnich 7 dni: 185.\nCzas aktywności: 1 h 30 min.\nGranie: 45 min.\nNajczęstsza aktywność: Nauka (1×).',
+  );
+  await send(page, '/statystyki 30d');
+  await expect(replies.last()).toHaveText(
+    'Punkty z ostatnich 30 dni: 235.\nCzas aktywności: 2 h 15 min.\nGranie: 45 min.\nNajczęstsza aktywność: Nauka (2×).',
+  );
+});
+
+test('/statystyki on a clean account says there is nothing yet', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-stats-empty' });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/statystyki 7d');
+  await expect(page.locator('.exus-msg--exus').last()).toHaveText(
+    'Punkty z ostatnich 7 dni: 0.\nCzas aktywności: 0 min.\nGranie: 0 min.\nBrak danych. Zaloguj kilka aktywności!',
+  );
+});
+
+test('/co-teraz 30 picks an idea and what it would give, and writes nothing', async ({ page }) => {
+  const account = await cappedAccount('exus-whatnow', { earnedToday: 0 });
+  const before = await activityState(account.uid);
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+
+  await send(page, '/co-teraz 30');
+  await expect(replies.last()).toContainText(/^Wylosowano: .+ \(30 min\)\.\nDostaniesz \d+ pkt\.$/);
+  await send(page, '/co-teraz 3');
+  await expect(replies.last()).toHaveText('Co najmniej 5 minut.');
+  await send(page, '/co-teraz');
+  await expect(replies.last()).toContainText('Brakuje: czas.');
+  expect(await activityState(account.uid)).toEqual(before);
+  await expect(page.getByRole('button', { name: 'Cofnij' })).toHaveCount(0);
+  await send(page, '/cofnij');
+  await expect(replies.last()).toHaveText('Nie ma nic do cofnięcia.');
+});
+
+test('/co-teraz with the daily limit full says that nothing would be credited', async ({ page }) => {
+  const account = await cappedAccount('exus-whatnow-full', { earnedToday: 150 });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/co-teraz 1h');
+  await expect(page.locator('.exus-msg--exus').last()).toContainText('Dzienny limit 150 pkt jest już osiągnięty.');
+});
+
+test('with Chores or Statistics XP off, their commands are gone from the palette, the help and Ex-us', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-no-chores-stats', profile: { enabledModules: ['money', 'notes', 'aichat', 'games'] } });
+  await openSignedIn(page, account, '#/exus');
+  const field = page.getByLabel('Wiadomość do Ex-us');
+  const list = page.getByRole('list', { name: 'Komendy pasujące do wpisu' });
+  await field.fill('/');
+  await expect(list.getByRole('button')).toHaveCount(14);
+  for (const prefix of ['/obow', '/rozl', '/akty', '/ser', '/staty', '/co-']) {
+    await field.fill(prefix);
+    await expect(list).toHaveCount(0);
+  }
+  for (const command of ['/obowiazek zmywarki', '/obowiazki', '/rozlicz', '/aktywnosc nauka 60', '/seria', '/statystyki', '/co-teraz 30']) {
+    await send(page, command);
+    await expect(page.locator('.exus-msg--exus').last()).toContainText(`Nie znam komendy ${command.split(' ')[0]}.`);
+  }
+  await send(page, '/pomoc');
+  const help = page.locator('.exus-msg--exus').last();
+  await expect(help).toContainText('/saldo — Saldo, wydatki');
+  await expect(help).not.toContainText('/obowiazek');
+  await expect(help).not.toContainText('/aktywnosc');
+});
+
+test('with only Chores off, the XP commands stay', async ({ page }) => {
+  const noChores = await createUser({ tag: 'exus-no-chores', profile: { enabledModules: ['money', 'notes', 'aichat', 'games', 'stats'] } });
+  await openSignedIn(page, noChores, '#/exus');
+  await send(page, '/seria');
+  await expect(page.locator('.exus-msg--exus').last()).toContainText('Zdobądź dziś punkty');
+  await send(page, '/obowiazki');
+  await expect(page.locator('.exus-msg--exus').last()).toContainText('Nie znam komendy /obowiazki.');
+});
+
+test('with only Statistics XP off, the chore commands stay', async ({ page }) => {
+  const noStats = await createUser({ tag: 'exus-no-stats', profile: { enabledModules: ['money', 'notes', 'aichat', 'games', 'chores'] } });
+  await openSignedIn(page, noStats, '#/exus');
+  await send(page, '/obowiazki');
+  await expect(page.locator('.exus-msg--exus').last()).toContainText('Dziś nic jeszcze nie zapisano.');
+  await send(page, '/seria');
+  await expect(page.locator('.exus-msg--exus').last()).toContainText('Nie znam komendy /seria.');
 });

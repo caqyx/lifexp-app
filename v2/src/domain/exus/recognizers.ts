@@ -91,8 +91,11 @@ function validKey(y: number, m: number, d: number): string | undefined {
  * Days as local "YYYY-MM-DD" keys, counted from `today`: "dziś" "jutro" "pojutrze"
  * "wczoraj", a weekday ("pt" = the nearest Friday, today included), "12.10"
  * (this year), "12.10.2026", "2026-10-12", "+3d", "+2t" (weeks).
+ *
+ * `dayMonth: false` leaves out the short "12.10": in a command with an amount "5.10"
+ * is five złoty ten grosze, so there a date is written in full ("12.10.2026") or by name.
  */
-export function dateFrom(today: string): Recognizer<string> {
+export function dateFrom(today: string, { dayMonth = true }: { dayMonth?: boolean } = {}): Recognizer<string> {
   return (token) => {
     const t = fold(token);
     if (t in RELATIVE) return addDays(today, RELATIVE[t]!);
@@ -105,7 +108,7 @@ export function dateFrom(today: string): Recognizer<string> {
     m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
     if (m) return validKey(Number(m[1]), Number(m[2]), Number(m[3]));
     m = /^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?$/.exec(t);
-    if (m) return validKey(m[3] ? Number(m[3]) : Number(today.slice(0, 4)), Number(m[2]), Number(m[1]));
+    if (m && (m[3] || dayMonth)) return validKey(m[3] ? Number(m[3]) : Number(today.slice(0, 4)), Number(m[2]), Number(m[1]));
     return undefined;
   };
 }

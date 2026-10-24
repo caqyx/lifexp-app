@@ -87,6 +87,14 @@ describe('recognizers', () => {
     ['M', undefined],
   ])('date %s', (token, expected) => expect(date(token)).toBe(expected));
 
+  it('leaves out the short day-month when asked, and keeps every other form', () => {
+    const noShort = dateFrom('2026-10-09', { dayMonth: false });
+    for (const token of ['12.10', '5.1', '31.12']) expect(noShort(token), token).toBeUndefined();
+    for (const [token, expected] of [['12.10.2026', '2026-10-12'], ['2026-10-12', '2026-10-12'], ['+3d', '2026-10-12'], ['wczoraj', '2026-10-08'], ['pt', '2026-10-09']]) {
+      expect(noShort(token!), token).toBe(expected);
+    }
+  });
+
   it('oneOf matches in any case, with or without Polish letters', () => {
     const when = oneOf({ dziś: 'today', wczoraj: 'yesterday' });
     expect(when('DZIS')).toBe('today');

@@ -105,7 +105,13 @@ export interface LogActivityInput {
   day?: string;
 }
 
-export type LogActivityOutcome = { ok: true; points: number; earned: number } | { ok: false; problem: 'dailyLimit' };
+/**
+ * `id`: the new entry (Ex-us takes it back with deleteActivity); `limit`: the daily limit the credit was
+ * cut to, from the server's profile, not from a screen's snapshot.
+ */
+export type LogActivityOutcome =
+  | { ok: true; points: number; earned: number; id: string; limit: number }
+  | { ok: false; problem: 'dailyLimit'; limit: number };
 
 /**
  * v1 logActivity() + persistActivity() as one transaction: the credit is worked out
@@ -119,10 +125,11 @@ export function logActivity(uid: string, input: LogActivityInput): Promise<LogAc
     const user = await tx.get(userOf(uid));
     const earnedToday = day.exists() ? numberOr(day.data().pointsEarned) : 0;
     const credit = creditActivity(input.minutes, input.pointsPerHour, earnedToday, numberOr(user.data()?.dailyLimit));
-    if (credit.points === 0) return { ok: false, problem: 'dailyLimit' };
+    if (credit.points === 0) return { ok: false, problem: 'dailyLimit', limit: credit.limit };
 
+    const entry = doc(activitiesOf(uid));
     tx.set(
-      doc(activitiesOf(uid)),
+      entry,
       newActivityData({ type: input.type, typeName: input.typeName, minutes: input.minutes, desc: input.desc, points: credit.points, now: input.now }),
     );
     if (day.exists()) tx.update(dayRef, { pointsEarned: increment(credit.points) });
@@ -131,7 +138,7 @@ export function logActivity(uid: string, input: LogActivityInput): Promise<LogAc
       'points.total': increment(credit.points),
       'points.earnedAllTime': increment(credit.points),
     });
-    return { ok: true, points: credit.points, earned: credit.earned };
+    return { ok: true, points: credit.points, earned: credit.earned, id: entry.id, limit: credit.limit };
   });
 }
 

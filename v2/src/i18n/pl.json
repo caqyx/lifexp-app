@@ -1231,11 +1231,18 @@
       "goals": "Cele i postęp",
       "edit-goal": "Zmień nazwę albo kwotę celu",
       "delete-goal": "Usuń cel (odłożone pieniądze wracają na saldo)",
-      "add-money": "Zapisz wpływ: kwota, kategoria, notatka, data",
-      "remove-money": "Zapisz wydatek (kosztuje punkty według przelicznika)",
+      "add-money": "Zapisz wpływ: kwota, kategoria, notatka, data (samo 5.10 to kwota; data: dziś, wczoraj, pt, 12.10.2026)",
+      "remove-money": "Zapisz wydatek (kosztuje punkty według przelicznika; samo 5.10 to kwota, data: dziś, wczoraj, pt, 12.10.2026)",
       "balance": "Saldo, wydatki w tym miesiącu i pieniądze w celach",
       "create-category": "Nowa kategoria transakcji",
-      "delete-transaction": "Usuń transakcję (saldo i punkty wracają)"
+      "delete-transaction": "Usuń transakcję (saldo i punkty wracają)",
+      "complete-chore": "Zapisz zrobiony obowiązek (dziś albo wczoraj)",
+      "chores": "Obowiązki: zrobione dziś, do wypłaty, wpisy w miesiącu",
+      "settle-chores": "Rozlicz wypłatę: punkty z obowiązków wpłyną jako złotówki do Pieniędzy",
+      "log-activity": "Zapisz aktywność: rodzaj, czas, opis (punkty z dziennym limitem)",
+      "streak": "Seria dni z punktami i zamrożenie serii",
+      "stats": "Punkty i czas aktywności z 7 albo 30 dni",
+      "what-now": "Co teraz? Losuje pomysł na podany czas, niczego nie zapisuje"
     },
     "missing": "Brakuje: {{fields}}.\n{{syntax}}",
     "slots": {
@@ -1244,7 +1251,10 @@
       "name": "nazwa",
       "target": "kwota (zł albo pkt)",
       "goal": "cel",
-      "amount": "kwota"
+      "amount": "kwota",
+      "chore": "obowiązek",
+      "type": "rodzaj aktywności",
+      "duration": "czas"
     },
     "today": {
       "points": "Punkty: {{total}} (dziś {{earned}} z limitu {{limit}}).",
@@ -1270,7 +1280,11 @@
       "add-money": "<kwota> [kategoria] [notatka] [data]",
       "remove-money": "<kwota> [kategoria] [notatka] [data]",
       "create-category": "<nazwa>",
-      "delete-transaction": "[ostatnia|tekst]"
+      "delete-transaction": "[ostatnia|tekst]",
+      "complete-chore": "<obowiązek> [dzis|wczoraj]",
+      "log-activity": "<rodzaj> <czas> [opis]",
+      "stats": "[7d|30d]",
+      "what-now": "<czas>"
     },
     "paletteLabel": "Komendy pasujące do wpisu",
     "tasksFailed": "Nie udało się wczytać zadań. Sprawdź połączenie i spróbuj ponownie.",
@@ -1280,7 +1294,9 @@
       "create-goal": "cel „{{name}}”",
       "add-money": "wpływ {{amount}} ({{category}})",
       "remove-money": "wydatek {{amount}} ({{category}})",
-      "create-category": "kategoria „{{name}}”"
+      "create-category": "kategoria „{{name}}”",
+      "complete-chore": "obowiązek „{{name}}”",
+      "log-activity": "aktywność „{{name}}” (−{{points}} pkt)"
     },
     "nothingToUndo": "Nie ma nic do cofnięcia.",
     "undoFailed": "Nie udało się cofnąć. Sprawdź połączenie i spróbuj ponownie.",
@@ -1334,6 +1350,42 @@
       "deleteExpenseEffect": "Saldo wzrośnie o {{amount}}.",
       "deletePoints": "{{points}} pkt wróci na konto.",
       "deleted": "Usunięto: {{what}}."
+    },
+    "chore": {
+      "none": "Nie ma obowiązku „{{name}}”. Lista obowiązków jest w widoku Obowiązki.",
+      "ambiguous": "Pasuje kilka obowiązków: {{names}}. Napisz dokładniej.",
+      "loggedToday": "Zapisano obowiązek „{{name}}” na dziś (+{{points}} pkt).",
+      "loggedYesterday": "Zapisano obowiązek „{{name}}” na wczoraj, {{date}} (+{{points}} pkt).",
+      "oneTimeGone": "Był jednorazowy, więc zniknął z listy.",
+      "doneToday": "Dziś zrobione: {{list}}.",
+      "noneToday": "Dziś nic jeszcze nie zapisano.",
+      "unpaid": "Do wypłaty: {{points}} pkt, czyli {{amount}} (1 pkt = {{rate}}).",
+      "month": "Wpisy w tym miesiącu: {{count}}.",
+      "nothingToSettle": "Nie ma nic do rozliczenia.",
+      "settleEffect": "Rozliczysz {{points}} pkt z wpisów: {{count}}. Kwota {{amount}} wpłynie na saldo w Pieniądzach jako wpływ w kategorii „{{category}}”, a wpisy znikną z kalendarza. Tego nie da się cofnąć.",
+      "settled": "Rozliczono {{points}} pkt: {{amount}} wpłynęło na saldo w Pieniądzach."
+    },
+    "activity": {
+      "none": "Nie ma rodzaju aktywności „{{name}}”. Masz: {{names}}.",
+      "ambiguous": "Pasuje kilka rodzajów aktywności: {{names}}. Napisz dokładniej.",
+      "offline": "Zapisanie aktywności potrzebuje połączenia z serwerem. Użyj zapisu na ekranie Dziś, który zachowa szkic.",
+      "nothingSaved": "Nic nie zapisano.",
+      "logged": "Zapisano aktywność „{{name}}” ({{time}}): +{{points}} pkt.",
+      "capped": "Czas był wart {{earned}} pkt, ale do dziennego limitu {{limit}} pkt zostało {{points}}.",
+      "levelUp": "Nowy poziom: {{level}}, {{title}}!"
+    },
+    "streak": {
+      "freezeWaiting": "Zamrożenie serii wróci po {{days}} dniach od ostatniego użycia."
+    },
+    "stats": {
+      "points": "Punkty z ostatnich {{days}} dni: {{points}}.",
+      "activityTime": "Czas aktywności: {{time}}.",
+      "activityTimePartial": "Czas aktywności: co najmniej {{time}} (z ostatnich 50 wpisów).",
+      "gaming": "Granie: {{time}}.",
+      "top": "Najczęstsza aktywność: {{name}} ({{count}}×)."
+    },
+    "whatNow": {
+      "pick": "Wylosowano: {{name}} ({{time}})."
     }
   }
 }
