@@ -12,6 +12,12 @@ html {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* A modal layer on its way out (components/useModal.ts): the page can be typed into
+   already, but taps land nowhere, not on what slides past. */
+html[data-modal-closing] {
+  pointer-events: none;
+}
+
 body {
   margin: 0;
   background: var(--color-bg);

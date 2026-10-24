@@ -1225,12 +1225,21 @@
       "help": "Lista komend albo opis jednej",
       "today": "Podsumowanie dnia",
       "undo": "Cofnij ostatni zapis z tej rozmowy",
-      "create-task": "Nowe zadanie"
+      "create-task": "Nowe zadanie",
+      "create-goal": "Nowy cel: kwota w zł to cel pieniężny, w pkt punktowy",
+      "deposit-goal": "Wpłać z salda na cel pieniężny",
+      "goals": "Cele i postęp",
+      "edit-goal": "Zmień nazwę albo kwotę celu",
+      "delete-goal": "Usuń cel (odłożone pieniądze wracają na saldo)"
     },
     "missing": "Brakuje: {{fields}}.\n{{syntax}}",
     "slots": {
       "text": "treść",
-      "due": "termin"
+      "due": "termin",
+      "name": "nazwa",
+      "target": "kwota (zł albo pkt)",
+      "goal": "cel",
+      "amount": "kwota"
     },
     "today": {
       "points": "Punkty: {{total}} (dziś {{earned}} z limitu {{limit}}).",
@@ -1248,13 +1257,18 @@
     },
     "args": {
       "help": "[komenda]",
-      "create-task": "<treść> <termin> [S/M/L]"
+      "create-task": "<treść> <termin> [S/M/L]",
+      "create-goal": "<nazwa> <kwota zł|pkt>",
+      "deposit-goal": "<cel> <kwota>",
+      "edit-goal": "<cel> [nazwa=…] [kwota=…]",
+      "delete-goal": "<cel>"
     },
     "paletteLabel": "Komendy pasujące do wpisu",
     "tasksFailed": "Nie udało się wczytać zadań. Sprawdź połączenie i spróbuj ponownie.",
     "undoneWhat": "Cofnięto: {{what}}.",
     "undoWhat": {
-      "create-task": "zadanie „{{text}}”"
+      "create-task": "zadanie „{{text}}”",
+      "create-goal": "cel „{{name}}”"
     },
     "nothingToUndo": "Nie ma nic do cofnięcia.",
     "undoFailed": "Nie udało się cofnąć. Sprawdź połączenie i spróbuj ponownie.",
@@ -1262,6 +1276,26 @@
     "failed": "Nie udało się wykonać komendy. Spróbuj ponownie.",
     "confirmTitle": "Wykonać /{{name}}?",
     "confirm": "Wykonaj",
-    "cancelled": "Anulowano, nic się nie zmieniło."
+    "cancelled": "Anulowano, nic się nie zmieniło.",
+    "unread": "Nie rozumiem: {{fields}}.\n{{syntax}}",
+    "goal": {
+      "none": "Nie ma celu „{{name}}”. Wpisz /cele, żeby zobaczyć cele.",
+      "ambiguous": "Pasuje kilka celów: {{names}}. Napisz dokładniej.",
+      "needUnit": "Dopisz jednostkę kwoty: „zł” dla celu pieniężnego albo „pkt” dla punktowego, np. 1500 zł albo 5000 pkt.",
+      "notWhole": "Cel punktowy ma całkowitą liczbę punktów.",
+      "nameTooLong": "Nazwa celu ma najwyżej {{max}} znaków.",
+      "created": "Dodano cel „{{name}}”: {{target}} (celów: {{count}} z {{max}}).",
+      "pointsDeposit": "Cel „{{name}}” jest punktowy. Wpłacać można tylko na cele pieniężne.",
+      "alreadyReached": "Cel „{{name}}” jest już osiągnięty.",
+      "depositUnit": "Wpłata jest w złotych, bez „pkt”.",
+      "wantsMoney": "Cel „{{name}}” jest pieniężny: podaj kwotę w zł.",
+      "wantsPoints": "Cel „{{name}}” jest punktowy: podaj punkty (pkt).",
+      "nothingToEdit": "Podaj, co zmienić: nazwę albo kwotę.\n{{syntax}}",
+      "edited": "Zapisano cel „{{name}}”: {{target}}.",
+      "deleteEffect": "Cel „{{name}}” zniknie z listy. Na saldo nic nie wraca.",
+      "deleteEffectRefund": "Cel „{{name}}” zniknie z listy, a odłożone {{amount}} wróci na saldo w Pieniądzach.",
+      "deleted": "Usunięto cel „{{name}}”.",
+      "deletedRefund": "Usunięto cel „{{name}}”. Odłożone {{amount}} wróciło na saldo."
+    }
   }
 }

@@ -15,7 +15,7 @@ import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 import { TextField } from '@/ui/components/Fields';
 import { Card, Page, Stack } from '@/ui/components/Layout';
 import type { HandlerContext } from './handlers';
-import { effectOf, runCommand } from './pipeline';
+import { blockedBy, effectOf, runCommand } from './pipeline';
 import { commandName, syntax } from './syntax';
 import { createUndoStack } from './undo';
 import './exus.css';
@@ -33,6 +33,9 @@ interface Pending {
   ctx: HandlerContext;
   effect: string;
 }
+
+/** The slots a reply can name as missing (exus.slots). */
+type SlotName = 'text' | 'due' | 'name' | 'target' | 'goal' | 'amount';
 
 let nextId = 1;
 
@@ -72,18 +75,23 @@ export default function ExusPage() {
     const parsed = parseInput(input, today, commands);
     if (parsed.kind === 'text') return say(t('exus.aiLater'));
     if (parsed.kind === 'unknown') return say(t('exus.unknown', { name: parsed.name }));
-    const { spec, args, missing } = parsed;
+    const { spec, args, missing, unread } = parsed;
     const ctx: HandlerContext = { uid, profile, today, commands, undo: undoStack };
+    if (unread.length > 0) {
+      return say(t('exus.unread', { fields: unread.map((name) => t(`exus.slots.${name as SlotName}`)).join(', '), syntax: syntax(spec) }));
+    }
     const decision = whatToDo(spec.risk, missing);
     if (decision === 'ask-missing') {
       return say(
         t('exus.missing', {
-          fields: missing.map((name) => t(`exus.slots.${name as 'text' | 'due'}`)).join(', '),
+          fields: missing.map((name) => t(`exus.slots.${name as SlotName}`)).join(', '),
           syntax: syntax(spec),
         }),
       );
     }
     if (decision === 'confirm') {
+      const blocked = blockedBy(spec, args, ctx);
+      if (blocked) return say(blocked);
       setPending({ spec, args, ctx, effect: effectOf(spec, args, ctx) });
       return setConfirming(true);
     }

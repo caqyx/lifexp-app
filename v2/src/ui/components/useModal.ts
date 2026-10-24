@@ -2,7 +2,10 @@
 // <dialog>: showModal() gives the focus trap, inert background, Escape and the
 // top layer for free. On top of that:
 // - opening adds a history entry, so the system Back closes the layer (PLAN.md 4.7);
-// - closing plays the exit animation before the element really closes;
+// - closing ends the modal at once (the page is usable again: a message typed right
+//   after a button of the layer is not lost) and plays the exit animation on the
+//   closed dialog, which the CSS keeps in the top layer while it animates (taps
+//   are held off the page until it is gone);
 // - a dialog the browser closes by itself (Chrome on Android closes the top dialog
 //   on Back through its close watcher, sometimes without a cancel event) reports
 //   it to the parent, which would otherwise keep `open` true: the button that
@@ -11,6 +14,13 @@ import { useEffect, useRef } from 'preact/hooks';
 
 const HISTORY_KEY = 'lifexpModal';
 let counter = 0;
+/** Layers on their way out; while any is, taps are held off the page (ui/base.css). */
+let leaving = 0;
+
+function leave(delta: 1 | -1) {
+  leaving += delta;
+  document.documentElement.toggleAttribute('data-modal-closing', leaving > 0);
+}
 
 function topEntryId(): string | null {
   const state: unknown = history.state;
@@ -61,12 +71,26 @@ export function useModal(open: boolean, onClose: () => void) {
     if (dialog.open && dialog.dataset.state === 'open') {
       dropEntry();
       dialog.dataset.state = 'closing';
+      const duration = exitDuration(dialog);
+      // close() lifts the inert page and gives the focus back at once. The layer
+      // stays on screen for its exit: `transition: overlay, display … allow-discrete`
+      // in its CSS holds it (and its backdrop) in the top layer until the animation
+      // is over, where that is supported; elsewhere it just goes. Taps are held off
+      // the page meanwhile (ui/base.css), so one lands nowhere, not on what slides past.
+      closingOurselves.current = true;
+      dialog.close();
+      leave(1);
+      let ended = false;
+      // Opened again while leaving: the cleanup runs at once and ends the hold.
       const timer = setTimeout(() => {
-        closingOurselves.current = true;
-        dialog.close();
-        delete dialog.dataset.state;
-      }, exitDuration(dialog));
-      return () => clearTimeout(timer);
+        if (dialog.dataset.state === 'closing') delete dialog.dataset.state;
+        leave(-1);
+        ended = true;
+      }, duration);
+      return () => {
+        clearTimeout(timer);
+        if (!ended) leave(-1);
+      };
     }
   }, [open]);
 

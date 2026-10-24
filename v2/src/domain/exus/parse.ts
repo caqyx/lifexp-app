@@ -4,6 +4,8 @@
 // is left becomes the one text slot. Missing slots are not an error here: the
 // preview card is an editable form that shows what is missing.
 
+import { fold } from './recognizers';
+
 export interface Tokenized {
   /** "zadanie" for "/zadanie …"; null when the text is not a command. */
   command: string | null;
@@ -101,20 +103,40 @@ export interface SlotDef<T = unknown> {
   name: string;
   type: SlotType;
   required: boolean;
-  /** Not used for the text slot. */
+  /** Not used for the text and entity slots. */
   recognize?: Recognizer<T>;
+  /** Looks from the last token backwards: a name may hold numbers, the amount comes last. */
+  fromEnd?: boolean;
+  /** Also read from `key=value` (keys in lower case, without Polish letters). */
+  keys?: readonly string[];
+  /** Takes only its `key=value`, never a loose token. */
+  namedOnly?: boolean;
 }
 
 /** Most specific first: a date never ends up as part of a task's text. */
 const SPECIFICITY: readonly SlotType[] = ['enum', 'date', 'duration', 'money', 'points', 'number', 'entity', 'text'];
 
-export function fillSlots(tokens: readonly string[], slots: readonly SlotDef[]): Record<string, unknown> {
+export function fillSlots(
+  tokens: readonly string[],
+  slots: readonly SlotDef[],
+  named: Readonly<Record<string, string>> = {},
+): Record<string, unknown> {
   const used = new Set<number>();
   const out: Record<string, unknown> = {};
   const ordered = [...slots].sort((a, b) => SPECIFICITY.indexOf(a.type) - SPECIFICITY.indexOf(b.type));
+  // `key=value` first: it is explicit, so it never competes with a loose token.
+  const byKey = new Map(Object.entries(named).map(([k, v]) => [fold(k), v]));
+  for (const slot of slots) {
+    const raw = slot.keys?.map((k) => byKey.get(k)).find((v) => v !== undefined);
+    if (raw === undefined) continue;
+    const value = slot.recognize ? slot.recognize(raw) : raw.trim() || undefined;
+    if (value !== undefined) out[slot.name] = value;
+  }
   for (const slot of ordered) {
-    if (slot.type === 'text' || !slot.recognize) continue;
-    for (let j = 0; j < tokens.length; j++) {
+    if (slot.type === 'text' || slot.type === 'entity' || !slot.recognize || slot.namedOnly || slot.name in out) continue;
+    const order = tokens.map((_, j) => j);
+    if (slot.fromEnd) order.reverse();
+    for (const j of order) {
       if (used.has(j)) continue;
       const value = slot.recognize(tokens[j]!);
       if (value !== undefined) {
@@ -124,12 +146,19 @@ export function fillSlots(tokens: readonly string[], slots: readonly SlotDef[]):
       }
     }
   }
-  const text = slots.find((s) => s.type === 'text');
+  // Whatever is left is the one free-text slot (or the entity, named by its words).
+  const text = slots.find((s) => (s.type === 'text' || s.type === 'entity') && !s.namedOnly && !(s.name in out));
   if (text) {
     const rest = tokens.filter((_, i) => !used.has(i)).join(' ');
     if (rest) out[text.name] = rest;
   }
   return out;
+}
+
+/** The slots whose `key=value` was written but could not be read (e.g. "kwota=abc"). */
+export function unreadNamed(slots: readonly SlotDef[], named: Readonly<Record<string, string>>, args: Record<string, unknown>): string[] {
+  const keys = new Set(Object.keys(named).map(fold));
+  return slots.filter((s) => s.keys?.some((k) => keys.has(k)) && args[s.name] === undefined).map((s) => s.name);
 }
 
 /** The required slots `args` has no value for: what the card marks as missing. */

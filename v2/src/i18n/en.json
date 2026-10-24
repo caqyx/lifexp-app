@@ -1225,12 +1225,21 @@
       "help": "The commands, or one of them explained",
       "today": "The day in short",
       "undo": "Undo the last change made in this conversation",
-      "create-task": "A new task"
+      "create-task": "A new task",
+      "create-goal": "A new goal: an amount in zł is a money goal, in pkt a points goal",
+      "deposit-goal": "Put money from the balance onto a money goal",
+      "goals": "The goals and how far they are",
+      "edit-goal": "Change the name or the amount of a goal",
+      "delete-goal": "Delete a goal (money put aside goes back to the balance)"
     },
     "missing": "Missing: {{fields}}.\n{{syntax}}",
     "slots": {
       "text": "text",
-      "due": "due date"
+      "due": "due date",
+      "name": "name",
+      "target": "amount (zł or pkt)",
+      "goal": "goal",
+      "amount": "amount"
     },
     "today": {
       "points": "Points: {{total}} (today {{earned}} of the {{limit}} limit).",
@@ -1248,13 +1257,18 @@
     },
     "args": {
       "help": "[command]",
-      "create-task": "<text> <due date> [S/M/L]"
+      "create-task": "<text> <due date> [S/M/L]",
+      "create-goal": "<name> <amount zł|pkt>",
+      "deposit-goal": "<goal> <amount>",
+      "edit-goal": "<goal> [name=…] [amount=…]",
+      "delete-goal": "<goal>"
     },
     "paletteLabel": "Commands matching what is typed",
     "tasksFailed": "Could not load the tasks. Check the connection and try again.",
     "undoneWhat": "Undone: {{what}}.",
     "undoWhat": {
-      "create-task": "the task \"{{text}}\""
+      "create-task": "the task \"{{text}}\"",
+      "create-goal": "the goal \"{{name}}\""
     },
     "nothingToUndo": "There is nothing to undo.",
     "undoFailed": "Could not undo. Check the connection and try again.",
@@ -1262,6 +1276,26 @@
     "failed": "Could not run the command. Try again.",
     "confirmTitle": "Run /{{name}}?",
     "confirm": "Run",
-    "cancelled": "Cancelled, nothing has changed."
+    "cancelled": "Cancelled, nothing has changed.",
+    "unread": "I do not understand: {{fields}}.\n{{syntax}}",
+    "goal": {
+      "none": "There is no goal \"{{name}}\". Type /goals to see them.",
+      "ambiguous": "Several goals fit: {{names}}. Be more precise.",
+      "needUnit": "Add a unit to the amount: \"zł\" for a money goal or \"pkt\" for a points goal, e.g. 1500 zł or 5000 pkt.",
+      "notWhole": "A points goal has a whole number of points.",
+      "nameTooLong": "A goal name has at most {{max}} characters.",
+      "created": "Added the goal \"{{name}}\": {{target}} (goals: {{count}} of {{max}}).",
+      "pointsDeposit": "The goal \"{{name}}\" is a points goal. Only money goals take deposits.",
+      "alreadyReached": "The goal \"{{name}}\" is already reached.",
+      "depositUnit": "A deposit is in złoty, without \"pkt\".",
+      "wantsMoney": "The goal \"{{name}}\" is a money goal: give the amount in zł.",
+      "wantsPoints": "The goal \"{{name}}\" is a points goal: give points (pkt).",
+      "nothingToEdit": "Say what to change: the name or the amount.\n{{syntax}}",
+      "edited": "Saved the goal \"{{name}}\": {{target}}.",
+      "deleteEffect": "The goal \"{{name}}\" will leave the list. Nothing goes back to the balance.",
+      "deleteEffectRefund": "The goal \"{{name}}\" will leave the list and the {{amount}} put aside goes back to the Money balance.",
+      "deleted": "Deleted the goal \"{{name}}\".",
+      "deletedRefund": "Deleted the goal \"{{name}}\". The {{amount}} put aside went back to the balance."
+    }
   }
 }

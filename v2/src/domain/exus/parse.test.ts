@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fillSlots, missingSlots, tokenize, type SlotDef } from './parse';
+import { fillSlots, missingSlots, tokenize, unreadNamed, type SlotDef } from './parse';
 import { amount, dateFrom, duration, fold, integer, money, oneOf, points } from './recognizers';
 
 describe('tokenize', () => {
@@ -127,5 +127,58 @@ describe('fillSlots', () => {
   it('names the required slots that are missing', () => {
     expect(missingSlots(task, { text: 'Kupić mleko' })).toEqual(['due']);
     expect(missingSlots(task, { text: 'x', due: '2026-10-10' })).toEqual([]);
+  });
+
+  describe('an entity and an amount', () => {
+    const deposit: SlotDef[] = [
+      { name: 'goal', type: 'entity', required: true },
+      { name: 'amount', type: 'money', required: true, recognize: amount, fromEnd: true },
+    ];
+
+    it.each([
+      ['Rower 50', { goal: 'Rower', amount: { kind: 'unknown', value: 50 } }],
+      ['50 zł Rower', { goal: 'Rower', amount: { kind: 'money', grosze: 5000 } }],
+      ['"Nowy rower" 20,5zł', { goal: 'Nowy rower', amount: { kind: 'money', grosze: 2050 } }],
+      ['Nowy rower 1 000 zł', { goal: 'Nowy rower', amount: { kind: 'money', grosze: 100000 } }],
+      // a number inside the name stays there: the amount is read from the end
+      ['Rower 2 50 zł', { goal: 'Rower 2', amount: { kind: 'money', grosze: 5000 } }],
+      ['Rower 50 pkt', { goal: 'Rower', amount: { kind: 'points', points: 50 } }],
+      ['Rower', { goal: 'Rower' }],
+    ])('%s', (input, expected) => {
+      expect(fillSlots(tokenize(input).tokens, deposit)).toEqual(expected);
+    });
+  });
+
+  describe('key=value', () => {
+    const edit: SlotDef[] = [
+      { name: 'goal', type: 'entity', required: true },
+      { name: 'name', type: 'text', required: false, keys: ['nazwa', 'name'], namedOnly: true },
+      { name: 'target', type: 'money', required: false, recognize: amount, keys: ['kwota'], namedOnly: true },
+    ];
+    const fill = (input: string) => {
+      const { tokens, named } = tokenize(input);
+      const args = fillSlots(tokens, edit, named);
+      return { args, unread: unreadNamed(edit, named, args) };
+    };
+
+    it('fills named slots and leaves the loose words to the entity', () => {
+      expect(fill('/x Rower nazwa="Nowy rower" kwota=2000zł').args).toEqual({
+        goal: 'Rower',
+        name: 'Nowy rower',
+        target: { kind: 'money', grosze: 200000 },
+      });
+      expect(fill('/x Rower Kwota=300').args).toEqual({ goal: 'Rower', target: { kind: 'unknown', value: 300 } });
+      expect(fill('/x nazwa=Auto stary rower').args).toEqual({ goal: 'stary rower', name: 'Auto' });
+    });
+
+    it('a loose amount never fills a named-only slot', () => {
+      expect(fill('/x Rower 300').args).toEqual({ goal: 'Rower 300' });
+    });
+
+    it('reports a value it cannot read', () => {
+      expect(fill('/x Rower kwota=abc')).toEqual({ args: { goal: 'Rower' }, unread: ['target'] });
+      expect(fill('/x Rower nazwa=')).toEqual({ args: { goal: 'Rower' }, unread: ['name'] });
+      expect(fill('/x Rower').unread).toEqual([]);
+    });
   });
 });

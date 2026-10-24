@@ -53,3 +53,8 @@ export async function runCommand(
 export function effectOf(spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext): string {
   return HANDLERS[spec.id].effect?.(args, ctx) ?? t(`exus.commands.${spec.id}`);
 }
+
+/** A destructive command that cannot run (no such goal) is answered before it asks for a "yes". */
+export function blockedBy(spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext): string | null {
+  return HANDLERS[spec.id].check?.(args, ctx) ?? null;
+}
