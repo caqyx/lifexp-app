@@ -31,3 +31,33 @@ export async function callExusTurn(request: AiTurnRequest): Promise<AiTurnRespon
   if (!response) throw new AiError('failed');
   return response;
 }
+
+// ── The parent's e-mail code on the server (stage 6-4) ──
+
+/** What the functions say went wrong (`details.reason`), or 'failed' for anything else. */
+export type ParentCodeReason = 'invalid' | 'rateLimited' | 'sendFailed' | 'noPending' | 'expired' | 'wrongCode' | 'locked' | 'failed';
+
+const PARENT_REASONS: readonly ParentCodeReason[] = ['invalid', 'rateLimited', 'sendFailed', 'noPending', 'expired', 'wrongCode', 'locked'];
+
+const sendParentEmailCode = httpsCallable<{ email: string; lang: string }, unknown>(functions, 'sendParentEmailCode', { timeout: 30_000 });
+const verifyParentEmailCode = httpsCallable<{ code: string; lang: string }, unknown>(functions, 'verifyParentEmailCode', { timeout: 30_000 });
+
+async function parentCall(call: () => Promise<unknown>): Promise<ParentCodeReason | null> {
+  try {
+    await call();
+    return null;
+  } catch (error) {
+    const reason = isFunctionsError(error) ? (error.details as { reason?: unknown } | undefined)?.reason : undefined;
+    return PARENT_REASONS.find((r) => r === reason) ?? 'failed';
+  }
+}
+
+/** Sends the code to `email`; null when it is on its way. */
+export function callSendParentEmailCode(email: string, lang: string): Promise<ParentCodeReason | null> {
+  return parentCall(() => sendParentEmailCode({ email, lang }));
+}
+
+/** Checks the code; null when the address is verified. */
+export function callVerifyParentEmailCode(code: string, lang: string): Promise<ParentCodeReason | null> {
+  return parentCall(() => verifyParentEmailCode({ code, lang }));
+}

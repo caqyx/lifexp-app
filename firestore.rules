@@ -134,5 +134,18 @@ match /users/{uid} {
     match /aiUsageGlobalV2/{date} {
       allow read, write: if false;
     }
+
+    // Kody weryfikacji e-maila rodzica v2 (sendParentEmailCode / verifyParentEmailCode,
+    // docs/v2/PLAN.md 9.1, 6-4): tylko skrót kodu z solą, termin, próby i limity wysyłek.
+    // Pisze i czyta wyłącznie funkcja (Admin SDK). Uwaga: v1 do cutover nadal zapisuje
+    // parentEmail i kod w users/{uid} po stronie klienta (B12) — ta dziura zostaje dla v1
+    // do etapu 7/8; tu niczego jej nie zamykamy.
+    match /parentEmailCodes/{uid} {
+      allow read, write: if false;
+    }
+    // Skrzynka fałszywej poczty — istnieje tylko w emulatorze Functions (parent/mailer.ts).
+    match /emulatorMail/{uid} {
+      allow read, write: if false;
+    }
   }
 }
