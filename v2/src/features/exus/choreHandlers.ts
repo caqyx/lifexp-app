@@ -18,7 +18,16 @@ import { locale, t } from '@/i18n';
 import { formatDayMonth } from '@/lib/dates';
 import { formatInteger } from '@/lib/format';
 import { formatMoney } from '@/lib/money';
-import { createChoreDef, deleteChoreDef, deleteChoreEntry, ensureChoreDefs, logChore, removeCreatedChoreDef, settleChores } from '@/services/chores';
+import {
+  createChoreDef,
+  deleteChoreDef,
+  deleteChoreEntry,
+  ensureChoreDefs,
+  logChore,
+  removeCreatedChoreDef,
+  settleChores,
+  unpaidEntriesNow,
+} from '@/services/chores';
 import { today as todaySources } from '@/stores/today';
 import type { CommandHandler, HandlerContext, HandlerResult } from './handlers';
 import { loadedToday, seeded } from './loaded';
@@ -32,6 +41,10 @@ const rateOf = ({ profile }: HandlerContext) => choresRate(profile.rateChores.zl
 const NAMES_SHOWN = 8;
 
 const quoted = (names: readonly string[]) => names.slice(0, NAMES_SHOWN).map((n) => `„${n}”`).join(', ');
+
+/** /rozlicz: the unpaid entries read from the server by its `ready`, for its question and its payout. */
+let settleFor: { uid: string; entries: readonly ChoreEntry[] } | null = null;
+const toSettle = (ctx: HandlerContext): readonly ChoreEntry[] => (settleFor?.uid === ctx.uid ? settleFor.entries : unpaidNow());
 
 /** Unpaid entries now in the store: what a settle would pay (the transaction reads them again). */
 const unpaidNow = (): readonly ChoreEntry[] => todaySources.value.choreEntries ?? [];
@@ -203,16 +216,23 @@ export const CHORE_HANDLERS = {
   },
 
   'settle-chores': {
-    ready: async () => void (await loadedToday('choreEntries')),
+    // The question and the payout read what the server has now, not the listener: right
+    // after a payout the listener still holds the entries it deleted (they leave it one by
+    // one), and "/rozlicz" then asked to pay them again instead of saying there is nothing.
+    // /rozlicz needs the internet anyway (a transaction), so a server read costs nothing new.
+    ready: async (ctx) => {
+      settleFor = { uid: ctx.uid, entries: await unpaidEntriesNow(ctx.uid) };
+    },
     // Nothing to settle is answered before it asks for a "yes".
-    check: (_args, ctx) => (payoutPlan(unpaidNow(), rateOf(ctx)) ? null : t('exus.chore.nothingToSettle')),
+    check: (_args, ctx) => (payoutPlan(toSettle(ctx), rateOf(ctx)) ? null : t('exus.chore.nothingToSettle')),
     effect: (_args, ctx) => {
-      const plan = payoutPlan(unpaidNow(), rateOf(ctx));
+      const entries = toSettle(ctx);
+      const plan = payoutPlan(entries, rateOf(ctx));
       if (!plan) return t('exus.chore.nothingToSettle');
       const lang = locale();
       return t('exus.chore.settleEffect', {
         points: formatInteger(plan.points, lang),
-        count: unpaidNow().length,
+        count: entries.length,
         amount: formatMoney(plan.grosze, lang),
         category: t('chores.incomeCategory'),
       });
@@ -220,13 +240,15 @@ export const CHORE_HANDLERS = {
     run: async (_args, ctx) => {
       let entries: readonly ChoreEntry[];
       try {
-        entries = await loadedToday('choreEntries');
+        // What the question showed; the transaction reads each entry again and skips one paid meanwhile.
+        entries = settleFor?.uid === ctx.uid ? settleFor.entries : await unpaidEntriesNow(ctx.uid);
       } catch {
         return { reply: t('chores.loadFailed') };
       }
       try {
         // One transaction: the payout record, the entries, the balance and the income together or not at all.
         const paid = await settleChores(ctx.uid, entries, rateOf(ctx), t('chores.incomeCategory'));
+        settleFor = null;
         if (!paid) return { reply: t('exus.chore.nothingToSettle') };
         const lang = locale();
         const amount = formatMoney(paid.grosze, lang);

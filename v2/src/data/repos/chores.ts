@@ -113,6 +113,16 @@ export async function seedChoreDefsIfEmpty(uid: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Every unpaid entry as the server has it now. The listener (repos/today) can still
+ * hold entries a payout just deleted: a transaction's deletes reach it only on the
+ * next snapshot, one by one.
+ */
+export async function readUnpaidEntriesFromServer(uid: string): Promise<ChoreEntry[]> {
+  const snap = await getDocsFromServer(entriesOf(uid));
+  return snap.docs.flatMap((d) => choreEntryFromData(d.id, d.data()) ?? []);
+}
+
 /** users/{uid}/chorePayouts, newest first. */
 export function watchChorePayouts(uid: string, onChange: (payouts: ChorePayout[]) => void, onError: OnError) {
   return onSnapshot(
