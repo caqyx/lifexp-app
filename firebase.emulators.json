@@ -2,6 +2,20 @@
   "firestore": {
     "rules": "firestore.rules"
   },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "lifexp-v2",
+      "ignore": [
+        "node_modules",
+        "lib-test",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
   "emulators": {
     "singleProjectMode": true,
     "auth": {
@@ -11,6 +25,10 @@
     "firestore": {
       "host": "127.0.0.1",
       "port": 8080
+    },
+    "functions": {
+      "host": "127.0.0.1",
+      "port": 5001
     },
     "ui": {
       "enabled": false
