@@ -12,16 +12,16 @@ import {
   sumGaming,
   TOP_COUNT,
   topActivities,
-  type StatsDay,
   type StatsFact,
   type TopActivity,
 } from '@/domain/stats';
 import { locale, t } from '@/i18n';
-import { formatDayKey, formatWeekdayLong, formatWeekdayShort, utcDayKey } from '@/lib/dates';
+import { formatWeekdayLong, utcDayKey } from '@/lib/dates';
 import { formatInteger } from '@/lib/format';
 import { formatMoney } from '@/lib/money';
 import { stats as statsSources, watchStats } from '@/stores/stats';
 import { BarChart, type BarDatum } from '@/ui/components/BarChart';
+import { weekBars } from '@/features/shared/charts';
 import { EmphasisText, EmptyState, IconTile, List, ListRow, Metric, Skeleton } from '@/ui/components/Display';
 import { Card, Section } from '@/ui/components/Layout';
 import { formatDuration } from '@/features/shared/activity';
@@ -40,30 +40,6 @@ function Totals({ profile, gamingMinutes }: { profile: Profile; gamingMinutes: n
       </div>
     </Card>
   );
-}
-
-function bars(
-  week: readonly StatsDay[],
-  todayKey: string,
-  pick: (day: StatsDay) => number,
-  unit: (n: number) => string,
-): BarDatum[] {
-  const lang = locale();
-  return week.map((day) => {
-    const value = pick(day);
-    const title = formatDayKey(day.key, lang);
-    const valueLabel = unit(value);
-    return {
-      key: day.key,
-      label: formatWeekdayShort(day.key, lang),
-      value,
-      valueText: formatInteger(value, lang),
-      title,
-      valueLabel,
-      description: t('stats.dayValue', { day: title, value: valueLabel }),
-      current: day.key === todayKey,
-    };
-  });
 }
 
 function WeekChart({ title, data }: { title: string; data: BarDatum[] }) {
@@ -213,11 +189,11 @@ export function OverviewView({ uid, profile }: { uid: string; profile: Profile }
         <>
           <WeekChart
             title={t('stats.pointsChart')}
-            data={bars(weeks.thisWeek, todayKey, (d) => d.points, pointsUnit)}
+            data={weekBars(weeks.thisWeek, todayKey, (d) => d.points, pointsUnit)}
           />
           <WeekChart
             title={t('stats.gamingChart')}
-            data={bars(weeks.thisWeek, todayKey, (d) => d.gamingMinutes, formatDuration)}
+            data={weekBars(weeks.thisWeek, todayKey, (d) => d.gamingMinutes, formatDuration)}
           />
         </>
       ) : (

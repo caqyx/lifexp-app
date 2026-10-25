@@ -4,6 +4,7 @@
 import { LogOut, Sparkles } from 'lucide-preact';
 import { isModuleOn, type ModuleChoice } from '@/domain/modules';
 import { t } from '@/i18n';
+import { isParent } from '@/stores/parent';
 import { isPlainClick } from './links';
 import { featureHref, featurePath, navItems, type FeatureDef, type ModuleId } from './registry';
 
@@ -22,6 +23,8 @@ interface NavMenuProps {
 }
 
 export function NavMenu({ activeId, onSelect, account, modules, onSignOut }: NavMenuProps) {
+  // "Rodzic" only for a parent (stores/parent: some child entered this e-mail).
+  const parent = isParent(account.email);
   const item = (feature: FeatureDef) => {
     const Icon = feature.icon;
     return (
@@ -59,7 +62,7 @@ export function NavMenu({ activeId, onSelect, account, modules, onSignOut }: Nav
       )}
       <ul class="nav__list">{navItems('main', modules).map(item)}</ul>
       <hr class="nav__divider" />
-      <ul class="nav__list">{navItems('secondary', modules).map(item)}</ul>
+      <ul class="nav__list">{navItems('secondary', modules, parent).map(item)}</ul>
       <section class="nav__account" aria-label={t('nav.account')}>
         <p class="nav__account-name">{account.name}</p>
         {account.email && <p class="nav__account-email">{account.email}</p>}

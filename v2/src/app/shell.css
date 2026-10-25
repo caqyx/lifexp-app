@@ -457,3 +457,43 @@
   min-height: var(--touch-target);
   font-weight: var(--font-weight-semibold);
 }
+
+/* ── #/parent for an e-mail without a LifeXP account of its own (stage 6-2) ── */
+
+.parent-alone {
+  min-height: 100dvh;
+  background: var(--color-bg);
+}
+
+.parent-alone__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: calc(var(--topbar-height) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) var(--space-4) 0;
+  border-bottom: 1px solid var(--color-separator);
+}
+
+.parent-alone__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.parent-alone__sign-out {
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--duration-exit) var(--ease-out);
+}
+
+.parent-alone__sign-out:hover {
+  background: var(--color-accent-soft);
+}

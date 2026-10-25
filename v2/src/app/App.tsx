@@ -4,6 +4,7 @@ import { BroadcastBanner } from '@/features/broadcasts/BroadcastBanner';
 import { DraftsReview } from '@/features/offline/DraftsReview';
 import { generalRate } from '@/domain/points';
 import { language, t } from '@/i18n';
+import { findParentChildren } from '@/stores/parent';
 import { session } from '@/stores/session';
 import { AppShell } from './AppShell';
 import { BootScreen } from './BootScreen';
@@ -16,6 +17,30 @@ import { signOut } from './sign-out';
 
 const loadLoginPage = () => import('@/features/auth/LoginPage');
 const loadSetupPage = () => import('@/features/auth/SetupPage');
+const loadParentPage = () => import('@/features/parent/ParentPage');
+
+/**
+ * A parent needs no LifeXP profile of their own (v1 parent.html: any signed-in
+ * e-mail): #/parent opens before the profile gates, on a plain page with sign-out.
+ */
+const PARENT_PATH = '/parent';
+const parentBeforeGates = (gate: Gate) => gate.kind === 'finishSetup' || gate.kind === 'setup' || gate.kind === 'verify';
+
+function ParentAlone() {
+  return (
+    <div class="parent-alone">
+      <header class="parent-alone__top">
+        <h1 class="parent-alone__title">{t('nav.parent')}</h1>
+        <button type="button" class="parent-alone__sign-out" onClick={signOut}>
+          {t('nav.signOut')}
+        </button>
+      </header>
+      <main class="parent-alone__main">
+        <LazyView load={loadParentPage} props={{ path: PARENT_PATH, params: {}, navigate }} fallback={<BootScreen />} />
+      </main>
+    </div>
+  );
+}
 
 function gateTitle(gate: Gate): string {
   switch (gate.kind) {
@@ -61,6 +86,13 @@ export function App() {
   const gate = sessionGate(session.value);
   const path = currentPath.value;
   const route = resolveRoute(path);
+  const alone = path === PARENT_PATH && parentBeforeGates(gate);
+
+  // Who is a parent (some child entered this e-mail): the menu lists "Rodzic" only then.
+  const email = session.value.status === 'signedIn' ? session.value.user.email : null;
+  useEffect(() => {
+    if (email !== null) findParentChildren(email);
+  }, [email]);
 
   // Unknown or empty hash → Today, without leaving a history entry behind. The
   // hash is kept while signed out, so login lands where the link pointed. A module
@@ -70,11 +102,12 @@ export function App() {
     if (!route || off) navigate(DEFAULT_PATH, { replace: true });
   }, [route === null, off]);
 
-  const title = gate.kind === 'ready' ? (route ? t(route.feature.labelKey) : '') : gateTitle(gate);
+  const title = alone ? t('nav.parent') : gate.kind === 'ready' ? (route ? t(route.feature.labelKey) : '') : gateTitle(gate);
   useEffect(() => {
     document.title = title ? `${title} · ${t('app.name')}` : t('app.name');
   }, [title]);
 
+  if (alone) return <ParentAlone />;
   if (gate.kind !== 'ready') return <GateScreen gate={gate} />;
   if (!route || off) return null;
 

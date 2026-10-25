@@ -24,7 +24,8 @@
     "account": "Account",
     "signOut": "Log out",
     "tabBar": "Shortcuts",
-    "add": "Add"
+    "add": "Add",
+    "parent": "Parent"
   },
   "today": {
     "greeting": "Hi, {{name}}",
@@ -1617,5 +1618,39 @@
       "moduleOff": "This suggestion is for a module that is turned off. Turn it on in Settings to use it.",
       "cannotShow": "I cannot show this suggestion. Try a command: type /help."
     }
+  },
+  "parent": {
+    "readOnly": "View only: nothing can be changed here.",
+    "child": "Child",
+    "loading": "Loading…",
+    "noChildren": "No linked accounts",
+    "noChildrenBody": "No account has {{email}} as its parent e-mail. Ask your child to open Settings → Parent e-mail in the app and enter exactly this address.",
+    "loadFailed": "Could not load the data. Check the connection and try again.",
+    "retry": "Try again",
+    "points": "Points: {{name}}",
+    "pointsWorth": "≈ {{amount}} at the rate set on the child's account",
+    "pointsToday": "Today",
+    "spent": "Spent in total",
+    "level": "Level",
+    "streak": "Streak",
+    "pointsWeek": "Points in the last 7 days",
+    "gamingWeek": "Gaming in the last 7 days",
+    "gamingToday": "Gaming today",
+    "gamingWeekTotal": "Gaming in 7 days",
+    "purchases": "Recent purchases",
+    "noPurchases": "No purchases.",
+    "purchaseMeta": "{{date}} · {{points}} pts",
+    "goals": "Goals",
+    "noGoals": "No goals.",
+    "chores": "Chores to pay out",
+    "choresUnpaid": "{{points}} pts unpaid, at the rate set on the child's account",
+    "payouts": "Payout history",
+    "noPayouts": "No payouts.",
+    "payoutPeriod": "for {{from}}–{{to}}",
+    "money": "Money balance",
+    "recent": "Recent activities",
+    "noRecent": "No activities.",
+    "top": "Most frequent in 7 days",
+    "noTop": "Nothing logged in the last 7 days."
   }
 }
