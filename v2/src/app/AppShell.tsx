@@ -5,8 +5,9 @@
 // persistent sidebar and there is no tab bar. Only the shell uses position: fixed.
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import type { ModuleChoice } from '@/domain/modules';
+import { isModuleOn, type ModuleChoice } from '@/domain/modules';
 import { t } from '@/i18n';
+import { requestExusFocus } from '@/stores/exusFocus';
 import { ToastHost } from '@/ui/components/ToastHost';
 import { playEnter } from '@/ui/motion';
 import { dragProgress, releaseVelocity, settlesOpen, TAP_SLOP, type DragSample } from '@/lib/gesture';
@@ -69,6 +70,22 @@ export function AppShell({ title, activeId, path, account, modules, onSignOut, c
       removeEventListener('offline', update);
     };
   }, []);
+  // Ctrl/Cmd+K: Ex-us from anywhere, with the field focused (PLAN.md 6.10). Not while a layer is open.
+  const exusOn = isModuleOn('aichat', modules);
+  const pathRef = useRef(path);
+  pathRef.current = path;
+  useEffect(() => {
+    if (!exusOn) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== 'k') return;
+      if (document.querySelector('dialog[open]')) return;
+      e.preventDefault();
+      if (pathRef.current !== '/exus') navigate('/exus');
+      requestExusFocus();
+    };
+    addEventListener('keydown', onKeyDown);
+    return () => removeEventListener('keydown', onKeyDown);
+  }, [exusOn]);
   const openRef = useRef(false);
   const wasOpen = useRef(false);
   const drag = useRef<Drag | null>(null);
