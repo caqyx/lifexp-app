@@ -4,6 +4,7 @@
 // the card is read-only and cannot run again.
 import { useState } from 'preact/hooks';
 import type { CommandSpec } from '@/domain/exus/commands';
+import type { DoneCard } from '@/domain/exus/history';
 import { readForm, type FieldDef, type FieldError, type RawValue } from '@/domain/exus/form';
 import { locale, t } from '@/i18n';
 import { formatDayMonth } from '@/lib/dates';
@@ -23,8 +24,9 @@ interface FormCardProps {
   fields: readonly FieldDef[];
   /** What the parser understood. */
   initial: Record<string, RawValue>;
-  /** Runs the command with the card's arguments; the card is done with it. */
-  onRun: (args: Record<string, unknown>) => void;
+  /** Runs the command with the card's arguments; the card is done and becomes `done` (a summary). */
+  onRun: (args: Record<string, unknown>, done: DoneCard) => void;
+  onSkip: () => void;
 }
 
 /** A value of the card in words, for the summary of a card that was run. */
@@ -45,32 +47,34 @@ function shown({ kind }: FieldDef, value: unknown, raw: RawValue | undefined): s
   }
 }
 
-export function FormCard({ spec, fields, initial, onRun }: FormCardProps) {
+/** A card that was run, read-only: what it was run with (kept in the history as it is). */
+export function DoneCardView({ card }: { card: DoneCard }) {
+  return (
+    <section class="exus-card exus-card--done" aria-label={card.title}>
+      <p class="exus-card__title">{card.title}</p>
+      <dl class="exus-card__summary">
+        {card.rows.map((row) => (
+          <div key={row.label} class="exus-card__row">
+            <dt>{row.label}</dt>
+            <dd class="user-text">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+export function FormCard({ spec, fields, initial, onRun, onSkip }: FormCardProps) {
   const [raw, setRaw] = useState<Record<string, RawValue>>(initial);
-  const [status, setStatus] = useState<'open' | 'sent' | 'skipped'>('open');
   const { args, errors } = readForm(fields, raw);
   const ready = Object.keys(errors).length === 0;
   const name = commandName(spec);
-
-  if (status === 'skipped') return <p class="exus-msg exus-msg--exus">{t('exus.form.skipped')}</p>;
-
-  if (status === 'sent') {
-    return (
-      <section class="exus-card exus-card--done" aria-label={t('exus.form.sent', { name })}>
-        <p class="exus-card__title">{t('exus.form.sent', { name })}</p>
-        <dl class="exus-card__summary">
-          {fields
-            .filter((f) => args[f.slot.name] !== undefined)
-            .map((f) => (
-              <div key={f.slot.name} class="exus-card__row">
-                <dt>{slotLabel(f.slot.name)}</dt>
-                <dd class="user-text">{shown(f, args[f.slot.name], raw[f.slot.name])}</dd>
-              </div>
-            ))}
-        </dl>
-      </section>
-    );
-  }
+  const summary = (): DoneCard => ({
+    title: t('exus.form.sent', { name }),
+    rows: fields
+      .filter((f) => args[f.slot.name] !== undefined)
+      .map((f) => ({ label: slotLabel(f.slot.name), value: shown(f, args[f.slot.name], raw[f.slot.name]) })),
+  });
 
   const set = (field: string, value: RawValue) => setRaw((r) => ({ ...r, [field]: value }));
   const control = (field: FieldDef) => {
@@ -124,8 +128,7 @@ export function FormCard({ spec, fields, initial, onRun }: FormCardProps) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!ready) return;
-        setStatus('sent');
-        onRun(args);
+        onRun(args, summary());
       }}
     >
       <p class="exus-card__title">{t('exus.form.title', { name })}</p>
@@ -137,7 +140,7 @@ export function FormCard({ spec, fields, initial, onRun }: FormCardProps) {
         <Button type="submit" variant="primary" disabled={!ready}>
           {t('exus.form.run')}
         </Button>
-        <Button variant="quiet" onClick={() => setStatus('skipped')}>
+        <Button variant="quiet" onClick={onSkip}>
           {t('exus.form.skip')}
         </Button>
       </div>

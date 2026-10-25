@@ -1592,6 +1592,10 @@
       "L": "L",
       "today": "dziś",
       "yesterday": "wczoraj"
+    },
+    "offline": {
+      "needsInternet": "To polecenie wymaga internetu. Połącz się i spróbuj ponownie.",
+      "text": "Rozmowa z Ex-us wymaga internetu. Komendy zaczynające się od / działają też bez niego, jeśli ich zapis może poczekać."
     }
   }
 }

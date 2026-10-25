@@ -2,7 +2,7 @@
 // read and run locally, through the same services as the screens, no backend call.
 const { Timestamp } = require('firebase-admin/firestore');
 const { createUser, db, todayUtcKey } = require('../support/emulator');
-const { test, expect, openSignedIn } = require('../support/v2');
+const { test, expect, openSignedIn, signIn } = require('../support/v2');
 
 test.use({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
 
@@ -2236,4 +2236,181 @@ test.describe('on a phone', () => {
     await card.getByRole('button', { name: 'Pomiń' }).click();
     await expect(page.locator('.exus-msg--exus').last()).toHaveText('Pominięto.');
   });
+});
+
+// ── Stage 5a-11a: history on the device, Ctrl/Cmd+K, offline ──
+
+test('the conversation survives a reload, without a live undo list; /nowy clears it for good', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-history' });
+  await openSignedIn(page, account, '#/exus');
+  await expect(log(page)).toContainText('Wpisz /pomoc');
+  await send(page, '/zadanie Kupić mleko jutro');
+  await expect(log(page)).toContainText('Dodano zadanie „Kupić mleko”');
+  await send(page, '/nie-ma-takiej');
+  await expect.poll(() => tasksOf(account.uid)).toHaveLength(1);
+
+  await page.reload();
+  await expect(log(page)).toContainText('/zadanie Kupić mleko jutro');
+  await expect(log(page)).toContainText('Dodano zadanie „Kupić mleko”');
+  await expect(log(page)).toContainText('Nie znam komendy /nie-ma-takiej.');
+  // Said once, kept once: no greeting in a conversation that has begun.
+  await expect(log(page)).not.toContainText('Wpisz /pomoc, żeby zobaczyć komendy.');
+  // The undo list is not kept: the task is there, and /cofnij has nothing.
+  await send(page, '/cofnij');
+  await expect(page.locator('.exus-msg--exus').last()).toHaveText('Nie ma nic do cofnięcia.');
+  await expect.poll(async () => (await tasksOf(account.uid)).map((task) => task.text)).toEqual(['Kupić mleko']);
+
+  await send(page, '/nowy');
+  await expect(page.locator('.exus-msg')).toHaveCount(1);
+  await expect(log(page)).toContainText('Zaczynamy od nowa.');
+  await page.reload();
+  await expect(log(page)).toContainText('Wpisz /pomoc, żeby zobaczyć komendy.');
+  await expect(log(page)).not.toContainText('Kupić mleko');
+  await expect(page.locator('.exus-msg')).toHaveCount(1);
+});
+
+test('another account on the same device does not see the conversation, and signing out clears it', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-history-out' });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/zadanie Sekretne zadanie jutro');
+  await expect(log(page)).toContainText('Dodano zadanie „Sekretne zadanie”');
+  await expect.poll(() => tasksOf(account.uid)).toHaveLength(1);
+
+  await page.locator('.tabbar').getByRole('button', { name: 'Menu' }).click();
+  await page.getByRole('region', { name: 'Konto' }).getByRole('button', { name: 'Wyloguj' }).click();
+  await expect(page.getByRole('button', { name: 'Zaloguj się' })).toBeVisible();
+  // Nothing of it is left in the browser's storage.
+  const stored = await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const open = indexedDB.open('lifexp-v2-exus');
+        open.onerror = () => resolve('none');
+        open.onsuccess = () => {
+          const db = open.result;
+          if (!db.objectStoreNames.contains('history')) return resolve('none');
+          const all = db.transaction('history').objectStore('history').getAll();
+          all.onsuccess = () => resolve(all.result.length);
+          all.onerror = () => resolve('error');
+        };
+      }),
+  );
+  expect(stored === 'none' || stored === 0).toBe(true);
+
+  await signIn(page, account);
+  await expect(page.locator('.shell')).toBeVisible();
+  await page.evaluate(() => (location.hash = '#/exus'));
+  await expect(log(page)).toContainText('Wpisz /pomoc');
+  await expect(log(page)).not.toContainText('Sekretne');
+});
+
+test('a form card is kept as what it became: a used one read-only, a skipped one as "Pominięto.", an unused one not at all', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-history-cards' });
+  await openSignedIn(page, account, '#/exus');
+  const tomorrow = await page.evaluate(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+
+  await send(page, '/zadanie Kupić mleko');
+  const used = await expectCard(page, 'zadanie', ['termin']);
+  await used.getByLabel('termin', { exact: true }).fill(tomorrow);
+  await used.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(log(page)).toContainText('Dodano zadanie „Kupić mleko”');
+  await expect.poll(() => tasksOf(account.uid)).toHaveLength(1);
+
+  await send(page, '/zadanie Skipped');
+  await (await expectCard(page, 'zadanie', ['termin'])).getByRole('button', { name: 'Pomiń' }).click();
+  await expect(page.locator('.exus-msg--exus').last()).toHaveText('Pominięto.');
+
+  await send(page, '/zadanie Nieużyta');
+  await expectCard(page, 'zadanie', ['termin']);
+  await expect(page.getByLabel('Wiadomość do Ex-us')).toHaveValue('');
+  // The last message is written to the device before the reload.
+  await send(page, '/pomoc');
+  await expect(log(page)).toContainText('Komendy (kolejność argumentów dowolna):');
+
+  await page.reload();
+  await expect(log(page)).toContainText('Komendy (kolejność argumentów dowolna):');
+  const summary = page.getByRole('region', { name: 'Do wykonania: /zadanie' });
+  await expect(summary).toHaveCount(1);
+  await expect(summary).toContainText('Kupić mleko');
+  await expect(summary.getByRole('button')).toHaveCount(0);
+  await expect(summary.getByRole('textbox')).toHaveCount(0);
+  await expect(page.locator('.exus-msg--exus').filter({ hasText: /^Pominięto\.$/ })).toHaveCount(1);
+  // The card nobody used is gone: nothing on the page can run it twice.
+  await expect(page.getByRole('form', { name: /^Uzupełnij/ })).toHaveCount(0);
+  expect(await tasksOf(account.uid)).toHaveLength(1);
+});
+
+test('Ctrl+K opens Ex-us from another screen and focuses the field; on Ex-us it only focuses; Cmd+K does the same', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-ctrl-k' });
+  await openSignedIn(page, account, '#/today');
+  const field = page.getByLabel('Wiadomość do Ex-us');
+
+  // The shell registers the key in an effect right after it shows: on a slow machine the first press can come first.
+  await expect(async () => {
+    await page.keyboard.press('Control+K');
+    await expect(page).toHaveURL(/#\/exus$/, { timeout: 1000 });
+  }).toPass();
+  await expect(field).toBeFocused();
+
+  // Already on Ex-us: no new history entry, just the focus.
+  await page.getByRole('log', { name: 'Rozmowa z Ex-us' }).click({ position: { x: 5, y: 5 } });
+  await field.blur();
+  await expect(field).not.toBeFocused();
+  const entries = await page.evaluate(() => history.length);
+  await page.keyboard.press('Control+K');
+  await expect(field).toBeFocused();
+  expect(await page.evaluate(() => history.length)).toBe(entries);
+
+  await page.evaluate(() => (location.hash = '#/goals'));
+  await expect(page).toHaveURL(/#\/goals$/);
+  await page.keyboard.press('Meta+K');
+  await expect(page).toHaveURL(/#\/exus$/);
+  await expect(field).toBeFocused();
+});
+
+test('Ctrl+K does nothing when Ex-us is off', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-ctrl-k-off', profile: { enabledModules: ['money', 'chores', 'stats', 'notes'] } });
+  await openSignedIn(page, account, '#/today');
+  await page.keyboard.press('Control+K');
+  await page.waitForTimeout(300);
+  await expect(page).toHaveURL(/#\/today$/);
+});
+
+test('offline, a command that needs the server says so; a write Firestore queues still goes; plain text says the chat needs the internet', async ({ page, context }) => {
+  const account = await goalsAccount('exus-offline');
+  await openSignedIn(page, account, '#/exus');
+  const replies = page.locator('.exus-msg--exus');
+  // Everything the screen loads lazily is loaded first (offline, a missing chunk would reload the page, as it does on a stale deploy).
+  await send(page, '/saldo');
+  await expect(replies.last()).toContainText('Saldo: 50,00 zł.');
+  await send(page, '/statystyki');
+  await expect(replies.last()).toContainText('Punkty z ostatnich 7 dni');
+  await send(page, '/szukaj nic');
+  await expect(replies.last()).toContainText('nic');
+  await page.waitForTimeout(500);
+  await context.setOffline(true);
+  await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
+
+  await send(page, '/cel Rower 1500 zł');
+  await expect(replies.last()).toHaveText('To polecenie wymaga internetu. Połącz się i spróbuj ponownie.');
+  // Before any card: no form for a command that cannot run.
+  await send(page, '/cel');
+  await expect(replies.last()).toHaveText('To polecenie wymaga internetu. Połącz się i spróbuj ponownie.');
+  await expect(page.getByRole('form', { name: /^Uzupełnij/ })).toHaveCount(0);
+  await send(page, '/wydatek 5 jedzenie');
+  await expect(replies.last()).toHaveText('To polecenie wymaga internetu. Połącz się i spróbuj ponownie.');
+  await send(page, 'odłóż 50 zł na rower');
+  await expect(replies.last()).toContainText('Rozmowa z Ex-us wymaga internetu.');
+  // Reads from what is loaded and single queued writes go on, as on the screens.
+  await send(page, '/zadanie Offline jutro');
+  await expect(replies.last()).toContainText('Dodano zadanie „Offline”');
+
+  await context.setOffline(false);
+  await expect.poll(() => goalsOf(account.uid)).toEqual([]);
+  await expect.poll(() => tasksOf(account.uid)).toHaveLength(1);
+  await send(page, '/cel Rower 1500 zł');
+  await expect(replies.last()).toContainText('Dodano cel „Rower”');
 });

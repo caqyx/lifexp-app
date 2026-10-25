@@ -1,16 +1,20 @@
 // Ex-us (docs/v2/PLAN.md 6, stage 5a): one chat for slash commands now and for
 // the AI later (5b). A command is read locally (domain/exus) and run through the
-// same services as the screens, so it obeys the same limits. The conversation
-// lives in memory for now; history on the device comes with the full UI (6.10).
+// same services as the screens, so it obeys the same limits. The conversation is kept
+// on the device per account (offline/chatHistory, 6.10): text only, a form card as
+// what it became, cleared by /nowy and by signing out.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { availableCommands, palette, parseInput, type CommandSpec } from '@/domain/exus/commands';
 import { fieldsFor, initialValues, type FieldDef, type RawValue } from '@/domain/exus/form';
-import { whatToDo } from '@/domain/exus/policy';
+import { serializeHistory, type DoneCard } from '@/domain/exus/history';
+import { needsInternet, whatToDo } from '@/domain/exus/policy';
 import { isModuleOn } from '@/domain/modules';
 import { t } from '@/i18n';
 import { localDayKey } from '@/lib/dates';
 import type { RouteProps } from '@/lib/route-match';
+import { loadChatHistory, saveChatHistory } from '@/offline/chatHistory';
 import { prepareMoney } from '@/services/money';
+import { exusFocusRequests } from '@/stores/exusFocus';
 import { watchMoney } from '@/stores/money';
 import { watchNotes } from '@/stores/notes';
 import { watchMyReportsState } from '@/stores/reports';
@@ -23,7 +27,7 @@ import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 import { TextField } from '@/ui/components/Fields';
 import { Card, Page, Stack } from '@/ui/components/Layout';
 import type { HandlerContext } from './handlers';
-import { FormCard } from './FormCard';
+import { DoneCardView, FormCard } from './FormCard';
 import { blockedBy, effectOf, readyFor, runCommand } from './pipeline';
 import { commandName, syntax } from './syntax';
 import { createUndoStack } from './undo';
@@ -33,6 +37,10 @@ interface Message {
   id: number;
   from: 'me' | 'exus';
   text: string;
+  /** Shown now but not kept on the device: the greeting, the answer to /nowy. */
+  passing?: boolean;
+  /** A form card that was run, read-only (kept on the device as it is). */
+  done?: DoneCard;
   /** A form card for a command with missing slots instead of text (PLAN.md 6.6, row 2). */
   card?: { spec: CommandSpec; fields: FieldDef[]; initial: Record<string, RawValue>; ctx: HandlerContext };
 }
@@ -94,7 +102,10 @@ export default function ExusPage({ navigate }: RouteProps) {
   useEffect(() => {
     if (uid && moneyOn) prepareMoney(uid, incomeCounted).catch(() => {});
   }, [uid, moneyOn]);
-  const [messages, setMessages] = useState<Message[]>(() => [{ id: nextId++, from: 'exus', text: t('exus.hello') }]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  // The kept conversation arrives from the device's storage; nothing is saved before it did.
+  const [restored, setRestored] = useState(false);
+  const passingNext = useRef(false);
   const [draft, setDraft] = useState('');
   const log = useRef<HTMLDivElement>(null);
   const form = useRef<HTMLFormElement>(null);
@@ -103,6 +114,28 @@ export default function ExusPage({ navigate }: RouteProps) {
   // The last destructive command asked about; it stays while the dialog closes.
   const [pending, setPending] = useState<Pending | null>(null);
   const [confirming, setConfirming] = useState(false);
+  useEffect(() => {
+    if (!uid) return;
+    let wanted = true;
+    void loadChatHistory(uid).then((kept) => {
+      if (!wanted) return;
+      // What was said while it loaded stays after it.
+      const earlier: Message[] = kept.length > 0 ? kept.map((m) => ({ ...m, id: nextId++ })) : [{ id: nextId++, from: 'exus', text: t('exus.hello'), passing: true }];
+      setMessages((now) => [...earlier, ...now]);
+      setRestored(true);
+    });
+    return () => {
+      wanted = false;
+    };
+  }, [uid]);
+  useEffect(() => {
+    if (uid && restored) void saveChatHistory(uid, serializeHistory(messages.map((m) => ({ ...m, live: m.card !== undefined }))));
+  }, [messages, restored, uid]);
+  // Ctrl/Cmd+K (the shell) asks for the field.
+  const focusRequests = exusFocusRequests.value;
+  useEffect(() => {
+    if (focusRequests > 0) form.current?.querySelector('input')?.focus();
+  }, [focusRequests]);
   useEffect(() => {
     log.current?.lastElementChild?.scrollIntoView({ block: 'end' });
   }, [messages.length]);
@@ -114,10 +147,22 @@ export default function ExusPage({ navigate }: RouteProps) {
   // /nowy: the chat and the undo stack start over; the reply that follows is the first message.
   const newChat = () => {
     undoStack.clear();
+    passingNext.current = true;
     setMessages([]);
   };
 
-  const say = (text: string) => setMessages((m) => [...m, { id: nextId++, from: 'exus', text }]);
+  const say = (text: string) => {
+    const passing = passingNext.current;
+    passingNext.current = false;
+    setMessages((m) => [...m, { id: nextId++, from: 'exus', text, ...(passing ? { passing } : {}) }]);
+  };
+
+  /** Offline, a command that moves money or points in a transaction waits for a connection. */
+  const offlineBlocked = (spec: CommandSpec) => {
+    if (navigator.onLine || !needsInternet(spec.id)) return false;
+    say(t('exus.offline.needsInternet'));
+    return true;
+  };
 
   const run = (spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext) =>
     void runCommand(spec, args, ctx, say).then(say, () => say(t('exus.failed')));
@@ -129,13 +174,14 @@ export default function ExusPage({ navigate }: RouteProps) {
     setMessages((m) => [...m, { id: nextId++, from: 'me', text: input }]);
     const today = localDayKey(new Date());
     const parsed = parseInput(input, today, commands);
-    if (parsed.kind === 'text') return say(t('exus.aiLater'));
+    if (parsed.kind === 'text') return say(t(navigator.onLine ? 'exus.aiLater' : 'exus.offline.text'));
     if (parsed.kind === 'unknown') return say(t('exus.unknown', { name: parsed.name }));
     const { spec, args, missing, unread } = parsed;
     const ctx: HandlerContext = { uid, profile, today, commands, navigate, undo: undoStack, newChat };
     if (unread.length > 0) {
       return say(t('exus.unread', { fields: unread.map((name) => t(`exus.slots.${name as SlotName}`)).join(', '), syntax: syntax(spec) }));
     }
+    if (offlineBlocked(spec)) return;
     const decision = whatToDo(spec.risk, missing);
     if (decision === 'ask-missing') return sayMissing(spec, missing);
     if (decision === 'form') {
@@ -153,6 +199,7 @@ export default function ExusPage({ navigate }: RouteProps) {
 
   /** A complete command: run it, or ask first when it is destructive. */
   const proceed = (spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext, decision: 'run' | 'confirm') => {
+    if (offlineBlocked(spec)) return;
     if (decision === 'confirm') {
       // The question reads stores that may still be loading: it waits for them (or says it cannot).
       void readyFor(spec, ctx).then(
@@ -187,11 +234,15 @@ export default function ExusPage({ navigate }: RouteProps) {
                 spec={m.card.spec}
                 fields={m.card.fields}
                 initial={m.card.initial}
-                onRun={(args) => {
+                onSkip={() => setMessages((all) => all.map((x) => (x.id === m.id ? { id: m.id, from: 'exus', text: t('exus.form.skipped') } : x)))}
+                onRun={(args, done) => {
                   const card = m.card!;
+                  setMessages((all) => all.map((x) => (x.id === m.id ? { id: m.id, from: 'exus', text: '', done } : x)));
                   proceed(card.spec, args, card.ctx, whatToDo(card.spec.risk, []) === 'confirm' ? 'confirm' : 'run');
                 }}
               />
+            ) : m.done ? (
+              <DoneCardView key={m.id} card={m.done} />
             ) : (
             <p key={m.id} class={`exus-msg exus-msg--${m.from} user-text`}>
               {m.text}
