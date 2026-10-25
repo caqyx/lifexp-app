@@ -96,3 +96,37 @@ test("v1's worker updating does not delete v2's caches", async ({ page, context,
   await expect(page.locator('.topbar__title')).toHaveText('Dziś');
   await context.setOffline(false);
 });
+
+test('a push shows the reminder with v2\'s icon; its link stays on our origin (6-8)', async ({ page, context, account }) => {
+  await context.grantPermissions(['notifications']);
+  await openSignedIn(page, account, '#/today');
+  await waitForServiceWorker(page);
+
+  // DevTools' "Push" button: deliver a message to v2's registration without a subscription (v2 has none before the cutover).
+  const cdp = await context.newCDPSession(page);
+  const registrations = [];
+  cdp.on('ServiceWorker.workerRegistrationUpdated', ({ registrations: list }) => registrations.push(...list));
+  await cdp.send('ServiceWorker.enable');
+  await expect.poll(() => registrations.find((r) => r.scopeURL.endsWith('/v2/dist/') && !r.isDeleted)?.registrationId).toBeTruthy();
+  const registration = registrations.find((r) => r.scopeURL.endsWith('/v2/dist/') && !r.isDeleted);
+  const origin = new URL(registration.scopeURL).origin;
+
+  const send = (payload) =>
+    cdp.send('ServiceWorker.deliverPushMessage', { origin, registrationId: registration.registrationId, data: JSON.stringify(payload) });
+  const shown = () =>
+    page.evaluate(async () =>
+      (await (await navigator.serviceWorker.ready).getNotifications()).map((n) => ({ title: n.title, body: n.body, icon: n.icon, url: n.data?.url })),
+    );
+
+  await send({ notification: { title: '🔥 Seria: 2 dni', body: 'Dziś jeszcze nic nie ma.' }, fcmOptions: { link: '#/today' } });
+  await expect.poll(shown).toContainEqual({
+    title: '🔥 Seria: 2 dni',
+    body: 'Dziś jeszcze nic nie ma.',
+    icon: `${registration.scopeURL}icon-192.png`,
+    url: `${registration.scopeURL}#/today`,
+  });
+
+  // A link to another site is never kept: a tap would open v2's start instead.
+  await send({ notification: { title: 'Obcy link', body: '' }, fcmOptions: { link: 'https://evil.example/' } });
+  await expect.poll(async () => (await shown()).find((n) => n.title === 'Obcy link')?.url).toBe(registration.scopeURL);
+});

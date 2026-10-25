@@ -166,6 +166,70 @@ test('a parent without a LifeXP account of their own (v1 parent.html) opens #/pa
   await expect(page.getByRole('button', { name: 'Zaloguj się' })).toBeVisible();
 });
 
+// ── 6-8: the rules trust only an address Firebase Auth verified ──
+
+const AUTH_SIGN_IN = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo';
+const FIRESTORE = 'http://127.0.0.1:8080/v1/projects/demo-lifexp/databases/(default)/documents';
+
+async function idToken(request, email, password) {
+  const res = await request.post(AUTH_SIGN_IN, { data: { email, password, returnSecureToken: true } });
+  return (await res.json()).idToken;
+}
+
+/** The query v1's parent.html and v2 make, straight against the emulator's rules. */
+async function childrenQuery(request, token, email) {
+  const res = await request.post(`${FIRESTORE}:runQuery`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: {
+      structuredQuery: {
+        from: [{ collectionId: 'users' }],
+        where: { fieldFilter: { field: { fieldPath: 'parentEmail' }, op: 'EQUAL', value: { stringValue: email } } },
+      },
+    },
+  });
+  return { status: res.status(), docs: res.ok() ? (await res.json()).filter((r) => r.document).length : 0 };
+}
+
+test('rules: a parent reads the child only with an address Firebase Auth verified', async ({ request }) => {
+  const email = `rules-parent-${process.pid}-${Date.now()}@test.lifexp`;
+  const password = 'test-password-123';
+  const parent = await auth.createUser({ email, password, emailVerified: true });
+  const child = await seedChild(email);
+  const verified = await idToken(request, email, password);
+  expect(await childrenQuery(request, verified, email)).toEqual({ status: 200, docs: 1 });
+  const day = await request.get(`${FIRESTORE}/users/${child.uid}/dailyLog/${todayUtcKey()}`, { headers: { Authorization: `Bearer ${verified}` } });
+  expect(day.status()).toBe(200);
+
+  // Someone who registered the same address without verifying it gets nothing.
+  await auth.updateUser(parent.uid, { emailVerified: false });
+  const unverified = await idToken(request, email, password);
+  expect((await childrenQuery(request, unverified, email)).status).toBe(403);
+  const denied = await request.get(`${FIRESTORE}/users/${child.uid}/dailyLog/${todayUtcKey()}`, { headers: { Authorization: `Bearer ${unverified}` } });
+  expect(denied.status()).toBe(403);
+});
+
+test('a parent with an unverified e-mail and password account verifies it with Firebase\'s link, then sees the child', async ({ page, request }) => {
+  const email = `unverified-parent-${process.pid}-${Date.now()}@test.lifexp`;
+  const password = 'test-password-123';
+  await auth.createUser({ email, password, emailVerified: false });
+  await seedChild(email);
+  await page.goto(appUrl('#/parent'));
+  await signIn(page, { email, password });
+  await expect(page.getByText('Najpierw potwierdź swój adres e-mail')).toBeVisible();
+  await page.getByRole('button', { name: 'Sprawdź ponownie' }).click();
+  await expect(page.getByText('Adres nie jest jeszcze potwierdzony.', { exact: false })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Wyślij link' }).click();
+  await expect(page.getByText(`Link poszedł na ${email}.`, { exact: false })).toBeVisible();
+  // The Auth emulator keeps the link; opening it verifies the address.
+  const codes = await (await request.get('http://127.0.0.1:9099/emulator/v1/projects/demo-lifexp/oobCodes')).json();
+  const link = codes.oobCodes.filter((c) => c.email === email && c.requestType === 'VERIFY_EMAIL').pop().oobLink;
+  expect((await request.get(link)).ok()).toBe(true);
+
+  await page.getByRole('button', { name: 'Sprawdź ponownie' }).click();
+  await expect(page.getByText('Punkty: Ala')).toBeVisible();
+});
+
 test.describe('v1 on a desktop', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 

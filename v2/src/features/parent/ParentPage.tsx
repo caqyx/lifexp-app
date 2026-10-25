@@ -16,7 +16,7 @@ import { formatDayMonth, formatShortDate, utcDayKey } from '@/lib/dates';
 import { formatInteger } from '@/lib/format';
 import { formatMoney } from '@/lib/money';
 import { childData, findParentChildren, loadChildData, parentChildren, type ParentChild } from '@/stores/parent';
-import { session } from '@/stores/session';
+import { recheckEmailVerified, sendVerificationLink, session } from '@/stores/session';
 import { BarChart } from '@/ui/components/BarChart';
 import { Button } from '@/ui/components/Button';
 import { EmptyState, IconTile, List, ListRow, Metric, ProgressBar, Skeleton } from '@/ui/components/Display';
@@ -285,11 +285,59 @@ function Failed({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+/**
+ * The rules trust a parent's address only when Firebase Auth verified it (Google always;
+ * e-mail and password after Firebase's link — v1's 6-digit code sets only the profile).
+ */
+function VerifyEmail({ email, onVerified }: { email: string; onVerified: () => void }) {
+  const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'checking' | 'notYet' | 'failed'>('idle');
+  const send = () => {
+    setState('sending');
+    sendVerificationLink().then(
+      () => setState('sent'),
+      () => setState('failed'),
+    );
+  };
+  const recheck = () => {
+    setState('checking');
+    recheckEmailVerified().then(
+      (ok) => (ok ? onVerified() : setState('notYet')),
+      () => setState('failed'),
+    );
+  };
+  const note =
+    state === 'sent' ? t('parent.verifySent', { email }) : state === 'notYet' ? t('parent.verifyNotYet') : state === 'failed' ? t('parent.loadFailed') : null;
+  return (
+    <Card>
+      <EmptyState
+        title={t('parent.verifyTitle')}
+        body={t('parent.verifyBody', { email })}
+        action={
+          <div class="parent-actions">
+            <Button variant="primary" busy={state === 'sending'} onClick={send}>
+              {t('parent.verifySend')}
+            </Button>
+            <Button variant="secondary" busy={state === 'checking'} onClick={recheck}>
+              {t('parent.verifyRecheck')}
+            </Button>
+          </div>
+        }
+      />
+      {note && (
+        <p class="parent-note" role="status">
+          {note}
+        </p>
+      )}
+    </Card>
+  );
+}
+
 export default function ParentPage() {
   const current = session.value;
   const email = current.status === 'signedIn' ? current.user.email : '';
+  const verified = current.status === 'signedIn' && current.user.emailVerified;
   // Looked up again on every visit, so a link the child just made shows up.
-  useEffect(() => findParentChildren(email, true), [email]);
+  useEffect(() => findParentChildren(email, verified, true), [email, verified]);
   const state = parentChildren.value;
   const kids = state?.email === email ? state.children : undefined;
   const [picked, setPicked] = useState<string | null>(null);
@@ -312,7 +360,8 @@ export default function ParentPage() {
           {t('parent.readOnly')}
         </p>
         {kids === undefined && <Loading />}
-        {kids === 'error' && <Failed onRetry={() => findParentChildren(email, true)} />}
+        {kids === 'error' && <Failed onRetry={() => findParentChildren(email, verified, true)} />}
+        {kids === 'unverified' && <VerifyEmail email={email} onVerified={() => findParentChildren(email, true, true)} />}
         {Array.isArray(kids) && kids.length === 0 && (
           <Card>
             <EmptyState title={t('parent.noChildren')} body={t('parent.noChildrenBody', { email })} />

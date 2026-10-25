@@ -9,10 +9,13 @@
 //   anyone: an open page keeps running, and app/pwa.ts reloads it only if it asks
 //   for a chunk the deploy removed.
 // - Only same-origin GETs are touched; Firebase traffic goes straight to the network.
+// - Push (stage 6-8): shows the reminders and opens their link on a tap (swPush.ts).
+//   v2 does not subscribe before the cutover (R7), so until then nothing arrives here.
 /// <reference lib="webworker" />
 import { clientsClaim, setCacheNameDetails } from 'workbox-core';
 import { addRoute, cleanupOutdatedCaches, matchPrecache, precache, type PrecacheEntry } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
+import { clickUrl, parsePushData, readPush } from './swPush';
 
 declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: (string | PrecacheEntry)[] };
 
@@ -47,3 +50,42 @@ self.addEventListener('install', () => {
   void self.skipWaiting();
 });
 clientsClaim();
+
+// ── Push (docs/v2/PLAN.md 9.1, row 6-8) ──
+
+/** The manifest's icon (vite.config.ts), next to the worker's scope. */
+const ICON = () => new URL('icon-192.png', self.registration.scope).href;
+
+self.addEventListener('push', (event) => {
+  const raw = event.data ? parsePushData(() => event.data!.json(), () => event.data!.text()) : {};
+  const notice = readPush(raw);
+  event.waitUntil(
+    self.registration.showNotification(notice.title, {
+      body: notice.body,
+      icon: ICON(),
+      badge: ICON(),
+      data: { url: clickUrl(notice.link, self.registration.scope) },
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const data = event.notification.data as { url?: unknown } | null;
+  // Re-checked here: only our origin, else v2's start.
+  const url = clickUrl(typeof data?.url === 'string' ? data.url : null, self.registration.scope);
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      // A v2 window is reused only for a v2 address; a link outside the scope (v1 until the cutover) opens its own.
+      const inScope = url.startsWith(self.registration.scope);
+      const open = inScope ? windows.find((w) => w.url.startsWith(self.registration.scope)) : undefined;
+      if (open) {
+        await open.focus();
+        if (open.url !== url && 'navigate' in open) await open.navigate(url).catch(() => null);
+        return;
+      }
+      await self.clients.openWindow(url);
+    })(),
+  );
+});

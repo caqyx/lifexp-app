@@ -15,23 +15,30 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    // Rodzic = zalogowany użytkownik, którego email == parentEmail dziecka.
+    // Adres z tokenu liczy się tylko potwierdzony przez Firebase Auth (Google zawsze;
+    // e-mail i hasło po kliknięciu linku weryfikacyjnego). Bez tego ktoś mógłby założyć
+    // konto na cudzy adres i czytać dane dziecka (docs/v2/PLAN.md 9.1, 6-2/6-8).
+    function hasVerifiedEmail() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    // Rodzic = zalogowany użytkownik, którego POTWIERDZONY email == parentEmail dziecka.
     // Dla zapytań listujących (parent.html) reguła sprawdza każdy zwracany dokument,
     // więc zapytanie MUSI mieć where('parentEmail','==', <email rodzica>).
     function isParentOfDoc() {
-      return isSignedIn() && resource.data.parentEmail == request.auth.token.email;
+      return hasVerifiedEmail() && resource.data.parentEmail == request.auth.token.email;
     }
 
     // Dla podkolekcji: dociągamy dokument rodzica (users/{uid}) i porównujemy email.
     function isParentOf(uid) {
-      return isSignedIn() &&
+      return hasVerifiedEmail() &&
         get(/databases/$(database)/documents/users/$(uid)).data.parentEmail == request.auth.token.email;
     }
 
     // Admin systemu zgłoszeń błędów — jedyne konto, które widzi WSZYSTKIE bugReports
     // (właściciel danego zgłoszenia i tak widzi swoje własne, patrz reguła niżej).
     function isBugAdmin() {
-      return isSignedIn() && request.auth.token.email == 'szymonrogalski098@gmail.com';
+      return hasVerifiedEmail() && request.auth.token.email == 'szymonrogalski098@gmail.com';
     }
 
 match /users/{uid} {

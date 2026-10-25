@@ -3,6 +3,7 @@ import {
   browserPopupRedirectResolver,
   GoogleAuthProvider,
   onAuthStateChanged,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -31,4 +32,23 @@ export async function signInWithGoogle(): Promise<void> {
 
 export function signOutUser(): Promise<void> {
   return signOut(auth);
+}
+
+/**
+ * Firebase's own verification link to the signed-in address (6-8: the rules trust a
+ * parent's e-mail only when Firebase Auth has it verified; v1's 6-digit code sets only
+ * the profile flag). Rejects when nobody is signed in.
+ */
+export async function sendAuthVerificationLink(): Promise<void> {
+  if (!auth.currentUser) throw new Error('signed out');
+  await sendEmailVerification(auth.currentUser);
+}
+
+/** After the link was opened: the fresh state, with a new token so the rules see it. */
+export async function reloadAuthUser(): Promise<SessionUser | null> {
+  const user = auth.currentUser;
+  if (!user) return null;
+  await user.reload();
+  await user.getIdToken(true);
+  return toSessionUser(user);
 }
