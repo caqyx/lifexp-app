@@ -505,8 +505,6 @@ export default function TodayPage({ path, navigate }: RouteProps) {
 
         {sources.failed && <p class="today-error" role="alert">{t('today.loadFailed')}</p>}
 
-        {isModuleOn('aichat', profile) && <ExusField navigate={navigate} />}
-
         {drafts.value.length > 0 && (
           <Card>
             <div class="today-drafts">
@@ -524,6 +522,9 @@ export default function TodayPage({ path, navigate }: RouteProps) {
         {/* Points, level, streak and the day's limit are what "Statystyki XP" counts:
             with it off nothing earns points, so Today does not show them. */}
         {statsOn && <PointsHero profile={profile} />}
+        {/* Owner's decision (2026-10-25): the Ex-us field sits right under the points card,
+            or in its place when "Statystyki XP" is off. */}
+        {isModuleOn('aichat', profile) && <ExusField navigate={navigate} />}
         {statsOn && <LevelCard profile={profile} />}
 
         {sources.days ? (

@@ -1,7 +1,7 @@
 // The Ex-us field on Today (docs/v2/PLAN.md 6.10, stage 5a-11b): what is typed there
 // is sent by the Ex-us screen through the same engine, handed over in memory.
 const { createUser, db } = require('../support/emulator');
-const { test, expect: baseExpect, openSignedIn } = require('../support/v2');
+const { test, expect: baseExpect, openSignedIn, screenSettled } = require('../support/v2');
 
 // A plain-text message waits for exusTurn; the Functions emulator's first call of a run starts a worker.
 const expect = baseExpect.configure({ timeout: 15000 });
@@ -55,4 +55,52 @@ test('on a 360 px phone Today with the field does not scroll sideways', async ({
   await expect(field(page)).toBeVisible();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+/** The Today card (a child of the screen's stack) holding the Ex-us field, and its neighbours. */
+function fieldPlacement(page) {
+  return page.locator('form.today-exus').evaluate((form) => {
+    let card = form;
+    while (card.parentElement && !card.parentElement.classList.contains('ui-stack')) card = card.parentElement;
+    const cards = [...card.parentElement.children];
+    const hero = cards.find((c) => c.classList.contains('today-hero'));
+    const rect = (el) => el.getBoundingClientRect();
+    const fieldTop = rect(card).top;
+    const heroBottom = hero ? rect(hero).bottom : null;
+    const between = hero
+      ? cards.filter((c) => c !== hero && c !== card && rect(c).height > 0 && rect(c).top >= heroBottom - 0.5 && rect(c).bottom <= fieldTop + 0.5).length
+      : null;
+    return {
+      index: cards.indexOf(card),
+      heroIndex: hero ? cards.indexOf(hero) : -1,
+      previous: card.previousElementSibling?.className ?? '',
+      fieldTop,
+      heroBottom,
+      between,
+    };
+  });
+}
+
+test('on a 360 px phone the field sits right under the points card', async ({ page }) => {
+  const account = await createUser({ tag: 'today-exus-order' });
+  await openSignedIn(page, account, '#/today');
+  await expect(page.getByTestId('points-total')).toBeVisible();
+  await expect(field(page)).toBeVisible();
+  await screenSettled(page);
+  const placed = await fieldPlacement(page);
+  expect(placed.heroIndex).toBeGreaterThanOrEqual(0);
+  expect(placed.index).toBe(placed.heroIndex + 1);
+  expect(placed.fieldTop).toBeGreaterThanOrEqual(placed.heroBottom);
+  expect(placed.between).toBe(0);
+});
+
+test('with "Statystyki XP" off the field takes the points card\'s place, under the greeting', async ({ page }) => {
+  const account = await createUser({ tag: 'today-exus-nostats', profile: { enabledModules: ['chores', 'money', 'notes', 'aichat'] } });
+  await openSignedIn(page, account, '#/today');
+  await expect(field(page)).toBeVisible();
+  await expect(page.getByTestId('points-total')).toHaveCount(0);
+  await screenSettled(page);
+  const placed = await fieldPlacement(page);
+  expect(placed.heroIndex).toBe(-1);
+  expect(placed.previous).toContain('today-greeting');
 });
