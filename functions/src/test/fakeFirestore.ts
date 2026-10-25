@@ -2,7 +2,7 @@
 // runTransaction with get, set, update and delete; FieldValue.delete() in updates),
 // in memory. Transactions run one at a time, and a callback that throws leaves
 // nothing written, as in Firestore. update() on a missing document throws, as in Firestore.
-import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp, type Firestore } from 'firebase-admin/firestore';
 
 type Data = Record<string, unknown>;
 
@@ -11,6 +11,14 @@ interface FakeRef {
   get(): Promise<FakeSnap>;
   set(data: Data, opts?: { merge?: boolean }): Promise<void>;
   update(data: Data): Promise<void>;
+}
+
+/** A deep copy that keeps Timestamps and Dates as they are (structuredClone would flatten them). */
+function clone<T>(value: T): T {
+  if (value instanceof Timestamp || value instanceof Date || value instanceof FieldValue) return value;
+  if (Array.isArray(value)) return value.map(clone) as T;
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, clone(v)])) as T;
+  return value;
 }
 
 const isDelete = (v: unknown) => v instanceof FieldValue && v.isEqual(FieldValue.delete());
@@ -37,10 +45,10 @@ export interface FakeDb {
 }
 
 export function fakeFirestore(initial: Record<string, Data> = {}): FakeDb {
-  const docs = new Map<string, Data>(Object.entries(initial).map(([k, v]) => [k, structuredClone(v)]));
+  const docs = new Map<string, Data>(Object.entries(initial).map(([k, v]) => [k, clone(v)]));
   const snap = (path: string): FakeSnap => {
     const d = docs.get(path);
-    return { exists: d !== undefined, data: () => (d ? structuredClone(d) : undefined) };
+    return { exists: d !== undefined, data: () => (d ? clone(d) : undefined) };
   };
   const write = (path: string, data: Data | null, mode: 'set' | 'merge' | 'update') => {
     if (data === null) return void docs.delete(path);
@@ -87,6 +95,31 @@ export function fakeFirestore(initial: Record<string, Data> = {}): FakeDb {
     return next;
   };
 
-  state.db = { doc, runTransaction } as unknown as Firestore;
+  // collection(path).where(field, op, value)…get(): the direct children of `path`,
+  // filtered with ==, <, <=, >, >= (Timestamps by time, strings by order).
+  type Op = '==' | '<' | '<=' | '>' | '>=';
+  const comparable = (v: unknown) => (v instanceof Timestamp ? v.toMillis() : v instanceof Date ? v.getTime() : v);
+  const test = (a: unknown, op: Op, b: unknown) => {
+    const x = comparable(a) as number | string;
+    const y = comparable(b) as number | string;
+    if (op === '==') return x === y;
+    if (typeof x !== typeof y || x === undefined) return false;
+    return op === '<' ? x < y : op === '<=' ? x <= y : op === '>' ? x > y : x >= y;
+  };
+  const collection = (path: string) => {
+    const query = (filters: [string, Op, unknown][]) => ({
+      where: (field: string, op: Op, value: unknown) => query([...filters, [field, op, value]]),
+      get: async () => {
+        const out = [...docs.entries()]
+          .filter(([p]) => p.startsWith(`${path}/`) && !p.slice(path.length + 1).includes('/'))
+          .filter(([, d]) => filters.every(([f, op, v]) => test(d[f], op, v)))
+          .map(([p, d]) => ({ id: p.slice(path.length + 1), ref: doc(p), data: () => clone(d) }));
+        return { docs: out, empty: out.length === 0, size: out.length };
+      },
+    });
+    return query([]);
+  };
+
+  state.db = { doc, runTransaction, collection } as unknown as Firestore;
   return state;
 }

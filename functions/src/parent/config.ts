@@ -22,12 +22,15 @@ export const MEMORY = '256MiB' as const;
 export const TIMEOUT_SECONDS = 30;
 
 /**
- * The template v1 and 4g-1 send the code with (settings.js, v2 data/emailjs.ts).
+ * EmailJS as v1 uses it: the code template (settings.js, v2 data/emailjs.ts) and the
+ * weekly report's (scripts/send-weekly-report.js).
  * Public ids, already in the repo; the private key is the secret EMAILJS_PRIVATE_KEY.
  */
 export const EMAILJS = {
   url: 'https://api.emailjs.com/api/v1.0/email/send',
   serviceId: 'service_417sg11',
   templateId: 'template_f2b4jeo',
+  /** v1's weekly report (scripts/send-weekly-report.js; the HTML is email-templates/weekly-report.html). */
+  reportTemplateId: 'template_jztwowz',
   publicKey: '1vFk29QDNKopU0RnJ',
 } as const;
