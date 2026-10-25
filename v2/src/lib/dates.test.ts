@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { addDays, formatDayKey, formatDayMonth, formatMonthKey, formatWeekdayLong, formatWeekdayShort, localDayKey, utcDayKey, weekOf, zonedIsoMinutes } from './dates';
+import { addDays, formatDayKey, formatDayMonth, formatMonthKey, formatWeekdayLong, formatWeekdayShort, localDayKey, utcDayKey, weekOf, zonedDayKey, zonedIsoMinutes } from './dates';
 
 describe('day keys', () => {
   test('the UTC day is v1 todayStr: after 22:00 UTC it is already tomorrow in Poland, not in UTC', () => {
@@ -56,5 +56,13 @@ describe('zonedIsoMinutes', () => {
     expect(zonedIsoMinutes(new Date('2026-10-25T17:40:59Z'), 'Europe/Warsaw')).toBe('2026-10-25T18:40');
     expect(zonedIsoMinutes(new Date('2026-07-01T22:30:00Z'), 'Europe/Warsaw')).toBe('2026-07-02T00:30');
     expect(zonedIsoMinutes(new Date('2026-07-01T22:30:00Z'), 'UTC')).toBe('2026-07-01T22:30');
+  });
+});
+
+describe('zonedDayKey', () => {
+  test('the calendar day in the zone: after 22:00 UTC in summer it is already the next day in Warsaw', () => {
+    expect(zonedDayKey(new Date('2026-07-05T21:59:00Z'), 'Europe/Warsaw')).toBe('2026-07-05');
+    expect(zonedDayKey(new Date('2026-07-05T22:00:00Z'), 'Europe/Warsaw')).toBe('2026-07-06');
+    expect(zonedDayKey(new Date('2026-12-06T23:00:00Z'), 'Europe/Warsaw')).toBe('2026-12-07');
   });
 });

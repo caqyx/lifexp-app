@@ -37,6 +37,11 @@ export function zonedIsoMinutes(date: Date, timeZone: string): string {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
+/** The calendar day of `date` in `timeZone`, "YYYY-MM-DD" (the weekly report's Europe/Warsaw days). */
+export function zonedDayKey(date: Date, timeZone: string): string {
+  return zonedIsoMinutes(date, timeZone).slice(0, 10);
+}
+
 function keyToUtcDate(key: string): Date {
   return new Date(`${key}T00:00:00Z`);
 }
