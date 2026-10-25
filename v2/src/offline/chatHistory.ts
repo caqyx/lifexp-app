@@ -48,18 +48,33 @@ export async function loadChatHistory(uid: string): Promise<StoredMessage[]> {
   }
 }
 
-export async function saveChatHistory(uid: string, messages: readonly StoredMessage[]): Promise<void> {
-  try {
-    // Copied now: the queue may run this after the caller's list has moved on.
-    const kept = [...messages];
-    await inOrder(() => withStore('readwrite', (s) => (kept.length > 0 ? s.put(kept, uid) : s.delete(uid))));
-  } catch {
-    // Storage blocked or full: the conversation just is not kept.
+/** Saves not yet started, per account: a newer save replaces the list of one still waiting in the queue. */
+const waiting = new Map<string, { messages: readonly StoredMessage[]; done: Promise<void> }>();
+
+export function saveChatHistory(uid: string, messages: readonly StoredMessage[]): Promise<void> {
+  // Copied now: the caller's list moves on.
+  const kept = [...messages];
+  const queued = waiting.get(uid);
+  if (queued) {
+    // A burst of messages is one write of the newest list, not one per message.
+    queued.messages = kept;
+    return queued.done;
   }
+  const entry = { messages: kept, done: Promise.resolve() };
+  waiting.set(uid, entry);
+  entry.done = inOrder(async () => {
+    if (waiting.get(uid) === entry) waiting.delete(uid);
+    await withStore('readwrite', (s) => (entry.messages.length > 0 ? s.put([...entry.messages], uid) : s.delete(uid)));
+  }).catch(() => {
+    // Storage blocked or full: the conversation just is not kept.
+  });
+  return entry.done;
 }
 
 /** Every account's conversation: what signing out leaves on the device is nothing. */
 export async function clearChatHistory(): Promise<void> {
+  // A save made after this must not merge into one queued before it, or the clear would wipe it.
+  waiting.clear();
   try {
     await inOrder(() => withStore('readwrite', (s) => s.clear()));
   } catch {

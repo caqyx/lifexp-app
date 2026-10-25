@@ -2238,6 +2238,26 @@ test.describe('on a phone', () => {
   });
 });
 
+/** The texts kept on the device for the conversation (every account), read from IndexedDB. */
+const keptTexts = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const open = indexedDB.open('lifexp-v2-exus');
+        open.onerror = () => resolve([]);
+        open.onsuccess = () => {
+          const db = open.result;
+          if (!db.objectStoreNames.contains('history')) return resolve([]);
+          const all = db.transaction('history').objectStore('history').getAll();
+          all.onsuccess = () => resolve(all.result.flat().map((m) => m.text || m.done?.title || ''));
+          all.onerror = () => resolve([]);
+        };
+      }),
+  );
+
+/** Waits until the last message is on the device, as a person's pause before closing the app would: a reload before that loses it. */
+const expectKept = (page, fragment) => expect.poll(async () => (await keptTexts(page)).some((text) => text.includes(fragment))).toBe(true);
+
 // ── Stage 5a-11a: history on the device, Ctrl/Cmd+K, offline ──
 
 test('the conversation survives a reload, without a live undo list; /nowy clears it for good', async ({ page }) => {
@@ -2248,6 +2268,7 @@ test('the conversation survives a reload, without a live undo list; /nowy clears
   await expect(log(page)).toContainText('Dodano zadanie „Kupić mleko”');
   await send(page, '/nie-ma-takiej');
   await expect.poll(() => tasksOf(account.uid)).toHaveLength(1);
+  await expectKept(page, 'Nie znam komendy /nie-ma-takiej.');
 
   await page.reload();
   await expect(log(page)).toContainText('/zadanie Kupić mleko jutro');
@@ -2263,6 +2284,7 @@ test('the conversation survives a reload, without a live undo list; /nowy clears
   await send(page, '/nowy');
   await expect(page.locator('.exus-msg')).toHaveCount(1);
   await expect(log(page)).toContainText('Zaczynamy od nowa.');
+  await expect.poll(async () => (await keptTexts(page)).length).toBe(0);
   await page.reload();
   await expect(log(page)).toContainText('Wpisz /pomoc, żeby zobaczyć komendy.');
   await expect(log(page)).not.toContainText('Kupić mleko');
@@ -2329,6 +2351,7 @@ test('a form card is kept as what it became: a used one read-only, a skipped one
   // The last message is written to the device before the reload.
   await send(page, '/pomoc');
   await expect(log(page)).toContainText('Komendy (kolejność argumentów dowolna):');
+  await expectKept(page, 'Komendy (kolejność argumentów dowolna):');
 
   await page.reload();
   await expect(log(page)).toContainText('Komendy (kolejność argumentów dowolna):');
