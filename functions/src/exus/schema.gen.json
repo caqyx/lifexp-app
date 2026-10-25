@@ -1,0 +1,613 @@
+{
+  "$comment": "GENERATED from v2/src/domain/exus/commands.ts by v2/tools/exus-schema.ts. Do not edit. Regenerate: npm run gen:exus-schema --prefix v2",
+  "commands": [
+    {
+      "id": "today",
+      "description": "Podsumowanie dnia",
+      "risk": "read",
+      "slots": []
+    },
+    {
+      "id": "create-task",
+      "description": "Nowe zadanie",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "text",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "due",
+          "type": "date",
+          "required": true
+        },
+        {
+          "name": "size",
+          "type": "enum",
+          "required": false,
+          "choices": [
+            "S",
+            "M",
+            "L"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "complete-task",
+      "description": "Oznacz zadanie jako zrobione (kawałki budowy PC tylko w terminie)",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "task",
+          "type": "entity",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "tasks",
+      "description": "Zadania: domyślnie na dziś i zaległe, albo dzis, zalegle, wszystkie",
+      "risk": "read",
+      "slots": [
+        {
+          "name": "scope",
+          "type": "enum",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "edit-task",
+      "description": "Zmień treść, termin albo rozmiar zadania",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "task",
+          "type": "entity",
+          "required": true
+        },
+        {
+          "name": "text",
+          "type": "text",
+          "required": false,
+          "keys": [
+            "tresc",
+            "text"
+          ]
+        },
+        {
+          "name": "due",
+          "type": "date",
+          "required": false,
+          "keys": [
+            "termin",
+            "due"
+          ]
+        },
+        {
+          "name": "size",
+          "type": "enum",
+          "required": false,
+          "choices": [
+            "S",
+            "M",
+            "L"
+          ],
+          "keys": [
+            "rozmiar",
+            "size"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "delete-task",
+      "description": "Usuń zadanie (budowa PC zostaje bez zmian)",
+      "risk": "destructive",
+      "slots": [
+        {
+          "name": "task",
+          "type": "entity",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "create-goal",
+      "description": "Nowy cel: kwota w zł to cel pieniężny, w pkt punktowy",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "target",
+          "type": "money",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "deposit-goal",
+      "description": "Wpłać z salda na cel pieniężny",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "goal",
+          "type": "entity",
+          "required": true
+        },
+        {
+          "name": "amount",
+          "type": "money",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "goals",
+      "description": "Cele i postęp",
+      "risk": "read",
+      "slots": []
+    },
+    {
+      "id": "edit-goal",
+      "description": "Zmień nazwę albo kwotę celu",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "goal",
+          "type": "entity",
+          "required": true
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": false,
+          "keys": [
+            "nazwa",
+            "name"
+          ]
+        },
+        {
+          "name": "target",
+          "type": "money",
+          "required": false,
+          "keys": [
+            "kwota",
+            "amount"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "delete-goal",
+      "description": "Usuń cel (odłożone pieniądze wracają na saldo)",
+      "risk": "destructive",
+      "slots": [
+        {
+          "name": "goal",
+          "type": "entity",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "add-money",
+      "description": "Zapisz wpływ: kwota, kategoria, notatka, data (samo 5.10 to kwota; data: dziś, wczoraj, pt, 12.10.2026)",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "amount",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": false
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "required": false,
+          "keys": [
+            "kategoria",
+            "category"
+          ]
+        },
+        {
+          "name": "rest",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "remove-money",
+      "description": "Zapisz wydatek (kosztuje punkty według przelicznika; samo 5.10 to kwota, data: dziś, wczoraj, pt, 12.10.2026)",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "amount",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "date",
+          "type": "date",
+          "required": false
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "required": false,
+          "keys": [
+            "kategoria",
+            "category"
+          ]
+        },
+        {
+          "name": "rest",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "balance",
+      "description": "Saldo, wydatki w tym miesiącu i pieniądze w celach",
+      "risk": "read",
+      "slots": []
+    },
+    {
+      "id": "create-category",
+      "description": "Nowa kategoria transakcji",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "delete-transaction",
+      "description": "Usuń transakcję (saldo i punkty wracają)",
+      "risk": "destructive",
+      "slots": [
+        {
+          "name": "ref",
+          "type": "entity",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "complete-chore",
+      "description": "Zapisz zrobiony obowiązek (dziś albo wczoraj)",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "chore",
+          "type": "entity",
+          "required": true
+        },
+        {
+          "name": "when",
+          "type": "enum",
+          "required": false,
+          "choices": [
+            "today",
+            "yesterday"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chores",
+      "description": "Obowiązki: zrobione dziś, do wypłaty, wpisy w miesiącu",
+      "risk": "read",
+      "slots": []
+    },
+    {
+      "id": "settle-chores",
+      "description": "Rozlicz wypłatę: punkty z obowiązków wpłyną jako złotówki do Pieniędzy",
+      "risk": "destructive",
+      "slots": []
+    },
+    {
+      "id": "log-activity",
+      "description": "Zapisz aktywność: rodzaj, czas, opis (punkty z dziennym limitem)",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "type",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "duration",
+          "type": "duration",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "streak",
+      "description": "Seria dni z punktami i zamrożenie serii",
+      "risk": "read",
+      "slots": []
+    },
+    {
+      "id": "stats",
+      "description": "Punkty i czas aktywności z 7 albo 30 dni",
+      "risk": "read",
+      "slots": [
+        {
+          "name": "period",
+          "type": "enum",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "what-now",
+      "description": "Co teraz? Losuje pomysł na podany czas, niczego nie zapisuje",
+      "risk": "read",
+      "slots": [
+        {
+          "name": "duration",
+          "type": "duration",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "create-note",
+      "description": "Nowa notatka: pierwsze słowo (albo słowa w cudzysłowie) to tytuł, reszta to treść",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "keys": [
+            "tytul",
+            "title"
+          ]
+        },
+        {
+          "name": "content",
+          "type": "text",
+          "required": false,
+          "keys": [
+            "tresc",
+            "content"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "archive-note",
+      "description": "Przenieś notatkę do archiwum",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "note",
+          "type": "entity",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "find-note",
+      "description": "Szukaj w tytułach i treści notatek",
+      "risk": "read",
+      "slots": [
+        {
+          "name": "query",
+          "type": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "daily-limit",
+      "description": "Dzienny limit punktów (50–500)",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "limit",
+          "type": "number",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "go",
+      "description": "Przejdź do ekranu: dziś, zadania, cele, obowiązki, pieniądze, notatki, statystyki, zgłoszenia, ustawienia",
+      "risk": "read",
+      "slots": [
+        {
+          "name": "screen",
+          "type": "text",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "lend",
+      "description": "Pożycz komuś: osoba, kwota, notatka (saldo maleje o kwotę)",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "amount",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "person",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "borrow",
+      "description": "Pożycz od kogoś: osoba, kwota, notatka (saldo rośnie o kwotę)",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "amount",
+          "type": "money",
+          "required": true
+        },
+        {
+          "name": "person",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "repay",
+      "description": "Spłać pożyczkę: pożyczka albo osoba i kwota (ponad to, co zostało, jest ucinane)",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "loan",
+          "type": "entity",
+          "required": true
+        },
+        {
+          "name": "amount",
+          "type": "money",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "loans",
+      "description": "Pożyczki: do odzyskania i do oddania, osobami",
+      "risk": "read",
+      "slots": []
+    },
+    {
+      "id": "money-limit",
+      "description": "Miesięczny limit wydatków (0 wyłącza limit)",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "amount",
+          "type": "money",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "create-chore",
+      "description": "Nowy obowiązek na liście: nazwa, punkty, z --jednorazowy zniknie po pierwszym zapisaniu",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "points",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "once",
+          "type": "flag",
+          "required": false,
+          "keys": [
+            "jednorazowy",
+            "once"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "delete-chore",
+      "description": "Usuń obowiązek z listy (zapisane wpisy zostają)",
+      "risk": "destructive",
+      "slots": [
+        {
+          "name": "chore",
+          "type": "entity",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "delete-chore-entry",
+      "description": "Usuń wpis obowiązku do wypłaty: ostatni albo nazwa obowiązku",
+      "risk": "destructive",
+      "slots": [
+        {
+          "name": "ref",
+          "type": "entity",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "delete-activity",
+      "description": "Usuń aktywność: ostatnia albo tekst (punkty wracają)",
+      "risk": "destructive",
+      "slots": [
+        {
+          "name": "ref",
+          "type": "entity",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "report-bug",
+      "description": "Zgłoś błąd: tytuł | obszar | opis (jedno zgłoszenie dziennie)",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "report",
+          "type": "text",
+          "required": true,
+          "raw": true
+        }
+      ]
+    },
+    {
+      "id": "edit-pending",
+      "description": "Zmień niezatwierdzoną kartę z poprzedniej tury (ref p1..p3 z pendingActions) — podaj tylko zmieniane pola",
+      "risk": "write",
+      "slots": [
+        {
+          "name": "ref",
+          "type": "ref",
+          "required": true,
+          "pattern": "^p[1-3]$"
+        }
+      ],
+      "pendingSlots": true
+    }
+  ]
+}

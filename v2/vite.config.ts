@@ -48,6 +48,6 @@ export default defineConfig({
     sourcemap: true,
   },
   test: {
-    include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.ts'],
+    include: ['src/**/*.test.{ts,tsx}', 'tests/**/*.test.ts', 'tools/**/*.test.ts'],
   },
 });

@@ -8,6 +8,8 @@
 //   "wiele" / "many"        -> five actions (the server keeps three)
 //   "zadanie" / "task"      -> create-task with the rest of the message as text, due "jutro"
 //   "saldo" / "balance"     -> balance
+//   "zmien" / "change"      -> edit-pending of card p1, due "piatek"
+//                              (dropped by the server unless context.pendingActions has p1)
 //   anything else           -> a plain reply, no actions
 // Every call costs FAKE_TOKENS_PER_CALL tokens.
 import { parseJson, type ModelClient, type ModelRequest, type ModelResponse } from './model';
@@ -47,6 +49,9 @@ function answer(message: string): string {
     const text = message.replace(/^.*?\b(zadanie|task)\b[:\s]*/i, '').trim() || 'Zadanie';
     actions = [{ command: 'create-task', args: [{ name: 'text', value: text }, { name: 'due', value: 'jutro' }] }];
     reply = 'Ex-us (emulator): create-task';
+  } else if (has('zmien', 'change')) {
+    actions = [{ command: 'edit-pending', args: [{ name: 'ref', value: 'p1' }, { name: 'due', value: 'piatek' }] }];
+    reply = 'Ex-us (emulator): edit-pending';
   } else if (has('saldo', 'balance')) {
     actions = [{ command: 'balance', args: [] }];
     reply = 'Ex-us (emulator): balance';

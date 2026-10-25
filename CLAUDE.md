@@ -21,6 +21,7 @@ npm test                      # testy v1 (Playwright, bez sieci)
 npm run test:emulator         # v1 na emulatorach Auth + Firestore (wymaga Javy 21)
 npm run check --prefix v2     # v2: typecheck + lint architektury + testy jednostkowe
 npm run build --prefix v2     # v2: build do v2/dist
+npm run gen:exus-schema --prefix v2  # po zmianie rejestru Ex-us: functions/src/exus/schema.gen.json (check v2 pilnuje aktualności)
 npm run test:v2               # v2: build + testy w przeglądarce na emulatorach (logowanie, powłoka; Java 21)
 node scripts/build-site.js    # składa stronę Pages (v1 + v2/dist) w _site i sprawdza pliki v1
 ```

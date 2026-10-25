@@ -1,6 +1,6 @@
 // The real model: one generateContent call with structured JSON output.
 import { GoogleGenAI, type GenerateContentParameters, type GenerateContentResponse } from '@google/genai';
-import { MAX_OUTPUT_TOKENS, MODEL_NAME, THINKING_BUDGET } from './config';
+import { MAX_OUTPUT_TOKENS, MODEL_NAME, THINKING_LEVEL } from './config';
 import { parseJson, type ModelClient, type ModelRequest, type ModelResponse } from './model';
 
 /** The one SDK method used; injectable so tests can see the exact request. */
@@ -27,9 +27,8 @@ export class GeminiModelClient implements ModelClient {
         responseMimeType: 'application/json',
         responseSchema: schema,
         maxOutputTokens: MAX_OUTPUT_TOKENS,
-        temperature: 0.3,
         candidateCount: 1,
-        thinkingConfig: { thinkingBudget: THINKING_BUDGET },
+        thinkingConfig: { thinkingLevel: THINKING_LEVEL },
       },
     });
     const text = response.text ?? '';

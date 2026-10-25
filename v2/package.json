@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.sw.json",
     "lint": "eslint .",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run lint && npm test"
+    "check": "npm run typecheck && npm run lint && npm test",
+    "gen:exus-schema": "node tools/gen-exus-schema.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "5.3.0",
