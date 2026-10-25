@@ -21,7 +21,7 @@ import { loadChatHistory, saveChatHistory } from '@/offline/chatHistory';
 import { aiDenied, askExus } from '@/services/exus-ai';
 import { prepareMoney } from '@/services/money';
 import { aiUsage } from '@/stores/exusAi';
-import { exusFocusRequests } from '@/stores/exusFocus';
+import { exusFocusRequests, exusHandoff } from '@/stores/exusFocus';
 import { watchMoney } from '@/stores/money';
 import { watchNotes } from '@/stores/notes';
 import { watchMyReportsState } from '@/stores/reports';
@@ -189,6 +189,14 @@ export default function ExusPage({ navigate }: RouteProps) {
   useEffect(() => {
     if (focusRequests > 0) form.current?.querySelector('input')?.focus();
   }, [focusRequests]);
+  // A message from the field on Today goes out once the kept conversation is back, after it.
+  const handoff = exusHandoff.value;
+  const sendRef = useRef<(text: string) => void>(() => {});
+  useEffect(() => {
+    if (!restored || handoff === null) return;
+    exusHandoff.value = null;
+    sendRef.current(handoff);
+  }, [restored, handoff]);
   useEffect(() => {
     log.current?.lastElementChild?.scrollIntoView({ block: 'end' });
   }, [messages.length]);
@@ -324,8 +332,8 @@ export default function ExusPage({ navigate }: RouteProps) {
       );
   };
 
-  const send = () => {
-    const input = draft.trim();
+  const send = (text = draft) => {
+    const input = text.trim();
     if (!input) return;
     setDraft('');
     const today = localDayKey(new Date());
@@ -380,6 +388,8 @@ export default function ExusPage({ navigate }: RouteProps) {
     }
     run(spec, args, ctx, outcome);
   };
+
+  sendRef.current = send;
 
   const pal = palette(draft, commands);
   // Shown from the first AI answer of the session on.

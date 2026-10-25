@@ -53,6 +53,7 @@ import { Card, Page, Section, Stack } from '@/ui/components/Layout';
 import { ActivitySheet } from './ActivitySheet';
 import { ChoresCard } from './ChoresCard';
 import { ChoresCardSheet } from './ChoresCardSheet';
+import { ExusField } from './ExusField';
 import './today.css';
 
 function PointsHero({ profile }: { profile: Profile }) {
@@ -503,6 +504,8 @@ export default function TodayPage({ path, navigate }: RouteProps) {
         </header>
 
         {sources.failed && <p class="today-error" role="alert">{t('today.loadFailed')}</p>}
+
+        {isModuleOn('aichat', profile) && <ExusField navigate={navigate} />}
 
         {drafts.value.length > 0 && (
           <Card>
