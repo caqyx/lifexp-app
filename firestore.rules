@@ -121,5 +121,18 @@ match /users/{uid} {
     match /aiUsageGlobal/{date} {
       allow read, write: if false;
     }
+
+    // Liczniki tokenów Ex-us v2 (exusTurn, docs/v2/PLAN.md 6.12): per konto i dzień
+    // (aiUsage/{uid}_{YYYY-MM-DD}) oraz globalny bezpiecznik (aiUsageGlobalV2/{YYYY-MM-DD}).
+    // Pisze i czyta wyłącznie funkcja (Admin SDK). Klient nie dostaje nawet odczytu
+    // własnego licznika: stan paska limitu przychodzi w odpowiedzi exusTurn (`usage`).
+    // Top-level celowo: pod users/{uid} reguła wildcard dałaby właścicielowi zapis
+    // i mógłby wyzerować sobie licznik.
+    match /aiUsage/{id} {
+      allow read, write: if false;
+    }
+    match /aiUsageGlobalV2/{date} {
+      allow read, write: if false;
+    }
   }
 }

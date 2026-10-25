@@ -1,0 +1,7 @@
+{
+  // Unit tests (node:test): src plus *.test.ts, compiled to lib-test (git-ignored, never deployed).
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "lib-test", "sourceMap": false },
+  "include": ["src"],
+  "exclude": []
+}

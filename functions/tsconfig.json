@@ -12,5 +12,7 @@
     "skipLibCheck": true,
     "sourceMap": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  // Tests compile separately (tsconfig.test.json) and are never deployed.
+  "exclude": ["src/**/*.test.ts", "src/test"]
 }
