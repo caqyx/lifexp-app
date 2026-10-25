@@ -79,3 +79,28 @@ test('a layer opened right after another closed stays open, however late the Bac
   await expect(sheet).toBeHidden();
   await expect(page).toHaveURL(/#\/today$/);
 });
+
+test('a layer opened right after another closed stays open when the Back of the first lands after more than a second', async ({ page, account }) => {
+  // CI (2026-10-25): under load the Back of a cancelled Ex-us confirmation landed more than a
+  // second late. The wait for it gave up after 1 s, the next layer pushed its entry, and the
+  // late Back then popped that entry and closed the new layer before it could be used.
+  await page.addInitScript(() => {
+    const back = history.back.bind(history);
+    history.back = () => void setTimeout(back, 1800);
+  });
+  await openSignedIn(page, account, '#/today');
+  const plus = page.locator('.tabbar').getByRole('button', { name: 'Dodaj' });
+  const sheet = page.getByRole('dialog', { name: 'Dodaj' });
+  await plus.tap();
+  await expect(sheet).toBeVisible();
+  await sheet.getByRole('button', { name: 'Zamknij' }).tap();
+  await expect(sheet).toBeHidden();
+  await plus.tap();
+  await expect(sheet).toBeVisible();
+  // Past the late Back (and past the old 1 s give-up): still open, and one Back closes it.
+  await page.waitForTimeout(2500);
+  await expect(sheet).toBeVisible();
+  await page.goBack();
+  await expect(sheet).toBeHidden();
+  await expect(page).toHaveURL(/#\/today$/);
+});

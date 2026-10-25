@@ -37,35 +37,56 @@ function leave(delta: 1 | -1) {
 /**
  * `history.back()` is asynchronous: it lands after whatever the page does next. A layer
  * opened right after another closed would push its entry first, and the late Back would
- * then pop *that* entry and close the new layer at once. So our own Backs are counted,
+ * then pop *that* entry and close the new layer at once. So our own Backs are tracked,
  * and a layer opened meanwhile pushes its entry only after the last one has landed.
+ *
+ * A Back can take well over a second on a loaded device (CI, 2026-10-25). The wait must
+ * not end on a timer while the Back is still on its way, or the new entry is pushed and
+ * the late Back takes it: so it ends only once the entry the Back takes off is no longer
+ * on top (it landed, popstate or not), or after BACK_GIVE_UP_MS as a last resort.
  */
-let backsPending = 0;
+interface PendingBack {
+  /** The modal entry that was on top when the Back was asked for. */
+  from: string | null;
+  since: number;
+}
+const pendingBacks: PendingBack[] = [];
 const afterBacks = new Set<() => void>();
-/** If a Back never lands (nothing to go back to), the wait ends anyway. */
-const BACK_GIVE_UP_MS = 1000;
+const BACK_CHECK_MS = 500;
+const BACK_GIVE_UP_MS = 10_000;
 
-function backLanded() {
-  if (backsPending > 0) backsPending -= 1;
-  if (backsPending > 0) return;
+function runAfterBacks() {
+  if (pendingBacks.length > 0) return;
   const waiting = [...afterBacks];
   afterBacks.clear();
   for (const run of waiting) run();
 }
+
+function backLanded() {
+  pendingBacks.shift();
+  runAfterBacks();
+}
 addEventListener('popstate', backLanded);
 
 function ourBack() {
-  backsPending += 1;
+  const back: PendingBack = { from: topEntryId(), since: Date.now() };
+  pendingBacks.push(back);
   history.back();
-  setTimeout(() => {
-    if (backsPending === 0) return;
-    backsPending = 0;
-    backLanded();
-  }, BACK_GIVE_UP_MS);
+  const check = () => {
+    if (!pendingBacks.includes(back)) return;
+    const onItsWay = topEntryId() === back.from && Date.now() - back.since < BACK_GIVE_UP_MS;
+    if (onItsWay) {
+      setTimeout(check, BACK_CHECK_MS);
+      return;
+    }
+    pendingBacks.splice(pendingBacks.indexOf(back), 1);
+    runAfterBacks();
+  };
+  setTimeout(check, BACK_CHECK_MS);
 }
 
 function whenBacksLanded(run: () => void) {
-  if (backsPending === 0) run();
+  if (pendingBacks.length === 0) run();
   else afterBacks.add(run);
 }
 
