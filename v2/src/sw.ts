@@ -60,12 +60,15 @@ self.addEventListener('push', (event) => {
   const raw = event.data ? parsePushData(() => event.data!.json(), () => event.data!.text()) : {};
   const notice = readPush(raw);
   event.waitUntil(
-    self.registration.showNotification(notice.title, {
-      body: notice.body,
-      icon: ICON(),
-      badge: ICON(),
-      data: { url: clickUrl(notice.link, self.registration.scope) },
-    }),
+    self.registration
+      .showNotification(notice.title, {
+        body: notice.body,
+        icon: ICON(),
+        badge: ICON(),
+        data: { url: clickUrl(notice.link, self.registration.scope) },
+      })
+      // No permission (or a browser that cannot show one): nothing to show, and the worker carries on.
+      .catch(() => undefined),
   );
 });
 
