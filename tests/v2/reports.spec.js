@@ -64,8 +64,7 @@ test("a report is checked, sent with today's count, and then the day is used", a
   await expect(list.getByRole('listitem')).toContainText('Saldo');
   await expect(list.getByRole('listitem')).toContainText('Nowe');
   await expect.poll(async () => (await reportsOf(account.uid)).map(written)).toEqual([SALDO_DOC(account)]);
-  const { lastBugReportAt } = (await db.doc(`users/${account.uid}`).get()).data();
-  expect(lastBugReportAt.slice(0, 10)).toBe(todayUtcKey());
+  await expect.poll(async () => (await db.doc(`users/${account.uid}`).get()).data()?.lastBugReportAt?.slice(0, 10)).toBe(todayUtcKey());
 
   await expect(page.getByText('Dzisiejsze zgłoszenie już wysłane. Następne możesz wysłać jutro.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Zgłoś błąd' })).toBeDisabled();
@@ -169,7 +168,7 @@ test.describe('v1 on a desktop', () => {
     await page.fill('#bug-desc', SALDO.description);
     await page.click('#bug-submit-btn');
     await expect.poll(async () => (await reportsOf(account.uid)).map(written)).toEqual([SALDO_DOC(account)]);
-    const { lastBugReportAt } = (await db.doc(`users/${account.uid}`).get()).data();
-    expect(lastBugReportAt.slice(0, 10)).toBe(todayUtcKey());
+    // v1 writes the report first and lastBugReportAt in a second write (bug-reports.js), so wait for it.
+    await expect.poll(async () => (await db.doc(`users/${account.uid}`).get()).data()?.lastBugReportAt?.slice(0, 10)).toBe(todayUtcKey());
   });
 });

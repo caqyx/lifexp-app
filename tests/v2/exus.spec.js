@@ -1906,7 +1906,7 @@ test('/blad sends the report the Reports screen sends (title, area by name, desc
     status: 'new',
     messages: [],
   });
-  expect((await db.doc(`users/${account.uid}`).get()).data().lastBugReportAt.slice(0, 10)).toBe(todayUtcKey());
+  await expect.poll(async () => (await db.doc(`users/${account.uid}`).get()).data()?.lastBugReportAt?.slice(0, 10)).toBe(todayUtcKey());
 
   // One a day: the second is refused and writes nothing; it cannot be undone either.
   await send(page, '/blad Inne | inne | Przycisk nie działa');
