@@ -13,6 +13,7 @@ import {
   confirmParentEmail,
   readParentCode,
   setAutoReport,
+  setParentAlerts,
   startParentEmailVerification,
 } from '@/data/repos/profile';
 import { newParentCode, parentCodeProblem, parentEmailProblem, PARENT_CODE_TTL_MS, type CodeProblem } from '@/domain/parent-email';
@@ -97,4 +98,8 @@ export function cancelParentCode(uid: string): Promise<void> {
 
 export function saveAutoReport(uid: string, on: boolean): Promise<void> {
   return setAutoReport(uid, on);
+}
+
+export function saveParentAlerts(uid: string, on: boolean): Promise<void> {
+  return setParentAlerts(uid, on);
 }

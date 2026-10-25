@@ -7,6 +7,9 @@ import type { ChoreEntry, ChorePayout } from './chores';
 import type { Goal } from './goals';
 import type { MoneyTx } from './money';
 import {
+  GAMING_ALERT_MINUTES,
+  alertRecipient,
+  gamingCrossed,
   PARENT_PAYOUT_COUNT,
   PARENT_RECENT_COUNT,
   parentSummary,
@@ -354,5 +357,33 @@ describe('reportRecipient', () => {
   test('v1: no report when it is off or there is no address', () => {
     expect(who(false, 'rodzic@example.com', '2026-10-01T10:00:00Z')).toBeNull();
     expect(who(true, '', '2026-10-01T10:00:00Z')).toBeNull();
+  });
+});
+
+describe('alerts to the parent (6-3b)', () => {
+  const base = { accountMode: 'supervised' as const, parentEmail: 'mama@example.com', parentEmailVerifiedAt: '2026-10-01T10:00:00Z', parentAlerts: true };
+
+  test('the verified address, without needing the weekly report', () => {
+    expect(alertRecipient(base)).toBe('mama@example.com');
+    expect(alertRecipient({ ...base, accountMode: null })).toBe('mama@example.com');
+  });
+
+  test.each([
+    ['solo account', { accountMode: 'solo' as const }],
+    ['alerts turned off', { parentAlerts: false }],
+    ['address not verified', { parentEmailVerifiedAt: null }],
+    ['no address', { parentEmail: '' }],
+  ])('nobody: %s', (_name, over) => {
+    expect(alertRecipient({ ...base, ...over })).toBeNull();
+  });
+
+  test.each([
+    [0, 60, true],
+    [59, 61, true],
+    [30, 59, false],
+    [60, 90, false],
+    [61, 120, false],
+  ])(`gaming %i → %i min crosses ${GAMING_ALERT_MINUTES}: %s`, (before, after, crossed) => {
+    expect(gamingCrossed(before, after)).toBe(crossed);
   });
 });

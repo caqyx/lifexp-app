@@ -27,6 +27,8 @@ export function profileFromData(data: DocumentData): Profile {
     parentEmailVerifiedAt: nonEmptyString(data.parentEmailVerifiedAt),
     pendingParentEmail: nonEmptyString(data.pendingParentEmail),
     autoReport: data.autoReport === true,
+    // New in v2 (6-3b): missing means on.
+    parentAlerts: data.parentAlerts !== false,
     modulesChosen: data.enabledModules !== undefined,
     enabledModules: stringsOrNull(data.enabledModules),
     disabledModules: stringsOrNull(data.disabledModules),

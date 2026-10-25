@@ -26,6 +26,7 @@ const profile: Profile = {
   parentEmailVerifiedAt: null,
   pendingParentEmail: null,
   autoReport: false,
+  parentAlerts: true,
   modulesChosen: true,
   enabledModules: ['chores', 'money', 'stats', 'notes', 'aichat'],
   disabledModules: null,

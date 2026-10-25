@@ -14,6 +14,7 @@ const ready: Profile = {
   parentEmailVerifiedAt: null,
   pendingParentEmail: null,
   autoReport: false,
+  parentAlerts: true,
   modulesChosen: true,
   enabledModules: ['chores'],
   disabledModules: null,

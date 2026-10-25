@@ -8,6 +8,7 @@ import { t } from '@/i18n';
 import {
   cancelParentCode,
   saveAutoReport,
+  saveParentAlerts,
   sendParentCode,
   verifyParentCode,
   type SendProblem,
@@ -135,6 +136,11 @@ export function ParentSection({ uid, profile }: { uid: string; profile: Profile 
   // A new code or a newly verified address ends "change the address".
   useEffect(() => setChanging(false), [state.kind, profile.parentEmail]);
 
+  const toggleAlerts = (on: boolean) => {
+    saveParentAlerts(uid, on).catch(failed);
+    saved(t(on ? 'settings.parentAlertsOn' : 'settings.parentAlertsOff'));
+  };
+
   const toggleReport = (on: boolean) => {
     saveAutoReport(uid, on).catch(failed);
     saved(t(on ? 'settings.weeklyReportOn' : 'settings.weeklyReportOff'));
@@ -175,6 +181,16 @@ export function ParentSection({ uid, profile }: { uid: string; profile: Profile 
             description={verified ? t('settings.weeklyReportTo', { email: verified }) : t('settings.weeklyReportNoEmail')}
             checked={profile.autoReport}
             onChange={toggleReport}
+          />
+        </Card>
+      </Section>
+      <Section title={t('settings.parentAlerts')}>
+        <Card>
+          <Switch
+            label={t('settings.parentAlerts')}
+            description={verified ? t('settings.parentAlertsTo', { email: verified }) : t('settings.parentAlertsNoEmail')}
+            checked={profile.parentAlerts}
+            onChange={toggleAlerts}
           />
         </Card>
       </Section>

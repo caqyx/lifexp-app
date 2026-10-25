@@ -236,6 +236,29 @@ export function reportRecipient(profile: Pick<Profile, 'autoReport' | 'parentEma
   return profile.autoReport && profile.parentEmail && profile.parentEmailVerifiedAt ? profile.parentEmail : null;
 }
 
+// ── Alerts to the parent (PLAN 6-3b; owner's decision 2026-10-25: e-mail, at most one per day per kind) ──
+
+/** Gaming in one day that the parent hears about (owner: 60 minutes). */
+export const GAMING_ALERT_MINUTES = 60;
+
+export type ParentAlertKind = 'gaming' | 'purchase';
+
+/**
+ * Where an alert goes: the verified parent address, unless the account is solo or the
+ * child turned alerts off (parentAlerts, on by default). No autoReport needed.
+ */
+export function alertRecipient(
+  profile: Pick<Profile, 'accountMode' | 'parentEmail' | 'parentEmailVerifiedAt' | 'parentAlerts'>,
+): string | null {
+  if (profile.accountMode === 'solo' || !profile.parentAlerts) return null;
+  return profile.parentEmail && profile.parentEmailVerifiedAt ? profile.parentEmail : null;
+}
+
+/** A day's gaming that just reached the threshold (not one that was already over it). */
+export function gamingCrossed(before: number, after: number): boolean {
+  return before < GAMING_ALERT_MINUTES && after >= GAMING_ALERT_MINUTES;
+}
+
 function topExpenseCategories(transactions: readonly MoneyTx[], monthKey: string, lastDay: string): CategorySum[] {
   const sums = new Map<string, number>();
   for (const t of txsInMonth(transactions, monthKey)) {

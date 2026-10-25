@@ -37,6 +37,8 @@ export interface Profile {
   pendingParentEmail: string | null;
   /** The weekly report to the parent is on (v1 autoReport). */
   autoReport: boolean;
+  /** E-mails to the parent on 60+ minutes of gaming or a purchase (v2 parentAlerts; on unless turned off). */
+  parentAlerts: boolean;
   /** v1's first-run module survey (enabledModules) is done. */
   modulesChosen: boolean;
   /** v1 module ids the person turned on (chores, money, notes, games, stats, aichat, …); null = not chosen. */

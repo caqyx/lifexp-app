@@ -27,6 +27,18 @@ export interface ReportMailer {
   sendReport(mail: ReportMail): Promise<void>;
 }
 
+/** An alert to the parent (6-3b): its own template (email-templates/parent-alert.html). */
+export interface AlertMail {
+  uid: string;
+  kind: string;
+  templateId: string;
+  params: Record<string, string> & { to_email: string };
+}
+
+export interface AlertMailer {
+  sendAlert(mail: AlertMail): Promise<void>;
+}
+
 /** Where the fake mailer puts mail (emulator only; no rule gives clients access). */
 export const FAKE_MAILBOX = 'emulatorMail';
 
@@ -36,7 +48,7 @@ export function isFunctionsEmulator(env: NodeJS.ProcessEnv): boolean {
 
 type Fetch = (url: string, init: { method: string; headers: Record<string, string>; body: string }) => Promise<{ ok: boolean; status: number }>;
 
-export class EmailJsMailer implements Mailer, ReportMailer {
+export class EmailJsMailer implements Mailer, ReportMailer, AlertMailer {
   constructor(
     private readonly privateKey: string,
     private readonly fetchImpl: Fetch = fetch,
@@ -48,6 +60,10 @@ export class EmailJsMailer implements Mailer, ReportMailer {
 
   sendReport({ params }: ReportMail): Promise<void> {
     return this.send(EMAILJS.reportTemplateId, params);
+  }
+
+  sendAlert({ templateId, params }: AlertMail): Promise<void> {
+    return this.send(templateId, params);
   }
 
   private async send(templateId: string, params: Record<string, string>): Promise<void> {
@@ -67,7 +83,7 @@ export class EmailJsMailer implements Mailer, ReportMailer {
   }
 }
 
-export function createFakeMailer(db: () => Firestore, env: NodeJS.ProcessEnv = process.env): Mailer & ReportMailer {
+export function createFakeMailer(db: () => Firestore, env: NodeJS.ProcessEnv = process.env): Mailer & ReportMailer & AlertMailer {
   if (!isFunctionsEmulator(env)) throw new Error('The fake mailer exists only in the Functions emulator.');
   return {
     async sendCode({ uid, to, userName, code }) {
@@ -79,10 +95,14 @@ export function createFakeMailer(db: () => Firestore, env: NodeJS.ProcessEnv = p
       if (params.to_email.startsWith('fail@')) throw new Error('fake mailer: refused');
       await db().doc(`${FAKE_MAILBOX}/${uid}_report`).set({ params, at: Date.now() });
     },
+    async sendAlert({ uid, kind, templateId, params }) {
+      if (params.to_email.startsWith('fail@')) throw new Error('fake mailer: refused');
+      await db().doc(`${FAKE_MAILBOX}/${uid}_alert_${kind}`).set({ templateId, params, at: Date.now() });
+    },
   };
 }
 
-export function selectMailer(env: NodeJS.ProcessEnv, db: () => Firestore, privateKey: () => string): Mailer & ReportMailer {
+export function selectMailer(env: NodeJS.ProcessEnv, db: () => Firestore, privateKey: () => string): Mailer & ReportMailer & AlertMailer {
   if (isFunctionsEmulator(env)) return createFakeMailer(db, env);
   return new EmailJsMailer(privateKey());
 }

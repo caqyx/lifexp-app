@@ -45,6 +45,7 @@ const profile = (over: Partial<Profile> = {}): Profile => ({
   parentEmailVerifiedAt: null,
   pendingParentEmail: PARENT,
   autoReport: true,
+  parentAlerts: true,
   modulesChosen: true,
   enabledModules: null,
   disabledModules: null,

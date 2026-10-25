@@ -153,6 +153,11 @@ match /users/{uid} {
     match /pushLog/{id} {
       allow read, write: if false;
     }
+    // Powiadomienia dla rodzica (parentAlertOnGaming / parentAlertOnPurchase, 6-3b): które rodzaje
+    // poszły danego dnia (parentAlertLog/{uid}_{dzień}). Tylko funkcja (Admin SDK).
+    match /parentAlertLog/{id} {
+      allow read, write: if false;
+    }
     // Fałszywe FCM — istnieje tylko w emulatorze Functions (push/messaging.ts).
     match /emulatorPush/{uid} {
       allow read, write: if false;

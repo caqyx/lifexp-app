@@ -2,6 +2,12 @@ import { describe, expect, test } from 'vitest';
 import { DEFAULT_NAME, choresCardFromData, profileFromData } from './profile';
 
 describe('profile converter', () => {
+  test('parentAlerts (v2, 6-3b): on unless saved as false', () => {
+    expect(profileFromData({}).parentAlerts).toBe(true);
+    expect(profileFromData({ parentAlerts: true }).parentAlerts).toBe(true);
+    expect(profileFromData({ parentAlerts: false }).parentAlerts).toBe(false);
+  });
+
   test('a fully set-up profile', () => {
     expect(
       profileFromData({
@@ -39,6 +45,7 @@ describe('profile converter', () => {
       parentEmailVerifiedAt: '2026-09-01T10:00:00.000Z',
       pendingParentEmail: null,
       autoReport: true,
+      parentAlerts: true,
       modulesChosen: true,
       enabledModules: ['chores', 'money'],
       disabledModules: null,
@@ -98,6 +105,7 @@ describe('profile converter', () => {
         parentEmail: 7,
         pendingParentEmail: '',
         autoReport: 'yes',
+        parentAlerts: 'no',
       }),
     ).toEqual({
       name: DEFAULT_NAME,
@@ -109,6 +117,8 @@ describe('profile converter', () => {
       parentEmailVerifiedAt: null,
       pendingParentEmail: null,
       autoReport: false,
+      // Only an explicit false turns alerts off; anything else (missing, junk) is on.
+      parentAlerts: true,
       modulesChosen: true,
       enabledModules: ['chores'],
       disabledModules: null,
