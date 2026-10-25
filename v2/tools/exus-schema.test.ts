@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { COMMANDS } from '@/domain/exus/commands';
+import { CONTEXT_FIXTURE_PATH, serializeContextFixture } from './exus-context-fixture';
 import { REGEN_COMMAND, SCHEMA_PATH, buildExusSchema, serializeExusSchema } from './exus-schema';
 
 const committed = () => readFileSync(fileURLToPath(new URL(`../${SCHEMA_PATH}`, import.meta.url)), 'utf8');
@@ -10,6 +11,11 @@ describe('Ex-us schema for the AI backend (functions/src/exus/schema.gen.json)',
   it('is up to date with the registry', () => {
     // On failure: run `npm run gen:exus-schema --prefix v2` and commit the file.
     expect(committed(), `schema.gen.json is stale: run ${REGEN_COMMAND}`).toBe(serializeExusSchema());
+  });
+
+  it('the context fixture for the backend tests is up to date', () => {
+    const fixture = readFileSync(fileURLToPath(new URL(`../${CONTEXT_FIXTURE_PATH}`, import.meta.url)), 'utf8');
+    expect(fixture, `exus-context.json is stale: run ${REGEN_COMMAND}`).toBe(serializeContextFixture());
   });
 
   it('the stale check notices a changed registry', () => {

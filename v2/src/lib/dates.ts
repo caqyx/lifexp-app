@@ -16,6 +16,27 @@ export function localDayKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Date and time to the minute in `timeZone`, "YYYY-MM-DDTHH:mm" (the Ex-us
+ * context's `now`). With the device's own zone its day is localDayKey's.
+ */
+export function zonedIsoMinutes(date: Date, timeZone: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(date)
+      .map((p) => [p.type, p.value]),
+  );
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
 function keyToUtcDate(key: string): Date {
   return new Date(`${key}T00:00:00Z`);
 }

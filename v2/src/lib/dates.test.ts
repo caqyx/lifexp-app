@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { addDays, formatDayKey, formatDayMonth, formatMonthKey, formatWeekdayLong, formatWeekdayShort, localDayKey, utcDayKey, weekOf } from './dates';
+import { addDays, formatDayKey, formatDayMonth, formatMonthKey, formatWeekdayLong, formatWeekdayShort, localDayKey, utcDayKey, weekOf, zonedIsoMinutes } from './dates';
 
 describe('day keys', () => {
   test('the UTC day is v1 todayStr: after 22:00 UTC it is already tomorrow in Poland, not in UTC', () => {
@@ -48,5 +48,13 @@ describe('day and month labels', () => {
     expect(formatDayMonth('2026-09-29', 'pl-PL')).toBe('29 września');
     expect(formatMonthKey('2026-09', 'pl-PL')).toBe('wrzesień 2026');
     expect(formatMonthKey('2027-01', 'en-GB')).toBe('January 2027');
+  });
+});
+
+describe('zonedIsoMinutes', () => {
+  test('reads the time in the given zone, to the minute', () => {
+    expect(zonedIsoMinutes(new Date('2026-10-25T17:40:59Z'), 'Europe/Warsaw')).toBe('2026-10-25T18:40');
+    expect(zonedIsoMinutes(new Date('2026-07-01T22:30:00Z'), 'Europe/Warsaw')).toBe('2026-07-02T00:30');
+    expect(zonedIsoMinutes(new Date('2026-07-01T22:30:00Z'), 'UTC')).toBe('2026-07-01T22:30');
   });
 });

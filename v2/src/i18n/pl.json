@@ -1596,6 +1596,9 @@
     "offline": {
       "needsInternet": "To polecenie wymaga internetu. Połącz się i spróbuj ponownie.",
       "text": "Rozmowa z Ex-us wymaga internetu. Komendy zaczynające się od / działają też bez niego, jeśli ich zapis może poczekać."
+    },
+    "ai": {
+      "unknownRef": "Nie wiem, o którą rzecz chodzi w tej propozycji. Napisz jeszcze raz, jej nazwą."
     }
   }
 }
