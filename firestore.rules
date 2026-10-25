@@ -143,6 +143,11 @@ match /users/{uid} {
     match /parentEmailCodes/{uid} {
       allow read, write: if false;
     }
+    // Ręczne wysyłki raportu tygodniowego (sendMyReportNow, 6-5): czasy wysyłek do limitu dziennego.
+    // Tylko funkcja (Admin SDK).
+    match /weeklyReportRuns/{uid} {
+      allow read, write: if false;
+    }
     // Skrzynka fałszywej poczty — istnieje tylko w emulatorze Functions (parent/mailer.ts).
     match /emulatorMail/{uid} {
       allow read, write: if false;

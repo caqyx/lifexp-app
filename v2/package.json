@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm test",
-    "gen:exus-schema": "node tools/gen-exus-schema.mjs"
+    "gen:exus-schema": "node tools/gen-exus-schema.mjs",
+    "gen:shared-domain": "node tools/gen-shared-domain.mjs"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "5.3.0",
