@@ -6,6 +6,7 @@
 import {
   addChoreDef,
   addChoreEntry,
+  readUnpaidEntriesFromServer,
   removeChoreDef,
   removeChoreEntry,
   restoreChoreDef,
@@ -43,6 +44,11 @@ export function logChore(
 /** v1 deleteChoreEntry(); `undo` puts the same entry back. */
 export function deleteChoreEntry(uid: string, entry: ChoreEntry): { saved: Promise<void>; undo: () => Promise<void> } {
   return { saved: removeChoreEntry(uid, entry.id), undo: () => restoreChoreEntry(uid, entry) };
+}
+
+/** The unpaid entries the server has now (a payout's question must not read a stale listener). */
+export function unpaidEntriesNow(uid: string): Promise<ChoreEntry[]> {
+  return readUnpaidEntriesFromServer(uid);
 }
 
 /**
