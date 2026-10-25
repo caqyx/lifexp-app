@@ -4,9 +4,11 @@
 // reads a store.
 import {
   ACTIVITY_MIN_MINUTES,
+  activityName,
   creditActivity,
   pickActivity,
   type ActivityCredit,
+  type Activity,
   type ActivityDef,
   type GeneratorPick,
 } from '../activity';
@@ -60,4 +62,35 @@ export function whatNow(
   if (minutes < ACTIVITY_MIN_MINUTES) return null;
   const pick = pickActivity(pool, random);
   return pick ? { pick, credit: creditActivity(minutes, pick.points, earnedToday, dailyLimit) } : null;
+}
+
+export type ActivityMatch =
+  | { kind: 'found'; activity: Activity }
+  /** Several fit: the caller lists them, newest first. */
+  | { kind: 'ambiguous'; activities: Activity[] }
+  | { kind: 'none' };
+
+/** Words that mean "the newest one". */
+const LAST = new Set(['ostatnia', 'ostatni', 'ostatnie', 'last', 'latest']);
+
+/** The type's name, then the note: what a text is matched with ("nauka rozdział 3"). */
+export const activityLabel = (activity: Activity, names: ReadonlyMap<string, string>): string =>
+  `${activityName(activity, names)} ${activity.desc}`.trim();
+
+/**
+ * The activity "/usun-aktywnosc" means among the newest ones: nothing or "ostatnia" is the
+ * newest; any other text is matched with "type note" like a goal name (several fits are
+ * listed, not guessed).
+ */
+export function findActivity(ref: string | undefined, activities: readonly Activity[], names: ReadonlyMap<string, string>): ActivityMatch {
+  const sorted = [...activities].sort((a, b) => b.at.getTime() - a.at.getTime());
+  const text = ref?.trim() ?? '';
+  if (!text || LAST.has(fold(text))) return sorted[0] ? { kind: 'found', activity: sorted[0] } : { kind: 'none' };
+  const match = matchEntity(
+    text,
+    sorted.map((activity) => ({ id: activity.id, name: activityLabel(activity, names), activity })),
+  );
+  if (match.kind === 'found') return { kind: 'found', activity: match.item.activity };
+  if (match.kind === 'ambiguous') return { kind: 'ambiguous', activities: match.items.map((i) => i.activity) };
+  return { kind: 'none' };
 }

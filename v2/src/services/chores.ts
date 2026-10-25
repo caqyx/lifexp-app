@@ -69,6 +69,11 @@ export function createChoreDef(uid: string, draft: ChoreDefDraft, defs: readonly
   return { ok: true, ...addChoreDef(uid, newChoreDef(draft, defs)) };
 }
 
+/** Undo of createChoreDef(): entries keep their own copy of the name and points, so nothing else changes. */
+export function removeCreatedChoreDef(uid: string, id: string): Promise<void> {
+  return removeChoreDef(uid, id);
+}
+
 /**
  * A changed definition (v2 only; v1 can only add and delete). Entries logged before
  * keep their own name and points; `undo` writes the old fields back.

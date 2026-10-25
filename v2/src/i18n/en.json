@@ -1254,7 +1254,18 @@
       "lang": "The app language: pl or en",
       "theme": "Theme: lifexp, ios, gold and light, dark, system (stays on this device)",
       "module": "Turn a module on or off: chores, money, notes, stats, games",
-      "go": "Go to a screen: today, tasks, goals, chores, money, notes, stats, reports, settings"
+      "go": "Go to a screen: today, tasks, goals, chores, money, notes, stats, reports, settings",
+      "lend": "Lend to someone: person, amount, note (the balance drops by the amount)",
+      "borrow": "Borrow from someone: person, amount, note (the balance rises by the amount)",
+      "repay": "Repay a loan: loan or person, and amount (above what is left is cut)",
+      "loans": "Loans: owed to me and what I owe, by person",
+      "money-limit": "The monthly spending limit (0 turns it off)",
+      "create-chore": "A new chore on the list: name, points, with --once it leaves the list after the first logging",
+      "delete-chore": "Remove a chore from the list (logged entries stay)",
+      "delete-chore-entry": "Delete a chore entry waiting for payout: the last one or a chore name",
+      "delete-activity": "Delete an activity: the last one or a text (points come back)",
+      "report-bug": "Report a bug: title | area | description (one report a day)",
+      "new-chat": "A new conversation: clears the chat and the undo list"
     },
     "missing": "Missing: {{fields}}.\n{{syntax}}",
     "slots": {
@@ -1277,7 +1288,11 @@
       "lang": "language",
       "module": "module",
       "state": "on or off",
-      "screen": "screen"
+      "screen": "screen",
+      "person": "person",
+      "loan": "loan",
+      "points": "points",
+      "report": "title | area | description"
     },
     "today": {
       "points": "Points: {{total}} (today {{earned}} of the {{limit}} limit).",
@@ -1319,7 +1334,16 @@
       "lang": "<pl|en>",
       "theme": "[lifexp|ios|gold] [light|dark|system]",
       "module": "<module> <on|off>",
-      "go": "<screen>"
+      "go": "<screen>",
+      "lend": "<person> <amount> [note]",
+      "borrow": "<person> <amount> [note]",
+      "repay": "<loan|person> <amount>",
+      "money-limit": "<amount>",
+      "create-chore": "<name> <pts> [--once]",
+      "delete-chore": "<chore>",
+      "delete-chore-entry": "[last|chore]",
+      "delete-activity": "[last|text]",
+      "report-bug": "<title> | <area> | <description>"
     },
     "paletteLabel": "Commands matching what is typed",
     "tasksFailed": "Could not load the tasks. Check the connection and try again.",
@@ -1336,7 +1360,13 @@
       "create-note": "the note “{{title}}”",
       "archive-note": "archiving the note “{{title}}”",
       "daily-limit": "the limit {{limit}} pts (back to {{before}} pts)",
-      "module": "switching the module {{name}}"
+      "module": "switching the module {{name}}",
+      "lend": "the loan to {{person}} ({{amount}})",
+      "borrow": "the loan from {{person}} ({{amount}})",
+      "money-limit": "the spending limit {{limit}} (back to {{before}})",
+      "create-chore": "the chore “{{name}}” on the list",
+      "delete-chore": "removing the chore “{{name}}”",
+      "delete-chore-entry": "deleting the entry “{{name}}”"
     },
     "nothingToUndo": "There is nothing to undo.",
     "undoFailed": "Could not undo. Check the connection and try again.",
@@ -1389,7 +1419,11 @@
       "deleteIncomeEffect": "The balance will go down by {{amount}}.",
       "deleteExpenseEffect": "The balance will go up by {{amount}}.",
       "deletePoints": "{{points}} pkt will come back to your account.",
-      "deleted": "Deleted: {{what}}."
+      "deleted": "Deleted: {{what}}.",
+      "limitSet": "Monthly spending limit: {{amount}} (was: {{before}}).",
+      "limitOff": "Spending limit turned off (was: {{before}}).",
+      "limitSame": "The spending limit is already {{limit}}.",
+      "noLimit": "no limit"
     },
     "chore": {
       "none": "There is no chore “{{name}}”. The list is in the Chores view.",
@@ -1403,7 +1437,17 @@
       "month": "Entries this month: {{count}}.",
       "nothingToSettle": "There is nothing to settle.",
       "settleEffect": "You settle {{points}} pts from entries: {{count}}. The {{amount}} goes to the balance in Money as an income in the “{{category}}” category, and the entries leave the calendar. This cannot be undone.",
-      "settled": "Settled {{points}} pts: {{amount}} went to the balance in Money."
+      "settled": "Settled {{points}} pts: {{amount}} went to the balance in Money.",
+      "nameTooLong": "A chore name has at most {{max}} characters.",
+      "created": "Added the chore “{{name}}” to the list: {{points}} pts.",
+      "createdOnce": "Added the one-time chore “{{name}}”: {{points}} pts. It leaves the list after the first logging.",
+      "deleteDefEffect": "The chore “{{name}}” leaves the list. Logged entries stay with their old name and points.",
+      "defDeleted": "Removed the chore “{{name}}” from the list.",
+      "noEntries": "There are no entries waiting for payout.",
+      "entryNone": "There is no entry “{{name}}” waiting for payout. Write “last” or a chore name.",
+      "entryAmbiguous": "Several chores fit: {{names}}. Be more precise or write “last”.",
+      "deleteEntryEffect": "You delete the entry “{{name}}” from {{date}} (+{{points}} pts). Those points will not go into the payout.",
+      "entryDeleted": "Deleted the entry “{{name}}” from {{date}}."
     },
     "activity": {
       "none": "There is no activity type “{{name}}”. You have: {{names}}.",
@@ -1412,7 +1456,13 @@
       "nothingSaved": "Nothing was saved.",
       "logged": "Logged the activity “{{name}}” ({{time}}): +{{points}} pts.",
       "capped": "The time was worth {{earned}} pts, but {{points}} were left of the daily limit of {{limit}} pts.",
-      "levelUp": "New level: {{level}}, {{title}}!"
+      "levelUp": "New level: {{level}}, {{title}}!",
+      "noActivities": "There are no activities to delete.",
+      "deleteNone": "There is no activity “{{name}}” among the latest. Write “last” or a type and part of the note.",
+      "deleteAmbiguous": "Several activities fit. Be more precise or write “last”:",
+      "line": "• {{name}} ({{time}}, {{date}}, {{points}} pts)",
+      "deleteEffect": "You delete the activity “{{name}}” ({{time}}, {{date}}). {{points}} pts are taken off your points and off the day it was logged.",
+      "deleted": "Deleted the activity “{{name}}”. Took back {{points}} pts."
     },
     "streak": {
       "freezeWaiting": "The streak freeze comes back {{days}} days after it was last used."
@@ -1486,6 +1536,33 @@
       "ambiguous": "Several screens fit: {{names}}. Be more precise.",
       "off": "The screen “{{name}}” is off. Turn it on in Settings, under Modules.",
       "went": "Going to: {{name}}."
-    }
+    },
+    "loan": {
+      "ambiguous": "Several loans fit: {{list}}. Write the person and part of the note, or repay on the Money screen, in the Loans view.",
+      "none": "There is no unpaid loan “{{name}}”. Type /loans to see the loans.",
+      "personTooLong": "A person’s name has at most {{max}} characters.",
+      "noteTooLong": "A note has at most {{max}} characters.",
+      "lent": "Recorded a loan to {{person}}, {{amount}}. The balance dropped by that amount.",
+      "borrowed": "Recorded a loan from {{person}}, {{amount}}. The balance rose by that amount.",
+      "noteLine": "Note: “{{note}}”.",
+      "repaidLent": "Repaid {{amount}} of the loan to {{person}}. {{left}} left. The balance rose.",
+      "repaidBorrowed": "Repaid {{amount}} of the loan from {{person}}. {{left}} left. The balance dropped.",
+      "settledLent": "The loan to {{person}} is settled. Repaid {{amount}}, the balance rose.",
+      "settledBorrowed": "The loan from {{person}} is settled. Repaid {{amount}}, the balance dropped.",
+      "capped": "The repayment was cut to what was left.",
+      "nothingLeft": "The loan “{{person}}” is already settled.",
+      "owedToMe": "Owed to me: {{amount}}.",
+      "iOwe": "I owe: {{amount}}.",
+      "person": "• {{person}}: {{amount}}"
+    },
+    "report": {
+      "format": "Write the report like this: title | area | description. Areas: {{areas}}.",
+      "areaNone": "There is no area “{{name}}”. Areas: {{areas}}.",
+      "areaAmbiguous": "Several areas fit: {{names}}. Be more precise.",
+      "titleTooLong": "A title has at most {{max}} characters.",
+      "descTooLong": "A description has at most {{max}} characters.",
+      "sent": "Report sent. Thanks! “{{title}}”, area: {{area}}."
+    },
+    "newChat": "Starting over. Type /help to see the commands."
   }
 }

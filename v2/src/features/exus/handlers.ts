@@ -21,8 +21,10 @@ import { ACTIVITY_HANDLERS } from './activityHandlers';
 import { CHORE_HANDLERS } from './choreHandlers';
 import { GOAL_HANDLERS } from './goalHandlers';
 import { loadedTasks } from './loaded';
+import { LOAN_HANDLERS } from './loanHandlers';
 import { MONEY_HANDLERS } from './moneyHandlers';
 import { NOTE_HANDLERS } from './noteHandlers';
+import { REPORT_HANDLERS } from './reportHandlers';
 import { SETTINGS_HANDLERS } from './settingsHandlers';
 import { TASK_HANDLERS } from './taskHandlers';
 import { syntax } from './syntax';
@@ -37,6 +39,8 @@ export interface HandlerContext {
   commands: readonly CommandSpec[];
   /** Moves to a screen (the router's `navigate`, passed in: features cannot import the app layer). */
   navigate: Navigate;
+  /** Empties the conversation and this session's undo stack (/nowy); the reply comes after it. */
+  newChat: () => void;
   /** This Ex-us session's undo stack (only /cofnij reads it; the pipeline fills it). */
   undo: UndoStack;
 }
@@ -140,6 +144,8 @@ export const HANDLERS: Record<CommandId, CommandHandler> = {
 
   ...MONEY_HANDLERS,
 
+  ...LOAN_HANDLERS,
+
   ...CHORE_HANDLERS,
 
   ...ACTIVITY_HANDLERS,
@@ -147,4 +153,13 @@ export const HANDLERS: Record<CommandId, CommandHandler> = {
   ...NOTE_HANDLERS,
 
   ...SETTINGS_HANDLERS,
+
+  ...REPORT_HANDLERS,
+
+  'new-chat': {
+    run: async (_args, ctx) => {
+      ctx.newChat();
+      return { reply: t('exus.newChat') };
+    },
+  },
 };

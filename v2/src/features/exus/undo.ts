@@ -22,6 +22,8 @@ export interface UndoStack {
   pop: () => UndoEntry | null;
   /** This entry, taken off the stack; null once it is gone (undone or pushed out). */
   take: (id: number) => UndoEntry | null;
+  /** Forgets every entry (a new conversation). */
+  clear: () => void;
   readonly size: number;
 }
 
@@ -43,6 +45,9 @@ export function createUndoStack(max = UNDO_MAX): UndoStack {
       const entry = entries.find((e) => e.id === id) ?? null;
       entries = entries.filter((e) => e.id !== id);
       return entry;
+    },
+    clear() {
+      entries = [];
     },
     get size() {
       return entries.length;

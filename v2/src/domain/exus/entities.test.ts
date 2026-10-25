@@ -69,6 +69,13 @@ describe('matchEntity', () => {
     expect(ids(matchEntity('rowar', goals))).toEqual(['a']);
   });
 
+  it('every word of the text may be anywhere in the name, in any order', () => {
+    const items = [goal('a', 'Nauka (JS, Unity) rozdział 3'), goal('b', 'Czytanie książki')];
+    expect(ids(matchEntity('nauka rozdzial', items))).toEqual(['a']);
+    expect(ids(matchEntity('rozdział 3 nauka', items))).toEqual(['a']);
+    expect(matchEntity('nauka książki', items)).toEqual({ kind: 'none' });
+  });
+
   it('nothing to choose from', () => {
     expect(matchEntity('rower', [])).toEqual({ kind: 'none' });
   });

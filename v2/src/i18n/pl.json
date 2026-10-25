@@ -1254,7 +1254,18 @@
       "lang": "Język aplikacji: pl albo en",
       "theme": "Motyw: lifexp, ios, gold oraz jasny, ciemny, system (zostaje na tym urządzeniu)",
       "module": "Włącz albo wyłącz moduł: obowiązki, pieniądze, notatki, statystyki, gry",
-      "go": "Przejdź do ekranu: dziś, zadania, cele, obowiązki, pieniądze, notatki, statystyki, zgłoszenia, ustawienia"
+      "go": "Przejdź do ekranu: dziś, zadania, cele, obowiązki, pieniądze, notatki, statystyki, zgłoszenia, ustawienia",
+      "lend": "Pożycz komuś: osoba, kwota, notatka (saldo maleje o kwotę)",
+      "borrow": "Pożycz od kogoś: osoba, kwota, notatka (saldo rośnie o kwotę)",
+      "repay": "Spłać pożyczkę: pożyczka albo osoba i kwota (ponad to, co zostało, jest ucinane)",
+      "loans": "Pożyczki: do odzyskania i do oddania, osobami",
+      "money-limit": "Miesięczny limit wydatków (0 wyłącza limit)",
+      "create-chore": "Nowy obowiązek na liście: nazwa, punkty, z --jednorazowy zniknie po pierwszym zapisaniu",
+      "delete-chore": "Usuń obowiązek z listy (zapisane wpisy zostają)",
+      "delete-chore-entry": "Usuń wpis obowiązku do wypłaty: ostatni albo nazwa obowiązku",
+      "delete-activity": "Usuń aktywność: ostatnia albo tekst (punkty wracają)",
+      "report-bug": "Zgłoś błąd: tytuł | obszar | opis (jedno zgłoszenie dziennie)",
+      "new-chat": "Nowa rozmowa: czyści czat i listę do cofnięcia"
     },
     "missing": "Brakuje: {{fields}}.\n{{syntax}}",
     "slots": {
@@ -1277,7 +1288,11 @@
       "lang": "język",
       "module": "moduł",
       "state": "on albo off",
-      "screen": "ekran"
+      "screen": "ekran",
+      "person": "osoba",
+      "loan": "pożyczka",
+      "points": "punkty",
+      "report": "tytuł | obszar | opis"
     },
     "today": {
       "points": "Punkty: {{total}} (dziś {{earned}} z limitu {{limit}}).",
@@ -1319,7 +1334,16 @@
       "lang": "<pl|en>",
       "theme": "[lifexp|ios|gold] [jasny|ciemny|system]",
       "module": "<moduł> <on|off>",
-      "go": "<ekran>"
+      "go": "<ekran>",
+      "lend": "<osoba> <kwota> [notatka]",
+      "borrow": "<osoba> <kwota> [notatka]",
+      "repay": "<pożyczka|osoba> <kwota>",
+      "money-limit": "<kwota>",
+      "create-chore": "<nazwa> <pkt> [--jednorazowy]",
+      "delete-chore": "<obowiązek>",
+      "delete-chore-entry": "[ostatni|obowiązek]",
+      "delete-activity": "[ostatnia|tekst]",
+      "report-bug": "<tytuł> | <obszar> | <opis>"
     },
     "paletteLabel": "Komendy pasujące do wpisu",
     "tasksFailed": "Nie udało się wczytać zadań. Sprawdź połączenie i spróbuj ponownie.",
@@ -1336,7 +1360,13 @@
       "create-note": "notatka „{{title}}”",
       "archive-note": "archiwizacja notatki „{{title}}”",
       "daily-limit": "limit {{limit}} pkt (wraca {{before}} pkt)",
-      "module": "przełączenie modułu {{name}}"
+      "module": "przełączenie modułu {{name}}",
+      "lend": "pożyczka dla: {{person}} ({{amount}})",
+      "borrow": "pożyczka od: {{person}} ({{amount}})",
+      "money-limit": "limit wydatków {{limit}} (wraca {{before}})",
+      "create-chore": "obowiązek „{{name}}” na liście",
+      "delete-chore": "usunięcie obowiązku „{{name}}”",
+      "delete-chore-entry": "usunięcie wpisu „{{name}}”"
     },
     "nothingToUndo": "Nie ma nic do cofnięcia.",
     "undoFailed": "Nie udało się cofnąć. Sprawdź połączenie i spróbuj ponownie.",
@@ -1389,7 +1419,11 @@
       "deleteIncomeEffect": "Saldo zmaleje o {{amount}}.",
       "deleteExpenseEffect": "Saldo wzrośnie o {{amount}}.",
       "deletePoints": "{{points}} pkt wróci na konto.",
-      "deleted": "Usunięto: {{what}}."
+      "deleted": "Usunięto: {{what}}.",
+      "limitSet": "Miesięczny limit wydatków: {{amount}} (było: {{before}}).",
+      "limitOff": "Limit wydatków wyłączony (było: {{before}}).",
+      "limitSame": "Limit wydatków już wynosi: {{limit}}.",
+      "noLimit": "brak limitu"
     },
     "chore": {
       "none": "Nie ma obowiązku „{{name}}”. Lista obowiązków jest w widoku Obowiązki.",
@@ -1403,7 +1437,17 @@
       "month": "Wpisy w tym miesiącu: {{count}}.",
       "nothingToSettle": "Nie ma nic do rozliczenia.",
       "settleEffect": "Rozliczysz {{points}} pkt z wpisów: {{count}}. Kwota {{amount}} wpłynie na saldo w Pieniądzach jako wpływ w kategorii „{{category}}”, a wpisy znikną z kalendarza. Tego nie da się cofnąć.",
-      "settled": "Rozliczono {{points}} pkt: {{amount}} wpłynęło na saldo w Pieniądzach."
+      "settled": "Rozliczono {{points}} pkt: {{amount}} wpłynęło na saldo w Pieniądzach.",
+      "nameTooLong": "Nazwa obowiązku ma najwyżej {{max}} znaków.",
+      "created": "Dodano obowiązek „{{name}}” do listy: {{points}} pkt.",
+      "createdOnce": "Dodano jednorazowy obowiązek „{{name}}”: {{points}} pkt. Zniknie z listy po pierwszym zapisaniu.",
+      "deleteDefEffect": "Obowiązek „{{name}}” zniknie z listy. Zapisane wpisy zostają z dawną nazwą i punktami.",
+      "defDeleted": "Usunięto obowiązek „{{name}}” z listy.",
+      "noEntries": "Nie ma żadnych wpisów do wypłaty.",
+      "entryNone": "Nie ma wpisu „{{name}}” do wypłaty. Wpisz „ostatni” albo nazwę obowiązku.",
+      "entryAmbiguous": "Pasuje kilka obowiązków: {{names}}. Napisz dokładniej albo wpisz „ostatni”.",
+      "deleteEntryEffect": "Usuniesz wpis „{{name}}” z dnia {{date}} (+{{points}} pkt). Te punkty nie trafią do wypłaty.",
+      "entryDeleted": "Usunięto wpis „{{name}}” z dnia {{date}}."
     },
     "activity": {
       "none": "Nie ma rodzaju aktywności „{{name}}”. Masz: {{names}}.",
@@ -1412,7 +1456,13 @@
       "nothingSaved": "Nic nie zapisano.",
       "logged": "Zapisano aktywność „{{name}}” ({{time}}): +{{points}} pkt.",
       "capped": "Czas był wart {{earned}} pkt, ale do dziennego limitu {{limit}} pkt zostało {{points}}.",
-      "levelUp": "Nowy poziom: {{level}}, {{title}}!"
+      "levelUp": "Nowy poziom: {{level}}, {{title}}!",
+      "noActivities": "Nie ma żadnych aktywności do usunięcia.",
+      "deleteNone": "Nie ma aktywności „{{name}}” wśród ostatnich. Wpisz „ostatnia” albo rodzaj i fragment opisu.",
+      "deleteAmbiguous": "Pasuje kilka aktywności. Napisz dokładniej albo wpisz „ostatnia”:",
+      "line": "• {{name}} ({{time}}, {{date}}, {{points}} pkt)",
+      "deleteEffect": "Usuniesz aktywność „{{name}}” ({{time}}, {{date}}). Odejmiemy {{points}} pkt z punktów i z dnia, w którym ją zapisano.",
+      "deleted": "Usunięto aktywność „{{name}}”. Odjęto {{points}} pkt."
     },
     "streak": {
       "freezeWaiting": "Zamrożenie serii wróci po {{days}} dniach od ostatniego użycia."
@@ -1486,6 +1536,33 @@
       "ambiguous": "Pasuje kilka ekranów: {{names}}. Napisz dokładniej.",
       "off": "Ekran „{{name}}” jest wyłączony. Włączysz go w Ustawieniach, w sekcji Moduły.",
       "went": "Przechodzę: {{name}}."
-    }
+    },
+    "loan": {
+      "ambiguous": "Pasuje kilka pożyczek: {{list}}. Napisz osobę i fragment notatki albo spłać na ekranie Pieniądze, w widoku Pożyczki.",
+      "none": "Nie ma niespłaconej pożyczki „{{name}}”. Wpisz /pozyczki, żeby zobaczyć pożyczki.",
+      "personTooLong": "Nazwa osoby ma najwyżej {{max}} znaków.",
+      "noteTooLong": "Notatka ma najwyżej {{max}} znaków.",
+      "lent": "Zapisano pożyczkę dla: {{person}}, {{amount}}. Saldo zmalało o tę kwotę.",
+      "borrowed": "Zapisano pożyczkę od: {{person}}, {{amount}}. Saldo wzrosło o tę kwotę.",
+      "noteLine": "Notatka: „{{note}}”.",
+      "repaidLent": "Spłacono {{amount}} pożyczki dla: {{person}}. Zostało {{left}}. Saldo wzrosło.",
+      "repaidBorrowed": "Spłacono {{amount}} pożyczki od: {{person}}. Zostało {{left}}. Saldo zmalało.",
+      "settledLent": "Pożyczka dla: {{person}} rozliczona. Spłacono {{amount}}, saldo wzrosło.",
+      "settledBorrowed": "Pożyczka od: {{person}} rozliczona. Spłacono {{amount}}, saldo zmalało.",
+      "capped": "Spłata ograniczona do tego, co zostało.",
+      "nothingLeft": "Pożyczka „{{person}}” jest już rozliczona.",
+      "owedToMe": "Do odzyskania: {{amount}}.",
+      "iOwe": "Do oddania: {{amount}}.",
+      "person": "• {{person}}: {{amount}}"
+    },
+    "report": {
+      "format": "Napisz zgłoszenie tak: tytuł | obszar | opis. Obszary: {{areas}}.",
+      "areaNone": "Nie znam obszaru „{{name}}”. Obszary: {{areas}}.",
+      "areaAmbiguous": "Pasuje kilka obszarów: {{names}}. Napisz dokładniej.",
+      "titleTooLong": "Tytuł ma najwyżej {{max}} znaków.",
+      "descTooLong": "Opis ma najwyżej {{max}} znaków.",
+      "sent": "Zgłoszenie wysłane. Dzięki! „{{title}}”, obszar: {{area}}."
+    },
+    "newChat": "Zaczynamy od nowa. Wpisz /pomoc, żeby zobaczyć komendy."
   }
 }

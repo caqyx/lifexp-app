@@ -8,7 +8,7 @@ export function commandName(spec: CommandSpec): string {
 }
 
 /** The commands that take arguments have `exus.args.<id>`. */
-type WithArgs = Exclude<CommandId, 'today' | 'undo' | 'goals' | 'balance' | 'chores' | 'settle-chores' | 'streak'>;
+type WithArgs = Exclude<CommandId, 'today' | 'undo' | 'goals' | 'balance' | 'chores' | 'settle-chores' | 'streak' | 'loans' | 'new-chat'>;
 
 export function syntax(spec: CommandSpec): string {
   const name = commandName(spec);
