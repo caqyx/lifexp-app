@@ -121,6 +121,11 @@ export function cancelParentEmailVerification(uid: string): Promise<void> {
   });
 }
 
+/** v2 parentAlerts (6-3b): e-mails to the parent on 60+ minutes of gaming or a purchase. */
+export function setParentAlerts(uid: string, on: boolean): Promise<void> {
+  return updateDoc(doc(db, 'users', uid), { parentAlerts: on });
+}
+
 /** v1 toggleAutoReport(). */
 export function setAutoReport(uid: string, on: boolean): Promise<void> {
   return updateDoc(doc(db, 'users', uid), { autoReport: on });

@@ -2,10 +2,10 @@
 // secret); the fake exists ONLY in the Functions emulator (FUNCTIONS_EMULATOR=true,
 // never set in Cloud Functions) and keeps what it was given in an emulator-only
 // collection, answering "not registered" for tokens that start with "dead".
-import { getApps, initializeApp } from 'firebase-admin/app';
 import type { Firestore } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { isFunctionsEmulator } from '../parent/mailer';
+import { ensureDefaultApp } from '../shared/admin';
 import { APP_URL } from './config';
 import type { PushText } from './messages';
 
@@ -40,7 +40,7 @@ export const FAKE_PUSHBOX = 'emulatorPush';
 
 export class FcmMessenger implements Messenger {
   async send(_uid: string, payload: PushPayload, tokens: readonly string[]): Promise<SendResult[]> {
-    if (getApps().length === 0) initializeApp();
+    ensureDefaultApp();
     const res = await getMessaging().sendEachForMulticast({ ...payload, tokens: [...tokens] });
     return res.responses.map((r) => (r.success ? { ok: true } : { ok: false, code: r.error?.code }));
   }

@@ -1093,6 +1093,11 @@
     "weeklyReport": "Weekly report",
     "weeklyReportTo": "Every week to {{email}}.",
     "weeklyReportNoEmail": "Confirm the parent's e-mail first, or the report will not go out.",
+    "parentAlerts": "Alerts for the parent",
+    "parentAlertsTo": "An e-mail to {{email}} when you play more than an hour a day or buy something. At most one of each a day.",
+    "parentAlertsNoEmail": "Works once the parent's e-mail is verified.",
+    "parentAlertsOn": "The parent will get alerts.",
+    "parentAlertsOff": "Alerts for the parent turned off.",
     "weeklyReportOn": "Weekly report on.",
     "weeklyReportOff": "Weekly report off."
   },

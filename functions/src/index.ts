@@ -5,6 +5,7 @@
 //   sendParentEmailCode, verifyParentEmailCode — stage 6-4: the parent's e-mail code on the server
 //   weeklyParentReport, sendMyReportNow        — stage 6-5/6-6: the weekly report to the parent
 //   pushReminders, sendMyPushNow               — stage 6-7: push reminders to v1's devices
+//   parentAlertOnGaming, parentAlertOnPurchase — stage 6-3b: e-mails to the parent
 //
 // The five v1 callables (aiClassifyIntent, aiAssistantChat, aiAssistantPing,
 // aiConfirmTask, aiConfirmGoal) are deployed from source that no longer
@@ -14,16 +15,19 @@
 import * as logger from 'firebase-functions/logger';
 import { onCall } from 'firebase-functions/https';
 import { onSchedule } from 'firebase-functions/scheduler';
+import { onDocumentCreated, onDocumentWritten } from 'firebase-functions/firestore';
 import { defineSecret } from 'firebase-functions/params';
 import { MAX_INSTANCES, MEMORY, REGION, TIMEOUT_SECONDS } from './exus/config';
 import { selectModelClient } from './exus/select';
 import { createTurnHandler } from './exus/turn';
 import * as parent from './parent/config';
 import { createSendHandler, createVerifyHandler } from './parent/handlers';
-import { selectMailer } from './parent/mailer';
+import { isFunctionsEmulator, selectMailer } from './parent/mailer';
 import * as report from './report/config';
 import { runWeeklyReports } from './report/job';
 import { createSendMyReportHandler } from './report/manual';
+import * as alerts from './alerts/config';
+import { createAlertHandlers } from './alerts/handlers';
 import * as push from './push/config';
 import { runPushReminders } from './push/job';
 import { createSendMyPushHandler } from './push/manual';
@@ -113,3 +117,23 @@ export const sendMyPushNow = onCall(
   { region: push.REGION, memory: push.MEMORY, maxInstances: 1, timeoutSeconds: 60 },
   createSendMyPushHandler(pushDeps),
 );
+
+const alertHandlers = createAlertHandlers({
+  db,
+  mailer: () => selectMailer(process.env, db, () => EMAILJS_PRIVATE_KEY.value()),
+  templateId: () => (isFunctionsEmulator(process.env) ? alerts.EMULATOR_TEMPLATE_ID : alerts.PARENT_ALERT_TEMPLATE_ID),
+  log: (event: string, data: Record<string, unknown>) => logger.info(event, data),
+});
+const alertOptions = { region: alerts.REGION, memory: alerts.MEMORY, maxInstances: alerts.MAX_INSTANCES, secrets: [EMAILJS_PRIVATE_KEY] };
+
+// Firestore triggers on the eur3 database: the CLI sets the event region (eur3) and requires
+// the function in europe-west1 (firebase-tools FIRESTORE_DUAL_REGION_TO_REGION_MAPPING).
+export const parentAlertOnGaming = onDocumentWritten({ ...alertOptions, document: 'users/{uid}/dailyLog/{day}' }, async (event) => {
+  const after = event.data?.after;
+  if (!after?.exists) return;
+  await alertHandlers.gaming(event.params.uid, event.params.day, event.data?.before?.data()?.gamingMinutes, after.data()?.gamingMinutes);
+});
+
+export const parentAlertOnPurchase = onDocumentCreated({ ...alertOptions, document: 'users/{uid}/purchases/{id}' }, async (event) => {
+  await alertHandlers.purchase(event.params.uid, event.data?.data());
+});

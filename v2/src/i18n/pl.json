@@ -1093,6 +1093,11 @@
     "weeklyReport": "Raport tygodniowy",
     "weeklyReportTo": "Co tydzień na {{email}}.",
     "weeklyReportNoEmail": "Najpierw potwierdź e-mail rodzica, inaczej raport nie wyjdzie.",
+    "parentAlerts": "Powiadomienia dla rodzica",
+    "parentAlertsTo": "E-mail na {{email}}, gdy grasz ponad godzinę dziennie albo coś kupisz. Najwyżej jeden każdego rodzaju na dzień.",
+    "parentAlertsNoEmail": "Zadziała po potwierdzeniu e-maila rodzica.",
+    "parentAlertsOn": "Rodzic dostanie powiadomienia.",
+    "parentAlertsOff": "Powiadomienia dla rodzica wyłączone.",
     "weeklyReportOn": "Raport tygodniowy włączony.",
     "weeklyReportOff": "Raport tygodniowy wyłączony."
   },
