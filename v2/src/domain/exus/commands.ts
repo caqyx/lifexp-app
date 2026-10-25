@@ -129,7 +129,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     slots: (today) => [
       { name: 'text', type: 'text', required: true },
       { name: 'due', type: 'date', required: true, recognize: dateFrom(today) },
-      { name: 'size', type: 'enum', required: false, recognize: SIZE },
+      { name: 'size', type: 'enum', required: false, recognize: SIZE, choices: TASK_SIZES },
     ],
   },
   {
@@ -160,7 +160,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       { name: 'task', type: 'entity', required: true },
       { name: 'text', type: 'text', required: false, keys: ['tresc', 'text'], namedOnly: true },
       { name: 'due', type: 'date', required: false, recognize: dateFrom(today), keys: ['termin', 'due'], namedOnly: true },
-      { name: 'size', type: 'enum', required: false, recognize: SIZE, keys: ['rozmiar', 'size'], namedOnly: true },
+      { name: 'size', type: 'enum', required: false, recognize: SIZE, choices: TASK_SIZES, keys: ['rozmiar', 'size'], namedOnly: true },
     ],
   },
   {
@@ -273,7 +273,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     aiExposed: true,
     slots: () => [
       { name: 'chore', type: 'entity', required: true },
-      { name: 'when', type: 'enum', required: false, recognize: CHORE_DAY },
+      { name: 'when', type: 'enum', required: false, recognize: CHORE_DAY, choices: ['today', 'yesterday'] },
     ],
   },
   {

@@ -1292,7 +1292,15 @@
       "person": "osoba",
       "loan": "pożyczka",
       "points": "punkty",
-      "report": "tytuł | obszar | opis"
+      "report": "tytuł | obszar | opis",
+      "date": "data",
+      "category": "kategoria",
+      "rest": "kategoria i notatka",
+      "when": "kiedy",
+      "once": "jednorazowy",
+      "family": "motyw",
+      "mode": "tryb",
+      "ref": "wpis"
     },
     "today": {
       "points": "Punkty: {{total}} (dziś {{earned}} z limitu {{limit}}).",
@@ -1563,6 +1571,27 @@
       "descTooLong": "Opis ma najwyżej {{max}} znaków.",
       "sent": "Zgłoszenie wysłane. Dzięki! „{{title}}”, obszar: {{area}}."
     },
-    "newChat": "Zaczynamy od nowa. Wpisz /pomoc, żeby zobaczyć komendy."
+    "newChat": "Zaczynamy od nowa. Wpisz /pomoc, żeby zobaczyć komendy.",
+    "form": {
+      "title": "Uzupełnij /{{name}}",
+      "run": "Wykonaj",
+      "skip": "Pomiń",
+      "required": "Uzupełnij to pole.",
+      "invalid": "Ta wartość nie pasuje.",
+      "optional": "{{label}} (opcjonalnie)",
+      "none": "bez wyboru",
+      "yes": "tak",
+      "amountHint": "Np. 1500 zł albo 5000 pkt.",
+      "fillIn": "Uzupełnij zaznaczone pola, żeby wykonać.",
+      "sent": "Do wykonania: /{{name}}",
+      "skipped": "Pominięto."
+    },
+    "choices": {
+      "S": "S",
+      "M": "M",
+      "L": "L",
+      "today": "dziś",
+      "yesterday": "wczoraj"
+    }
   }
 }

@@ -71,3 +71,54 @@
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
 }
+
+/* The form card of a command with missing slots (PLAN.md 6.6): fields, then the two buttons. */
+.exus-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  align-self: stretch;
+  min-width: 0;
+  padding: var(--space-4);
+  border: var(--card-border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  animation: ui-rise-in var(--duration-enter) var(--ease-out);
+}
+
+.exus-card--done {
+  gap: var(--space-2);
+}
+
+.exus-card__title {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.exus-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.exus-card__summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.exus-card__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.exus-card__row dt {
+  color: var(--color-text-secondary);
+}
+
+.exus-card__row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
