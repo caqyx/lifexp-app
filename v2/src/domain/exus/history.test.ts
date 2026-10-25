@@ -70,4 +70,20 @@ describe('parseHistory', () => {
   it('cuts a list that grew past the limit', () => {
     expect(parseHistory(Array.from({ length: 300 }, (_, i) => msg(i)))).toHaveLength(HISTORY_MAX);
   });
+
+  it('keeps the AI flag of a turn (sent as history, rendered as Markdown), and only a true one', () => {
+    const kept = serializeHistory([
+      { from: 'me', text: 'Cześć', ai: true },
+      { from: 'exus', text: '**Hej**', ai: true },
+      { from: 'exus', text: 'pisze…', ai: true, passing: true },
+      { from: 'me', text: '/dzis' },
+    ]);
+    expect(kept).toEqual([
+      { from: 'me', text: 'Cześć', ai: true },
+      { from: 'exus', text: '**Hej**', ai: true },
+      { from: 'me', text: '/dzis' },
+    ]);
+    expect(parseHistory(kept)).toEqual(kept);
+    expect(parseHistory([{ from: 'exus', text: 'x', ai: 'yes' }])).toEqual([{ from: 'exus', text: 'x' }]);
+  });
 });

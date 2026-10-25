@@ -122,3 +122,31 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* An AI reply (stage 5b): Markdown inside the bubble; "pisze…" turns into it in place. */
+.exus-msg--ai {
+  white-space: normal;
+}
+
+.exus-msg--typing {
+  color: var(--color-text-secondary);
+}
+
+.exus-msg__body {
+  display: block;
+  animation: ui-fade-in var(--duration-enter) var(--ease-out);
+}
+
+/* The AI budget left today (PLAN.md 6.9), under the field once the AI has answered. */
+.exus-usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  animation: ui-fade-in var(--duration-enter) var(--ease-out);
+}
+
+.exus-usage__text {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}

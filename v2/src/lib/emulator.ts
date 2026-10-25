@@ -7,12 +7,13 @@ export interface EmulatorTarget {
   host: string;
   authPort: number;
   firestorePort: number;
+  functionsPort: number;
   projectId: string;
 }
 
 export const EMULATOR_FLAG_KEY = 'lifexp-emulator';
 
-const TARGET: EmulatorTarget = { host: '127.0.0.1', authPort: 9099, firestorePort: 8080, projectId: 'demo-lifexp' };
+const TARGET: EmulatorTarget = { host: '127.0.0.1', authPort: 9099, firestorePort: 8080, functionsPort: 5001, projectId: 'demo-lifexp' };
 
 interface FlagStorage {
   getItem(key: string): string | null;

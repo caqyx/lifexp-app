@@ -36,7 +36,8 @@ function sessionStorageOrNull(): Storage | null {
   }
 }
 
-const emulator = emulatorTarget(location.hostname, location.search, sessionStorageOrNull());
+/** The emulators this tab uses (?emulator=1 on localhost), or null: data/functions.ts connects to them too. */
+export const emulator = emulatorTarget(location.hostname, location.search, sessionStorageOrNull());
 
 export const app = initializeApp(emulator ? { ...FIREBASE_CONFIG, projectId: emulator.projectId } : FIREBASE_CONFIG);
 // getAuth() without its popup/redirect helper: that helper loads Google's gapi

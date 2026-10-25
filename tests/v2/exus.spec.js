@@ -92,7 +92,7 @@ test('the menu opens Ex-us; /pomoc lists the commands, other text and unknown co
   await expect(log(page)).toContainText('/blad <tytuł> | <obszar> | <opis> — Zgłoś błąd');
   await expect(log(page)).toContainText('/nowy — Nowa rozmowa');
   await send(page, 'odłóż 50 zł na rower');
-  await expect(log(page)).toContainText('Rozmowa z AI dojdzie w następnym kroku.');
+  await expect(log(page)).toContainText('Ex-us AI jest na razie w testach');
   await send(page, '/latanie');
   await expect(log(page)).toContainText('Nie znam komendy /latanie.');
 });

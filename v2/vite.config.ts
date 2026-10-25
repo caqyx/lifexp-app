@@ -40,6 +40,10 @@ export default defineConfig({
       },
     }),
   ],
+  define: {
+    // The commit in CI (Deploy, Tests), "dev" elsewhere; exusTurn logs it with each turn.
+    __LIFEXP_CLIENT_VERSION__: JSON.stringify(`v2-${(process.env.GITHUB_SHA ?? 'dev').slice(0, 7)}`),
+  },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
