@@ -6,6 +6,10 @@ const { test, expect, openSignedIn } = require('../support/v2');
 
 test.use({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
 
+// v1's client-side flow (4g-1), the fallback of services/parent-email.ts until the
+// functions are deployed; the server flow (6-4) is in parent-email-server.spec.js.
+test.beforeEach(({ page }) => page.addInitScript(() => sessionStorage.setItem('lifexp-parent-code-client', '1')));
+
 const EMAILJS = 'https://api.emailjs.com/api/v1.0/email/send';
 
 /** Answers EmailJS with `status` and keeps what was sent. */

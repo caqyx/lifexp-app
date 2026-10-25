@@ -2,7 +2,7 @@
 //
 // Exports (docs/v2/PLAN.md 6.9, 6.12):
 //   exusTurn                                   — stage 5b: one Gemini call per message
-//   sendParentEmailCode, verifyParentEmailCode — stage 6 (not yet)
+//   sendParentEmailCode, verifyParentEmailCode — stage 6-4: the parent's e-mail code on the server
 //
 // The five v1 callables (aiClassifyIntent, aiAssistantChat, aiAssistantPing,
 // aiConfirmTask, aiConfirmGoal) are deployed from source that no longer
@@ -15,6 +15,9 @@ import { defineSecret } from 'firebase-functions/params';
 import { MAX_INSTANCES, MEMORY, REGION, TIMEOUT_SECONDS } from './exus/config';
 import { selectModelClient } from './exus/select';
 import { createTurnHandler } from './exus/turn';
+import * as parent from './parent/config';
+import { createSendHandler, createVerifyHandler } from './parent/handlers';
+import { selectMailer } from './parent/mailer';
 import { db } from './shared/admin';
 
 // The secret already exists in Secret Manager (the v1 functions use it); this only references it by name.
@@ -28,3 +31,22 @@ export const exusTurn = onCall(
     log: (event, data) => logger.info(event, data),
   }),
 );
+
+// Was a GitHub Actions secret for v1's weekly report; for functions the owner puts it
+// into Secret Manager under this name (docs/v2/PLAN.md 9.1, row 6-4). Read only by the real mailer.
+const EMAILJS_PRIVATE_KEY = defineSecret('EMAILJS_PRIVATE_KEY');
+
+const parentOptions = {
+  region: parent.REGION,
+  memory: parent.MEMORY,
+  maxInstances: parent.MAX_INSTANCES,
+  timeoutSeconds: parent.TIMEOUT_SECONDS,
+};
+const parentDeps = {
+  db,
+  mailer: () => selectMailer(process.env, db, () => EMAILJS_PRIVATE_KEY.value()),
+  log: (event: string, data: Record<string, unknown>) => logger.info(event, data),
+};
+
+export const sendParentEmailCode = onCall({ ...parentOptions, secrets: [EMAILJS_PRIVATE_KEY] }, createSendHandler(parentDeps));
+export const verifyParentEmailCode = onCall(parentOptions, createVerifyHandler(parentDeps));

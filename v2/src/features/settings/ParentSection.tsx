@@ -2,10 +2,17 @@
 // parent's e-mail, verified with a code (v1 updateParentEmailUI's four states), and
 // the weekly report that goes to it (v1 toggleAutoReport).
 import { useEffect, useState } from 'preact/hooks';
-import { parentEmailState, type CodeProblem } from '@/domain/parent-email';
+import { parentEmailState } from '@/domain/parent-email';
 import type { Profile } from '@/domain/profile';
 import { t } from '@/i18n';
-import { cancelParentCode, saveAutoReport, sendParentCode, verifyParentCode, type SendProblem } from '@/services/parent-email';
+import {
+  cancelParentCode,
+  saveAutoReport,
+  sendParentCode,
+  verifyParentCode,
+  type SendProblem,
+  type VerifyProblem,
+} from '@/services/parent-email';
 import { useSettingsToast } from './toast';
 import { Button } from '@/ui/components/Button';
 import { Switch, TextField } from '@/ui/components/Fields';
@@ -14,13 +21,15 @@ import { Card, Section, Stack } from '@/ui/components/Layout';
 const SEND_PROBLEM = {
   invalid: 'settings.parentEmailInvalid',
   sendFailed: 'settings.parentEmailSendFailed',
+  rateLimited: 'settings.parentEmailRateLimited',
 } as const satisfies Record<SendProblem, string>;
 
 const CODE_PROBLEM = {
   noPending: 'settings.parentCodeNoPending',
   expired: 'settings.parentCodeExpired',
   invalid: 'settings.parentCodeInvalid',
-} as const satisfies Record<CodeProblem, string>;
+  locked: 'settings.parentCodeLocked',
+} as const satisfies Record<VerifyProblem, string>;
 
 function AddressForm({ uid, profile, initial, onCancel }: { uid: string; profile: Profile; initial: string; onCancel?: () => void }) {
   const [email, setEmail] = useState(initial);
@@ -30,7 +39,7 @@ function AddressForm({ uid, profile, initial, onCancel }: { uid: string; profile
 
   const send = async () => {
     setBusy(true);
-    const result = await sendParentCode(uid, profile.name, email).catch((): SendProblem => 'sendFailed');
+    const result = await sendParentCode(uid, profile.name, email, profile.lang ?? 'pl').catch((): SendProblem => 'sendFailed');
     setBusy(false);
     setProblem(result);
     if (!result) saved(t('settings.parentCodeSent'));
@@ -71,15 +80,15 @@ function AddressForm({ uid, profile, initial, onCancel }: { uid: string; profile
   );
 }
 
-function CodeForm({ uid, email }: { uid: string; email: string }) {
+function CodeForm({ uid, email, lang }: { uid: string; email: string; lang: string }) {
   const [code, setCode] = useState('');
-  const [problem, setProblem] = useState<CodeProblem | 'failed' | null>(null);
+  const [problem, setProblem] = useState<VerifyProblem | 'failed' | null>(null);
   const [busy, setBusy] = useState(false);
   const { saved, failed } = useSettingsToast();
 
   const confirm = async () => {
     setBusy(true);
-    const result = await verifyParentCode(uid, code).catch(() => 'failed' as const);
+    const result = await verifyParentCode(uid, code, lang).catch(() => 'failed' as const);
     setBusy(false);
     setProblem(result);
     if (!result) saved(t('settings.parentVerified'));
@@ -136,7 +145,7 @@ export function ParentSection({ uid, profile }: { uid: string; profile: Profile 
       <Section title={t('settings.parentEmail')}>
         <Card>
           {state.kind === 'pending' ? (
-            <CodeForm uid={uid} email={state.email} />
+            <CodeForm uid={uid} email={state.email} lang={profile.lang ?? 'pl'} />
           ) : state.kind === 'verified' && !changing ? (
             <Stack gap="sm">
               <p>{t('settings.parentVerifiedTo', { email: state.email })}</p>
