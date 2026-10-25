@@ -14,6 +14,7 @@ import {
   Settings,
   Sparkles,
   Target,
+  Users,
   Wallet,
 } from 'lucide-preact';
 import type { ComponentType } from 'preact';
@@ -32,6 +33,7 @@ export type ModuleId =
   | 'reports'
   | 'settings'
   | 'exus'
+  | 'parent'
   | 'gallery';
 
 export interface FeatureDef {
@@ -56,6 +58,11 @@ export interface FeatureDef {
    * not a new screen: the switch slides and only the content below changes.
    */
   views?: readonly string[];
+  /**
+   * 'parent': listed only for a parent, i.e. an e-mail some child entered as
+   * parentEmail (stores/parent). The route itself stays reachable and explains.
+   */
+  audience?: 'parent';
 }
 
 export const FEATURES: readonly FeatureDef[] = [
@@ -170,6 +177,16 @@ export const FEATURES: readonly FeatureDef[] = [
     stage: '5',
     view: () => import('@/features/exus/ExusPage'),
   },
+  {
+    id: 'parent',
+    labelKey: 'nav.parent',
+    icon: Users,
+    paths: ['/parent'],
+    nav: { group: 'secondary', order: 5 },
+    stage: '6',
+    audience: 'parent',
+    view: () => import('@/features/parent/ParentPage'),
+  },
   // Not in the menu: a preview of the ui/ components in every theme.
   {
     id: 'gallery',
@@ -205,8 +222,10 @@ export function featureOn(feature: FeatureDef, choice: ModuleChoice = ALL_ON): b
   return feature.optional === undefined || isModuleOn(feature.optional, choice);
 }
 
-export function navItems(group: 'main' | 'secondary', choice: ModuleChoice = ALL_ON): FeatureDef[] {
-  return FEATURES.filter((f) => f.nav?.group === group && featureOn(f, choice)).sort(
+export function navItems(group: 'main' | 'secondary', choice: ModuleChoice = ALL_ON, parent = false): FeatureDef[] {
+  return FEATURES.filter(
+    (f) => f.nav?.group === group && featureOn(f, choice) && (f.audience !== 'parent' || parent),
+  ).sort(
     (a, b) => (a.nav?.order ?? 0) - (b.nav?.order ?? 0),
   );
 }

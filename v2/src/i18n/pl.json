@@ -24,7 +24,8 @@
     "account": "Konto",
     "signOut": "Wyloguj",
     "tabBar": "Na skróty",
-    "add": "Dodaj"
+    "add": "Dodaj",
+    "parent": "Rodzic"
   },
   "today": {
     "greeting": "Cześć, {{name}}",
@@ -1617,5 +1618,39 @@
       "moduleOff": "Ta propozycja dotyczy modułu, który jest wyłączony. Włącz go w Ustawieniach, żeby z niej skorzystać.",
       "cannotShow": "Nie umiem pokazać tej propozycji. Spróbuj komendą: wpisz /pomoc."
     }
+  },
+  "parent": {
+    "readOnly": "Tylko podgląd: tu niczego nie zmienisz.",
+    "child": "Dziecko",
+    "loading": "Wczytywanie…",
+    "noChildren": "Brak powiązanych kont",
+    "noChildrenBody": "Żadne konto nie ma adresu {{email}} jako e-maila rodzica. Poproś dziecko, żeby w aplikacji weszło w Ustawienia → E-mail rodzica i wpisało dokładnie ten adres.",
+    "loadFailed": "Nie udało się wczytać danych. Sprawdź połączenie i spróbuj ponownie.",
+    "retry": "Spróbuj ponownie",
+    "points": "Punkty: {{name}}",
+    "pointsWorth": "≈ {{amount}} po kursie z konta dziecka",
+    "pointsToday": "Dziś",
+    "spent": "Wydane łącznie",
+    "level": "Poziom",
+    "streak": "Seria",
+    "pointsWeek": "Punkty w ostatnich 7 dniach",
+    "gamingWeek": "Granie w ostatnich 7 dniach",
+    "gamingToday": "Granie dziś",
+    "gamingWeekTotal": "Granie w 7 dni",
+    "purchases": "Ostatnie zakupy",
+    "noPurchases": "Brak zakupów.",
+    "purchaseMeta": "{{date}} · {{points}} pkt",
+    "goals": "Cele",
+    "noGoals": "Brak celów.",
+    "chores": "Obowiązki do wypłaty",
+    "choresUnpaid": "{{points}} pkt nierozliczone, po kursie z konta dziecka",
+    "payouts": "Historia wypłat",
+    "noPayouts": "Brak wypłat.",
+    "payoutPeriod": "za {{from}}–{{to}}",
+    "money": "Saldo w Pieniądzach",
+    "recent": "Ostatnie aktywności",
+    "noRecent": "Brak aktywności.",
+    "top": "Najczęstsze w 7 dniach",
+    "noTop": "W ostatnich 7 dniach nic nie zapisano."
   }
 }

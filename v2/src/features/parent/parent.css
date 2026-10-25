@@ -1,0 +1,64 @@
+/* The parent's view (stage 6-2). */
+
+.parent-note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.parent-note__icon {
+  inline-size: 1rem;
+  block-size: 1rem;
+  flex: none;
+}
+
+.parent-points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.parent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.parent-grid--gap {
+  margin-block-end: var(--space-5);
+}
+
+.parent-goals {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.parent-goal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.parent-goal__top {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.parent-goal__name {
+  font-weight: var(--font-weight-medium);
+  min-inline-size: 0;
+}
+
+.parent-rank {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}

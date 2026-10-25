@@ -49,6 +49,11 @@ describe('module registry', () => {
     expect(navItems('secondary').map((f) => f.id)).toEqual(['reports', 'settings']);
   });
 
+  test('"Rodzic" is listed only for a parent; the route is there for everyone', () => {
+    expect(navItems('secondary', undefined, true).map((f) => f.id)).toEqual(['parent', 'reports', 'settings']);
+    expect(resolveRoute('/parent')?.feature.id).toBe('parent');
+  });
+
   test('the phone tab bar holds Today, Chores and Money (D10); each also stays in the menu', () => {
     expect(tabItems().map((f) => f.id)).toEqual(['today', 'chores', 'money']);
     for (const feature of tabItems()) expect(feature.nav).not.toBeNull();
@@ -85,7 +90,8 @@ describe('the screens of /idz', () => {
 
   test('every screen of the menu that can be reached has a name, except the ones that are not there yet', () => {
     const named = new Set(SCREENS.map((s) => s.id));
-    const missing = FEATURES.filter((f) => f.nav !== null && f.view && !named.has(f.id as never)).map((f) => f.id);
+    // "Rodzic" is in a parent's menu only; /idz leads to the screens everyone has.
+    const missing = FEATURES.filter((f) => f.nav !== null && f.view && !f.audience && !named.has(f.id as never)).map((f) => f.id);
     expect(missing).toEqual([]);
   });
 });
