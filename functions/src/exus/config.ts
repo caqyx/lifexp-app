@@ -2,14 +2,18 @@
 // Budgets start LOW on purpose: raise them here and redeploy
 // (`npm run deploy` in functions/, which targets functions:lifexp-v2 only).
 
+import { ThinkingLevel } from '@google/genai';
+
 /**
- * The Gemini model. One constant, so a model change is one line. Thinking is
- * switched off (THINKING_BUDGET) because thought tokens count against the
- * budget and a turn only has to pick a reply and at most three actions.
- * `thinkingBudget` is a Gemini 2.5 setting; check it when moving to another family.
+ * The Gemini model. One constant, so a model change is one line.
+ * gemini-2.5-flash was shut down on 2026-10-16; Google points to gemini-3.5-flash.
+ * Thinking is kept at the lowest Gemini 3 level (`thinkingLevel`; Gemini 3 has
+ * no `thinkingBudget: 0`) because thought tokens count against the budget and
+ * a turn only has to pick a reply and at most three actions. Temperature stays
+ * at the model default, as Google advises for Gemini 3.
  */
-export const MODEL_NAME = 'gemini-2.5-flash';
-export const THINKING_BUDGET = 0;
+export const MODEL_NAME = 'gemini-3.5-flash';
+export const THINKING_LEVEL = ThinkingLevel.MINIMAL;
 /** Caps one answer, and with it how far one call can overshoot a budget. */
 export const MAX_OUTPUT_TOKENS = 1024;
 
@@ -40,3 +44,5 @@ export const MAX_ACTIONS = 3;
 export const MAX_REPLY_CHARS = 4000;
 export const MAX_ARGS = 10;
 export const MAX_ARG_VALUE_CHARS = 500;
+/** A `raw` slot (the bug report) is the whole text after the command, as long as a message. */
+export const MAX_RAW_ARG_CHARS = MAX_MESSAGE_CHARS;

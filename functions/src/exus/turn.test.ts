@@ -233,7 +233,7 @@ describe('exusTurn', () => {
           { command: 'create-task', args: [{ name: 'Bad Name', value: 'x' }] },
           { command: 'create-task', args: [{ name: 'text', value: 'a' }, { name: 'text', value: 'b' }] },
           'nonsense',
-          { command: 'add-money', args: { amount: '12,50 zł', note: 5 } },
+          { command: 'add-money', args: { amount: '12,50 zł', rest: 5, note: 'not a slot of add-money' } },
         ],
       },
     });
@@ -241,8 +241,22 @@ describe('exusTurn', () => {
     assert.deepEqual(r.actions, [
       { command: 'create-task', args: { text: 'Mleko', due: 'jutro' } },
       { command: 'balance', args: {} },
-      { command: 'add-money', args: { amount: '12,50 zł', note: '5' } },
+      { command: 'add-money', args: { amount: '12,50 zł', rest: '5' } },
     ]);
+  });
+
+  it('checks edit-pending against the pending cards sent in the context', async () => {
+    const answer = {
+      reply: 'Zmieniam',
+      actions: [
+        { command: 'edit-pending', args: [{ name: 'ref', value: 'p1' }, { name: 'due', value: 'piątek' }, { name: 'amount', value: '5' }] },
+        { command: 'edit-pending', args: [{ name: 'ref', value: 'p2' }, { name: 'due', value: 'piątek' }] },
+      ],
+    };
+    const { call } = setup({ answer });
+    const context = { pendingActions: [{ ref: 'p1', command: 'create-task', args: { text: 'Mleko', due: '2026-10-26' } }] };
+    const r = await call(input({ context }));
+    assert.deepEqual(r.actions, [{ command: 'edit-pending', args: { ref: 'p1', due: 'piątek' } }]);
   });
 
   it('answers unavailable when the model call fails, without counting usage', async () => {

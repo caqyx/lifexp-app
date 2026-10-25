@@ -6,6 +6,7 @@
 // one as a card and runs it through the same pipeline as a typed command.
 import { HttpsError, type CallableRequest } from 'firebase-functions/https';
 import type { Firestore } from 'firebase-admin/firestore';
+import { pendingCards } from './args';
 import { buildResponseSchema } from './commands';
 import { parseTurnInput } from './input';
 import type { ModelClient } from './model';
@@ -63,7 +64,7 @@ export function createTurnHandler(deps: TurnDeps) {
       throw new HttpsError('unavailable', UNAVAILABLE[input.lang]);
     }
 
-    const output = validateOutput(answer, input.lang);
+    const output = validateOutput(answer, input.lang, pendingCards(input.context));
     const used = await recordUsage(db, uid, day, answer.usage.totalTokens, at);
     log('exusTurn', {
       promptVersion: PROMPT_VERSION,

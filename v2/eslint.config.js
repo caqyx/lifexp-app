@@ -62,7 +62,7 @@ export default tseslint.config(
   },
   ...layerRules,
   {
-    files: ['*.{js,ts}', 'tests/**/*.ts'],
+    files: ['*.{js,ts}', 'tests/**/*.ts', 'tools/**/*.{ts,mjs}'],
     languageOptions: { globals: globals.node },
   },
 );

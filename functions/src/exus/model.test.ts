@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
-import type { GenerateContentParameters, GenerateContentResponse } from '@google/genai';
+import { ThinkingLevel, type GenerateContentParameters, type GenerateContentResponse } from '@google/genai';
 import { buildResponseSchema } from './commands';
-import { MODEL_NAME } from './config';
+import { MAX_OUTPUT_TOKENS, MODEL_NAME } from './config';
 import { FAKE_TOKENS_PER_CALL, createFakeModelClient } from './fake';
 import { GeminiModelClient } from './gemini';
 import { validateOutput } from './output';
@@ -51,6 +51,10 @@ describe('GeminiModelClient', () => {
     assert.equal(seen[0].config?.responseMimeType, 'application/json');
     assert.equal(seen[0].config?.responseSchema, schema);
     assert.equal(seen[0].config?.systemInstruction, 'S');
+    assert.equal(MODEL_NAME, 'gemini-3.5-flash');
+    assert.deepEqual(seen[0].config?.thinkingConfig, { thinkingLevel: ThinkingLevel.MINIMAL });
+    assert.equal(seen[0].config?.temperature, undefined, 'Gemini 3 keeps its default temperature');
+    assert.equal(seen[0].config?.maxOutputTokens, MAX_OUTPUT_TOKENS);
     assert.deepEqual(seen[0].contents, [{ role: 'user', parts: [{ text: 'Hej' }] }]);
     assert.deepEqual(res, { text: '{"reply":"ok","actions":[]}', json: { reply: 'ok', actions: [] }, usage: { totalTokens: 950 } });
   });
@@ -82,6 +86,14 @@ describe('fake model (emulator)', () => {
     const plain = await ask('Cześć');
     assert.deepEqual(plain.actions, []);
     assert.match(plain.reply, /Cześć/);
+  });
+
+  it('turns "zmień" into edit-pending of p1, kept only when p1 is pending', async () => {
+    const res = await fake.generate({ system: '', contents: [{ role: 'user', text: 'Zmień termin na piątek' }], schema: buildResponseSchema() });
+    assert.deepEqual(validateOutput(res, 'pl', new Map([['p1', 'create-task']])).actions, [
+      { command: 'edit-pending', args: { ref: 'p1', due: 'piatek' } },
+    ]);
+    assert.deepEqual(validateOutput(res, 'pl').actions, []);
   });
 
   it('drives the safe paths: malformed, unknown, too many', async () => {

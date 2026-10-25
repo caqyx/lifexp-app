@@ -1,10 +1,12 @@
 // The server's check of what the model answered (docs/v2/PLAN.md 6.9). The
 // client only ever gets a reply string and actions with a known command and
-// text arguments; anything malformed becomes a safe generic reply, so model
-// text that failed the check never leaks and never turns into a 500.
+// text arguments that fit its slots (args.ts); anything malformed becomes a
+// safe generic reply, so model text that failed the check never leaks and
+// never turns into a 500.
 import { z } from 'zod';
-import { isAllowedCommand } from './commands';
-import { MAX_ACTIONS, MAX_ARG_VALUE_CHARS, MAX_ARGS, MAX_REPLY_CHARS } from './config';
+import { checkArgs, type ArgPair, type PendingCards } from './args';
+import { commandSpec } from './commands';
+import { MAX_ACTIONS, MAX_ARGS, MAX_RAW_ARG_CHARS, MAX_REPLY_CHARS } from './config';
 import type { TurnInput } from './input';
 import { parseJson } from './model';
 
@@ -13,11 +15,19 @@ export interface ExusAction {
   args: Record<string, string>;
 }
 
+export interface OutputIssues {
+  malformed: boolean;
+  droppedUnknown: number;
+  droppedInvalid: number;
+  droppedArgs: number;
+  trimmed: number;
+}
+
 export interface ValidatedOutput {
   reply: string;
   actions: ExusAction[];
   /** Why the answer was replaced or trimmed, for logs (no model text). */
-  issues: { malformed: boolean; droppedUnknown: number; droppedInvalid: number; trimmed: number };
+  issues: OutputIssues;
 }
 
 export const SAFE_REPLY: Record<TurnInput['lang'], string> = {
@@ -35,19 +45,22 @@ const argsSchema = z
     z.record(z.string(), scalar).transform((o) => Object.entries(o).map(([name, value]) => ({ name, value }))),
   ])
   .refine((pairs) => pairs.length <= MAX_ARGS)
-  .refine((pairs) => pairs.every((p) => ARG_NAME.test(p.name) && p.value.length <= MAX_ARG_VALUE_CHARS))
-  .refine((pairs) => new Set(pairs.map((p) => p.name)).size === pairs.length)
-  .transform((pairs) => Object.fromEntries(pairs.map((p) => [p.name, p.value])) as Record<string, string>);
+  .refine((pairs) => pairs.every((p) => ARG_NAME.test(p.name) && p.value.length <= MAX_RAW_ARG_CHARS))
+  .refine((pairs) => new Set(pairs.map((p) => p.name)).size === pairs.length);
 
-const actionSchema = z.object({ command: z.string(), args: argsSchema.default({}) });
+const actionSchema = z.object({ command: z.string(), args: argsSchema.default([]) });
 
 const answerSchema = z.object({
   reply: z.string(),
   actions: z.array(z.unknown()).default([]),
 });
 
-export function validateOutput(raw: { text: string; json: unknown }, lang: TurnInput['lang']): ValidatedOutput {
-  const issues = { malformed: false, droppedUnknown: 0, droppedInvalid: 0, trimmed: 0 };
+export function validateOutput(
+  raw: { text: string; json: unknown },
+  lang: TurnInput['lang'],
+  pending: PendingCards = new Map(),
+): ValidatedOutput {
+  const issues: OutputIssues = { malformed: false, droppedUnknown: 0, droppedInvalid: 0, droppedArgs: 0, trimmed: 0 };
   const parsed = answerSchema.safeParse(raw.json !== undefined ? raw.json : parseJson(raw.text));
   const reply = parsed.success ? parsed.data.reply.trim().slice(0, MAX_REPLY_CHARS) : '';
   if (!parsed.success || reply === '') {
@@ -56,9 +69,19 @@ export function validateOutput(raw: { text: string; json: unknown }, lang: TurnI
   const actions: ExusAction[] = [];
   for (const item of parsed.data.actions) {
     const action = actionSchema.safeParse(item);
-    if (!action.success) issues.droppedInvalid++;
-    else if (!isAllowedCommand(action.data.command)) issues.droppedUnknown++;
-    else actions.push(action.data);
+    if (!action.success) {
+      issues.droppedInvalid++;
+      continue;
+    }
+    const spec = commandSpec(action.data.command);
+    if (!spec) {
+      issues.droppedUnknown++;
+      continue;
+    }
+    const checked = checkArgs(spec, action.data.args as ArgPair[], pending);
+    issues.droppedArgs += checked.dropped;
+    if (checked.args === null) issues.droppedInvalid++;
+    else actions.push({ command: spec.id, args: checked.args });
   }
   issues.trimmed = Math.max(0, actions.length - MAX_ACTIONS);
   return { reply, actions: actions.slice(0, MAX_ACTIONS), issues };

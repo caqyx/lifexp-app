@@ -1,71 +1,55 @@
-// Commands the model may propose, and the response schema built from them.
+// Commands the model may propose, read from schema.gen.json, and what is built
+// from them: the Gemini response schema and the command list of the prompt.
 //
-// SEAM FOR 5b-2: this hand-written list stands in for `schema.gen.json`, which
-// will be generated from the v2 registry (v2/src/domain/exus/commands.ts,
-// every CommandSpec with `aiExposed: true`) together with per-command argument
-// schemas. Until then the list mirrors the aiExposed ids by hand and arguments
-// are free name -> text pairs, read on the client by the same slot recognizers
-// as a typed command or the form card. Replace AI_COMMANDS and
-// buildResponseSchema() and nothing else has to change.
+// schema.gen.json is GENERATED from the v2 registry (every CommandSpec with
+// `aiExposed: true`, its i18n description and slots, plus the AI-only
+// `edit-pending`) by v2/tools/exus-schema.ts. Never edit it by hand:
+//   npm run gen:exus-schema --prefix v2
+// `npm run check --prefix v2` fails when it is stale.
 import { Type, type Schema } from '@google/genai';
 import { MAX_ACTIONS } from './config';
+import schemaJson from './schema.gen.json';
 
-export interface AiCommand {
-  id: string;
-  /** One line for the system prompt. */
-  summary: string;
+export interface SchemaSlot {
+  name: string;
+  type: 'text' | 'entity' | 'date' | 'duration' | 'money' | 'points' | 'number' | 'enum' | 'flag' | 'ref';
+  required: boolean;
+  choices?: string[];
+  keys?: string[];
+  raw?: boolean;
+  pattern?: string;
 }
 
-export const AI_COMMANDS: readonly AiCommand[] = [
-  { id: 'today', summary: 'show today: points, limit, balance, tasks due' },
-  { id: 'create-task', summary: 'create a task (text, due, size S/M/L)' },
-  { id: 'complete-task', summary: 'mark an open task done' },
-  { id: 'tasks', summary: 'list open tasks' },
-  { id: 'edit-task', summary: 'change a task' },
-  { id: 'delete-task', summary: 'delete a task' },
-  { id: 'create-goal', summary: 'create a goal (points or money)' },
-  { id: 'deposit-goal', summary: 'put money or points into a goal' },
-  { id: 'goals', summary: 'list goals' },
-  { id: 'edit-goal', summary: 'change a goal' },
-  { id: 'delete-goal', summary: 'delete a goal' },
-  { id: 'add-money', summary: 'record income in Money' },
-  { id: 'remove-money', summary: 'record an expense in Money' },
-  { id: 'balance', summary: 'show the Money balance' },
-  { id: 'create-category', summary: 'create a Money category' },
-  { id: 'delete-transaction', summary: 'delete a Money transaction' },
-  { id: 'complete-chore', summary: 'log a done chore' },
-  { id: 'chores', summary: 'list chores and unsettled points' },
-  { id: 'settle-chores', summary: 'settle chore points into Money' },
-  { id: 'log-activity', summary: 'log an activity for points' },
-  { id: 'streak', summary: 'show the streak' },
-  { id: 'stats', summary: 'show statistics' },
-  { id: 'what-now', summary: 'suggest what to do next' },
-  { id: 'create-note', summary: 'create a note' },
-  { id: 'archive-note', summary: 'archive a note' },
-  { id: 'find-note', summary: 'search notes' },
-  { id: 'daily-limit', summary: 'show or change the daily points limit' },
-  { id: 'go', summary: 'open a screen' },
-  { id: 'lend', summary: 'record money lent to someone' },
-  { id: 'borrow', summary: 'record money borrowed from someone' },
-  { id: 'repay', summary: 'record a loan repayment' },
-  { id: 'loans', summary: 'list loans' },
-  { id: 'money-limit', summary: 'set the monthly spending limit' },
-  { id: 'create-chore', summary: 'define a new chore' },
-  { id: 'delete-chore', summary: 'delete a chore definition' },
-  { id: 'delete-chore-entry', summary: 'delete a logged chore' },
-  { id: 'delete-activity', summary: 'delete a logged activity' },
-  { id: 'report-bug', summary: 'send a bug report' },
-];
+export interface SchemaCommand {
+  id: string;
+  description: string;
+  risk: 'read' | 'write' | 'destructive';
+  slots: SchemaSlot[];
+  /** edit-pending only: also takes the slots of the pending card's command. */
+  pendingSlots?: boolean;
+}
 
-const ALLOWED = new Set(AI_COMMANDS.map((c) => c.id));
+export const EDIT_PENDING = 'edit-pending';
+
+export const AI_COMMANDS: readonly SchemaCommand[] = (schemaJson as { commands: SchemaCommand[] }).commands;
+
+const BY_ID = new Map(AI_COMMANDS.map((c) => [c.id, c]));
+
+export function commandSpec(id: string): SchemaCommand | undefined {
+  return BY_ID.get(id);
+}
 
 export function isAllowedCommand(id: string): boolean {
-  return ALLOWED.has(id);
+  return BY_ID.has(id);
 }
+
+/** Every slot name of every command: the only argument names the model may write. */
+export const ARG_NAMES: readonly string[] = [...new Set(AI_COMMANDS.flatMap((c) => c.slots.map((s) => s.name)))].sort();
 
 /**
  * Gemini structured output. Arguments are a list of {name, value} because the
- * schema dialect has no free-form object; output.ts turns them into an object.
+ * schema dialect has no free-form object; which names fit which command is
+ * told by the prompt and checked by args.ts.
  */
 export function buildResponseSchema(): Schema {
   return {
@@ -83,7 +67,10 @@ export function buildResponseSchema(): Schema {
               type: Type.ARRAY,
               items: {
                 type: Type.OBJECT,
-                properties: { name: { type: Type.STRING }, value: { type: Type.STRING } },
+                properties: {
+                  name: { type: Type.STRING, format: 'enum', enum: [...ARG_NAMES] },
+                  value: { type: Type.STRING },
+                },
                 required: ['name', 'value'],
               },
             },
@@ -95,4 +82,18 @@ export function buildResponseSchema(): Schema {
     required: ['reply', 'actions'],
     propertyOrdering: ['reply', 'actions'],
   };
+}
+
+function describeSlot(s: SchemaSlot): string {
+  const kind = s.choices ? s.choices.join('|') : s.type === 'flag' ? 'true|false' : s.pattern ? s.pattern : s.type;
+  return `${s.name} (${kind}${s.required ? ', required' : ''})`;
+}
+
+/** One line per command for the system prompt. */
+export function describeCommands(): string {
+  return AI_COMMANDS.map((c) => {
+    const args = c.slots.length ? ` args: ${c.slots.map(describeSlot).join(', ')}` : ' no args';
+    const pending = c.pendingSlots ? ' + the fields to change, named as in the pending card\'s command' : '';
+    return `- ${c.id} [${c.risk}]: ${c.description}.${args}${pending}`;
+  }).join('\n');
 }
