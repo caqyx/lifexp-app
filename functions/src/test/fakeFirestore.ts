@@ -11,6 +11,7 @@ interface FakeRef {
   get(): Promise<FakeSnap>;
   set(data: Data, opts?: { merge?: boolean }): Promise<void>;
   update(data: Data): Promise<void>;
+  delete(): Promise<void>;
 }
 
 /** A deep copy that keeps Timestamps and Dates as they are (structuredClone would flatten them). */
@@ -61,6 +62,7 @@ export function fakeFirestore(initial: Record<string, Data> = {}): FakeDb {
     get: async () => snap(path),
     set: async (data, opts) => write(path, data, opts?.merge ? 'merge' : 'set'),
     update: async (data) => write(path, data, 'update'),
+    delete: async () => write(path, null, 'set'),
   });
   let queue: Promise<unknown> = Promise.resolve();
   const state: FakeDb = { db: undefined as unknown as Firestore, docs, transactions: 0 };
@@ -96,12 +98,13 @@ export function fakeFirestore(initial: Record<string, Data> = {}): FakeDb {
   };
 
   // collection(path).where(field, op, value)…get(): the direct children of `path`,
-  // filtered with ==, <, <=, >, >= (Timestamps by time, strings by order).
-  type Op = '==' | '<' | '<=' | '>' | '>=';
+  // filtered with ==, <, <=, >, >= (Timestamps by time, strings by order) and array-contains.
+  type Op = '==' | '<' | '<=' | '>' | '>=' | 'array-contains';
   const comparable = (v: unknown) => (v instanceof Timestamp ? v.toMillis() : v instanceof Date ? v.getTime() : v);
   const test = (a: unknown, op: Op, b: unknown) => {
     const x = comparable(a) as number | string;
     const y = comparable(b) as number | string;
+    if (op === 'array-contains') return Array.isArray(a) && a.includes(b);
     if (op === '==') return x === y;
     if (typeof x !== typeof y || x === undefined) return false;
     return op === '<' ? x < y : op === '<=' ? x <= y : op === '>' ? x > y : x >= y;

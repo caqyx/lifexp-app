@@ -4,6 +4,7 @@
 //   exusTurn                                   — stage 5b: one Gemini call per message
 //   sendParentEmailCode, verifyParentEmailCode — stage 6-4: the parent's e-mail code on the server
 //   weeklyParentReport, sendMyReportNow        — stage 6-5/6-6: the weekly report to the parent
+//   pushReminders, sendMyPushNow               — stage 6-7: push reminders to v1's devices
 //
 // The five v1 callables (aiClassifyIntent, aiAssistantChat, aiAssistantPing,
 // aiConfirmTask, aiConfirmGoal) are deployed from source that no longer
@@ -23,6 +24,10 @@ import { selectMailer } from './parent/mailer';
 import * as report from './report/config';
 import { runWeeklyReports } from './report/job';
 import { createSendMyReportHandler } from './report/manual';
+import * as push from './push/config';
+import { runPushReminders } from './push/job';
+import { createSendMyPushHandler } from './push/manual';
+import { selectMessenger } from './push/messaging';
 import { db } from './shared/admin';
 
 // The secret already exists in Secret Manager (the v1 functions use it); this only references it by name.
@@ -81,4 +86,30 @@ export const weeklyParentReport = onSchedule(
 export const sendMyReportNow = onCall(
   { region: report.REGION, memory: report.MEMORY, maxInstances: 1, timeoutSeconds: 60, secrets: [EMAILJS_PRIVATE_KEY] },
   createSendMyReportHandler(reportDeps),
+);
+
+const pushDeps = {
+  db,
+  messenger: () => selectMessenger(process.env, db),
+  log: (event: string, data: Record<string, unknown>) => logger.info(event, data),
+};
+
+// Every hour on the Warsaw clock; FCM through the Admin SDK's default credentials (no secret).
+export const pushReminders = onSchedule(
+  {
+    schedule: push.SCHEDULE,
+    timeZone: push.TIME_ZONE,
+    region: push.REGION,
+    memory: push.MEMORY,
+    timeoutSeconds: push.TIMEOUT_SECONDS,
+    maxInstances: 1,
+  },
+  async () => {
+    await runPushReminders(pushDeps);
+  },
+);
+
+export const sendMyPushNow = onCall(
+  { region: push.REGION, memory: push.MEMORY, maxInstances: 1, timeoutSeconds: 60 },
+  createSendMyPushHandler(pushDeps),
 );
