@@ -169,6 +169,31 @@ test.describe('phone: drawer', () => {
     await expect(page.locator('.shell__edge')).toHaveCount(0);
   });
 
+  test('the menu says Beta and ends with a way back to v1', async ({ page, account }) => {
+    await openApp(page, account);
+    await menuButton(page).click();
+    await waitForDrawer(page, 'open');
+    await expect(drawer(page).locator('.nav__wordmark')).toHaveText('LifeXP Beta');
+    await expect(drawer(page).locator('.nav__beta')).toBeVisible();
+
+    const back = drawer(page).getByRole('link', { name: 'Wróć do starej wersji' });
+    await expect(back).toBeVisible();
+    await expect(back).toHaveAttribute('href', '../app.html');
+    // Icon next to the text (D9), not instead of it.
+    await expect(back.locator('svg[aria-hidden="true"]')).toHaveCount(1);
+    // On Pages (v2 under /lifexp-app/v2/) it resolves to v1's app.html one level up.
+    const pagesBase = 'https://example.github.io/lifexp-app/v2/';
+    expect(await back.evaluate((a, base) => new URL(a.getAttribute('href'), base).pathname, pagesBase)).toBe(
+      '/lifexp-app/app.html',
+    );
+    // At the bottom: below every module entry, above the account.
+    const backBox = await back.boundingBox();
+    const lastModule = await drawer(page).locator('.nav__link').last().boundingBox();
+    const accountBox = await drawer(page).locator('.nav__account').boundingBox();
+    expect(backBox.y).toBeGreaterThan(lastModule.y);
+    expect(backBox.y + backBox.height).toBeLessThanOrEqual(accountBox.y + 1);
+  });
+
   test('menu entries and the Menu button are at least 44×44 px', async ({ page, account }) => {
     await openApp(page, account);
     const menu = await menuButton(page).boundingBox();

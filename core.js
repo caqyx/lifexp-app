@@ -9,6 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { loadPurchases } from "./activities.js";
 import { loadAiChat } from "./assistants.js";
+import { showBetaBanner } from "./beta-banner.js";
 import { isBugAdmin, loadBugReportPage, renderAdminBugList, renderBugAreaSelect, renderBugKeywordsSettings, renderMyBugReports } from "./bug-reports.js";
 import { choreDefs, loadChoreDefs, loadChores, renderChores } from "./chores.js";
 import { loadDashboard, renderAchievements, renderGoal, renderLevel } from "./dashboard.js";
@@ -434,6 +435,9 @@ onAuthStateChanged(auth, async user => {
   // przegląd szkiców zrobionych offline (kolejka w localStorage).
   updateOfflineBanner();
   maybeShowOfflineReview();
+
+  // Zaproszenie do testów v2 (beta) — każde zalogowane konto, bez listy dostępu.
+  showBetaBanner();
 });
 
 export async function loadProfile() {

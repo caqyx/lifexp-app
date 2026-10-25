@@ -2,7 +2,8 @@
   "app": {
     "name": "LifeXP",
     "newVersion": "Jest nowa wersja aplikacji.",
-    "reload": "Odśwież"
+    "reload": "Odśwież",
+    "beta": "Beta"
   },
   "nav": {
     "label": "Nawigacja",
@@ -23,6 +24,7 @@
     "gallery": "Komponenty",
     "account": "Konto",
     "signOut": "Wyloguj",
+    "classicApp": "Wróć do starej wersji",
     "tabBar": "Na skróty",
     "add": "Dodaj",
     "parent": "Rodzic"
