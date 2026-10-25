@@ -580,3 +580,10 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
 }
+
+/* The Ex-us field (PLAN.md 6.10): one hint line under it, no command palette here. */
+.today-exus__hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}

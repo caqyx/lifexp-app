@@ -92,7 +92,12 @@
     "cardSave": "Zapisz",
     "cardSaved": "Zapisano listę na „Dziś”.",
     "cardManage": "Dodaj lub usuń obowiązki",
-    "newBadge": "Nowa odznaka: {{list}}!"
+    "newBadge": "Nowa odznaka: {{list}}!",
+    "exus": {
+      "label": "Zapytaj Ex-us",
+      "hint": "Zwykły tekst trafia do Ex-us AI, a komendy zaczynają się od /, np. /dzis.",
+      "send": "Wyślij do Ex-us"
+    }
   },
   "stats": {
     "views": "Widok statystyk",

@@ -92,7 +92,12 @@
     "cardSave": "Save",
     "cardSaved": "Today's list saved.",
     "cardManage": "Add or remove chores",
-    "newBadge": "New badge: {{list}}!"
+    "newBadge": "New badge: {{list}}!",
+    "exus": {
+      "label": "Ask Ex-us",
+      "hint": "Plain text goes to Ex-us AI; commands start with /, e.g. /today.",
+      "send": "Send to Ex-us"
+    }
   },
   "stats": {
     "views": "Stats view",
