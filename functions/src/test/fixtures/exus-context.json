@@ -1,0 +1,108 @@
+{
+  "now": "2026-10-25T17:40",
+  "tz": "Europe/Warsaw",
+  "lang": "pl",
+  "points": {
+    "total": 1240,
+    "today": 90,
+    "dailyLimit": 150,
+    "level": 4
+  },
+  "goals": [
+    {
+      "ref": "g1",
+      "name": "Rower",
+      "type": "money",
+      "amount": 1500,
+      "saved": 120
+    },
+    {
+      "ref": "g2",
+      "name": "Nowa gra",
+      "type": "points",
+      "amount": 2000
+    }
+  ],
+  "money": {
+    "balance": 312.5,
+    "monthSpent": 140,
+    "monthlyLimit": 200
+  },
+  "tasks": [
+    {
+      "ref": "t1",
+      "text": "Matma zad. 5",
+      "due": "2026-10-24",
+      "size": "S",
+      "overdue": true
+    },
+    {
+      "ref": "t2",
+      "text": "Wypracowanie",
+      "due": "2026-10-26",
+      "size": "M"
+    }
+  ],
+  "chores": {
+    "defs": [
+      {
+        "ref": "c1",
+        "name": "Zmywarka",
+        "points": 15
+      },
+      {
+        "ref": "c2",
+        "name": "Odkurzanie",
+        "points": 20
+      }
+    ],
+    "unsettledPts": 15
+  },
+  "activityTypes": [
+    {
+      "ref": "a1",
+      "name": "Nauka (JS, Unity, C#)",
+      "ptsPerHour": 40
+    },
+    {
+      "ref": "a2",
+      "name": "Czytanie / kurs",
+      "ptsPerHour": 25
+    }
+  ],
+  "categories": [
+    "gry",
+    "jedzenie",
+    "szkoła"
+  ],
+  "loans": [
+    {
+      "ref": "l1",
+      "person": "Kuba",
+      "direction": "lent",
+      "left": 15
+    }
+  ],
+  "notes": [
+    {
+      "ref": "n1",
+      "title": "Lista zakupów"
+    }
+  ],
+  "recentActions": [
+    {
+      "command": "create-task",
+      "status": "executed"
+    }
+  ],
+  "pendingActions": [
+    {
+      "ref": "p1",
+      "command": "create-task",
+      "args": {
+        "text": "Mleko",
+        "due": "2026-10-26"
+      }
+    }
+  ]
+}

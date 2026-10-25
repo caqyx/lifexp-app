@@ -1596,6 +1596,9 @@
     "offline": {
       "needsInternet": "This command needs the internet. Connect and try again.",
       "text": "Chatting with Ex-us needs the internet. Commands starting with / also work without it when their write can wait."
+    },
+    "ai": {
+      "unknownRef": "I could not tell which item that suggestion meant. Please say it again, by its name."
     }
   }
 }
