@@ -322,3 +322,22 @@ v2: historia czyta stronę kursorem (`limit(16)` + `startAfter`) zamiast całej 
 
 e2e = `tests/v2/notes.spec.js`: ten sam scenariusz w v1 i v2 daje ten sam dokument (bez id i `createdAt`),
 a v1 pokazuje notatkę zapisaną przez v2.
+
+## G16. Widok rodzica i raport tygodniowy
+
+`parent.html`, `scripts/send-weekly-report.js`, `email-templates/weekly-report.html`. Domena v2: `domain/parent.ts`
+(etap 6-1/6-3), testy `domain/parent.test.ts`.
+
+| # | Sytuacja | v1 | v2 | Status |
+|---|---|---|---|---|
+| G16.1 | saldo 120 pkt, kurs domyślny | 12,00 zł | 12,00 zł | kod |
+| G16.2 | saldo 120 pkt, kurs 1 zł / 5 pkt | 12,00 zł (stałe /10, B10) | 24,00 zł | kod |
+| G16.3 | 7 pkt obowiązków, kurs domyślny | 3,15 zł | 3,15 zł | kod |
+| G16.4 | 40 pkt obowiązków, kurs 1 zł / 2 pkt | 18,00 zł (stałe 0,45) | 20,00 zł | kod |
+| G16.5 | cel pieniężny 100 zł, `saved` 25 zł, saldo Money 90 zł | 90% (saldo) | 25% (`saved`) | kod |
+| G16.6 | wykres u rodzica | dziś − 6 … dziś (dni UTC), punkty i granie | to samo | kod |
+| G16.7 | okres raportu | 7 dni wstecz od wysyłki; zakupy z 20 najnowszych | pon.–niedz. w Europe/Warsaw; wszystkie zakupy tygodnia | kod |
+| G16.8 | cele w raporcie | legacy `moneyGoals` | `users.goals` | kod |
+| G16.9 | adresat raportu | każdy `parentEmail` przy `autoReport` | tylko potwierdzony (`parentEmailVerifiedAt`) | kod |
+
+Pełna lista różnic: PLAN.md 9.1, wiersz 6-1.
