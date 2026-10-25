@@ -2414,3 +2414,60 @@ test('offline, a command that needs the server says so; a write Firestore queues
   await send(page, '/cel Rower 1500 zł');
   await expect(replies.last()).toContainText('Dodano cel „Rower”');
 });
+
+test('slow storage cannot bring an old conversation back: writes land in the order they were made, so /nowy sticks', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-history-order' });
+  // Each open of the history database takes less time than the one before it: without ordering, the newest write would commit first and the oldest last.
+  await page.addInitScript(() => {
+    const open = IDBFactory.prototype.open;
+    let calls = 0;
+    IDBFactory.prototype.open = function (name, version) {
+      if (name !== 'lifexp-v2-exus') return open.call(this, name, version);
+      const delay = Math.max(0, 900 - 150 * calls++);
+      let real;
+      const proxy = {
+        onsuccess: null,
+        onerror: null,
+        onupgradeneeded: null,
+        get result() {
+          return real.result;
+        },
+        get error() {
+          return real.error;
+        },
+      };
+      setTimeout(() => {
+        real = open.call(this, name, version);
+        real.onupgradeneeded = (e) => proxy.onupgradeneeded?.(e);
+        real.onsuccess = (e) => proxy.onsuccess?.(e);
+        real.onerror = (e) => proxy.onerror?.(e);
+      }, delay);
+      return proxy;
+    };
+  });
+  await openSignedIn(page, account, '#/exus');
+  await expect(log(page)).toContainText('Wpisz /pomoc');
+  await send(page, '/pomoc');
+  await expect(log(page)).toContainText('Komendy (kolejność argumentów dowolna):');
+  await send(page, '/nie-ma-takiej');
+  await send(page, '/nowy');
+  await expect(page.locator('.exus-msg')).toHaveCount(1);
+
+  const stored = () =>
+    page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          const open = indexedDB.open('lifexp-v2-exus');
+          open.onerror = () => resolve(-1);
+          open.onsuccess = () => {
+            const db = open.result;
+            if (!db.objectStoreNames.contains('history')) return resolve(0);
+            const all = db.transaction('history').objectStore('history').getAll();
+            all.onsuccess = () => resolve(all.result.flat().length);
+          };
+        }),
+    );
+  // Every write has landed once the stored conversation stops changing; it must be the empty one.
+  await page.waitForTimeout(3000);
+  expect(await stored()).toBe(0);
+});

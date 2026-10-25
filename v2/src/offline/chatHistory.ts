@@ -2,6 +2,7 @@
 // account, cleared on sign-out. Storage can be missing or blocked (private mode): then
 // there is simply no history, and nothing here throws.
 import { parseHistory, type StoredMessage } from '@/domain/exus/history';
+import { createSerial } from '@/lib/serial';
 
 const DB_NAME = 'lifexp-v2-exus';
 const STORE = 'history';
@@ -14,6 +15,14 @@ function open(): Promise<IDBDatabase> {
     request.onerror = () => reject(request.error);
   });
 }
+
+/**
+ * Every read and write goes through one queue. Each runs on its own connection and
+ * transaction, so two started close together could commit in either order: an older save
+ * finishing late would bring back a conversation that /nowy or signing out just cleared.
+ * Queued, they land in the order they were made, and a clear waits for the saves before it.
+ */
+const inOrder = createSerial();
 
 /** Runs one request on the store; resolves to its result and always closes the connection. */
 async function withStore(mode: IDBTransactionMode, run: (store: IDBObjectStore) => IDBRequest): Promise<unknown> {
@@ -33,7 +42,7 @@ async function withStore(mode: IDBTransactionMode, run: (store: IDBObjectStore) 
 
 export async function loadChatHistory(uid: string): Promise<StoredMessage[]> {
   try {
-    return parseHistory(await withStore('readonly', (s) => s.get(uid)));
+    return parseHistory(await inOrder(() => withStore('readonly', (s) => s.get(uid))));
   } catch {
     return [];
   }
@@ -41,7 +50,9 @@ export async function loadChatHistory(uid: string): Promise<StoredMessage[]> {
 
 export async function saveChatHistory(uid: string, messages: readonly StoredMessage[]): Promise<void> {
   try {
-    await withStore('readwrite', (s) => (messages.length > 0 ? s.put(messages, uid) : s.delete(uid)));
+    // Copied now: the queue may run this after the caller's list has moved on.
+    const kept = [...messages];
+    await inOrder(() => withStore('readwrite', (s) => (kept.length > 0 ? s.put(kept, uid) : s.delete(uid))));
   } catch {
     // Storage blocked or full: the conversation just is not kept.
   }
@@ -50,7 +61,7 @@ export async function saveChatHistory(uid: string, messages: readonly StoredMess
 /** Every account's conversation: what signing out leaves on the device is nothing. */
 export async function clearChatHistory(): Promise<void> {
   try {
-    await withStore('readwrite', (s) => s.clear());
+    await inOrder(() => withStore('readwrite', (s) => s.clear()));
   } catch {
     // Nothing stored, or storage blocked.
   }
