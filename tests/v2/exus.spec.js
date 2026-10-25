@@ -1729,6 +1729,7 @@ test('/usun-obowiazek asks first; Anuluj changes nothing, Wykonaj removes the de
   await expect(dialog).toContainText('Obowiązek „Opróżnienie zmywarki” zniknie z listy. Zapisane wpisy zostają z dawną nazwą i punktami.');
   await dialog.getByRole('button', { name: 'Anuluj' }).click();
   await expect(replies.last()).toHaveText('Anulowano, nic się nie zmieniło.');
+  await expect(dialog).toBeHidden();
   expect(await hasDef('dishwasher')).toBe(true);
 
   await send(page, '/usun-obowiazek zmywarki');
@@ -1772,6 +1773,7 @@ test('/usun-wpis deletes the newest unpaid entry or the newest of a chore, after
   await expect(dialog).toContainText('(+15 pkt). Te punkty nie trafią do wypłaty.');
   await dialog.getByRole('button', { name: 'Anuluj' }).click();
   await expect(replies.last()).toHaveText('Anulowano, nic się nie zmieniło.');
+  await expect(dialog).toBeHidden();
   expect(await choreEntries(account.uid)).toHaveLength(3);
 
   await send(page, '/usun-wpis ostatni');
@@ -1806,6 +1808,9 @@ test('/usun-wpis with no entries says so at once, without a question', async ({ 
   await expect(page.getByRole('alertdialog')).toBeHidden();
 });
 
+/** A moment of today's UTC day (v1 todayStr), `seconds` after its 00:00. */
+const utcTodayAt = (seconds) => Timestamp.fromMillis(Date.parse(`${todayUtcKey()}T00:00:00Z`) + seconds * 1000);
+
 /** An account with two logged activities (Nauka 40 pts, Czytanie 25 pts) and the totals and today's log they left. */
 async function twoActivities(tag) {
   const account = await createUser({ tag, profile: { points: { total: 120, earnedAllTime: 620, spentAllTime: 0 }, dailyLimit: 150 } });
@@ -1813,9 +1818,10 @@ async function twoActivities(tag) {
   await user.collection('dailyLog').doc(todayUtcKey()).set({ pointsEarned: 65, gamingMinutes: 0 });
   await user.collection('activityDefs').doc('learning').set({ name: 'Nauka', points: 40, color: '#6c63ff', icon: 'ti-book', order: 0 });
   await user.collection('activityDefs').doc('reading').set({ name: 'Czytanie', points: 25, color: '#ffd700', icon: 'ti-book-2', order: 1 });
-  const at = (minutes) => Timestamp.fromDate(new Date(Date.now() - minutes * 60000));
-  await user.collection('activities').add({ type: 'learning', duration: 60, points: 40, desc: 'rozdział 3', timestamp: at(30) });
-  await user.collection('activities').add({ type: 'reading', duration: 60, points: 25, desc: '', timestamp: at(10) });
+  // Inside today's UTC day whatever the time of the run: the day log a delete corrects is keyed by the
+  // UTC day of the timestamp, so "30 minutes ago" would be yesterday's right after 00:00 UTC.
+  await user.collection('activities').add({ type: 'learning', duration: 60, points: 40, desc: 'rozdział 3', timestamp: utcTodayAt(1) });
+  await user.collection('activities').add({ type: 'reading', duration: 60, points: 25, desc: '', timestamp: utcTodayAt(3) });
   return account;
 }
 
@@ -1830,6 +1836,7 @@ test('/usun-aktywnosc asks first; Wykonaj deletes the newest and takes its point
   await expect(dialog).toContainText('Odejmiemy 25 pkt z punktów i z dnia, w którym ją zapisano.');
   await dialog.getByRole('button', { name: 'Anuluj' }).click();
   await expect(replies.last()).toHaveText('Anulowano, nic się nie zmieniło.');
+  await expect(dialog).toBeHidden();
   expect((await activityState(account.uid)).activities).toHaveLength(2);
 
   await send(page, '/usun-aktywnosc ostatnia');
@@ -1867,7 +1874,7 @@ test('/usun-aktywnosc lists several fits and says when nothing fits, before any 
     duration: 30,
     points: 20,
     desc: 'testy',
-    timestamp: Timestamp.fromDate(new Date(Date.now() - 20 * 60000)),
+    timestamp: utcTodayAt(2),
   });
   await openSignedIn(page, account, '#/exus');
   const replies = page.locator('.exus-msg--exus');
