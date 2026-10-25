@@ -148,6 +148,15 @@ match /users/{uid} {
     match /weeklyReportRuns/{uid} {
       allow read, write: if false;
     }
+    // Przypomnienia push (pushReminders / sendMyPushNow, 6-7): co i o której poszło danego dnia
+    // (pushLog/{uid}_{dzień w Warszawie}). Tylko funkcja (Admin SDK).
+    match /pushLog/{id} {
+      allow read, write: if false;
+    }
+    // Fałszywe FCM — istnieje tylko w emulatorze Functions (push/messaging.ts).
+    match /emulatorPush/{uid} {
+      allow read, write: if false;
+    }
     // Skrzynka fałszywej poczty — istnieje tylko w emulatorze Functions (parent/mailer.ts).
     match /emulatorMail/{uid} {
       allow read, write: if false;

@@ -113,6 +113,22 @@ test('a parent sees each child with the numbers of the shared domain, and nothin
   expect([await snapshotAccount(parent.uid), await snapshotAccount(ala.uid), await snapshotAccount(bartek.uid)]).toEqual(before);
 });
 
+test('every empty list on #/parent looks the same, "Brak wypłat." included', async ({ page }) => {
+  const parent = await createUser({ tag: 'parent-empty' });
+  await createUser({ tag: 'child-empty', profile: { name: 'Bartek', parentEmail: parent.email } });
+  await openSignedIn(page, parent, '#/parent');
+  await expect(page.getByText('Brak wypłat.')).toBeVisible();
+  await screenSettled(page);
+  const looks = await page.locator('.ui-empty__title').evaluateAll((els) =>
+    els.map((el) => {
+      const style = getComputedStyle(el);
+      return { text: el.textContent, look: `${style.fontSize} ${style.fontWeight} ${el.closest('.ui-card')?.className}` };
+    }),
+  );
+  expect(looks.map((l) => l.text)).toEqual(['Brak celów.', 'Brak wypłat.', 'Brak zakupów.', 'W ostatnich 7 dniach nic nie zapisano.', 'Brak aktywności.']);
+  expect(new Set(looks.map((l) => l.look)).size).toBe(1);
+});
+
 test('an account that is nobody\'s parent has no "Rodzic" in the menu; #/parent says how to link', async ({ page }) => {
   const someone = await createUser({ tag: 'not-parent' });
   await openSignedIn(page, someone, '#/today');

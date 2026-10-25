@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 export const SHARED_DIR = '../functions/src/v2';
 export const REGEN_COMMAND = 'npm run gen:shared-domain --prefix v2';
 /** What the functions import; everything they import is copied too. */
-export const ROOTS = ['domain/parent.ts', 'lib/money.ts'] as const;
+export const ROOTS = ['domain/parent.ts', 'domain/reminders.ts', 'lib/money.ts'] as const;
 
 const SRC = fileURLToPath(new URL('../src', import.meta.url));
 const IMPORT = /((?:import|export)\b[^'"]*?\bfrom\s+)(['"])([^'"]+)\2/g;
