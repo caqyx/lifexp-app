@@ -27,6 +27,10 @@ interface FormCardProps {
   /** Runs the command with the card's arguments; the card is done and becomes `done` (a summary). */
   onRun: (args: Record<string, unknown>, done: DoneCard) => void;
   onSkip: () => void;
+  /** The heading instead of "Uzupełnij /…" (an AI proposal names what it does). */
+  title?: string;
+  /** Every edit, for the chat to know what the card holds now (an AI proposal is sent back as pendingActions). */
+  onChange?: (raw: Record<string, RawValue>) => void;
 }
 
 /** A value of the card in words, for the summary of a card that was run. */
@@ -64,7 +68,7 @@ export function DoneCardView({ card }: { card: DoneCard }) {
   );
 }
 
-export function FormCard({ spec, fields, initial, onRun, onSkip }: FormCardProps) {
+export function FormCard({ spec, fields, initial, onRun, onSkip, title, onChange }: FormCardProps) {
   const [raw, setRaw] = useState<Record<string, RawValue>>(initial);
   const { args, errors } = readForm(fields, raw);
   const ready = Object.keys(errors).length === 0;
@@ -76,7 +80,11 @@ export function FormCard({ spec, fields, initial, onRun, onSkip }: FormCardProps
       .map((f) => ({ label: slotLabel(f.slot.name), value: shown(f, args[f.slot.name], raw[f.slot.name]) })),
   });
 
-  const set = (field: string, value: RawValue) => setRaw((r) => ({ ...r, [field]: value }));
+  const set = (field: string, value: RawValue) => {
+    const next = { ...raw, [field]: value };
+    setRaw(next);
+    onChange?.(next);
+  };
   const control = (field: FieldDef) => {
     const { slot, kind } = field;
     const value = raw[slot.name];
@@ -123,7 +131,7 @@ export function FormCard({ spec, fields, initial, onRun, onSkip }: FormCardProps
   return (
     <form
       class="exus-card"
-      aria-label={t('exus.form.title', { name })}
+      aria-label={title ?? t('exus.form.title', { name })}
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
@@ -131,7 +139,7 @@ export function FormCard({ spec, fields, initial, onRun, onSkip }: FormCardProps
         onRun(args, summary());
       }}
     >
-      <p class="exus-card__title">{t('exus.form.title', { name })}</p>
+      <p class="exus-card__title">{title ?? t('exus.form.title', { name })}</p>
       {fields.map((f) => (
         <div key={f.slot.name}>{control(f)}</div>
       ))}

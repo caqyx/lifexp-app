@@ -1605,7 +1605,12 @@
       "network": "Nie udało się połączyć z Ex-us AI. Sprawdź połączenie i spróbuj jeszcze raz.",
       "failed": "Coś poszło nie tak z Ex-us AI. Spróbuj jeszcze raz.",
       "usage": "Limit AI na dziś: {{percent}}%",
-      "usageLabel": "Pozostały dzisiejszy limit Ex-us AI"
+      "usageLabel": "Pozostały dzisiejszy limit Ex-us AI",
+      "proposal": "Propozycja: {{what}}",
+      "expired": "Propozycja wygasła: {{what}}.",
+      "updated": "Zaktualizowano propozycję.",
+      "moduleOff": "Ta propozycja dotyczy modułu, który jest wyłączony. Włącz go w Ustawieniach, żeby z niej skorzystać.",
+      "cannotShow": "Nie umiem pokazać tej propozycji. Spróbuj komendą: wpisz /pomoc."
     }
   }
 }

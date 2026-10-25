@@ -3,7 +3,11 @@
 // (functions/src/exus/fake.ts: deterministic replies, 100 tokens per call), so
 // access, budget, the safe reply and the request itself are checked end to end.
 const { createUser, db } = require('../support/emulator');
-const { test, expect, openSignedIn } = require('../support/v2');
+const { test, expect: baseExpect, openSignedIn } = require('../support/v2');
+
+// The Functions emulator starts a worker for the first calls of a run (several seconds,
+// more under load); every answer here waits for exusTurn, so allow for that.
+const expect = baseExpect.configure({ timeout: 15000 });
 
 test.use({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
 
@@ -37,6 +41,26 @@ async function send(page, text) {
   await page.getByRole('button', { name: 'Wyślij' }).click();
 }
 
+/** The texts kept on the device for the conversation, read from IndexedDB. */
+const keptTexts = (page) =>
+  page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        const open = indexedDB.open('lifexp-v2-exus');
+        open.onerror = () => resolve([]);
+        open.onsuccess = () => {
+          const db = open.result;
+          if (!db.objectStoreNames.contains('history')) return resolve([]);
+          const all = db.transaction('history').objectStore('history').getAll();
+          all.onsuccess = () => resolve(all.result.flat().map((m) => m.text || m.done?.title || ''));
+          all.onerror = () => resolve([]);
+        };
+      }),
+  );
+
+/** Waits until the message is on the device, as a person's pause before closing the app would (as in exus.spec). */
+const expectKept = (page, fragment) => expect.poll(async () => (await keptTexts(page)).some((text) => text.includes(fragment))).toBe(true);
+
 const log = (page) => page.getByRole('log', { name: 'Rozmowa z Ex-us' });
 const replies = (page) => page.locator('.exus-msg--exus');
 const bar = (page) => page.getByRole('progressbar', { name: 'Pozostały dzisiejszy limit Ex-us AI' });
@@ -69,6 +93,7 @@ test('plain text gets the AI reply in one call; it stays in the history; the bar
   expect(usage).toMatchObject({ tokens: 2 * FAKE_TOKENS, calls: 2 });
 
   // Kept on the device like every other message.
+  await expectKept(page, 'Ex-us (emulator): A jutro?');
   await page.reload();
   await expect(log(page)).toContainText('Ex-us (emulator): A jutro?');
   await expect(log(page)).toContainText('Cześć, jak leci?');
@@ -149,6 +174,8 @@ test('offline, plain text makes no call', async ({ page, context }) => {
   // One turn online first: offline, a chunk not loaded yet would reload the page (as on a stale deploy).
   await send(page, 'online');
   await expect(replies(page).last()).toHaveText('Ex-us (emulator): online');
+  // The Markdown renderer is its own chunk: rendered, not the plain fallback, means it has loaded.
+  await expect(replies(page).last().locator('.ui-markdown:not(.ui-markdown--plain)')).toHaveCount(1);
   await context.setOffline(true);
   await expect.poll(() => page.evaluate(() => navigator.onLine)).toBe(false);
   await send(page, 'czy działa?');
@@ -180,4 +207,144 @@ test('the context sent names things by short refs, never by Firestore ids', asyn
   expect(context.money.balance).toBe(12.5);
   for (const id of [...Object.values(ids), account.uid]) expect(body).not.toContain(id);
   expect(body).not.toContain(account.email);
+});
+
+// ── Actions proposed by the AI (stage 5b-5, PLAN.md 6.6 row 3) ──
+
+const proposal = (page, what) => page.getByRole('form', { name: `Propozycja: ${what}` });
+const tasksOf = async (uid) => (await db.collection(`users/${uid}/todos`).get()).docs.map((d) => d.data());
+const localDay = (offset = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** Waits until the tasks are loaded, so the context the next turn sends has them. */
+async function tasksLoaded(page, text) {
+  await send(page, '/zadania wszystkie');
+  await expect(log(page)).toContainText(text);
+}
+
+test('a proposed task is a card filled in; Wykonaj writes it as v1 does, the card is read-only, /cofnij takes it back', async ({ page }) => {
+  const account = await aiAccount('exus-ai-card');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, 'dodaj zadanie kupić mleko');
+  await expect(replies(page).filter({ hasText: 'Ex-us (emulator): create-task' })).toHaveCount(1);
+  const card = proposal(page, 'Nowe zadanie');
+  await expect(card).toBeVisible();
+  await expect(card.getByLabel('treść', { exact: true })).toHaveValue('kupić mleko');
+  await expect(card.getByLabel('termin', { exact: true })).toHaveValue(localDay(1));
+  // Nothing is written before Wykonaj.
+  expect(await tasksOf(account.uid)).toEqual([]);
+  await card.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(log(page)).toContainText('Dodano zadanie „kupić mleko”');
+  await expect(card).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Do wykonania: /zadanie' })).toBeVisible();
+  await expect.poll(() => tasksOf(account.uid)).toEqual([expect.objectContaining({ text: 'kupić mleko', dueDate: localDay(1), size: 'M', done: false })]);
+  await send(page, '/cofnij');
+  await expect.poll(() => tasksOf(account.uid)).toEqual([]);
+});
+
+test('Pomiń skips the proposal; the next turn is told it was skipped, and of the card still waiting as p1', async ({ page }) => {
+  const account = await aiAccount('exus-ai-skip');
+  const turns = watchTurns(page);
+  await openSignedIn(page, account, '#/exus');
+  await send(page, 'dodaj zadanie pierwsze');
+  await proposal(page, 'Nowe zadanie').getByRole('button', { name: 'Pomiń' }).click();
+  await expect(log(page)).toContainText('Pominięto.');
+  await send(page, 'dodaj zadanie drugie');
+  await expect(proposal(page, 'Nowe zadanie')).toHaveCount(1);
+  await send(page, 'co dalej?');
+  await expect(replies(page).last()).toHaveText('Ex-us (emulator): co dalej?');
+  expect(turns).toHaveLength(3);
+  expect(turns[1].data.context.recentActions).toEqual([{ command: 'create-task', status: 'skipped' }]);
+  expect(turns[2].data.context.pendingActions).toEqual([{ ref: 'p1', command: 'create-task', args: { text: 'drugie', due: localDay(1) } }]);
+  expect(turns[0].data.context.pendingActions).toBeUndefined();
+});
+
+test('at most three cards; a ref Ex-us never gave is a line, not a card', async ({ page }) => {
+  const account = await aiAccount('exus-ai-many');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, 'wiele');
+  await expect(proposal(page, 'Nowe zadanie')).toHaveCount(3);
+  await send(page, 'zgubiony');
+  await expect(replies(page).last()).toHaveText('Nie wiem, o którą rzecz chodzi w tej propozycji. Napisz jeszcze raz, jej nazwą.');
+  await expect(page.getByRole('form', { name: /^Propozycja: Oznacz/ })).toHaveCount(0);
+  await expect(page.locator('form.exus-card')).toHaveCount(3);
+});
+
+test('edit-pending changes the waiting card in place', async ({ page }) => {
+  const account = await aiAccount('exus-ai-edit');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, 'dodaj zadanie mleko');
+  const card = proposal(page, 'Nowe zadanie');
+  await card.getByLabel('treść', { exact: true }).fill('mleko 2%');
+  await send(page, 'zmień termin na piątek');
+  await expect(log(page)).toContainText('Zaktualizowano propozycję.');
+  await expect(card).toHaveCount(1);
+  await expect(card.getByLabel('termin', { exact: true })).not.toHaveValue(localDay(1));
+  const due = await card.getByLabel('termin', { exact: true }).inputValue();
+  expect(new Date(`${due}T12:00:00Z`).getUTCDay()).toBe(5);
+  // What the person typed into the card stays.
+  await expect(card.getByLabel('treść', { exact: true })).toHaveValue('mleko 2%');
+});
+
+test('edit-pending with no waiting card changes nothing (the server drops it)', async ({ page }) => {
+  const account = await aiAccount('exus-ai-edit-none');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, 'zmień termin na piątek');
+  await expect(replies(page).last()).toHaveText('Ex-us (emulator): edit-pending');
+  // The server drops edit-pending without a card in pendingActions: no line, no card.
+  await expect(page.locator('form.exus-card')).toHaveCount(0);
+});
+
+test('a read action runs at once; a destructive one is a card whose Wykonaj asks in the dialog', async ({ page }) => {
+  const account = await aiAccount('exus-ai-destructive');
+  await db.doc(`users/${account.uid}/money/balance`).set({ current: 50 });
+  await db.doc(`users/${account.uid}/todos/aiDeleteMe`).set({ text: 'Do usunięcia', dueDate: '2099-01-01', size: 'S', done: false, createdAt: new Date().toISOString() });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, 'jakie mam saldo?');
+  await expect(log(page)).toContainText('Saldo: 50,00 zł.');
+  await expect(page.locator('form.exus-card')).toHaveCount(0);
+
+  await tasksLoaded(page, 'Do usunięcia');
+  await send(page, 'usuń to zadanie');
+  const card = proposal(page, 'Usuń zadanie (budowa PC zostaje bez zmian)');
+  await expect(card.getByLabel('zadanie', { exact: true })).toHaveValue('Do usunięcia');
+  await card.getByRole('button', { name: 'Wykonaj' }).click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toContainText('Do usunięcia');
+  expect(await tasksOf(account.uid)).toHaveLength(1);
+  await dialog.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(log(page)).toContainText('Usunięto zadanie „Do usunięcia”.');
+  await expect.poll(() => tasksOf(account.uid)).toEqual([]);
+});
+
+test('after a reload: a run card and a skipped one stay read-only, a waiting one has expired', async ({ page }) => {
+  const account = await aiAccount('exus-ai-reload');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, 'dodaj zadanie raz');
+  await proposal(page, 'Nowe zadanie').getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(log(page)).toContainText('Dodano zadanie „raz”');
+  await send(page, 'dodaj zadanie dwa');
+  await proposal(page, 'Nowe zadanie').getByRole('button', { name: 'Pomiń' }).click();
+  await send(page, 'dodaj zadanie trzy');
+  await expect(proposal(page, 'Nowe zadanie')).toHaveCount(1);
+  await expectKept(page, 'Propozycja wygasła: Nowe zadanie.');
+  await page.reload();
+  await expect(log(page)).toContainText('Propozycja wygasła: Nowe zadanie.');
+  await expect(page.getByRole('region', { name: 'Do wykonania: /zadanie' })).toBeVisible();
+  await expect(log(page)).toContainText('Pominięto.');
+  await expect(page.locator('form.exus-card')).toHaveCount(0);
+  await expect.poll(() => tasksOf(account.uid)).toHaveLength(1);
+});
+
+test('on a phone the cards fit without scrolling sideways', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 740 });
+  const account = await aiAccount('exus-ai-phone');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, 'wiele');
+  await expect(proposal(page, 'Nowe zadanie')).toHaveCount(3);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
 });
