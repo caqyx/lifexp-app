@@ -113,6 +113,8 @@ export interface SlotDef<T = unknown> {
   namedOnly?: boolean;
   /** A text slot that takes the first loose token (quote it for several words); the next text slot gets the rest. */
   leading?: boolean;
+  /** The words an enum slot may take (the form card offers them); an enum without them has no form control. */
+  choices?: readonly string[];
   /** Set by `--flag` (lower-case, without dashes): true when any of these was written. */
   flags?: readonly string[];
   /** The one text slot that gets everything after the command as typed, untouched (spacing, quotes, `a=b`, units). */

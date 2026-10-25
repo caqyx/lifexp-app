@@ -7,8 +7,8 @@ describe('whatToDo', () => {
     ['write', [], 'run'],
     ['destructive', [], 'confirm'],
     ['read', ['command'], 'ask-missing'],
-    ['write', ['text', 'due'], 'ask-missing'],
-    ['destructive', ['task'], 'ask-missing'],
+    ['write', ['text', 'due'], 'form'],
+    ['destructive', ['task'], 'form'],
   ] as const)('%s with missing %j → %s', (risk, missing, decision) => {
     expect(whatToDo(risk, missing)).toBe(decision);
   });

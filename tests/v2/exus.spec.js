@@ -30,6 +30,15 @@ async function send(page, text) {
 
 const log = (page) => page.getByRole('log', { name: 'Rozmowa z Ex-us' });
 
+/** The form card of a command with missing slots: the fields marked missing, and Wykonaj disabled until they are filled. */
+async function expectCard(page, command, missing) {
+  const card = page.getByRole('form', { name: `Uzupełnij /${command}` }).last();
+  await expect(card).toBeVisible();
+  for (const label of missing) await expect(card.getByLabel(label, { exact: true })).toHaveAttribute('aria-invalid', 'true');
+  await expect(card.getByRole('button', { name: 'Wykonaj' })).toBeDisabled();
+  return card;
+}
+
 test('the menu opens Ex-us; /pomoc lists the commands, other text and unknown commands say what to do', async ({ page }) => {
   const account = await createUser({ tag: 'exus-help' });
   await openSignedIn(page, account, '#/today');
@@ -98,7 +107,7 @@ test('/zadanie creates the task in any argument order; "Cofnij" takes it back', 
   });
 
   await send(page, '/zadanie Kupić mleko');
-  await expect(log(page)).toContainText('Brakuje: termin.');
+  await expectCard(page, 'zadanie', ['termin']);
   expect(await tasksOf(account.uid)).toEqual([]);
 
   await send(page, '/zadanie L jutro Kupić mleko');
@@ -193,7 +202,7 @@ test('/cel makes a money or a points goal by its unit, asks for a unit, keeps th
   await send(page, '/cel Rower 1500');
   await expect(replies.last()).toContainText('Dopisz jednostkę kwoty');
   await send(page, '/cel Rower');
-  await expect(replies.last()).toContainText('Brakuje: kwota (zł albo pkt).');
+  await expectCard(page, 'cel', ['kwota (zł albo pkt)']);
   expect(await goalsOf(account.uid)).toEqual([]);
 
   await send(page, '/cel Rower 150,5 zł');
@@ -232,7 +241,7 @@ test('/wplac moves money from the balance to a money goal; more than the balance
   await send(page, '/wplac Rower 10 pkt');
   await expect(replies.last()).toHaveText('Wpłata jest w złotych, bez „pkt”.');
   await send(page, '/wplac 10');
-  await expect(replies.last()).toContainText('Brakuje: cel.');
+  await expectCard(page, 'wplac', ['cel']);
   await send(page, '/wplac statek 10');
   await expect(replies.last()).toContainText('Nie ma celu „statek”.');
   expect(await goalsOf(account.uid)).toEqual([
@@ -449,7 +458,7 @@ test('/wydatek: above the balance is refused; the category is asked for; a new o
   expect(await moneyState(account.uid)).toEqual(before);
 
   await send(page, '/wydatek obiad w szkole');
-  await expect(replies.last()).toContainText('Brakuje: kwota.');
+  await expectCard(page, 'wydatek', ['kwota']);
   await send(page, '/wydatek 5 obiad w szkole');
   await expect(replies.last()).toContainText('Podaj kategorię: ');
   await expect(replies.last()).toContainText('kategoria=nazwa');
@@ -521,7 +530,7 @@ test('/kategoria adds a category through the service, refuses a duplicate, and /
   await send(page, '/kategoria sport');
   await expect(replies.last()).toHaveText('Taka kategoria już istnieje.');
   await send(page, '/kategoria');
-  await expect(replies.last()).toContainText('Brakuje: nazwa.');
+  await expectCard(page, 'kategoria', ['nazwa']);
   expect((await moneyState(account.uid)).categories).toHaveLength(4);
 
   await send(page, '/cofnij');
@@ -730,7 +739,7 @@ test('/obowiazek: a one-time chore leaves the list and /cofnij brings it back; u
   await send(page, '/obowiazek latanie');
   await expect(replies.last()).toContainText('Nie ma obowiązku „latanie”.');
   await send(page, '/obowiazek');
-  await expect(replies.last()).toContainText('Brakuje: obowiązek.');
+  await expectCard(page, 'obowiazek', ['obowiązek']);
   expect(await choreEntries(account.uid)).toEqual([]);
 });
 
@@ -897,9 +906,9 @@ test('/aktywnosc takes the time anywhere and the rest as the note; a type, a tim
   await send(page, '/aktywnosc latanie 30');
   await expect(replies.last()).toContainText('Nie ma rodzaju aktywności „latanie”. Masz: „Nauka (JS, Unity, C#)”');
   await send(page, '/aktywnosc nauka');
-  await expect(replies.last()).toContainText('Brakuje: czas.');
+  await expectCard(page, 'aktywnosc', ['czas']);
   await send(page, '/aktywnosc 30');
-  await expect(replies.last()).toContainText('Brakuje: rodzaj aktywności.');
+  await expectCard(page, 'aktywnosc', ['rodzaj aktywności']);
   await send(page, '/aktywnosc nauka 4');
   await expect(replies.last()).toHaveText('Co najmniej 5 minut.');
   expect((await activityState(account.uid)).activities).toHaveLength(1);
@@ -1082,7 +1091,7 @@ test('/zrobione writes what the Tasks screen writes: done, and the pieces of the
   await send(page, '/zrobione statek');
   await expect(replies(page).last()).toContainText('Nie ma otwartego zadania „statek”.');
   await send(page, '/zrobione');
-  await expect(replies(page).last()).toContainText('Brakuje: zadanie.');
+  await expectCard(page, 'zrobione', ['zadanie']);
 });
 
 test('/zrobione after the due day gives no pieces (G9.3); several fits are listed', async ({ page }) => {
@@ -1218,7 +1227,7 @@ test('/notatka writes a note like the editor; /szukaj finds it; /archiwizuj arch
   await openSignedIn(page, account, '#/exus');
 
   await send(page, '/notatka');
-  await expect(replies(page).last()).toContainText('Brakuje: tytuł.');
+  await expectCard(page, 'notatka', ['tytuł']);
   await send(page, '/notatka Zakupy mleko i chleb');
   await expect(replies(page).last()).toHaveText('Dodano notatkę „Zakupy” (aktywnych: 2 z 30).');
   await expect.poll(async () => (await notesOf(account.uid)).length).toBe(2);
@@ -1301,7 +1310,7 @@ test('/limit writes dailyLimit through the settings rule (50–500); "Cofnij" re
   await send(page, '/limit 501');
   await expect(replies(page).last()).toHaveText('Wpisz liczbę od 50 do 500.');
   await send(page, '/limit');
-  await expect(replies(page).last()).toContainText('Brakuje: limit (pkt).');
+  await expectCard(page, 'limit', ['limit (pkt)']);
   expect(await limitOf()).toBe(150);
 
   await send(page, '/limit 120');
@@ -1548,9 +1557,9 @@ test('/pozyczam above the balance is refused (G6.1); the person, the amount and 
   await send(page, '/pozyczam Ola 60');
   await expect(replies.last()).toHaveText('Za mało środków na saldzie.');
   await send(page, '/pozyczam Ola');
-  await expect(replies.last()).toContainText('Brakuje: kwota.');
+  await expectCard(page, 'pozyczam', ['kwota']);
   await send(page, '/pozyczam 20');
-  await expect(replies.last()).toContainText('Brakuje: osoba.');
+  await expectCard(page, 'pozyczam', ['osoba']);
   await send(page, '/pozyczam Ola 0');
   await expect(replies.last()).toHaveText('Podaj kwotę większą od zera.');
   await send(page, `/pozyczam ${'x'.repeat(41)} 5`);
@@ -1607,7 +1616,7 @@ test('/splata is capped at what is left and settles once (G6.3); a repayment has
   await send(page, '/cofnij');
   await expect(replies.last()).toHaveText('Nie ma nic do cofnięcia.');
   await send(page, '/splata Tata');
-  await expect(replies.last()).toContainText('Brakuje: kwota.');
+  await expectCard(page, 'splata', ['kwota']);
 });
 
 test('/splata with the balance too low changes nothing (G6.4); several loans of one person are told apart by the note', async ({ page }) => {
@@ -1680,7 +1689,7 @@ test('/limit-wydatkow sets the monthly limit as the Money settings do; 0 turns i
   await expect.poll(settings).toEqual({ monthlyLimit: 200, currency: 'PLN' });
 
   await send(page, '/limit-wydatkow');
-  await expect(replies.last()).toContainText('Brakuje: kwota.');
+  await expectCard(page, 'limit-wydatkow', ['kwota']);
   await send(page, '/limit-wydatkow 2000000');
   await expect(replies.last()).toHaveText('Najwięcej 1 000 000 zł.');
 });
@@ -1707,7 +1716,7 @@ test('/nowy-obowiazek writes the definition the Chores list writes, one-time wit
   expect(await defOf('Wyniesienie śmieci')).toHaveLength(1);
 
   await send(page, '/nowy-obowiazek Okna');
-  await expect(replies.last()).toContainText('Brakuje: punkty.');
+  await expectCard(page, 'nowy-obowiazek', ['punkty']);
   await send(page, '/nowy-obowiazek Okna 20000');
   await expect(replies.last()).toHaveText('Najwięcej 10000 pkt.');
   await send(page, `/nowy-obowiazek ${'x'.repeat(61)} 5`);
@@ -1751,7 +1760,7 @@ test('/usun-obowiazek asks first; Anuluj changes nothing, Wykonaj removes the de
   await expect(replies.last()).toContainText('Pasuje kilka obowiązków: „Odkurzanie schodów”, „Odkurzanie przedpokoju”.');
   await expect(dialog).toBeHidden();
   await send(page, '/usun-obowiazek');
-  await expect(replies.last()).toContainText('Brakuje: obowiązek.');
+  await expectCard(page, 'usun-obowiazek', ['obowiązek']);
 });
 
 test('/usun-wpis deletes the newest unpaid entry or the newest of a chore, after asking; /cofnij writes the same entry back', async ({ page }) => {
@@ -1862,6 +1871,13 @@ test('/usun-aktywnosc asks first; Wykonaj deletes the newest and takes its point
     day: { pointsEarned: 0, gamingMinutes: 0 },
     activities: [],
   });
+  // The list /statystyki and /usun-aktywnosc read is the Stats listener's: wait until it has dropped both entries.
+  await expect
+    .poll(async () => {
+      await send(page, '/statystyki');
+      return (await replies.last().innerText()).includes('Brak danych');
+    })
+    .toBe(true);
   await send(page, '/usun-aktywnosc');
   await expect(replies.last()).toHaveText('Nie ma żadnych aktywności do usunięcia.');
   await expect(dialog).toBeHidden();
@@ -1935,7 +1951,7 @@ test('/blad: the format, the area, the length and the spam filter work as on the
   const replies = page.locator('.exus-msg--exus');
 
   await send(page, '/blad');
-  await expect(replies.last()).toContainText('Brakuje: tytuł | obszar | opis.');
+  await expectCard(page, 'blad', ['tytuł | obszar | opis']);
   await send(page, '/blad Saldo');
   await expect(replies.last()).toHaveText('Napisz zgłoszenie tak: tytuł | obszar | opis. Obszary: Dziś, Pieniądze, Obowiązki, Historia, Statystyki, Ustawienia, Inne.');
   await send(page, '/blad Saldo | latanie | opis');
@@ -2057,4 +2073,167 @@ test('the 5a-9 commands wait for their data under a CPU 6 times slower, from a c
   await expect.poll(async () => (await loansState(account.uid)).balance).toEqual({ current: 55 });
   await expect.poll(() => choreEntries(account.uid)).toEqual([]);
   await expect.poll(async () => (await reportsOf(account.uid)).length).toBe(1);
+});
+
+// ── Stage 5a-10: the form card of a command with missing slots (PLAN.md 6.6, row 2) ──
+
+const cardOf = (page, command) => page.getByRole('form', { name: `Uzupełnij /${command}` }).last();
+
+test('/zadanie without a date shows a card with what was understood; filling it and "Wykonaj" creates the task and makes the card read-only', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-card-task' });
+  await openSignedIn(page, account, '#/exus');
+  const tomorrow = await page.evaluate(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+
+  await send(page, '/zadanie Kupić mleko L');
+  const card = await expectCard(page, 'zadanie', ['termin']);
+  // What the parser understood is in the fields; the optional one says so.
+  await expect(card.getByLabel('treść', { exact: true })).toHaveValue('Kupić mleko');
+  await expect(card.getByLabel('rozmiar (opcjonalnie)')).toHaveValue('L');
+  await expect(card.getByText('Uzupełnij to pole.')).toBeVisible();
+  await expect(card.getByText('Uzupełnij zaznaczone pola, żeby wykonać.')).toBeVisible();
+  expect(await tasksOf(account.uid)).toEqual([]);
+
+  await card.getByLabel('termin', { exact: true }).fill(tomorrow);
+  await expect(card.getByRole('button', { name: 'Wykonaj' })).toBeEnabled();
+  await card.getByLabel('treść', { exact: true }).fill('Kupić mleko i chleb');
+  await card.getByRole('button', { name: 'Wykonaj' }).click();
+
+  // The same handler as the typed command: the reply, the toast with "Cofnij", the task of the Tasks screen.
+  await expect(log(page)).toContainText('Dodano zadanie „Kupić mleko i chleb”');
+  await expect.poll(() => tasksOf(account.uid)).toEqual([
+    expect.objectContaining({ text: 'Kupić mleko i chleb', dueDate: tomorrow, size: 'L', done: false, penaltyApplied: false }),
+  ]);
+  // Read-only now: a summary, no fields, no second run.
+  await expect(cardOf(page, 'zadanie')).toHaveCount(0);
+  const summary = page.getByRole('region', { name: 'Do wykonania: /zadanie' });
+  await expect(summary).toContainText('treść');
+  await expect(summary).toContainText('Kupić mleko i chleb');
+  await expect(summary.getByRole('button')).toHaveCount(0);
+  await expect(summary.getByRole('textbox')).toHaveCount(0);
+  expect(await tasksOf(account.uid)).toHaveLength(1);
+
+  await page.getByRole('button', { name: 'Cofnij' }).click();
+  await expect.poll(() => tasksOf(account.uid)).toEqual([]);
+});
+
+test('"Pomiń" collapses the card into a short message and writes nothing', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-card-skip' });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/zadanie Kupić mleko');
+  const card = await expectCard(page, 'zadanie', ['termin']);
+  await card.getByRole('button', { name: 'Pomiń' }).click();
+  await expect(cardOf(page, 'zadanie')).toHaveCount(0);
+  await expect(page.locator('.exus-msg--exus').last()).toHaveText('Pominięto.');
+  expect(await tasksOf(account.uid)).toEqual([]);
+  await send(page, '/cofnij');
+  await expect(page.locator('.exus-msg--exus').last()).toHaveText('Nie ma nic do cofnięcia.');
+});
+
+test('an amount that does not read keeps "Wykonaj" disabled with a reason under the field, until it does', async ({ page }) => {
+  const account = await goalsAccount('exus-card-amount');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/cel Rower');
+  const card = await expectCard(page, 'cel', ['kwota (zł albo pkt)']);
+  const run = card.getByRole('button', { name: 'Wykonaj' });
+  const target = card.getByLabel('kwota (zł albo pkt)', { exact: true });
+
+  await target.fill('dużo');
+  await expect(card.getByText('Ta wartość nie pasuje.')).toBeVisible();
+  await expect(run).toBeDisabled();
+  await target.fill('1500');
+  await expect(card.getByText('Ta wartość nie pasuje.')).toBeHidden();
+  // A bare number reads (the command itself asks for the unit when it runs); with the unit it is a money goal.
+  await target.fill('1 500 zł');
+  await expect(run).toBeEnabled();
+  await run.click();
+  await expect(log(page)).toContainText('Dodano cel „Rower”: 1500,00 zł');
+  await expect.poll(() => goalsOf(account.uid)).toEqual([expect.objectContaining({ name: 'Rower', type: 'money', amount: 1500 })]);
+});
+
+test('a money field and the person: /pozyczam Ola asks for the amount; the loan is the one the typed command writes', async ({ page }) => {
+  const account = await moneyAccount('exus-card-loan');
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/pozyczam Ola');
+  const card = await expectCard(page, 'pozyczam', ['kwota']);
+  await expect(card.getByLabel('osoba', { exact: true })).toHaveValue('Ola');
+  await card.getByLabel('kwota', { exact: true }).fill('20');
+  await card.getByLabel('notatka (opcjonalnie)').fill('na kino');
+  await card.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(log(page)).toContainText('Zapisano pożyczkę dla: Ola, 20,00 zł.');
+  expect(await loansState(account.uid)).toEqual({ balance: { current: 30 }, loans: [loan('Ola', 20, 'lent', { note: 'na kino' })], transactions: 0 });
+});
+
+test('a destructive command with a missing slot shows a card, and "Wykonaj" still goes through the dialog', async ({ page }) => {
+  const account = await goalsAccount('exus-card-destructive', [rower]);
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/usun-cel');
+  const card = await expectCard(page, 'usun-cel', ['cel']);
+  await card.getByLabel('cel', { exact: true }).fill('rower');
+  await card.getByRole('button', { name: 'Wykonaj' }).click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toContainText('Wykonać /usun-cel?');
+  expect(await goalsOf(account.uid)).toHaveLength(1);
+  await dialog.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect.poll(() => goalsOf(account.uid)).toEqual([]);
+});
+
+test('a choice, a flag, and the raw text of /blad: each command gets the control of its slot', async ({ page }) => {
+  const account = await choresAccount('exus-card-controls', { name: 'Ola' });
+  await openSignedIn(page, account, '#/exus');
+
+  await send(page, '/obowiazek');
+  const chore = await expectCard(page, 'obowiazek', ['obowiązek']);
+  await chore.getByLabel('kiedy (opcjonalnie)').selectOption({ label: 'wczoraj' });
+  await chore.getByLabel('obowiązek', { exact: true }).fill('zmywarki');
+  await chore.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(log(page)).toContainText('Zapisano obowiązek „Opróżnienie zmywarki” na wczoraj');
+  await expect.poll(() => choreEntries(account.uid)).toEqual([choreEntry('dishwasher', localDay(-1))]);
+
+  await send(page, '/nowy-obowiazek Okna');
+  const create = await expectCard(page, 'nowy-obowiazek', ['punkty']);
+  await create.getByLabel('punkty', { exact: true }).fill('30');
+  await create.getByLabel('jednorazowy').check();
+  await create.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(log(page)).toContainText('Dodano jednorazowy obowiązek „Okna”: 30 pkt.');
+
+  await send(page, '/blad');
+  const bug = await expectCard(page, 'blad', ['tytuł | obszar | opis']);
+  await bug.getByLabel('tytuł | obszar | opis', { exact: true }).fill('Saldo | Pieniądze | Saldo nie działa po wypłacie');
+  await bug.getByRole('button', { name: 'Wykonaj' }).click();
+  await expect(log(page)).toContainText('Zgłoszenie wysłane. Dzięki! „Saldo”, obszar: Pieniądze.');
+  await expect.poll(async () => (await reportsOf(account.uid)).length).toBe(1);
+});
+
+test('a command whose slot has no control (/jezyk) and a read command keep the text reply', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-card-text' });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/jezyk');
+  await expect(page.locator('.exus-msg--exus').last()).toContainText('Brakuje: język.');
+  await send(page, '/szukaj');
+  await expect(page.locator('.exus-msg--exus').last()).toContainText('Brakuje: fraza.');
+  await expect(page.getByRole('form', { name: /^Uzupełnij/ })).toHaveCount(0);
+});
+
+test.describe('on a phone', () => {
+  test.use({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
+
+  test('the card fits the screen: no horizontal scroll, and its buttons are reachable', async ({ page }) => {
+    const account = await createUser({ tag: 'exus-card-phone' });
+    await openSignedIn(page, account, '#/exus');
+    await send(page, '/zadanie Kupić mleko');
+    const card = await expectCard(page, 'zadanie', ['termin']);
+    await card.scrollIntoViewIfNeeded();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    const box = await card.boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(412);
+    await expect(card.getByRole('button', { name: 'Pomiń' })).toBeInViewport();
+    await card.getByRole('button', { name: 'Pomiń' }).click();
+    await expect(page.locator('.exus-msg--exus').last()).toHaveText('Pominięto.');
+  });
 });

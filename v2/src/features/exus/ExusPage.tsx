@@ -4,6 +4,7 @@
 // lives in memory for now; history on the device comes with the full UI (6.10).
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { availableCommands, palette, parseInput, type CommandSpec } from '@/domain/exus/commands';
+import { fieldsFor, initialValues, type FieldDef, type RawValue } from '@/domain/exus/form';
 import { whatToDo } from '@/domain/exus/policy';
 import { isModuleOn } from '@/domain/modules';
 import { t } from '@/i18n';
@@ -22,6 +23,7 @@ import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 import { TextField } from '@/ui/components/Fields';
 import { Card, Page, Stack } from '@/ui/components/Layout';
 import type { HandlerContext } from './handlers';
+import { FormCard } from './FormCard';
 import { blockedBy, effectOf, readyFor, runCommand } from './pipeline';
 import { commandName, syntax } from './syntax';
 import { createUndoStack } from './undo';
@@ -31,6 +33,8 @@ interface Message {
   id: number;
   from: 'me' | 'exus';
   text: string;
+  /** A form card for a command with missing slots instead of text (PLAN.md 6.6, row 2). */
+  card?: { spec: CommandSpec; fields: FieldDef[]; initial: Record<string, RawValue>; ctx: HandlerContext };
 }
 
 /** A destructive command waiting for "yes" in the dialog. */
@@ -133,14 +137,22 @@ export default function ExusPage({ navigate }: RouteProps) {
       return say(t('exus.unread', { fields: unread.map((name) => t(`exus.slots.${name as SlotName}`)).join(', '), syntax: syntax(spec) }));
     }
     const decision = whatToDo(spec.risk, missing);
-    if (decision === 'ask-missing') {
-      return say(
-        t('exus.missing', {
-          fields: missing.map((name) => t(`exus.slots.${name as SlotName}`)).join(', '),
-          syntax: syntax(spec),
-        }),
-      );
+    if (decision === 'ask-missing') return sayMissing(spec, missing);
+    if (decision === 'form') {
+      const fields = fieldsFor(spec.slots(today));
+      // A slot with no sensible control (a language, a module): the reply names what is missing.
+      if (!fields) return sayMissing(spec, missing);
+      setMessages((m) => [...m, { id: nextId++, from: 'exus', text: '', card: { spec, fields, initial: initialValues(fields, args), ctx } }]);
+      return;
     }
+    proceed(spec, args, ctx, decision);
+  };
+
+  const sayMissing = (spec: CommandSpec, missing: string[]) =>
+    say(t('exus.missing', { fields: missing.map((name) => t(`exus.slots.${name as SlotName}`)).join(', '), syntax: syntax(spec) }));
+
+  /** A complete command: run it, or ask first when it is destructive. */
+  const proceed = (spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext, decision: 'run' | 'confirm') => {
     if (decision === 'confirm') {
       // The question reads stores that may still be loading: it waits for them (or says it cannot).
       void readyFor(spec, ctx).then(
@@ -168,11 +180,24 @@ export default function ExusPage({ navigate }: RouteProps) {
     <Page>
       <Stack gap="sm">
         <div class="exus-log" role="log" aria-label={t('exus.log')} ref={log}>
-          {messages.map((m) => (
+          {messages.map((m) =>
+            m.card ? (
+              <FormCard
+                key={m.id}
+                spec={m.card.spec}
+                fields={m.card.fields}
+                initial={m.card.initial}
+                onRun={(args) => {
+                  const card = m.card!;
+                  proceed(card.spec, args, card.ctx, whatToDo(card.spec.risk, []) === 'confirm' ? 'confirm' : 'run');
+                }}
+              />
+            ) : (
             <p key={m.id} class={`exus-msg exus-msg--${m.from} user-text`}>
               {m.text}
             </p>
-          ))}
+            ),
+          )}
         </div>
         <Card>
           <form

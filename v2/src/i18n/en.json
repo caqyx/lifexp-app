@@ -1292,7 +1292,15 @@
       "person": "person",
       "loan": "loan",
       "points": "points",
-      "report": "title | area | description"
+      "report": "title | area | description",
+      "date": "date",
+      "category": "category",
+      "rest": "category and note",
+      "when": "when",
+      "once": "one-time",
+      "family": "theme",
+      "mode": "mode",
+      "ref": "entry"
     },
     "today": {
       "points": "Points: {{total}} (today {{earned}} of the {{limit}} limit).",
@@ -1563,6 +1571,27 @@
       "descTooLong": "A description has at most {{max}} characters.",
       "sent": "Report sent. Thanks! “{{title}}”, area: {{area}}."
     },
-    "newChat": "Starting over. Type /help to see the commands."
+    "newChat": "Starting over. Type /help to see the commands.",
+    "form": {
+      "title": "Complete /{{name}}",
+      "run": "Run",
+      "skip": "Skip",
+      "required": "Fill in this field.",
+      "invalid": "This value does not fit.",
+      "optional": "{{label}} (optional)",
+      "none": "none",
+      "yes": "yes",
+      "amountHint": "E.g. 1500 zł or 5000 pkt.",
+      "fillIn": "Fill in the marked fields to run it.",
+      "sent": "Running: /{{name}}",
+      "skipped": "Skipped."
+    },
+    "choices": {
+      "S": "S",
+      "M": "M",
+      "L": "L",
+      "today": "today",
+      "yesterday": "yesterday"
+    }
   }
 }
