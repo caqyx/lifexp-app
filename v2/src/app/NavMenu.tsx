@@ -1,7 +1,7 @@
 // Menu content (docs/v2/PLAN.md 7.4), generated from the registry: each module's
 // icon next to its name (D9). Right-hand metadata ("2 po terminie") arrives with
 // the modules' data (stage 2+).
-import { LogOut, Sparkles } from 'lucide-preact';
+import { LogOut, Sparkles, Undo2 } from 'lucide-preact';
 import { isModuleOn, type ModuleChoice } from '@/domain/modules';
 import { t } from '@/i18n';
 import { isParent } from '@/stores/parent';
@@ -48,7 +48,9 @@ export function NavMenu({ activeId, onSelect, account, modules, onSignOut }: Nav
 
   return (
     <div class="nav">
-      <p class="nav__wordmark">{t('app.name')}</p>
+      <p class="nav__wordmark">
+        {t('app.name')} <span class="nav__beta">{t('app.beta')}</span>
+      </p>
       {isModuleOn('aichat', modules) && (
         <button
           type="button"
@@ -63,6 +65,11 @@ export function NavMenu({ activeId, onSelect, account, modules, onSignOut }: Nav
       <ul class="nav__list">{navItems('main', modules).map(item)}</ul>
       <hr class="nav__divider" />
       <ul class="nav__list">{navItems('secondary', modules, parent).map(item)}</ul>
+      {/* v2 is in beta: the way back to v1 (app.html next to /v2/) stays in reach. */}
+      <a class="nav__classic" href="../app.html">
+        <Undo2 class="nav__icon" aria-hidden="true" />
+        {t('nav.classicApp')}
+      </a>
       <section class="nav__account" aria-label={t('nav.account')}>
         <p class="nav__account-name">{account.name}</p>
         {account.email && <p class="nav__account-email">{account.email}</p>}

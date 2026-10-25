@@ -2,7 +2,8 @@
   "app": {
     "name": "LifeXP",
     "newVersion": "A new version of the app is out.",
-    "reload": "Reload"
+    "reload": "Reload",
+    "beta": "Beta"
   },
   "nav": {
     "label": "Navigation",
@@ -23,6 +24,7 @@
     "gallery": "Components",
     "account": "Account",
     "signOut": "Log out",
+    "classicApp": "Back to the old version",
     "tabBar": "Shortcuts",
     "add": "Add",
     "parent": "Parent"

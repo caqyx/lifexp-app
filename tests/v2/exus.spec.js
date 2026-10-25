@@ -30,6 +30,21 @@ async function send(page, text) {
 
 const log = (page) => page.getByRole('log', { name: 'Rozmowa z Ex-us' });
 
+/**
+ * The confirmation of a destructive command is open. When it is not, the failure names the
+ * last Ex-us replies, so a command that answered instead of asking (a store that failed to
+ * load, a name it did not find) is told apart from a dialog that did not show.
+ */
+async function dialogAsked(page) {
+  try {
+    // As long as the click it guards would have waited (the test's 30 s), not the default 5 s.
+    await expect(page.getByRole('alertdialog')).toBeVisible({ timeout: 20000 });
+  } catch (error) {
+    const replies = (await page.locator('.exus-msg--exus').allInnerTexts()).slice(-3);
+    throw new Error(`${error.message}\nLast Ex-us replies: ${JSON.stringify(replies)}`);
+  }
+}
+
 /** The form card of a command with missing slots: the fields marked missing, and Wykonaj disabled until they are filled. */
 async function expectCard(page, command, missing) {
   const card = page.getByRole('form', { name: `Uzupełnij /${command}` }).last();
@@ -335,6 +350,7 @@ test('/usun-cel asks first; Anuluj changes nothing, Wykonaj deletes the goal and
   expect(await balanceOf(account.uid)).toBe(50);
 
   await send(page, '/usun-cel "rower"');
+  await dialogAsked(page);
   await dialog.getByRole('button', { name: 'Wykonaj' }).click();
   await expect(log(page)).toContainText('Usunięto cel „Rower”. Odłożone 20,00 zł wróciło na saldo.');
   await expect.poll(() => goalsOf(account.uid)).toEqual([{ name: 'Poziom', type: 'points', amount: 500, celebrated: false }]);
@@ -558,6 +574,7 @@ test('/usun-transakcje asks first; Anuluj changes nothing, Wykonaj deletes the n
   expect(await moneyState(account.uid)).toEqual(afterLunch(before));
 
   await send(page, '/usun-transakcje ostatnia');
+  await dialogAsked(page);
   await dialog.getByRole('button', { name: 'Wykonaj' }).click();
   await expect(log(page)).toContainText('Usunięto: wydatek 5,00 zł (jedzenie, obiad)');
   await expect.poll(() => moneyState(account.uid)).toEqual(before);
@@ -813,6 +830,7 @@ test('/rozlicz asks first; Anuluj changes nothing, Wykonaj settles into Money in
   expect(await payoutState(account.uid)).toEqual(before);
 
   await send(page, '/rozlicz');
+  await dialogAsked(page);
   await dialog.getByRole('button', { name: 'Wykonaj' }).click();
   await expect(replies.last()).toHaveText('Rozliczono 40 pkt: 18,00 zł wpłynęło na saldo w Pieniądzach.');
   await expect(page.getByText('Rozliczono 18,00 zł')).toBeVisible();
@@ -1197,6 +1215,7 @@ test('/usun-zadanie asks first; Anuluj changes nothing, Wykonaj deletes the task
   expect((await ref.get()).exists).toBe(true);
 
   await send(page, '/usun-zadanie "do usunięcia"');
+  await dialogAsked(page);
   await dialog.getByRole('button', { name: 'Wykonaj' }).click();
   await expect(log(page)).toContainText('Usunięto zadanie „Do usunięcia”.');
   await expect.poll(async () => (await ref.get()).exists).toBe(false);
@@ -1742,6 +1761,7 @@ test('/usun-obowiazek asks first; Anuluj changes nothing, Wykonaj removes the de
   expect(await hasDef('dishwasher')).toBe(true);
 
   await send(page, '/usun-obowiazek zmywarki');
+  await dialogAsked(page);
   await dialog.getByRole('button', { name: 'Wykonaj' }).click();
   await expect(replies.last()).toHaveText('Usunięto obowiązek „Opróżnienie zmywarki” z listy.');
   await expect(page.getByText('Usunięto z listy: Opróżnienie zmywarki')).toBeVisible();
@@ -1786,6 +1806,7 @@ test('/usun-wpis deletes the newest unpaid entry or the newest of a chore, after
   expect(await choreEntries(account.uid)).toHaveLength(3);
 
   await send(page, '/usun-wpis ostatni');
+  await dialogAsked(page);
   await dialog.getByRole('button', { name: 'Wykonaj' }).click();
   await expect(replies.last()).toContainText('Usunięto wpis „Opróżnienie zmywarki” z dnia');
   await expect(page.getByText('Wpis usunięty.')).toBeVisible();
@@ -1800,6 +1821,7 @@ test('/usun-wpis deletes the newest unpaid entry or the newest of a chore, after
 
   // A name takes the newest entry of that chore.
   await send(page, '/usun-wpis schodow');
+  await dialogAsked(page);
   await dialog.getByRole('button', { name: 'Wykonaj' }).click();
   await expect(replies.last()).toContainText('Usunięto wpis „Odkurzanie schodów” z dnia');
   await expect.poll(async () => (await choreEntries(account.uid)).length).toBe(2);
@@ -1849,6 +1871,7 @@ test('/usun-aktywnosc asks first; Wykonaj deletes the newest and takes its point
   expect((await activityState(account.uid)).activities).toHaveLength(2);
 
   await send(page, '/usun-aktywnosc ostatnia');
+  await dialogAsked(page);
   await dialog.getByRole('button', { name: 'Wykonaj' }).click();
   await expect(replies.last()).toHaveText('Usunięto aktywność „Czytanie”. Odjęto 25 pkt.');
   await expect(page.getByText('Usunięto aktywność. −25 pkt')).toBeVisible();
@@ -1864,6 +1887,7 @@ test('/usun-aktywnosc asks first; Wykonaj deletes the newest and takes its point
 
   // A text names it by type and note; the last one goes, then there is nothing.
   await send(page, '/usun-aktywnosc nauka rozdzial');
+  await dialogAsked(page);
   await dialog.getByRole('button', { name: 'Wykonaj' }).click();
   await expect(replies.last()).toHaveText('Usunięto aktywność „Nauka”. Odjęto 40 pkt.');
   await expect.poll(() => activityState(account.uid)).toMatchObject({

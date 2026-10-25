@@ -350,6 +350,49 @@
   border-top: 1px solid var(--color-separator);
 }
 
+/* "Beta" next to the app name: v2 is still being tested. */
+.nav__beta {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent-text);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+  vertical-align: middle;
+}
+
+/* Back to v1, just above the account (the bottom of the menu). */
+.nav__classic {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target);
+  margin-top: auto;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav__classic:hover,
+.nav__classic:active {
+  background: var(--color-surface-raised);
+}
+
+.nav__classic .nav__icon {
+  color: var(--color-text-secondary);
+}
+
+.nav__classic + .nav__account {
+  margin-top: 0;
+}
+
 /* Who is signed in, at the bottom of the menu. */
 .nav__account {
   margin-top: auto;
