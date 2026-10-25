@@ -1218,7 +1218,6 @@
     "inputLabel": "Wiadomość do Ex-us",
     "placeholder": "Napisz do Ex-us albo wpisz /",
     "send": "Wyślij",
-    "aiLater": "Rozmowa z AI dojdzie w następnym kroku. Na razie działają komendy: wpisz /pomoc.",
     "unknown": "Nie znam komendy /{{name}}. Wpisz /pomoc, żeby zobaczyć listę.",
     "helpIntro": "Komendy (kolejność argumentów dowolna):",
     "commands": {
@@ -1598,7 +1597,15 @@
       "text": "Rozmowa z Ex-us wymaga internetu. Komendy zaczynające się od / działają też bez niego, jeśli ich zapis może poczekać."
     },
     "ai": {
-      "unknownRef": "Nie wiem, o którą rzecz chodzi w tej propozycji. Napisz jeszcze raz, jej nazwą."
+      "unknownRef": "Nie wiem, o którą rzecz chodzi w tej propozycji. Napisz jeszcze raz, jej nazwą.",
+      "typing": "Ex-us pisze…",
+      "noAccess": "Ex-us AI jest na razie w testach i to konto nie ma do niego dostępu. Działają komendy: wpisz /pomoc.",
+      "budget": "Dzisiejszy limit Ex-us AI się wyczerpał. Odnowi się o północy. Komendy z / działają dalej.",
+      "unavailable": "Ex-us AI jest teraz niedostępny. Spróbuj za chwilę.",
+      "network": "Nie udało się połączyć z Ex-us AI. Sprawdź połączenie i spróbuj jeszcze raz.",
+      "failed": "Coś poszło nie tak z Ex-us AI. Spróbuj jeszcze raz.",
+      "usage": "Limit AI na dziś: {{percent}}%",
+      "usageLabel": "Pozostały dzisiejszy limit Ex-us AI"
     }
   }
 }

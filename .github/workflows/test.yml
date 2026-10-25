@@ -49,6 +49,7 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             v2/package-lock.json
+            functions/package-lock.json
       # The browser tests sign in on the Firebase emulators; Firestore's is a Java program.
       - uses: actions/setup-java@v5
         with:
@@ -59,6 +60,8 @@ jobs:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ hashFiles('package-lock.json') }}
       - run: npm ci --prefix v2
+      # test:v2 runs exusTurn on the Functions emulator (fake model, no key).
+      - run: npm ci --prefix functions
       # typecheck, architecture lint, unit tests
       - run: npm run check --prefix v2
       - run: npm run build --prefix v2

@@ -23,6 +23,7 @@ npm run check --prefix v2     # v2: typecheck + lint architektury + testy jednos
 npm run build --prefix v2     # v2: build do v2/dist
 npm run gen:exus-schema --prefix v2  # po zmianie rejestru albo kontekstu Ex-us: schema.gen.json i fixture kontekstu w functions/ (check v2 pilnuje aktualności)
 npm run test:v2               # v2: build + testy w przeglądarce na emulatorach (logowanie, powłoka; Java 21)
+                              #   (też emulator Functions: exusTurn z fałszywym modelem, tests/v2/exus-ai.spec.js)
 node scripts/build-site.js    # składa stronę Pages (v1 + v2/dist) w _site i sprawdza pliki v1
 ```
 

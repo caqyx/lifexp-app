@@ -1218,7 +1218,6 @@
     "inputLabel": "Message to Ex-us",
     "placeholder": "Write to Ex-us or type /",
     "send": "Send",
-    "aiLater": "Talking to the AI comes in the next step. For now commands work: type /help.",
     "unknown": "I do not know /{{name}}. Type /help for the list.",
     "helpIntro": "Commands (arguments in any order):",
     "commands": {
@@ -1598,7 +1597,15 @@
       "text": "Chatting with Ex-us needs the internet. Commands starting with / also work without it when their write can wait."
     },
     "ai": {
-      "unknownRef": "I could not tell which item that suggestion meant. Please say it again, by its name."
+      "unknownRef": "I could not tell which item that suggestion meant. Please say it again, by its name.",
+      "typing": "Ex-us is typing…",
+      "noAccess": "Ex-us AI is still in testing and this account has no access to it. Commands work: type /help.",
+      "budget": "Today's Ex-us AI limit is used up. It renews at midnight. Commands with / still work.",
+      "unavailable": "Ex-us AI is unavailable right now. Please try again in a moment.",
+      "network": "Could not reach Ex-us AI. Check the connection and try again.",
+      "failed": "Something went wrong with Ex-us AI. Please try again.",
+      "usage": "AI limit for today: {{percent}}%",
+      "usageLabel": "Remaining Ex-us AI limit for today"
     }
   }
 }

@@ -16,6 +16,8 @@ export interface StoredMessage {
   from: 'me' | 'exus';
   text: string;
   done?: DoneCard;
+  /** A turn of the AI conversation (stage 5b): sent as history, and the reply is Markdown. */
+  ai?: true;
 }
 
 /** The newest `max` messages. */
@@ -41,25 +43,27 @@ export function parseHistory(raw: unknown): StoredMessage[] {
   if (!Array.isArray(raw)) return [];
   const messages = raw.flatMap((item: unknown): StoredMessage[] => {
     if (typeof item !== 'object' || item === null) return [];
-    const { from, text, done } = item as { from?: unknown; text?: unknown; done?: unknown };
+    const { from, text, done, ai } = item as { from?: unknown; text?: unknown; done?: unknown; ai?: unknown };
     if ((from !== 'me' && from !== 'exus') || !isText(text)) return [];
     const card = done === undefined ? undefined : doneFrom(done);
     if (done !== undefined && !card) return [];
     // A summary is the message; an empty bubble is nothing.
     if (!card && text === '') return [];
-    return [card ? { from, text, done: card } : { from, text }];
+    if (card) return [{ from, text, done: card }];
+    return [ai === true ? { from, text, ai } : { from, text }];
   });
   return trimHistory(messages);
 }
 
 /** What goes to storage: the messages that are text or a run card, trimmed. Live cards and passing messages are not kept. */
 export function serializeHistory(
-  messages: readonly { from: 'me' | 'exus'; text: string; done?: DoneCard; live?: boolean; passing?: boolean }[],
+  messages: readonly { from: 'me' | 'exus'; text: string; done?: DoneCard; ai?: boolean; live?: boolean; passing?: boolean }[],
 ): StoredMessage[] {
   return trimHistory(
     messages.flatMap((m): StoredMessage[] => {
       if (m.live || m.passing) return [];
-      return [m.done ? { from: m.from, text: m.text, done: m.done } : { from: m.from, text: m.text }];
+      if (m.done) return [{ from: m.from, text: m.text, done: m.done }];
+      return [m.ai ? { from: m.from, text: m.text, ai: true as const } : { from: m.from, text: m.text }];
     }),
   );
 }

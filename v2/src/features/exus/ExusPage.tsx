@@ -1,19 +1,24 @@
-// Ex-us (docs/v2/PLAN.md 6, stage 5a): one chat for slash commands now and for
-// the AI later (5b). A command is read locally (domain/exus) and run through the
-// same services as the screens, so it obeys the same limits. The conversation is kept
+// Ex-us (docs/v2/PLAN.md 6): one chat for slash commands (5a) and the AI (5b). A
+// command is read locally (domain/exus) and run through the same services as the
+// screens, so it obeys the same limits; plain text goes to exusTurn with the
+// context snapshot (5b-4), one call per message. The conversation is kept
 // on the device per account (offline/chatHistory, 6.10): text only, a form card as
 // what it became, cleared by /nowy and by signing out.
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { AiError, historyForAi, type AiErrorKind } from '@/domain/exus/ai';
 import { availableCommands, palette, parseInput, type CommandSpec } from '@/domain/exus/commands';
+import type { ContextRefs } from '@/domain/exus/context';
 import { fieldsFor, initialValues, type FieldDef, type RawValue } from '@/domain/exus/form';
 import { serializeHistory, type DoneCard } from '@/domain/exus/history';
 import { needsInternet, whatToDo } from '@/domain/exus/policy';
 import { isModuleOn } from '@/domain/modules';
-import { t } from '@/i18n';
+import { language, t } from '@/i18n';
 import { localDayKey } from '@/lib/dates';
 import type { RouteProps } from '@/lib/route-match';
 import { loadChatHistory, saveChatHistory } from '@/offline/chatHistory';
+import { aiDenied, askExus } from '@/services/exus-ai';
 import { prepareMoney } from '@/services/money';
+import { aiUsage } from '@/stores/exusAi';
 import { exusFocusRequests } from '@/stores/exusFocus';
 import { watchMoney } from '@/stores/money';
 import { watchNotes } from '@/stores/notes';
@@ -23,11 +28,14 @@ import { account } from '@/stores/session';
 import { watchTasks } from '@/stores/tasks';
 import { watchToday } from '@/stores/today';
 import { Button } from '@/ui/components/Button';
+import { ProgressBar } from '@/ui/components/Display';
+import { Markdown } from '@/ui/components/Markdown';
 import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
 import { TextField } from '@/ui/components/Fields';
 import { Card, Page, Stack } from '@/ui/components/Layout';
 import type { HandlerContext } from './handlers';
 import { DoneCardView, FormCard } from './FormCard';
+import { exusContext } from './context';
 import { blockedBy, effectOf, readyFor, runCommand } from './pipeline';
 import { commandName, syntax } from './syntax';
 import { createUndoStack } from './undo';
@@ -39,6 +47,10 @@ interface Message {
   text: string;
   /** Shown now but not kept on the device: the greeting, the answer to /nowy. */
   passing?: boolean;
+  /** A turn of the AI conversation: sent as history; Ex-us's reply is Markdown. */
+  ai?: boolean;
+  /** "Ex-us pisze…" while exusTurn answers; becomes the reply. */
+  typing?: boolean;
   /** A form card that was run, read-only (kept on the device as it is). */
   done?: DoneCard;
   /** A form card for a command with missing slots instead of text (PLAN.md 6.6, row 2). */
@@ -82,6 +94,19 @@ type SlotName =
 
 let nextId = 1;
 
+/** What the chat says when a turn with the AI did not come back. */
+const AI_ERROR_TEXT = {
+  'no-access': 'exus.ai.noAccess',
+  budget: 'exus.ai.budget',
+  invalid: 'exus.ai.failed',
+  unavailable: 'exus.ai.unavailable',
+  network: 'exus.ai.network',
+  failed: 'exus.ai.failed',
+} as const satisfies Record<AiErrorKind, string>;
+
+/** The build's version, sent with every AI turn (logged by exusTurn). */
+const CLIENT_VERSION = __LIFEXP_CLIENT_VERSION__;
+
 export default function ExusPage({ navigate }: RouteProps) {
   const current = account.value;
   const uid = current?.user.uid;
@@ -103,6 +128,11 @@ export default function ExusPage({ navigate }: RouteProps) {
     if (uid && moneyOn) prepareMoney(uid, incomeCounted).catch(() => {});
   }, [uid, moneyOn]);
   const [messages, setMessages] = useState<Message[]>([]);
+  // The conversation as it is now, for the history sent with the next AI turn.
+  const latest = useRef<Message[]>([]);
+  latest.current = messages;
+  // The refs of the latest context sent: an action from the AI names things by them (5b-5).
+  const refs = useRef<ContextRefs>({});
   // The kept conversation arrives from the device's storage; nothing is saved before it did.
   const [restored, setRestored] = useState(false);
   const passingNext = useRef(false);
@@ -167,14 +197,40 @@ export default function ExusPage({ navigate }: RouteProps) {
   const run = (spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext) =>
     void runCommand(spec, args, ctx, say).then(say, () => say(t('exus.failed')));
 
+  /** Plain text: one exusTurn call; "Ex-us pisze…" until the reply (or why there is none) replaces it. */
+  const askAi = (message: string) => {
+    const history = historyForAi(latest.current);
+    const typingId = nextId++;
+    setMessages((m) => [
+      ...m,
+      { id: nextId++, from: 'me', text: message, ai: true },
+      { id: typingId, from: 'exus', text: '', typing: true, passing: true },
+    ]);
+    const answer = (patch: Partial<Message>) =>
+      setMessages((all) => all.map((x) => (x.id === typingId ? { id: typingId, from: 'exus', text: '', ...patch } : x)));
+    const lang = language.value;
+    void exusContext(profile, lang)
+      .then((built) => {
+        refs.current = built.refs;
+        return askExus(uid, { message, history, context: built.context, lang, clientVersion: CLIENT_VERSION });
+      })
+      // Actions are shown as cards in 5b-5; until then the reply is the answer.
+      .then(
+        (response) => answer({ text: response.reply, ai: true }),
+        (error: unknown) => answer({ text: t(AI_ERROR_TEXT[error instanceof AiError ? error.kind : 'failed']) }),
+      );
+  };
+
   const send = () => {
     const input = draft.trim();
     if (!input) return;
     setDraft('');
-    setMessages((m) => [...m, { id: nextId++, from: 'me', text: input }]);
     const today = localDayKey(new Date());
     const parsed = parseInput(input, today, commands);
-    if (parsed.kind === 'text') return say(t(navigator.onLine ? 'exus.aiLater' : 'exus.offline.text'));
+    // Offline plain text waits for nobody; an account without AI is told so without another call.
+    if (parsed.kind === 'text' && navigator.onLine && !aiDenied(uid)) return askAi(input);
+    setMessages((m) => [...m, { id: nextId++, from: 'me', text: input }]);
+    if (parsed.kind === 'text') return say(t(navigator.onLine ? 'exus.ai.noAccess' : 'exus.offline.text'));
     if (parsed.kind === 'unknown') return say(t('exus.unknown', { name: parsed.name }));
     const { spec, args, missing, unread } = parsed;
     const ctx: HandlerContext = { uid, profile, today, commands, navigate, undo: undoStack, newChat };
@@ -217,6 +273,8 @@ export default function ExusPage({ navigate }: RouteProps) {
   };
 
   const pal = palette(draft, commands);
+  // Shown from the first AI answer of the session on.
+  const usage = aiUsage.value;
   /** A command from the palette goes into the field, ready for its arguments. */
   const pick = (spec: CommandSpec) => {
     setDraft(`/${commandName(spec)} `);
@@ -243,6 +301,17 @@ export default function ExusPage({ navigate }: RouteProps) {
               />
             ) : m.done ? (
               <DoneCardView key={m.id} card={m.done} />
+            ) : m.typing || (m.ai && m.from === 'exus') ? (
+              // One bubble: "pisze…" turns into the reply in place.
+              <div key={m.id} class={`exus-msg exus-msg--exus${m.typing ? ' exus-msg--typing' : ' exus-msg--ai'}`}>
+                {m.typing ? (
+                  <span class="exus-msg__body">{t('exus.ai.typing')}</span>
+                ) : (
+                  <div class="exus-msg__body" key="reply">
+                    <Markdown text={m.text} />
+                  </div>
+                )}
+              </div>
             ) : (
             <p key={m.id} class={`exus-msg exus-msg--${m.from} user-text`}>
               {m.text}
@@ -280,6 +349,12 @@ export default function ExusPage({ navigate }: RouteProps) {
               </ul>
             )}
             {pal.current && <p class="exus-hint">{syntax(pal.current)}</p>}
+            {usage && (
+              <div class="exus-usage">
+                <ProgressBar value={usage.remainingPercent / 100} label={t('exus.ai.usageLabel')} tone={usage.remainingPercent === 0 ? 'negative' : 'default'} />
+                <p class="exus-usage__text">{t('exus.ai.usage', { percent: usage.remainingPercent })}</p>
+              </div>
+            )}
             <div>
               <Button type="submit" variant="primary">
                 {t('exus.send')}
