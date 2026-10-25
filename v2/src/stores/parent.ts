@@ -13,20 +13,27 @@ export interface ParentChild {
   profile: ParentProfile;
 }
 
-/** For one e-mail: undefined = looking, 'error' = the read failed. */
+/**
+ * For one e-mail: undefined = looking, 'error' = the read failed, 'unverified' = Firebase
+ * Auth has not verified the address, so the rules give it nothing (6-8) and nothing is asked.
+ */
 export interface ChildrenState {
   email: string;
-  children: readonly ParentChild[] | undefined | 'error';
+  children: readonly ParentChild[] | undefined | 'error' | 'unverified';
 }
 
 export const parentChildren = signal<ChildrenState | null>(null);
 
 /** Looks the children up for `email` (again, when asked to refresh); '' (no e-mail) means none. */
-export function findParentChildren(email: string, refresh = false): void {
+export function findParentChildren(email: string, verified: boolean, refresh = false): void {
   const current = parentChildren.value;
-  if (!refresh && current?.email === email && current.children !== 'error') return;
+  if (!refresh && current?.email === email && current.children !== 'error' && (current.children !== 'unverified' || !verified)) return;
   if (!email) {
     parentChildren.value = { email, children: [] };
+    return;
+  }
+  if (!verified) {
+    parentChildren.value = { email, children: 'unverified' };
     return;
   }
   if (current?.email !== email) parentChildren.value = { email, children: undefined };

@@ -50,4 +50,22 @@ async function screenSettled(page) {
   await page.locator('.shell__main').evaluate((main) => Promise.all(main.getAnimations().map((a) => a.finished)));
 }
 
-module.exports = { test, expect, appUrl, signIn, openSignedIn, screenSettled };
+/**
+ * Wait until v2's worker is active and controls this page (it claims clients on first
+ * install). Polled: page.waitForFunction does not await an async predicate (the
+ * Promise itself is truthy), so it would return while the precache is still filling.
+ */
+async function waitForServiceWorker(page) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async () => {
+          const registration = await navigator.serviceWorker.getRegistration();
+          return registration?.active?.state === 'activated' && navigator.serviceWorker.controller !== null;
+        }),
+      { timeout: 20000 },
+    )
+    .toBe(true);
+}
+
+module.exports = { test, expect, appUrl, signIn, openSignedIn, screenSettled, waitForServiceWorker };

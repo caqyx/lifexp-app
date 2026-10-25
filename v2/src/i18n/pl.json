@@ -1658,6 +1658,12 @@
     "recent": "Ostatnie aktywności",
     "noRecent": "Brak aktywności.",
     "top": "Najczęstsze w 7 dniach",
-    "noTop": "W ostatnich 7 dniach nic nie zapisano."
+    "noTop": "W ostatnich 7 dniach nic nie zapisano.",
+    "verifyTitle": "Najpierw potwierdź swój adres e-mail",
+    "verifyBody": "Panel rodzica pokazuje dane tylko na adres potwierdzony w Firebase. Wyślemy link na {{email}}; otwórz go, wróć tutaj i naciśnij „Sprawdź ponownie”. Logowanie przez Google nie wymaga tego kroku.",
+    "verifySend": "Wyślij link",
+    "verifyRecheck": "Sprawdź ponownie",
+    "verifySent": "Link poszedł na {{email}}. Sprawdź też folder spam.",
+    "verifyNotYet": "Adres nie jest jeszcze potwierdzony. Otwórz link z e-maila i spróbuj ponownie."
   }
 }

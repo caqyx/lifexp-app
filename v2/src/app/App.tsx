@@ -90,9 +90,10 @@ export function App() {
 
   // Who is a parent (some child entered this e-mail): the menu lists "Rodzic" only then.
   const email = session.value.status === 'signedIn' ? session.value.user.email : null;
+  const verified = session.value.status === 'signedIn' && session.value.user.emailVerified;
   useEffect(() => {
-    if (email !== null) findParentChildren(email);
-  }, [email]);
+    if (email !== null) findParentChildren(email, verified);
+  }, [email, verified]);
 
   // Unknown or empty hash → Today, without leaving a history entry behind. The
   // hash is kept while signed out, so login lands where the link pointed. A module

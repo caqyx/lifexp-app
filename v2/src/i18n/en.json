@@ -1658,6 +1658,12 @@
     "recent": "Recent activities",
     "noRecent": "No activities.",
     "top": "Most frequent in 7 days",
-    "noTop": "Nothing logged in the last 7 days."
+    "noTop": "Nothing logged in the last 7 days.",
+    "verifyTitle": "Verify your e-mail address first",
+    "verifyBody": "The parent view shows data only to an address verified in Firebase. We will send a link to {{email}}; open it, come back here and press “Check again”. Signing in with Google needs no such step.",
+    "verifySend": "Send link",
+    "verifyRecheck": "Check again",
+    "verifySent": "The link went to {{email}}. Check the spam folder too.",
+    "verifyNotYet": "The address is not verified yet. Open the link from the e-mail and try again."
   }
 }

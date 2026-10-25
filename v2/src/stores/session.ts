@@ -47,3 +47,20 @@ export async function startSession(): Promise<void> {
     stopProfile = watchProfile(user.uid, setProfile, () => setProfile('error'));
   });
 }
+
+/** Sends Firebase's verification link to the signed-in address (the parent's view, 6-8). */
+export async function sendVerificationLink(): Promise<void> {
+  const { sendAuthVerificationLink } = await import('@/data/auth');
+  await sendAuthVerificationLink();
+}
+
+/** Re-reads the account after the link was opened; true when the address is now verified. */
+export async function recheckEmailVerified(): Promise<boolean> {
+  const { reloadAuthUser } = await import('@/data/auth');
+  const user = await reloadAuthUser();
+  const current = session.value;
+  if (user && current.status === 'signedIn' && current.user.uid === user.uid) {
+    session.value = { ...current, user: { ...current.user, emailVerified: user.emailVerified } };
+  }
+  return user?.emailVerified ?? false;
+}

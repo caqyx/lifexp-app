@@ -2,27 +2,9 @@
 // its own scope, v2 starts offline from the precache with the data Firestore
 // cached, and v1's Service Worker leaves v2's caches alone.
 const { createUser, db, serveCdnFromNpm } = require('../support/emulator');
-const { test, expect, appUrl, openSignedIn } = require('../support/v2');
+const { test, expect, appUrl, openSignedIn, waitForServiceWorker } = require('../support/v2');
 
 test.use({ serviceWorkers: 'allow', viewport: { width: 390, height: 844 } });
-
-/**
- * Wait until v2's worker is active and controls this page (it claims clients on first
- * install). Polled: page.waitForFunction does not await an async predicate (the
- * Promise itself is truthy), so it would return while the precache is still filling.
- */
-async function waitForServiceWorker(page) {
-  await expect
-    .poll(
-      () =>
-        page.evaluate(async () => {
-          const registration = await navigator.serviceWorker.getRegistration();
-          return registration?.active?.state === 'activated' && navigator.serviceWorker.controller !== null;
-        }),
-      { timeout: 20000 },
-    )
-    .toBe(true);
-}
 
 test('the worker installs with the /v2/ scope and precaches the app', async ({ page, account }) => {
   await openSignedIn(page, account, '#/today');
