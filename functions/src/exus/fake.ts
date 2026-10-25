@@ -6,6 +6,8 @@
 //   "zepsuj" / "malformed"  -> an answer that is not JSON (safe-reply path)
 //   "nieznana" / "unknown"  -> one unknown command and one valid one
 //   "wiele" / "many"        -> five actions (the server keeps three)
+//   "usun" / "delete"       -> delete-task of t1 (destructive: the dialog path)
+//   "zgubiony" / "lost"     -> complete-task of t9 (a ref the context never gave)
 //   "zadanie" / "task"      -> create-task with the rest of the message as text, due "jutro"
 //   "saldo" / "balance"     -> balance
 //   "zmien" / "change"      -> edit-pending of card p1, due "piatek"
@@ -45,6 +47,12 @@ function answer(message: string): string {
       ],
     }));
     reply = 'Ex-us (emulator): 5 actions';
+  } else if (has('usun', 'delete')) {
+    actions = [{ command: 'delete-task', args: [{ name: 'task', value: 't1' }] }];
+    reply = 'Ex-us (emulator): delete-task';
+  } else if (has('zgubiony', 'lost')) {
+    actions = [{ command: 'complete-task', args: [{ name: 'task', value: 't9' }] }];
+    reply = 'Ex-us (emulator): complete-task t9';
   } else if (has('zadanie', 'task')) {
     const text = message.replace(/^.*?\b(zadanie|task)\b[:\s]*/i, '').trim() || 'Zadanie';
     actions = [{ command: 'create-task', args: [{ name: 'text', value: text }, { name: 'due', value: 'jutro' }] }];

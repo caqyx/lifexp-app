@@ -1605,7 +1605,12 @@
       "network": "Could not reach Ex-us AI. Check the connection and try again.",
       "failed": "Something went wrong with Ex-us AI. Please try again.",
       "usage": "AI limit for today: {{percent}}%",
-      "usageLabel": "Remaining Ex-us AI limit for today"
+      "usageLabel": "Remaining Ex-us AI limit for today",
+      "proposal": "Suggestion: {{what}}",
+      "expired": "Suggestion expired: {{what}}.",
+      "updated": "Suggestion updated.",
+      "moduleOff": "This suggestion is for a module that is turned off. Turn it on in Settings to use it.",
+      "cannotShow": "I cannot show this suggestion. Try a command: type /help."
     }
   }
 }

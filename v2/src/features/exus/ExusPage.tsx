@@ -5,9 +5,11 @@
 // on the device per account (offline/chatHistory, 6.10): text only, a form card as
 // what it became, cleared by /nowy and by signing out.
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { AiError, historyForAi, type AiErrorKind } from '@/domain/exus/ai';
-import { availableCommands, palette, parseInput, type CommandSpec } from '@/domain/exus/commands';
-import type { ContextRefs } from '@/domain/exus/context';
+import { AiError, historyForAi, type AiErrorKind, type AiTurnAction } from '@/domain/exus/ai';
+import { resolveAction } from '@/domain/exus/aiAction';
+import { availableCommands, COMMANDS, palette, parseInput, type CommandSpec } from '@/domain/exus/commands';
+import type { ContextRefs, RecentAction } from '@/domain/exus/context';
+import { pendingProposals, withRecent } from '@/domain/exus/proposals';
 import { fieldsFor, initialValues, type FieldDef, type RawValue } from '@/domain/exus/form';
 import { serializeHistory, type DoneCard } from '@/domain/exus/history';
 import { needsInternet, whatToDo } from '@/domain/exus/policy';
@@ -53,9 +55,19 @@ interface Message {
   typing?: boolean;
   /** A form card that was run, read-only (kept on the device as it is). */
   done?: DoneCard;
-  /** A form card for a command with missing slots instead of text (PLAN.md 6.6, row 2). */
-  card?: { spec: CommandSpec; fields: FieldDef[]; initial: Record<string, RawValue>; ctx: HandlerContext };
+  /** A form card for a command with missing slots instead of text (PLAN.md 6.6, row 2), or an AI proposal (row 3). */
+  card?: {
+    spec: CommandSpec;
+    fields: FieldDef[];
+    initial: Record<string, RawValue>;
+    ctx: HandlerContext;
+    /** An AI proposal: what its fields hold now (sent back as pendingActions) and a count of edit-pending updates (remounts the card). */
+    ai?: { raw: Record<string, RawValue>; version: number };
+  };
 }
+
+/** What became of an AI proposal, for the next turn's recentActions. */
+type Outcome = RecentAction['status'];
 
 /** A destructive command waiting for "yes" in the dialog. */
 interface Pending {
@@ -63,6 +75,8 @@ interface Pending {
   args: Record<string, unknown>;
   ctx: HandlerContext;
   effect: string;
+  /** An AI proposal: told whether it ran. */
+  outcome?: (status: Outcome) => void;
 }
 
 /** The slots a reply can name as missing (exus.slots). */
@@ -131,8 +145,12 @@ export default function ExusPage({ navigate }: RouteProps) {
   // The conversation as it is now, for the history sent with the next AI turn.
   const latest = useRef<Message[]>([]);
   latest.current = messages;
-  // The refs of the latest context sent: an action from the AI names things by them (5b-5).
+  // The refs of the latest context sent: an action from the AI names things by them.
   const refs = useRef<ContextRefs>({});
+  // p1..p3 of the waiting proposals in the latest context sent → their cards (edit-pending).
+  const pendingRefs = useRef<Map<string, number>>(new Map());
+  // What became of the AI's proposals this session (recentActions, PLAN.md 6.6).
+  const recent = useRef<RecentAction[]>([]);
   // The kept conversation arrives from the device's storage; nothing is saved before it did.
   const [restored, setRestored] = useState(false);
   const passingNext = useRef(false);
@@ -159,7 +177,12 @@ export default function ExusPage({ navigate }: RouteProps) {
     };
   }, [uid]);
   useEffect(() => {
-    if (uid && restored) void saveChatHistory(uid, serializeHistory(messages.map((m) => ({ ...m, live: m.card !== undefined }))));
+    if (!uid || !restored) return;
+    // A proposal never used cannot come back live; it is kept as expired. A typed command's card is not kept.
+    const kept = messages.map((m) =>
+      m.card?.ai ? { id: m.id, from: 'exus' as const, text: t('exus.ai.expired', { what: t(`exus.commands.${m.card.spec.id}`) }) } : { ...m, live: m.card !== undefined },
+    );
+    void saveChatHistory(uid, serializeHistory(kept));
   }, [messages, restored, uid]);
   // Ctrl/Cmd+K (the shell) asks for the field.
   const focusRequests = exusFocusRequests.value;
@@ -194,8 +217,81 @@ export default function ExusPage({ navigate }: RouteProps) {
     return true;
   };
 
-  const run = (spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext) =>
-    void runCommand(spec, args, ctx, say).then(say, () => say(t('exus.failed')));
+  const run = (spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext, outcome?: (status: Outcome) => void) =>
+    void runCommand(spec, args, ctx, say).then(
+      (reply) => {
+        say(reply);
+        outcome?.('executed');
+      },
+      () => {
+        say(t('exus.failed'));
+        outcome?.('failed');
+      },
+    );
+
+  /** An AI proposal's outcome, for the next turn. */
+  const note = (command: string) => (status: Outcome) => {
+    recent.current = withRecent(recent.current, { command, status });
+  };
+
+  /**
+   * The actions of an AI answer (PLAN.md 6.6 row 3), below the reply: a read runs at once,
+   * a write is a card ("Wykonaj" / "Pomiń"), a destructive one a card whose "Wykonaj" asks
+   * in the dialog. A ref Ex-us never gave, or a command of a module that is off, is a line.
+   */
+  const propose = (actions: readonly AiTurnAction[]) => {
+    const today = localDayKey(new Date());
+    const ctx: HandlerContext = { uid, profile, today, commands, navigate, undo: undoStack, newChat };
+    for (const action of actions) {
+      if (action.command === 'edit-pending') {
+        editPending(action, today);
+        continue;
+      }
+      const spec = commands.find((c) => c.id === action.command);
+      if (!spec) {
+        const known = COMMANDS.some((c) => c.id === action.command);
+        say(t(known ? 'exus.ai.moduleOff' : 'exus.ai.cannotShow'));
+        continue;
+      }
+      const resolved = resolveAction(action, refs.current, spec, today);
+      if (!resolved.ok) {
+        say(t('exus.ai.unknownRef'));
+        continue;
+      }
+      if (spec.risk === 'read') {
+        if (resolved.missing.length > 0) sayMissing(spec, resolved.missing);
+        else if (!offlineBlocked(spec)) run(spec, resolved.args, ctx, note(spec.id));
+        continue;
+      }
+      const fields = fieldsFor(spec.slots(today));
+      if (!fields) {
+        say(t('exus.ai.cannotShow'));
+        continue;
+      }
+      const initial = initialValues(fields, resolved.args);
+      setMessages((m) => [...m, { id: nextId++, from: 'exus', text: '', card: { spec, fields, initial, ctx, ai: { raw: initial, version: 0 } } }]);
+    }
+  };
+
+  /** edit-pending: the waiting card pN takes the new values (read as the card reads them) in place. */
+  const editPending = (action: AiTurnAction, today: string) => {
+    const target = pendingRefs.current.get(action.args.ref ?? '');
+    const card = latest.current.find((m) => m.id === target)?.card;
+    if (target === undefined || !card?.ai) return say(t('exus.ai.unknownRef'));
+    const changes = Object.fromEntries(Object.entries(action.args).filter(([name]) => name !== 'ref'));
+    const resolved = resolveAction({ command: card.spec.id, args: changes }, refs.current, card.spec, today);
+    if (!resolved.ok) return say(t('exus.ai.unknownRef'));
+    const values = initialValues(card.fields, resolved.args);
+    const changed = Object.fromEntries(Object.keys(resolved.args).map((name) => [name, values[name] ?? null]));
+    setMessages((all) =>
+      all.map((x) => {
+        if (x.id !== target || !x.card?.ai) return x;
+        const raw = { ...x.card.ai.raw, ...changed };
+        return { ...x, card: { ...x.card, initial: raw, ai: { raw, version: x.card.ai.version + 1 } } };
+      }),
+    );
+    say(t('exus.ai.updated'));
+  };
 
   /** Plain text: one exusTurn call; "Ex-us pisze…" until the reply (or why there is none) replaces it. */
   const askAi = (message: string) => {
@@ -209,14 +305,21 @@ export default function ExusPage({ navigate }: RouteProps) {
     const answer = (patch: Partial<Message>) =>
       setMessages((all) => all.map((x) => (x.id === typingId ? { id: typingId, from: 'exus', text: '', ...patch } : x)));
     const lang = language.value;
-    void exusContext(profile, lang)
+    // The cards still waiting go with the message as p1..p3, with what their fields hold now.
+    const live = latest.current.flatMap((m) => (m.card?.ai ? [{ id: m.id, command: m.card.spec.id, fields: m.card.fields, raw: m.card.ai.raw }] : []));
+    const waiting = pendingProposals(live);
+    void exusContext(profile, lang, { recentActions: recent.current, pendingActions: waiting.cards })
       .then((built) => {
         refs.current = built.refs;
+        pendingRefs.current = waiting.byRef;
         return askExus(uid, { message, history, context: built.context, lang, clientVersion: CLIENT_VERSION });
       })
-      // Actions are shown as cards in 5b-5; until then the reply is the answer.
       .then(
-        (response) => answer({ text: response.reply, ai: true }),
+        (response) => {
+          // The reply as the AI wrote it; what its actions do shows below it, once they run.
+          answer({ text: response.reply, ai: true });
+          propose(response.actions);
+        },
         (error: unknown) => answer({ text: t(AI_ERROR_TEXT[error instanceof AiError ? error.kind : 'failed']) }),
       );
   };
@@ -254,22 +357,28 @@ export default function ExusPage({ navigate }: RouteProps) {
     say(t('exus.missing', { fields: missing.map((name) => t(`exus.slots.${name as SlotName}`)).join(', '), syntax: syntax(spec) }));
 
   /** A complete command: run it, or ask first when it is destructive. */
-  const proceed = (spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext, decision: 'run' | 'confirm') => {
-    if (offlineBlocked(spec)) return;
+  const proceed = (spec: CommandSpec, args: Record<string, unknown>, ctx: HandlerContext, decision: 'run' | 'confirm', outcome?: (status: Outcome) => void) => {
+    if (offlineBlocked(spec)) return outcome?.('failed');
     if (decision === 'confirm') {
       // The question reads stores that may still be loading: it waits for them (or says it cannot).
       void readyFor(spec, ctx).then(
         () => {
           const blocked = blockedBy(spec, args, ctx);
-          if (blocked) return say(blocked);
-          setPending({ spec, args, ctx, effect: effectOf(spec, args, ctx) });
+          if (blocked) {
+            say(blocked);
+            return outcome?.('failed');
+          }
+          setPending({ spec, args, ctx, effect: effectOf(spec, args, ctx), outcome });
           setConfirming(true);
         },
-        () => say(t('exus.failed')),
+        () => {
+          say(t('exus.failed'));
+          outcome?.('failed');
+        },
       );
       return;
     }
-    run(spec, args, ctx);
+    run(spec, args, ctx, outcome);
   };
 
   const pal = palette(draft, commands);
@@ -288,15 +397,24 @@ export default function ExusPage({ navigate }: RouteProps) {
           {messages.map((m) =>
             m.card ? (
               <FormCard
-                key={m.id}
+                key={`${m.id}-${m.card.ai?.version ?? 0}`}
                 spec={m.card.spec}
                 fields={m.card.fields}
                 initial={m.card.initial}
-                onSkip={() => setMessages((all) => all.map((x) => (x.id === m.id ? { id: m.id, from: 'exus', text: t('exus.form.skipped') } : x)))}
+                title={m.card.ai ? t('exus.ai.proposal', { what: t(`exus.commands.${m.card.spec.id}`) }) : undefined}
+                onChange={
+                  m.card.ai
+                    ? (raw) => setMessages((all) => all.map((x) => (x.id === m.id && x.card?.ai ? { ...x, card: { ...x.card, ai: { ...x.card.ai, raw } } } : x)))
+                    : undefined
+                }
+                onSkip={() => {
+                  if (m.card?.ai) note(m.card.spec.id)('skipped');
+                  setMessages((all) => all.map((x) => (x.id === m.id ? { id: m.id, from: 'exus', text: t('exus.form.skipped') } : x)));
+                }}
                 onRun={(args, done) => {
                   const card = m.card!;
                   setMessages((all) => all.map((x) => (x.id === m.id ? { id: m.id, from: 'exus', text: '', done } : x)));
-                  proceed(card.spec, args, card.ctx, whatToDo(card.spec.risk, []) === 'confirm' ? 'confirm' : 'run');
+                  proceed(card.spec, args, card.ctx, whatToDo(card.spec.risk, []) === 'confirm' ? 'confirm' : 'run', card.ai ? note(card.spec.id) : undefined);
                 }}
               />
             ) : m.done ? (
@@ -371,10 +489,11 @@ export default function ExusPage({ navigate }: RouteProps) {
         danger
         onConfirm={() => {
           setConfirming(false);
-          if (pending) run(pending.spec, pending.args, pending.ctx);
+          if (pending) run(pending.spec, pending.args, pending.ctx, pending.outcome);
         }}
         onCancel={() => {
           setConfirming(false);
+          pending?.outcome?.('skipped');
           say(t('exus.cancelled'));
         }}
       />

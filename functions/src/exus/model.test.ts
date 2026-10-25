@@ -96,6 +96,11 @@ describe('fake model (emulator)', () => {
     assert.deepEqual(validateOutput(res, 'pl').actions, []);
   });
 
+  it('turns "usuń" into delete-task of t1 and "zgubiony" into a ref the context never gave', async () => {
+    assert.deepEqual((await ask('Usuń to zadanie')).actions, [{ command: 'delete-task', args: { task: 't1' } }]);
+    assert.deepEqual((await ask('zgubiony')).actions, [{ command: 'complete-task', args: { task: 't9' } }]);
+  });
+
   it('drives the safe paths: malformed, unknown, too many', async () => {
     assert.equal((await ask('zepsuj')).issues.malformed, true);
     const unknown = await ask('nieznana komenda');
