@@ -43,7 +43,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Polityka strony gry: wszystko z tego originu, nic z zewnątrz. Style inline zostają (gry ich używają). */
-const BASE_CSP = [
+export const BASE_CSP = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self' 'unsafe-inline'",
@@ -59,7 +59,7 @@ const BASE_CSP = [
 ].join('; ');
 
 /** Rzeczy, które sięgają poza grę na wspólnym originie; każda wymaga łatki. */
-const FORBIDDEN = [
+export const FORBIDDEN = [
   { pattern: /\b(?:localStorage|sessionStorage)\.clear\s*\(/, why: 'czyści cały magazyn originu, także dane LifeXP' },
   { pattern: /\bindexedDB\.deleteDatabase\s*\(/, why: 'kasuje bazę IndexedDB (Firestore i logowanie LifeXP są w IndexedDB)' },
   { pattern: /\bcaches\.(?:delete|keys)\s*\(/, why: 'sięga do cache Service Workerów LifeXP' },

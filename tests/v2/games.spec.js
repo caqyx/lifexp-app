@@ -20,7 +20,7 @@ const GAME_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>Test<
 </script></body></html>`;
 
 async function serveTestGame(page) {
-  await page.route('**/games/test/index.html', (route) =>
+  await page.route(/\/games\/test\/index\.html(?:\?.*)?$/, (route) =>
     route.fulfill({ status: 200, contentType: 'text/html', body: GAME_PAGE }),
   );
 }
@@ -72,16 +72,17 @@ test.describe('on a phone', () => {
     await expect(cards).toHaveCount(4);
     await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie']);
     for (const card of await cards.all()) await expect(card.getByText('Dziś jeszcze nie grano')).toBeVisible();
-    // Wartime and Gridlock are in (g-2); Flappy Bird and Szybkie liczenie come with g-3 and g-4.
+    // Flappy Bird (g-3), Wartime and Gridlock (g-2) are in; Szybkie liczenie comes with g-4.
+    await expect(page.getByRole('link', { name: 'Graj: Flappy Bird' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Graj: Wartime' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Graj: Gridlock' })).toBeVisible();
-    await expect(cards.filter({ hasText: 'Wkrótce' }).getByRole('heading')).toHaveText(['Flappy Bird', 'Szybkie liczenie']);
+    await expect(cards.filter({ hasText: 'Wkrótce' }).getByRole('heading')).toHaveText(['Szybkie liczenie']);
     // The test game exists only by address, never in the list.
     await expect(page.getByText(GAME)).toHaveCount(0);
     // Nothing sticks out at 360 px.
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(PHONE.width);
 
-    await page.goto(page.url().replace('#/games', '#/games/flappy-bird'));
+    await page.goto(page.url().replace('#/games', '#/games/quick-math'));
     await expect(page.getByText('Wkrótce. Ta gra pojawi się w jednej z kolejnych wersji.')).toBeVisible();
     await page.getByRole('link', { name: 'Wszystkie gry' }).click();
     await expect(page).toHaveURL(/#\/games$/);
@@ -415,6 +416,113 @@ test.describe('Gridlock', () => {
     await expect(game.locator('#menu-coins')).toContainText(String(coins), { timeout: 20000 });
 
     await endAndExpectSession(page, account, 'Gridlock');
+    expect(problems).toEqual([]);
+  });
+});
+
+// ── Flappy Bird (stage g-3): LifeXP's own game, in the same frame and CSP ──
+
+/**
+ * Reopens the game's frame with a seed (?seed=, test only): the same pipes every run,
+ * and the bird's and the next gap's positions on the stage for the autopilot.
+ */
+async function seedFlappy(page, host, seed = 7) {
+  await host.locator('iframe').evaluate((frame, s) => {
+    frame.src = `${frame.src}&seed=${s}`;
+  }, seed);
+  await expect.poll(() => page.frames().some((f) => f.url().includes(`seed=${seed}`))).toBe(true);
+  return page.frames().find((f) => f.url().includes(`seed=${seed}`));
+}
+
+/**
+ * Flies like a player: flaps whenever the bird is falling below the next gap's centre.
+ * Returns a function that lets go of the controls.
+ */
+async function startAutopilot(frame) {
+  const id = await frame.evaluate(() => {
+    const stage = document.getElementById('stage');
+    return setInterval(() => {
+      const y = Number(stage.dataset.debugBirdY);
+      const vy = Number(stage.dataset.debugVy);
+      const gap = Number(stage.dataset.debugGapY || 300);
+      if (stage.dataset.state === 'playing' && y > gap + 14 && vy > 0) {
+        stage.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 }));
+      }
+    }, 8);
+  });
+  return () => frame.evaluate((i) => clearInterval(i), id);
+}
+
+test.describe('Flappy Bird', () => {
+  test.describe('on a touch phone held upright', () => {
+    test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+
+    test('a tap starts, a passed pipe scores, a fall ends it, the best survives a reload, Zakończ records the time', async ({ page, account }) => {
+      test.setTimeout(60000);
+      const problems = await watchProblems(page);
+      await page.clock.install();
+      const { host, game } = await playFromList(page, account, 'Flappy Bird');
+      // Upright is the game's own shape: no "turn your phone", and the world fills the frame's width.
+      await expect(host.getByRole('note')).toHaveCount(0);
+      const frame = await seedFlappy(page, host);
+      const stage = game.locator('#stage');
+      await expect(stage).toHaveAttribute('data-state', 'ready');
+      await expect(game.getByText('Stuknij, żeby zacząć')).toBeVisible(); // ?lang=pl from the host
+      const frameBox = await host.locator('iframe').boundingBox();
+      const stageBox = await stage.boundingBox();
+      expect(Math.abs(stageBox.width - frameBox.width)).toBeLessThan(2);
+
+      await stage.tap();
+      await expect(stage).toHaveAttribute('data-state', 'playing');
+      const release = await startAutopilot(frame);
+      await expect(game.locator('#score')).toHaveText(/^[1-9]\d*$/, { timeout: 20000 });
+      const scored = Number(await game.locator('#score').textContent());
+      expect(scored).toBeGreaterThan(0);
+
+      // Hands off: the bird falls, and the game is over with the score and the record.
+      await release();
+      await expect(stage).toHaveAttribute('data-state', 'over', { timeout: 10000 });
+      const over = game.getByRole('region', { name: 'Koniec gry' });
+      await expect(over).toBeVisible();
+      const score = Number(await game.locator('#over-score').textContent());
+      expect(score).toBeGreaterThanOrEqual(scored);
+      await expect(game.locator('#over-best')).toHaveText(String(score));
+      await expect(over.getByText('Nowy rekord!')).toBeVisible();
+      expect(await page.evaluate(() => localStorage.getItem('lifexp-flappy-best'))).toBe(String(score));
+
+      // "Jeszcze raz" goes back to the ready screen.
+      await over.getByRole('button', { name: 'Jeszcze raz' }).tap();
+      await expect(stage).toHaveAttribute('data-state', 'ready');
+
+      await page.reload();
+      await expect(game.locator('#ready-best')).toHaveText(String(score));
+
+      await endAndExpectSession(page, account, 'Flappy Bird');
+      expect(problems).toEqual([]);
+    });
+  });
+
+  test('sideways 800×360: letterboxed to the full height, Space flaps, and a pipe is passed', async ({ page, account }) => {
+    test.setTimeout(60000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Flappy Bird');
+    const frame = await seedFlappy(page, host, 11);
+    const stage = game.locator('#stage');
+    await expect(stage).toHaveAttribute('data-state', 'ready');
+    const frameBox = await host.locator('iframe').boundingBox();
+    const stageBox = await stage.boundingBox();
+    expect(Math.abs(stageBox.height - frameBox.height)).toBeLessThan(2);
+    expect(stageBox.width).toBeLessThan(frameBox.width);
+    expect(stageBox.x).toBeGreaterThanOrEqual(frameBox.x);
+    expect(stageBox.x + stageBox.width).toBeLessThanOrEqual(frameBox.x + frameBox.width + 1);
+
+    await host.locator('iframe').focus();
+    await page.keyboard.press('Space');
+    await expect(stage).toHaveAttribute('data-state', 'playing');
+    const release = await startAutopilot(frame);
+    await expect(game.locator('#score')).toHaveText(/^[1-9]\d*$/, { timeout: 20000 });
+    await release();
     expect(problems).toEqual([]);
   });
 });

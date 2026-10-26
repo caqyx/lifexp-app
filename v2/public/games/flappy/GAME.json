@@ -1,0 +1,7 @@
+{
+  "game": "flappy",
+  "source": "lifexp",
+  "code": "v2/public/games/flappy",
+  "note": "LifeXP's own game, written in this repo (docs/v2/PLAN.md 9.1, g-3): not a vendored copy, so no VENDORED.json. Its CSP is in index.html; tests/vendor-game.spec.js checks it like a vendored game's.",
+  "tests": ["v2/tests/flappy.test.ts", "tests/v2/games.spec.js"]
+}

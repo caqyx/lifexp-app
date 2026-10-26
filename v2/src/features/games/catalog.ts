@@ -1,7 +1,8 @@
 // The games of v2 (owner's decision 2026-10-26: exactly these four; v1's Coins, Snake,
 // 2048, Redstone and FPS stay in v1 until the cutover). A game with `src` runs in
 // GameHost; without one it is shown as "Wkrótce" until its stage (g-2..g-4) adds it.
-// Vendored games live in v2/public/games/<id>/ (scripts/vendor-game.mjs).
+// Vendored games live in v2/public/games/<id>/ (scripts/vendor-game.mjs, VENDORED.json);
+// Flappy Bird is LifeXP's own, written in this repo in v2/public/games/flappy/ (GAME.json).
 import { Bird, Calculator, FlaskConical, Grid3x3, type LucideIcon, Swords } from 'lucide-preact';
 import { emulatorTarget } from '@/lib/emulator';
 
@@ -24,7 +25,7 @@ export interface GameDef {
 }
 
 export const GAMES: readonly GameDef[] = [
-  { id: 'flappy-bird', sessionName: 'Flappy Bird', icon: Bird, src: null },
+  { id: 'flappy-bird', sessionName: 'Flappy Bird', icon: Bird, src: 'games/flappy/index.html' },
   { id: 'wartime', sessionName: 'Wartime', icon: Swords, src: 'games/wartime/index.html', landscape: true, downloads: true },
   { id: 'gridlock', sessionName: 'Gridlock', icon: Grid3x3, src: 'games/gridlock/index.html' },
   { id: 'quick-math', sessionName: 'Szybkie liczenie', icon: Calculator, src: null },
@@ -48,4 +49,13 @@ function onEmulators(): boolean {
 export function gameById(id: string): GameDef | null {
   if (id === TEST_GAME.id) return onEmulators() ? TEST_GAME : null;
   return GAMES.find((g) => g.id === id) ?? null;
+}
+
+/**
+ * The game's page with the app's language (?lang=pl|en): a framed page cannot use the
+ * app's i18n, so a game that has texts of its own (Flappy Bird) reads it from there;
+ * the vendored games ignore it.
+ */
+export function frameSrc(src: string, lang: string): string {
+  return `${src}${src.includes('?') ? '&' : '?'}lang=${encodeURIComponent(lang)}`;
 }
