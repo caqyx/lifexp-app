@@ -34,7 +34,8 @@ const HTML_INJECTION = 'HTML wstawia wyłącznie komponent Markdown (sanityzowan
 
 export default tseslint.config(
   // Vendored games are copies of other repositories (scripts/vendor-game.mjs), not v2 code.
-  { ignores: ['dist/**', 'node_modules/**', 'public/games/**'] },
+  // Flappy Bird (public/games/flappy) is LifeXP's own game and is linted like v2 code.
+  { ignores: ['dist/**', 'node_modules/**', 'public/games/*', '!public/games/flappy/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -62,6 +63,23 @@ export default tseslint.config(
     },
   },
   ...layerRules,
+  {
+    // Flappy Bird runs in GameHost's frame as plain ES modules (no build step), with its
+    // own CSP: no eval, no HTML strings, nothing global.
+    files: ['public/games/flappy/**/*.js'],
+    languageOptions: { globals: globals.browser, sourceType: 'module' },
+    rules: {
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-func': 'error',
+      'no-restricted-syntax': ['error',
+        { selector: 'AssignmentExpression > MemberExpression.left[property.name=/^(inner|outer)HTML$/]', message: 'Tekst przez textContent.' },
+        { selector: "CallExpression[callee.property.name='insertAdjacentHTML']", message: 'Tekst przez textContent.' },
+        { selector: "AssignmentExpression > MemberExpression.left[object.name='window']", message: 'Bez globali na window.' },
+        { selector: "CallExpression[callee.property.name='clear'][callee.object.name=/^(localStorage|sessionStorage)$/]", message: 'Gra kasuje tylko swój klucz (lifexp-flappy-best).' },
+      ],
+    },
+  },
   {
     files: ['*.{js,ts}', 'tests/**/*.ts', 'tools/**/*.{ts,mjs}'],
     languageOptions: { globals: globals.node },

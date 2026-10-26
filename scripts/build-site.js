@@ -2,7 +2,7 @@
  * Składa stronę GitHub Pages z dwóch części (PLAN.md 3.1):
  *   /      — pliki v1 z katalogu głównego repo, bez żadnych zmian,
  *   /v2/   — zbudowane v2 (najpierw: npm run build --prefix v2), z grami w /v2/games/<id>/
- *            (v2/public/games, kopie z scripts/vendor-game.mjs).
+ *            (v2/public/games: kopie z scripts/vendor-game.mjs i własny Flappy Bird).
  *
  * Do czasu tego skryptu Pages publikowało cały katalog główny. Teraz narzędzia
  * deweloperskie (testy, skrypty, dokumentacja, v2/src) zostają poza stroną,
@@ -87,18 +87,35 @@ function missingReferences() {
   // 3. v2.
   expect(path.join(OUT, 'v2', 'index.html'), path.join(OUT, 'v2'));
 
-  // 4. Gry v2 (v2/public/games → /v2/games/<id>/, scripts/vendor-game.mjs): każda ze stroną
-  //    i z VENDORED.json, który mówi, skąd i z którego commitu jest kopia.
+  // 4. Gry v2 (v2/public/games → /v2/games/<id>/): każda ze stroną z CSP i z metryczką:
+  //    kopia (scripts/vendor-game.mjs) ma VENDORED.json, który mówi, skąd i z którego
+  //    commitu jest; gra LifeXP pisana w tym repo (Flappy Bird) ma GAME.json z
+  //    "source": "lifexp", zamiast udawać kopię.
   const gamesDir = path.join(OUT, 'v2', 'games');
   if (fs.existsSync(gamesDir)) {
     for (const id of fs.readdirSync(gamesDir)) {
       const dir = path.join(gamesDir, id);
       if (!fs.statSync(dir).isDirectory()) continue;
-      expect(path.join(dir, 'index.html'), dir);
-      expect(path.join(dir, 'VENDORED.json'), dir);
+      const page = path.join(dir, 'index.html');
+      expect(page, dir);
+      if (fs.existsSync(page) && !/http-equiv=["']Content-Security-Policy["']/i.test(fs.readFileSync(page, 'utf8'))) {
+        missing.add(`${path.relative(OUT, page)}: brak Content-Security-Policy`);
+      }
+      if (!fs.existsSync(path.join(dir, 'VENDORED.json')) && gameSource(dir) !== 'lifexp') {
+        missing.add(`${path.relative(OUT, dir)}/VENDORED.json (albo GAME.json z "source": "lifexp")`);
+      }
     }
   }
   return [...missing].sort();
+}
+
+/** "source" z GAME.json gry pisanej w tym repo, albo null. */
+function gameSource(dir) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dir, 'GAME.json'), 'utf8')).source ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function main() {

@@ -9,16 +9,17 @@
 // (GameDef.downloads: Wartime's save export). With these two flags the sandbox
 // does not wall the game off from this page, so the trust lies in what is framed:
 // only files vendored into this repo from the owner's own repositories at a pinned
-// commit (scripts/vendor-game.mjs, VENDORED.json). The vendoring script removes
+// commit (scripts/vendor-game.mjs, VENDORED.json), or LifeXP's own game written in
+// this repo (Flappy Bird, v2/public/games/flappy, GAME.json). The vendoring script removes
 // third-party scripts (Gridlock's CrazyGames SDK), refuses a copy that still names an
 // external host, and writes a Content-Security-Policy into each game page that allows
 // only this origin: a game cannot load or send anything elsewhere (children play).
 import { RotateCcw, X } from 'lucide-preact';
 import { createPortal } from 'preact/compat';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { t } from '@/i18n';
+import { language, t } from '@/i18n';
 import { Button } from '@/ui/components/Button';
-import type { GameDef } from './catalog';
+import { frameSrc, type GameDef } from './catalog';
 import { usePlayTime } from './usePlayTime';
 
 interface GameHostProps {
@@ -57,7 +58,7 @@ export function GameHost({ uid, game, onExit }: GameHostProps) {
       <iframe
         ref={frame}
         class="game-host__frame"
-        src={game.src}
+        src={frameSrc(game.src, language.value)}
         title={t('games.frameTitle', { name })}
         sandbox={`allow-scripts allow-same-origin${game.downloads ? ' allow-downloads' : ''}`}
         allow=""

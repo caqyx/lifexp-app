@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Flappy Bird</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<main id="stage" class="stage" data-state="ready">
+  <canvas id="board" class="board" role="img"></canvas>
+
+  <p id="score" class="score" aria-hidden="true">0</p>
+
+  <section id="ready" class="panel panel--ready" aria-labelledby="ready-title">
+    <h1 id="ready-title" class="panel__title" data-t="title"></h1>
+    <p class="pill" data-t="start"></p>
+    <div class="panel__foot">
+      <p class="panel__best"><span data-t="best"></span> <strong id="ready-best">0</strong></p>
+      <p class="panel__hint" data-t="hint"></p>
+    </div>
+  </section>
+
+  <section id="over" class="panel panel--over" aria-labelledby="over-title" aria-live="polite">
+    <div class="card">
+      <h2 id="over-title" class="card__title" data-t="over"></h2>
+      <p id="new-best" class="badge" data-t="newBest"></p>
+      <dl class="results">
+        <div class="results__item"><dt data-t="score"></dt><dd id="over-score">0</dd></div>
+        <div class="results__item"><dt data-t="best"></dt><dd id="over-best">0</dd></div>
+      </dl>
+      <button id="again" class="button" type="button" data-t="again"></button>
+    </div>
+  </section>
+
+  <section id="paused" class="panel panel--paused" aria-labelledby="paused-title">
+    <div class="card">
+      <h2 id="paused-title" class="card__title" data-t="paused"></h2>
+      <p class="card__body" data-t="resume"></p>
+    </div>
+  </section>
+</main>
+</body>
+</html>
