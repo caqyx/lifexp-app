@@ -8,6 +8,11 @@
 // - Updates install in the background and take over at once, without reloading
 //   anyone: an open page keeps running, and app/pwa.ts reloads it only if it asks
 //   for a chunk the deploy removed.
+// - Games (public/games/<id>/, stage g-1) are not precached (Wartime alone is ~4.5 MB):
+//   each file is cached the first time it is played and served from there, while the
+//   network refreshes it in the background (a re-vendored game arrives on the next
+//   play). The game's own page is a frame navigation, so the app shell's navigation
+//   route leaves it alone.
 // - Only same-origin GETs are touched; Firebase traffic goes straight to the network.
 // - Push (stage 6-8): shows the reminders and opens their link on a tap (swPush.ts).
 //   v2 does not subscribe before the cutover (R7), so until then nothing arrives here.
@@ -15,6 +20,7 @@
 import { clientsClaim, setCacheNameDetails } from 'workbox-core';
 import { addRoute, cleanupOutdatedCaches, matchPrecache, precache, type PrecacheEntry } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
+import { StaleWhileRevalidate } from 'workbox-strategies';
 import { clickUrl, parsePushData, readPush } from './swPush';
 
 declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: (string | PrecacheEntry)[] };
@@ -37,6 +43,15 @@ async function networkFirstShell(request: Request): Promise<Response> {
     return (await shell()) ?? Response.error();
   }
 }
+
+/** Everything under games/ next to the worker (its scope), the frame's page included. */
+const GAMES_PREFIX = () => new URL('games/', self.registration.scope).href;
+
+// First, so a game's page (a navigation inside the frame) is never answered with the app shell.
+registerRoute(
+  ({ url, request }) => request.method === 'GET' && url.href.startsWith(GAMES_PREFIX()),
+  new StaleWhileRevalidate({ cacheName: 'lifexp-v2-games' }),
+);
 
 // Registered before the precache route, so navigations (including ./ and
 // ./index.html) are network first instead of being answered from the precache.

@@ -1,7 +1,8 @@
 /**
  * Składa stronę GitHub Pages z dwóch części (PLAN.md 3.1):
  *   /      — pliki v1 z katalogu głównego repo, bez żadnych zmian,
- *   /v2/   — zbudowane v2 (najpierw: npm run build --prefix v2).
+ *   /v2/   — zbudowane v2 (najpierw: npm run build --prefix v2), z grami w /v2/games/<id>/
+ *            (v2/public/games, kopie z scripts/vendor-game.mjs).
  *
  * Do czasu tego skryptu Pages publikowało cały katalog główny. Teraz narzędzia
  * deweloperskie (testy, skrypty, dokumentacja, v2/src) zostają poza stroną,
@@ -85,6 +86,18 @@ function missingReferences() {
 
   // 3. v2.
   expect(path.join(OUT, 'v2', 'index.html'), path.join(OUT, 'v2'));
+
+  // 4. Gry v2 (v2/public/games → /v2/games/<id>/, scripts/vendor-game.mjs): każda ze stroną
+  //    i z VENDORED.json, który mówi, skąd i z którego commitu jest kopia.
+  const gamesDir = path.join(OUT, 'v2', 'games');
+  if (fs.existsSync(gamesDir)) {
+    for (const id of fs.readdirSync(gamesDir)) {
+      const dir = path.join(gamesDir, id);
+      if (!fs.statSync(dir).isDirectory()) continue;
+      expect(path.join(dir, 'index.html'), dir);
+      expect(path.join(dir, 'VENDORED.json'), dir);
+    }
+  }
   return [...missing].sort();
 }
 

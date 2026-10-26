@@ -21,6 +21,9 @@ export default defineConfig({
         // Classic script: module Service Workers are too new on older iPhones.
         rollupFormat: 'iife',
         globPatterns: ['**/*.{js,css,html,woff2,png,webmanifest}'],
+        // Vendored games (public/games, stage g-1) are cached when first played, not
+        // installed with the app: Wartime alone is ~4.5 MB (src/sw.ts).
+        globIgnores: ['games/**'],
       },
       manifest: {
         // Its own name while v1 and v2 live side by side, so two installed icons are told apart.

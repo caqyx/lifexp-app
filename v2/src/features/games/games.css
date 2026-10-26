@@ -1,0 +1,172 @@
+/* Games (stage g-1). */
+
+.games-note {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.games-error {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-negative) 12%, transparent);
+  color: var(--color-negative);
+  font-weight: var(--font-weight-medium);
+}
+
+.games-list {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (min-width: 720px) {
+  .games-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.game-card,
+.game-card > .ui-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.game-card > .ui-card {
+  flex: 1;
+  gap: var(--space-4);
+}
+
+.game-card__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.game-card__text {
+  min-width: 0;
+}
+
+.game-card__name {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.game-card__desc {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.game-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: auto;
+}
+
+.game-card__today {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.game-card__today svg,
+.game-card__foot .ui-button svg,
+.game-host__bar .ui-button svg,
+.game-host__hint svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+.game-card__soon {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ── The host: the whole screen, above the shell, inside the safe areas ── */
+
+.game-host {
+  position: fixed;
+  z-index: var(--z-dialog);
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: var(--color-bg);
+  animation: game-host-in var(--duration-enter) var(--ease-out);
+}
+
+@keyframes game-host-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.game-host__bar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.game-host__title {
+  overflow: hidden;
+  min-width: 0;
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Only for a game that wants the phone sideways, and only while it is held upright. */
+.game-host__hint {
+  display: none;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.game-host__hint span {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (orientation: portrait) and (max-width: 719px) {
+  .game-host__hint {
+    display: flex;
+  }
+}
+
+.game-host__frame {
+  display: block;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  background: var(--color-bg);
+}

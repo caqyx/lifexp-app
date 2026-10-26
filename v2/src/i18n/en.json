@@ -917,7 +917,7 @@
       "money": "Income, expenses, categories and loans.",
       "notes": "A notebook.",
       "stats": "Points, level and streak on Today, logging activities, history, stats and badges.",
-      "games": "Offline mini-games, no points.",
+      "games": "Games in the app; playing time counts itself, no points.",
       "aichat": "An AI assistant that helps you log and plan."
     },
     "theme": "Theme",
@@ -1667,5 +1667,37 @@
     "verifyRecheck": "Check again",
     "verifySent": "The link went to {{email}}. Check the spam folder too.",
     "verifyNotYet": "The address is not verified yet. Open the link from the e-mail and try again."
+  },
+  "games": {
+    "names": {
+      "flappy-bird": "Flappy Bird",
+      "wartime": "Wartime",
+      "gridlock": "Gridlock",
+      "quick-math": "Quick Math",
+      "test": "Test game"
+    },
+    "descriptions": {
+      "flappy-bird": "Fly the bird between the pipes. One tap, one flap.",
+      "wartime": "Turn-based strategy: Europe, Asia and Africa, from 1385 to 2026.",
+      "gridlock": "A neon arcade game: dodge the lasers on a 16×16 grid.",
+      "quick-math": "Mental maths against the clock: difficulty levels and records.",
+      "test": "A game for automated tests."
+    },
+    "play": "Play",
+    "soon": "Coming soon",
+    "soonBody": "This game arrives in one of the next versions.",
+    "today": "Today: {{time}}",
+    "todayNone": "Not played today",
+    "todayLoading": "Today: …",
+    "timeNote": "Playing time counts itself while a game is on screen. Playing costs no points.",
+    "exit": "Exit",
+    "frameTitle": "Game: {{name}}",
+    "rotate": "This game is easier to play sideways. Turn your phone.",
+    "rotateDismiss": "OK",
+    "saved": "Saved {{time}} of gaming.",
+    "saveFailed": "Could not save the playing time.",
+    "loadFailed": "Could not load today's playing time.",
+    "notFound": "There is no such game.",
+    "back": "All games"
   }
 }

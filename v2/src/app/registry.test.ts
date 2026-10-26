@@ -21,6 +21,7 @@ describe('module registry', () => {
       '/settings/theme': 'settings',
       '/exus': 'exus',
       '/games': 'games',
+      '/games/wartime': 'games',
     };
     for (const [path, id] of Object.entries(expected)) expect(resolveRoute(path)?.feature.id, path).toBe(id);
   });
