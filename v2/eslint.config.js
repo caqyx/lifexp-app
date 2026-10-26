@@ -34,8 +34,8 @@ const HTML_INJECTION = 'HTML wstawia wyłącznie komponent Markdown (sanityzowan
 
 export default tseslint.config(
   // Vendored games are copies of other repositories (scripts/vendor-game.mjs), not v2 code.
-  // Flappy Bird (public/games/flappy) is LifeXP's own game and is linted like v2 code.
-  { ignores: ['dist/**', 'node_modules/**', 'public/games/*', '!public/games/flappy/'] },
+  // LifeXP's own games (Flappy Bird, Szybkie liczenie: GAME.json) are linted like v2 code.
+  { ignores: ['dist/**', 'node_modules/**', 'public/games/*', '!public/games/flappy/', '!public/games/quick-math/'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -64,9 +64,9 @@ export default tseslint.config(
   },
   ...layerRules,
   {
-    // Flappy Bird runs in GameHost's frame as plain ES modules (no build step), with its
-    // own CSP: no eval, no HTML strings, nothing global.
-    files: ['public/games/flappy/**/*.js'],
+    // LifeXP's own games run in GameHost's frame as plain ES modules (no build step),
+    // with their own CSP: no eval, no HTML strings, nothing global.
+    files: ['public/games/flappy/**/*.js', 'public/games/quick-math/**/*.js'],
     languageOptions: { globals: globals.browser, sourceType: 'module' },
     rules: {
       'no-eval': 'error',
@@ -76,7 +76,7 @@ export default tseslint.config(
         { selector: 'AssignmentExpression > MemberExpression.left[property.name=/^(inner|outer)HTML$/]', message: 'Tekst przez textContent.' },
         { selector: "CallExpression[callee.property.name='insertAdjacentHTML']", message: 'Tekst przez textContent.' },
         { selector: "AssignmentExpression > MemberExpression.left[object.name='window']", message: 'Bez globali na window.' },
-        { selector: "CallExpression[callee.property.name='clear'][callee.object.name=/^(localStorage|sessionStorage)$/]", message: 'Gra kasuje tylko swój klucz (lifexp-flappy-best).' },
+        { selector: "CallExpression[callee.property.name='clear'][callee.object.name=/^(localStorage|sessionStorage)$/]", message: 'Gra kasuje tylko swoje klucze (lifexp-flappy-*, lifexp-quickmath-*).' },
       ],
     },
   },

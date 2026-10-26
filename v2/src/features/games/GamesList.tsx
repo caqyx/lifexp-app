@@ -1,5 +1,4 @@
-// The four games as cards: name, one line about it, today's play time and "Graj"
-// (or "Wkrótce" until its stage adds it).
+// The four games as cards: name, one line about it, today's play time and "Graj".
 import { Clock, Play } from 'lucide-preact';
 import { minutesByGame } from '@/domain/gaming';
 import { t } from '@/i18n';
@@ -35,14 +34,10 @@ function GameCard({ game, minutes }: { game: GameDef; minutes: number | undefine
           <Clock aria-hidden="true" />
           {todayText(minutes)}
         </p>
-        {game.src ? (
-          <ButtonLink variant="primary" href={`#/games/${game.id}`} label={t('games.playNamed', { name })}>
-            <Play aria-hidden="true" />
-            {t('games.play')}
-          </ButtonLink>
-        ) : (
-          <span class="game-card__soon">{t('games.soon')}</span>
-        )}
+        <ButtonLink variant="primary" href={`#/games/${game.id}`} label={t('games.playNamed', { name })}>
+          <Play aria-hidden="true" />
+          {t('games.play')}
+        </ButtonLink>
       </div>
       </Card>
     </li>

@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Szybkie liczenie</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<main id="app" class="app" data-screen="start">
+
+  <section id="start" class="screen screen--start" aria-labelledby="start-title">
+    <header class="start__head">
+      <h1 id="start-title" class="start__title" data-t="title"></h1>
+      <p class="start__intro" data-t="intro"></p>
+    </header>
+    <div class="segmented" role="radiogroup" aria-labelledby="mode-label">
+      <span id="mode-label" class="visually-hidden" data-t="mode"></span>
+      <button class="segmented__option" type="button" role="radio" aria-checked="true" data-mode="timed">
+        <span data-t="timed"></span> <span id="round-length" class="segmented__meta"></span>
+      </button>
+      <button class="segmented__option" type="button" role="radio" aria-checked="false" data-mode="practice">
+        <span data-t="practice"></span>
+      </button>
+    </div>
+    <h2 class="start__pick" data-t="pickLevel"></h2>
+    <ul class="levels">
+      <li>
+        <button class="level" type="button" data-level="easy">
+          <span class="level__badge" aria-hidden="true">1</span>
+          <span class="level__text"><span class="level__name" data-t="level.easy"></span><span class="level__desc" data-t="levelDesc.easy"></span></span>
+          <span class="level__best"><span data-t="best"></span> <strong data-best="easy">0</strong></span>
+        </button>
+      </li>
+      <li>
+        <button class="level" type="button" data-level="medium">
+          <span class="level__badge" aria-hidden="true">2</span>
+          <span class="level__text"><span class="level__name" data-t="level.medium"></span><span class="level__desc" data-t="levelDesc.medium"></span></span>
+          <span class="level__best"><span data-t="best"></span> <strong data-best="medium">0</strong></span>
+        </button>
+      </li>
+      <li>
+        <button class="level" type="button" data-level="hard">
+          <span class="level__badge" aria-hidden="true">3</span>
+          <span class="level__text"><span class="level__name" data-t="level.hard"></span><span class="level__desc" data-t="levelDesc.hard"></span></span>
+          <span class="level__best"><span data-t="best"></span> <strong data-best="hard">0</strong></span>
+        </button>
+      </li>
+    </ul>
+    <p class="start__hint" data-t="keysHint"></p>
+  </section>
+
+  <section id="play" class="screen screen--play" aria-labelledby="play-level">
+    <header class="hud">
+      <div class="hud__row">
+        <p class="hud__level" id="play-level"></p>
+        <p class="hud__score"><span data-t="score"></span> <strong id="score" class="numeric">0</strong></p>
+        <p id="combo" class="combo"><span data-t="combo"></span> <strong id="combo-mult" class="numeric">×1</strong></p>
+        <p class="hud__time"><span class="visually-hidden" data-t="timeLeft"></span><strong id="time" class="numeric"></strong></p>
+        <button id="end-practice" class="chip" type="button" data-t="endPractice"></button>
+      </div>
+      <div class="timer" aria-hidden="true"><div id="timer-fill" class="timer__fill"></div></div>
+    </header>
+
+    <div class="board">
+      <div id="card" class="card">
+        <p id="question" class="question" aria-live="polite" aria-atomic="true">
+          <span id="question-text" class="question__text numeric" aria-hidden="true"></span>
+          <span id="question-spoken" class="visually-hidden"></span>
+        </p>
+        <p class="answer">
+          <span class="visually-hidden" data-t="answer"></span>
+          <s id="answer-wrong" class="answer__wrong numeric"></s>
+          <span id="answer" class="answer__value numeric"></span>
+        </p>
+        <p id="feedback" class="feedback" role="status"></p>
+        <span id="points-pop" class="points-pop numeric" aria-hidden="true"></span>
+      </div>
+    </div>
+
+    <div id="keypad" class="keypad" role="group" aria-labelledby="keypad-label">
+      <span id="keypad-label" class="visually-hidden" data-t="keypad"></span>
+      <button class="key key--digit" type="button" data-key="7">7</button>
+      <button class="key key--digit" type="button" data-key="8">8</button>
+      <button class="key key--digit" type="button" data-key="9">9</button>
+      <button class="key key--back" type="button" data-key="back">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d="M21 5H9l-6 7 6 7h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="m12 9 6 6m0-6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span data-t="back"></span>
+      </button>
+      <button class="key key--digit" type="button" data-key="4">4</button>
+      <button class="key key--digit" type="button" data-key="5">5</button>
+      <button class="key key--digit" type="button" data-key="6">6</button>
+      <button class="key key--minus" type="button" data-key="minus" data-t-label="minus">−</button>
+      <button class="key key--digit" type="button" data-key="1">1</button>
+      <button class="key key--digit" type="button" data-key="2">2</button>
+      <button class="key key--digit" type="button" data-key="3">3</button>
+      <button class="key key--ok" type="button" data-key="ok" data-t="ok"></button>
+      <button class="key key--digit key--zero" type="button" data-key="0">0</button>
+    </div>
+  </section>
+
+  <section id="end" class="screen screen--end" aria-labelledby="end-title">
+    <div class="end-card">
+      <div class="end__summary">
+        <h2 id="end-title" class="end__title"></h2>
+      <p id="end-level" class="end__level"></p>
+      <p class="end__score"><strong id="end-score" class="numeric">0</strong> <span data-t="score"></span></p>
+      <p id="end-new-best" class="badge" data-t="newBest"></p>
+      <div class="end__actions">
+        <button id="again" class="button button--primary" type="button" data-t="again"></button>
+        <button id="change" class="button button--secondary" type="button" data-t="change"></button>
+      </div>
+      </div>
+      <div class="end__details">
+      <dl class="stats">
+        <div class="stats__item"><dt data-t="accuracy"></dt><dd id="end-accuracy" class="numeric"></dd></div>
+        <div class="stats__item"><dt data-t="perMinute"></dt><dd id="end-per-minute" class="numeric"></dd></div>
+        <div class="stats__item"><dt data-t="streak"></dt><dd id="end-streak" class="numeric"></dd></div>
+      </dl>
+      <h3 class="end__records-title" data-t="records"></h3>
+      <ul class="records">
+        <li class="records__item" data-record="easy"><span data-t="level.easy"></span><strong class="numeric" data-best="easy">0</strong></li>
+        <li class="records__item" data-record="medium"><span data-t="level.medium"></span><strong class="numeric" data-best="medium">0</strong></li>
+        <li class="records__item" data-record="hard"><span data-t="level.hard"></span><strong class="numeric" data-best="hard">0</strong></li>
+      </ul>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

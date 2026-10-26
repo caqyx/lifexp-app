@@ -11,22 +11,10 @@ import { account } from '@/stores/session';
 import { ButtonLink } from '@/ui/components/ButtonLink';
 import { EmptyState } from '@/ui/components/Display';
 import { Card, Page, Stack } from '@/ui/components/Layout';
-import { gameById, type GameDef } from './catalog';
+import { gameById } from './catalog';
 import { GameHost } from './GameHost';
 import { GamesList } from './GamesList';
 import './games.css';
-
-function SoonPage({ game }: { game: GameDef }) {
-  return (
-    <Card>
-      <EmptyState
-        title={t(`games.names.${game.id}`)}
-        body={`${t('games.soon')}. ${t('games.soonBody')}`}
-        action={<ButtonLink href="#/games">{t('games.back')}</ButtonLink>}
-      />
-    </Card>
-  );
-}
 
 export default function GamesModule({ params, navigate }: RouteProps) {
   const current = account.value;
@@ -41,25 +29,15 @@ export default function GamesModule({ params, navigate }: RouteProps) {
   if (!current || !uid) return null;
 
   const game = params.id ? gameById(params.id) : null;
-  if (params.id && game?.src) {
-    const src = game.src;
-    return <GameHost key={game.id} uid={uid} game={{ ...game, src }} onExit={() => navigate('/games')} />;
-  }
+  if (game) return <GameHost key={game.id} uid={uid} game={game} onExit={() => navigate('/games')} />;
 
   return (
     <Page>
       <Stack>
         {params.id ? (
-          game ? (
-            <SoonPage game={game} />
-          ) : (
-            <Card>
-              <EmptyState
-                title={t('games.notFound')}
-                action={<ButtonLink href="#/games">{t('games.back')}</ButtonLink>}
-              />
-            </Card>
-          )
+          <Card>
+            <EmptyState title={t('games.notFound')} action={<ButtonLink href="#/games">{t('games.back')}</ButtonLink>} />
+          </Card>
         ) : (
           <GamesList state={gamingDay.value} />
         )}

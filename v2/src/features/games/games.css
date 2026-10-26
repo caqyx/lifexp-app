@@ -90,14 +90,6 @@
   height: 18px;
 }
 
-.game-card__soon {
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-raised);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-}
 
 /* ── The host: the whole screen, above the shell, inside the safe areas ── */
 

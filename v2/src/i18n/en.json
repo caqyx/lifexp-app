@@ -1685,8 +1685,6 @@
     },
     "play": "Play",
     "playNamed": "Play: {{name}}",
-    "soon": "Coming soon",
-    "soonBody": "This game arrives in one of the next versions.",
     "today": "Today: {{time}}",
     "todayNone": "Not played today",
     "todayLoading": "Today: …",
