@@ -854,7 +854,7 @@ max 3 cele, max 30 zadań itd. egzekwowane w jednym miejscu).
 | `edit-pending` | — | `<ref karty> <zmienione args>` | read | tak (tylko AI) | aktualizuje niezatwierdzoną kartę (U10) |
 | **XP / aktywności** | | | | | |
 | `/log-activity` | `/aktywnosc` | `<typ> <czas> [opis]` | write | tak | `activity.log` |
-| `/log-gaming` | `/granie` | `<gra> <czas> [data]` | write | tak | `gaming.log` |
+| `/log-gaming` | `/granie` | `<gra> <czas> [data]` | write | tak | `gaming.log` — **w v2 nie ma tej komendy** (5a-9); od etapu gier (g-1) czas grania w grach v2 liczy się sam |
 | `/delete-activity` | `/usun-aktywnosc` | `[ostatnia\|ref]` | destructive | tak | `activity.delete` |
 | `/what-now` | `/co-teraz` | `<czas>` | read | tak | generator |
 | `/streak` | `/seria` | — | read | tak | domena streak |
@@ -1510,6 +1510,26 @@ serwera (test regresyjny `features/exus/choreHandlers.test.ts`). Etap zamyka wł
 
 
 
+**Etap gier (decyzje właściciela 2026-10-26)**
+
+1. v2 ma dokładnie 4 gry: Flappy Bird (piszemy sami), Wartime i Gridlock właściciela oraz „Szybkie liczenie”
+   (liczenie w pamięci na czas, poziomy trudności, rekordy). Stare gry v1 (Coins, Snake, 2048, Redstone, FPS) nie
+   przechodzą do v2; działają w v1 do cutover (D5).
+2. Czas grania liczy się sam i nie kosztuje punktów. Zapis jak w v1 (`activities.js` `persistGamingSession`):
+   `dailyLog/{dzień UTC}.gamingMinutes` w górę i dokument `gamingSessions` `{game, duration, date, timestamp}` tego
+   samego kształtu i typów. (Kod v1 przy ręcznym logowaniu grania też nie odejmuje punktów — zapisuje tylko te dwie
+   rzeczy.) Dzięki temu widok rodzica, raport tygodniowy i powiadomienie rodzica o 60 min (6-3b) widzą granie z v2.
+   Komenda `/granie` zostaje poza Ex-us (5a-9): czas jest teraz automatyczny.
+3. Wartime i Gridlock są kopiami w tym repo (`v2/public/games/<id>/`, publikowane pod `/v2/games/<id>/`). Nowa wersja
+   gry = ponowne uruchomienie jednego skryptu `scripts/vendor-game.mjs <id> <katalog-źródła>` i commit wyniku.
+
+| PR | Zakres | Stan |
+|---|---|---|
+| g-1 | Moduł `#/games` (rejestr: ścieżki `/games` i `/games/:id`, menu „Gry” z ikoną; id modułu `games` z v1 — ten sam przełącznik `enabledModules`, schemat bez zmian; `/idz gry` w Ex-us): karty 4 gier (nazwa, jedno zdanie, ikona, czas grania dziś z `gamingSessions` dnia UTC, „Graj” albo „Wkrótce”), każda gra pod własnym adresem, gra bez plików pokazuje „Wkrótce”. **Host gry** (`features/games/GameHost.tsx`): cały ekran nad powłoką (portal do `body`, obszary bezpieczne, przycisk „Zakończ”, prośba o obrót telefonu dla gier poziomych, np. Wartime), gra w `<iframe sandbox="allow-scripts allow-same-origin">` z pustym `allow`: gry trzymają zapisy i rekordy w `localStorage`, którego ramka z nieprzezroczystym originem nie ma, więc ramka jest same-origin; zaufanie opiera się na tym, co jest w ramce — wyłącznie kopie z repozytoriów właściciela z przypiętym commitem, bez skryptów zewnętrznych i z CSP tylko na ten origin (niżej). **Czas grania** (`domain/gaming.ts`, `services/gaming.ts`, `data/repos/gaming.ts`, `features/games/usePlayTime.ts`): liczy się tylko, gdy karta jest widoczna (`visibilitychange`); sesja krótsza niż 30 s nie jest zapisywana; minuty zaokrąglane do najbliższej pełnej (30 s = 1 min, jak całkowite minuty v1), najwyżej 1440 na sesję jak w v1; **północ UTC: cała sesja idzie na dzień UTC, w którym się kończy** (v1 zapisuje jeden dokument z jedną datą, a formularz podpowiada dzień zapisu, czyli po graniu), bez dzielenia. Zapis przy wyjściu („Zakończ”, „Wstecz”, zmiana ekranu) jednym atomowym batchem, nie transakcją (nic nie trzeba czytać, a batch Firestore kolejkuje offline): dokument sesji pod id nadanym na starcie + `dailyLog` przez `set` z `merge` i `increment` (`pointsEarned: increment(0)` daje dzień v1 `{pointsEarned: 0, gamingMinutes}` bez ruszania punktów); punkty profilu bez zmian. Karta ukryta: zegar staje, a kopia sesji czeka w `localStorage` (`lifexp-v2-gaming-pending`), bo telefon może zabić ukrytą kartę bez `pagehide`; `pagehide` zapisuje sesję „na próbę” i zostawia kopię; następne wejście w Gry zapisuje kopie innych wczytań strony transakcją tylko wtedy, gdy serwer nie ma dokumentu o tym id (po `waitForPendingWrites`), więc sesja trafia do bazy raz. **Skrypt kopiowania** `scripts/vendor-game.mjs` (użyty w g-2): tylko pliki gry z listy, łatki per gra, które muszą trafić dokładnie raz (Gridlock: bez skryptu CrazyGames SDK, kontrola `ADS_ENABLED = false`), CSP w każdej stronie gry (`default-src 'self'`, `connect-src 'self'`…), odmowa przy adresie zewnętrznego hosta albo niezapisanych zmianach w źródle, `VENDORED.json` (repozytorium, commit, data, łatki); `scripts/build-site.js` sprawdza, że każda gra w `/v2/games/` ma `index.html` i `VENDORED.json`. **SW v2:** gry poza precache (`globIgnores`, Wartime ma ok. 4,5 MB), cache `lifexp-v2-games` przy pierwszym graniu (stale-while-revalidate), trasa przed trasą nawigacji, więc strona gry w ramce nie dostaje powłoki aplikacji. Testy: domena (widoczność, minimum, zaokrąglenie, północ UTC, kopie), konwerter, skrypt kopiowania (`tests/vendor-game.spec.js`), e2e `tests/v2/games.spec.js` (lista na 360 px, gra testowa tylko na emulatorach z zegarem Playwright, przerwa w widoczności, krótka sesja, dzień z punktami, zamknięcie karty, kopia z zabitej karty zapisana raz, parytet: v1 zapisuje ten sam kształt i pokazuje sesję z v2 w historii) | w toku |
+| g-2 | Wartime i Gridlock: skopiowane skryptem z g-1, w katalogu z „Graj”; telefon, offline po pierwszym graniu, zapisy gier w `localStorage` | plan |
+| g-3 | Flappy Bird (własna gra) | plan |
+| g-4 | Szybkie liczenie: działania na czas, poziomy trudności, rekordy | plan |
+
 Kolejność od 2026-09-29: 1g → 2a (ekran „Dziś” tylko do odczytu, pierwszy ekran z danymi) → 1f. Właściciel
 nie widział dotąd zmian w aplikacji, a 1f (offline, manifest) też jest niewidoczne, więc ekran z danymi idzie przed nim.
 
@@ -1592,7 +1612,7 @@ Uzasadnienie techniczne:
 | D2 | ~~Czy usunięcie workflowów 19.08 było celowe?~~ **Rozstrzygnięte w etapie 0**: `test.yml` przywrócony; `notify`/`weekly-report` wracają w etapie 6 (skrypt raportu czyta nieaktualne dane) | — | — |
 | D3 | ~~Build i deploy przez GitHub Actions?~~ **Rozstrzygnięte 2026-09-29: tak.** Źródło Pages przełączane dopiero w etapie 1, po scaleniu `deploy.yml` (wcześniejsze przełączenie zatrzymałoby publikację zmian) | — | — |
 | D4 | ~~Które motywy zostają?~~ **Rozstrzygnięte 2026-09-29**: LifeXP ciemny (obecny) + jasny, nowy motyw iOS zamiast „Apple”, Gold bez zmian, wybór fontu zostaje (4.9) | — | — |
-| D5 | Gry i FPS w v2 | Zostają jako moduł lazy (silnik bez zmian), FPS jako osobna strona | Etap 7 |
+| D5 | ~~Gry i FPS w v2~~ **Rozstrzygnięte 2026-10-26** (właściciel): v2 ma 4 gry (Flappy Bird, Wartime, Gridlock, Szybkie liczenie); gry v1 i FPS nie przechodzą do v2 (etap gier w 9.1) | — | — |
 | D6 | `plannerTasks` (zadania dodane przez Ex-us, dziś niewidoczne) | Jednorazowy import niezrobionych do `todos` (M5) | Etap 3a |
 | D7 | Czy rodzic ma widzieć notatki, zadania i rozmowy z Ex-us (`aiConversations`) | Notatki i rozmowy: nie (prywatne); zadania: tak | Etap 8 |
 | D8 | ~~Czy dodać usuwanie zadań (v1 go nie ma)~~ **Zrobione w 3a-2**: usuwanie z „Cofnij”, budowa PC bez zmian | Tak, trywialne i oczekiwane | Etap 3a |

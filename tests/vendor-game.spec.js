@@ -1,0 +1,91 @@
+// scripts/vendor-game.mjs (PLAN.md 9.1, etap gier): kopia gry z repozytorium git
+// z łatkami, CSP i VENDORED.json; odmowa, gdy łatka nie pasuje albo zostaje zewnętrzny host.
+// Bez przeglądarki: źródła to tymczasowe repozytoria git.
+const { test, expect } = require('@playwright/test');
+const { execFileSync, spawnSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+const SCRIPT = path.join(__dirname, '..', 'scripts', 'vendor-game.mjs');
+
+/** A git repo shaped like Gridlock, with `files` overriding its pages. */
+function fakeRepo(files = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vendor-src-'));
+  const all = {
+    'index.html':
+      '<!DOCTYPE html>\n<html><head>\n<meta charset="UTF-8">\n<!-- [2.0-sdk] CrazyGames SDK. Loaded first. -->\n' +
+      '<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>\n<script src="js/main.js"></script>\n</head><body>' +
+      '<svg xmlns="http://www.w3.org/2000/svg"></svg></body></html>\n',
+    'cube_master.css': 'body { margin: 0; }\n',
+    'js/constants.js': 'const ADS_ENABLED = false;\n',
+    'js/main.js': 'console.log("game");\n',
+    'README.md': 'not copied\n',
+    ...files,
+  };
+  for (const [name, text] of Object.entries(all)) {
+    fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
+    fs.writeFileSync(path.join(dir, name), text);
+  }
+  const git = (...args) => execFileSync('git', ['-C', dir, ...args], { stdio: 'pipe' });
+  git('init', '-q');
+  git('add', '.');
+  git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '-qm', 'init');
+  return { dir, commit: git('rev-parse', 'HEAD').toString().trim() };
+}
+
+function vendor(source, out) {
+  return spawnSync(process.execPath, [SCRIPT, 'gridlock', source, '--out', out], { encoding: 'utf8' });
+}
+
+const outDir = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'vendor-out-')), 'gridlock');
+
+test('copies the game, drops the CrazyGames SDK, adds the CSP and VENDORED.json', () => {
+  const { dir, commit } = fakeRepo();
+  const out = outDir();
+  const run = vendor(dir, out);
+  expect(run.status, run.stderr).toBe(0);
+
+  expect(fs.existsSync(path.join(out, 'README.md'))).toBe(false);
+  expect(fs.existsSync(path.join(out, '.git'))).toBe(false);
+  const html = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
+  expect(html).not.toContain('crazygames');
+  expect(html).toContain('<script src="js/main.js"></script>');
+  expect(html).toMatch(/<meta charset="UTF-8">\n<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self';/);
+  expect(html).toContain("connect-src 'self'");
+
+  const vendored = JSON.parse(fs.readFileSync(path.join(out, 'VENDORED.json'), 'utf8'));
+  expect(vendored).toMatchObject({
+    game: 'gridlock',
+    source: 'https://github.com/szymonrogalski098-collab/gridlock',
+    commit,
+    dirty: false,
+    files: 4,
+  });
+  expect(vendored.patches).toHaveLength(2);
+  expect(Date.parse(vendored.vendoredAt)).not.toBeNaN();
+});
+
+test('a patch that no longer matches stops the copy', () => {
+  const { dir } = fakeRepo({ 'js/constants.js': 'const ADS_ENABLED = true;\n' });
+  const run = vendor(dir, outDir());
+  expect(run.status).toBe(1);
+  expect(run.stderr).toContain('0 trafień w js/constants.js');
+});
+
+test('an external host left in the game stops the copy and leaves nothing behind', () => {
+  const { dir } = fakeRepo({ 'js/main.js': 'fetch("https://tracker.example.com/hit");\n' });
+  const out = outDir();
+  const run = vendor(dir, out);
+  expect(run.status).toBe(1);
+  expect(run.stderr).toContain('js/main.js: https://tracker.example.com/hit');
+  expect(fs.existsSync(out)).toBe(false);
+});
+
+test('uncommitted changes in the source are refused', () => {
+  const { dir } = fakeRepo();
+  fs.writeFileSync(path.join(dir, 'js', 'main.js'), 'changed\n');
+  const run = vendor(dir, outDir());
+  expect(run.status).toBe(1);
+  expect(run.stderr).toContain('niezapisane zmiany');
+});

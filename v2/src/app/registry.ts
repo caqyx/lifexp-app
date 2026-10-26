@@ -144,9 +144,10 @@ export const FEATURES: readonly FeatureDef[] = [
     labelKey: 'nav.games',
     optional: 'games',
     icon: Gamepad2,
-    paths: ['/games'],
+    paths: ['/games', '/games/:id'],
     nav: { group: 'main', order: 80 },
-    stage: '7',
+    stage: 'g',
+    view: () => import('@/features/games/GamesModule'),
   },
   {
     id: 'reports',

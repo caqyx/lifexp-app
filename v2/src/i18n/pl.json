@@ -917,7 +917,7 @@
       "money": "Przychody, wydatki, kategorie i pożyczki.",
       "notes": "Notatnik.",
       "stats": "Punkty, poziom i seria na „Dziś”, zapisywanie aktywności, historia, statystyki i odznaki.",
-      "games": "Mini-gry offline, bez punktów.",
+      "games": "Gry w aplikacji; czas grania liczy się sam, bez punktów.",
       "aichat": "Asystent AI, który pomaga zapisywać i planować."
     },
     "theme": "Motyw",
@@ -1667,5 +1667,37 @@
     "verifyRecheck": "Sprawdź ponownie",
     "verifySent": "Link poszedł na {{email}}. Sprawdź też folder spam.",
     "verifyNotYet": "Adres nie jest jeszcze potwierdzony. Otwórz link z e-maila i spróbuj ponownie."
+  },
+  "games": {
+    "names": {
+      "flappy-bird": "Flappy Bird",
+      "wartime": "Wartime",
+      "gridlock": "Gridlock",
+      "quick-math": "Szybkie liczenie",
+      "test": "Gra testowa"
+    },
+    "descriptions": {
+      "flappy-bird": "Przeleć ptakiem między rurami. Jedno dotknięcie = jedno machnięcie.",
+      "wartime": "Turowa strategia: Europa, Azja i Afryka, od 1385 do 2026 roku.",
+      "gridlock": "Neonowa gra zręcznościowa: unikaj laserów na planszy 16×16.",
+      "quick-math": "Liczenie w pamięci na czas: poziomy trudności i rekordy.",
+      "test": "Gra do testów automatycznych."
+    },
+    "play": "Graj",
+    "soon": "Wkrótce",
+    "soonBody": "Ta gra pojawi się w jednej z kolejnych wersji.",
+    "today": "Dziś: {{time}}",
+    "todayNone": "Dziś jeszcze nie grano",
+    "todayLoading": "Dziś: …",
+    "timeNote": "Czas grania liczy się sam, kiedy gra jest na ekranie. Granie nie kosztuje punktów.",
+    "exit": "Zakończ",
+    "frameTitle": "Gra: {{name}}",
+    "rotate": "Ta gra jest wygodniejsza w poziomie. Obróć telefon.",
+    "rotateDismiss": "OK",
+    "saved": "Zapisano {{time}} grania.",
+    "saveFailed": "Nie udało się zapisać czasu grania.",
+    "loadFailed": "Nie udało się wczytać dzisiejszego czasu grania.",
+    "notFound": "Nie ma takiej gry.",
+    "back": "Wszystkie gry"
   }
 }
