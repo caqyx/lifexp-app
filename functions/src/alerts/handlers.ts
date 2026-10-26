@@ -4,6 +4,12 @@
 // verified parent address, not solo, parentAlerts not off). One e-mail per kind per
 // day, claimed in parentAlertLog/{uid}_{day} in a transaction and released if the
 // mail fails. Logs hold the kind and the outcome only.
+//
+// "Day" is the parent's day: the date in Warsaw when the alert goes, for both kinds.
+// The gaming threshold still reads the dailyLog document (v1's data, keyed by the UTC
+// day), but its e-mail is counted on the Warsaw day: before, it was counted on the log's
+// UTC day and a purchase on the Warsaw day, so between midnight in Warsaw and midnight
+// UTC (22:00/23:00–24:00 UTC) the two landed on different days' logs (CI 2026-10-26).
 import type { Firestore } from 'firebase-admin/firestore';
 import { formatDayKey, zonedDayKey } from '../v2/lib/dates';
 import { GAMING_ALERT_MINUTES, alertRecipient, gamingCrossed, type ParentAlertKind } from '../v2/domain/parent';
@@ -47,6 +53,8 @@ function duration(minutes: number): string {
 export function createAlertHandlers(deps: AlertDeps) {
   const now = deps.now ?? (() => new Date());
   const log = deps.log ?? (() => {});
+  /** The day an alert counts on: the parent's (Warsaw) date now, for every kind. */
+  const parentDay = () => zonedDayKey(now(), TIME_ZONE);
 
   async function alert(uid: string, kind: ParentAlertKind, day: string, text: (name: string) => { subject: string; body: string }): Promise<AlertOutcome> {
     const db = deps.db();
@@ -91,11 +99,15 @@ export function createAlertHandlers(deps: AlertDeps) {
   };
 
   return {
-    /** users/{uid}/dailyLog/{day} written: `before`/`after` are its gamingMinutes. The day is the log's own. */
-    async gaming(uid: string, day: string, before: unknown, after: unknown): Promise<AlertOutcome> {
+    /**
+     * users/{uid}/dailyLog/{day} written: `before`/`after` are its gamingMinutes. Counted
+     * on the Warsaw day of now, like a purchase (the log's own key is a UTC day).
+     */
+    async gaming(uid: string, before: unknown, after: unknown): Promise<AlertOutcome> {
       const minutes = num(after);
       // Most writes are points, not gaming: not logged, or every activity would leave a line.
       if (!gamingCrossed(num(before), minutes)) return 'notCrossed';
+      const day = parentDay();
       return alert(uid, 'gaming', day, (name) => ({
         subject: `${name}: dziś już ${duration(minutes)} grania`,
         body: `Czas grania tego dnia przekroczył ${GAMING_ALERT_MINUTES} min i wynosi teraz ${duration(minutes)}.`,
@@ -104,7 +116,7 @@ export function createAlertHandlers(deps: AlertDeps) {
 
     /** users/{uid}/purchases/{id} created (v1's shop: description, amount in złoty, pointsCost). */
     async purchase(uid: string, data: Record<string, unknown> | undefined): Promise<AlertOutcome> {
-      const day = zonedDayKey(now(), TIME_ZONE);
+      const day = parentDay();
       const what = typeof data?.description === 'string' && data.description.trim() ? data.description.trim().slice(0, 100) : 'zakup';
       const grosze = groszeFromZloty(num(data?.amount));
       const points = num(data?.pointsCost);

@@ -1230,6 +1230,42 @@ test('/usun-zadanie asks first; Anuluj changes nothing, Wykonaj deletes the task
   await expect(dialog).toBeHidden();
 });
 
+/**
+ * CI 2026-10-26: after "Anuluj" the next message was typed into a field that was still
+ * inert. The reply "Anulowano…" was on screen, but the dialog closed only in a passive
+ * effect (after paint), so on a slow machine Playwright's fill (and a fast person's
+ * typing) went nowhere and "Wyślij" then sent an empty field. The dialog must be closed
+ * in the same commit that shows the reply: checked at the first DOM change that shows it.
+ */
+test('Anuluj: the field takes typing as soon as the reply shows (the dialog is closed in the same commit)', async ({ page }) => {
+  const account = await createUser({ tag: 'exus-cancel-type' });
+  await seedTask(account.uid, { text: 'Zostaje' });
+  await openSignedIn(page, account, '#/exus');
+  await send(page, '/usun-zadanie zostaje');
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toBeVisible();
+
+  // Watches the log: when the reply appears, is the dialog still modal, and does the field take focus?
+  await page.evaluate(() => {
+    const field = document.querySelector('form input');
+    const logEl = document.querySelector('[role="log"]');
+    window.__atReply = new Promise((resolve) => {
+      new MutationObserver((_, observer) => {
+        if (!logEl.textContent.includes('Anulowano')) return;
+        observer.disconnect();
+        field.focus();
+        resolve({ dialogOpen: document.querySelector('dialog[open]') !== null, fieldFocused: document.activeElement === field });
+      }).observe(logEl, { childList: true, subtree: true, characterData: true });
+    });
+  });
+  await dialog.getByRole('button', { name: 'Anuluj' }).click();
+  expect(await page.evaluate(() => window.__atReply)).toEqual({ dialogOpen: false, fieldFocused: true });
+
+  // And the message typed right away is sent, not dropped.
+  await send(page, '/zadania');
+  await expect(log(page).locator('.exus-msg--me').last()).toHaveText('/zadania');
+});
+
 const notesOf = async (uid) => (await db.collection(`users/${uid}/notes`).get()).docs.map((d) => ({ id: d.id, ...d.data() }));
 const withoutId = ({ id, createdAt, ...rest }) => rest;
 

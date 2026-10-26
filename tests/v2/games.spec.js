@@ -49,12 +49,23 @@ async function setVisibility(page, state) {
   }, state);
 }
 
+/**
+ * The host is on screen *and* its effects ran: the play clock starts in an effect, which
+ * Preact runs after paint, so a region that is merely visible may not be counting yet, and
+ * a fastForward then would be lost (the session comes out under 30 s and writes nothing).
+ * The host focuses the frame in an effect declared after the clock's, in the same flush.
+ */
+async function hostMounted(host) {
+  await expect(host).toBeVisible();
+  await expect(host.locator('iframe')).toBeFocused();
+}
+
 async function openGame(page, account) {
   await serveTestGame(page);
   await page.clock.install();
   await openSignedIn(page, account, '#/games/test');
   const host = page.getByRole('region', { name: GAME });
-  await expect(host).toBeVisible();
+  await hostMounted(host);
   await expect(host.frameLocator('iframe').locator('#state')).toHaveText('record 1');
   return host;
 }
@@ -62,7 +73,7 @@ async function openGame(page, account) {
 test.describe('on a phone', () => {
   test.use({ viewport: PHONE });
 
-  test('the list: four games, each with a line, its time today and "Graj", or "Wkrótce" until it is added', async ({ page, account }) => {
+  test('the list: four games, each with a line, its time today and "Graj"', async ({ page, account }) => {
     await openSignedIn(page, account, '#/today');
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.getByLabel('Nawigacja').getByRole('link', { name: 'Gry' }).click();
@@ -72,18 +83,19 @@ test.describe('on a phone', () => {
     await expect(cards).toHaveCount(4);
     await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie']);
     for (const card of await cards.all()) await expect(card.getByText('Dziś jeszcze nie grano')).toBeVisible();
-    // Flappy Bird (g-3), Wartime and Gridlock (g-2) are in; Szybkie liczenie comes with g-4.
-    await expect(page.getByRole('link', { name: 'Graj: Flappy Bird' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Graj: Wartime' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Graj: Gridlock' })).toBeVisible();
-    await expect(cards.filter({ hasText: 'Wkrótce' }).getByRole('heading')).toHaveText(['Szybkie liczenie']);
+    // All four are in (g-2, g-3, g-4): nothing is "Wkrótce" any more.
+    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie']) {
+      await expect(page.getByRole('link', { name: `Graj: ${name}` })).toBeVisible();
+    }
+    await expect(page.getByText('Wkrótce')).toHaveCount(0);
     // The test game exists only by address, never in the list.
     await expect(page.getByText(GAME)).toHaveCount(0);
     // Nothing sticks out at 360 px.
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(PHONE.width);
 
-    await page.goto(page.url().replace('#/games', '#/games/quick-math'));
-    await expect(page.getByText('Wkrótce. Ta gra pojawi się w jednej z kolejnych wersji.')).toBeVisible();
+    // An address that is no game says so and leads back.
+    await page.goto(page.url().replace('#/games', '#/games/no-such-game'));
+    await expect(page.getByText('Nie ma takiej gry.')).toBeVisible();
     await page.getByRole('link', { name: 'Wszystkie gry' }).click();
     await expect(page).toHaveURL(/#\/games$/);
   });
@@ -144,7 +156,7 @@ test.describe('on a phone', () => {
     await serveTestGame(page);
     await page.clock.install();
     await page.evaluate(() => (location.hash = '#/games/test'));
-    await expect(page.getByRole('region', { name: GAME })).toBeVisible();
+    await hostMounted(page.getByRole('region', { name: GAME }));
     await page.clock.fastForward('01:00');
     await page.goBack();
     await expect(page).toHaveURL(/#\/games$/);
@@ -278,7 +290,7 @@ async function playFromList(page, account, name) {
   await openSignedIn(page, account, '#/games');
   await page.getByRole('link', { name: `Graj: ${name}` }).click();
   const host = page.getByRole('region', { name });
-  await expect(host).toBeVisible();
+  await hostMounted(host);
   return { host, game: host.frameLocator('iframe') };
 }
 
@@ -427,11 +439,16 @@ test.describe('Gridlock', () => {
  * and the bird's and the next gap's positions on the stage for the autopilot.
  */
 async function seedFlappy(page, host, seed = 7) {
-  await host.locator('iframe').evaluate((frame, s) => {
-    frame.src = `${frame.src}&seed=${s}`;
-  }, seed);
-  await expect.poll(() => page.frames().some((f) => f.url().includes(`seed=${seed}`))).toBe(true);
-  return page.frames().find((f) => f.url().includes(`seed=${seed}`));
+  return reopenFrameWith(page, host, `seed=${seed}`);
+}
+
+/** Reopens the game's frame with test-only query switches added (e.g. "seed=5&round=10"). */
+async function reopenFrameWith(page, host, query) {
+  await host.locator('iframe').evaluate((frame, q) => {
+    frame.src = `${frame.src}&${q}`;
+  }, query);
+  await expect.poll(() => page.frames().some((f) => f.url().endsWith(query))).toBe(true);
+  return page.frames().find((f) => f.url().endsWith(query));
 }
 
 /**
@@ -523,6 +540,148 @@ test.describe('Flappy Bird', () => {
     const release = await startAutopilot(frame);
     await expect(game.locator('#score')).toHaveText(/^[1-9]\d*$/, { timeout: 20000 });
     await release();
+    expect(problems).toEqual([]);
+  });
+});
+
+// ── Szybkie liczenie (stage g-4): LifeXP's own game, in the same frame and CSP ──
+
+/** The answer the game exposes with ?seed= (test only). */
+const answerOf = (game) => game.locator('#app').getAttribute('data-debug-answer').then(Number);
+
+/** Types a number on the game's keypad, by touch. */
+async function tapNumber(game, value) {
+  if (value < 0) await game.getByRole('button', { name: 'Minus' }).tap();
+  for (const ch of String(Math.abs(value))) await game.getByRole('button', { name: ch, exact: true }).tap();
+}
+
+/** Answers the question on screen correctly and waits for the next one. */
+async function answerRight(game, enter) {
+  const question = game.locator('#question-text');
+  const before = await question.textContent();
+  await enter(await answerOf(game));
+  await expect(question).not.toHaveText(before);
+}
+
+test.describe('Szybkie liczenie', () => {
+  test.describe('on a touch phone held upright', () => {
+    test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+
+    test('a level, answers on the keypad, a mistake corrected, the end with stats, the best after a reload, Zakończ records the time', async ({ page, account }) => {
+      test.setTimeout(60000);
+      const problems = await watchProblems(page);
+      await page.clock.install();
+      const { host, game } = await playFromList(page, account, 'Szybkie liczenie');
+      await expect(host.getByRole('note')).toHaveCount(0);
+      await reopenFrameWith(page, host, 'seed=5&round=12');
+      await expect(game.getByRole('heading', { name: 'Szybkie liczenie' })).toBeVisible(); // ?lang=pl from the host
+      await game.getByRole('button', { name: /Średni/ }).tap();
+      await expect(game.locator('#app')).toHaveAttribute('data-screen', 'play');
+
+      // Keys are real buttons, at least 48 px, all on screen.
+      const frameBox = await host.locator('iframe').boundingBox();
+      for (const name of ['7', '0', 'Usuń', 'OK']) {
+        const box = await game.getByRole('button', { name, exact: true }).boundingBox();
+        expect(box.height).toBeGreaterThanOrEqual(48);
+        expect(box.y + box.height).toBeLessThanOrEqual(frameBox.y + frameBox.height + 1);
+      }
+
+      // Three right answers: taken as soon as typed (no OK), the combo reaches ×2.
+      for (let i = 0; i < 3; i++) await answerRight(game, (n) => tapNumber(game, n));
+      await expect(game.locator('#score')).toHaveText('60'); // 15 + 15 + 15×2
+      await expect(game.locator('#combo-mult')).toHaveText('×2');
+
+      // A wrong answer waits for OK, shows the right one and breaks the combo.
+      const answer = await answerOf(game);
+      const question = await game.locator('#question-text').textContent();
+      await tapNumber(game, answer + 1);
+      await game.getByRole('button', { name: 'OK' }).tap();
+      await expect(game.getByRole('status')).toContainText(`Poprawnie: ${question} = ${answer}`);
+      await expect(game.locator('#answer-wrong')).toHaveText(String(answer + 1));
+      await expect(game.locator('#combo-mult')).toHaveText('×1');
+
+      // The round runs out: the end screen with the stats and a new best.
+      const end = game.getByRole('region', { name: 'Koniec czasu!' });
+      await expect(end).toBeVisible({ timeout: 20000 });
+      await expect(game.locator('#end-score')).toHaveText('60');
+      await expect(game.locator('#end-accuracy')).toContainText('75%');
+      await expect(game.locator('#end-accuracy')).toContainText('3/4');
+      await expect(game.locator('#end-streak')).toHaveText('3');
+      await expect(end.getByText('Nowy rekord!')).toBeVisible();
+      expect(await page.evaluate(() => localStorage.getItem('lifexp-quickmath-best-medium'))).toBe('60');
+
+      await page.reload();
+      await expect(game.locator('#start [data-best="medium"]')).toHaveText('60');
+
+      await endAndExpectSession(page, account, 'Szybkie liczenie');
+      expect(problems).toEqual([]);
+    });
+  });
+
+  test('on a desktop keyboard: 1 picks Łatwy, digits answer, Backspace fixes, Enter submits a wrong one', async ({ page, account }) => {
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Szybkie liczenie');
+    await reopenFrameWith(page, host, 'seed=8');
+    await expect(game.locator('#app')).toHaveAttribute('data-screen', 'start');
+    await host.locator('iframe').focus();
+    await page.keyboard.press('1');
+    await expect(game.locator('#app')).toHaveAttribute('data-level', 'easy');
+    await expect(game.locator('#app')).toHaveAttribute('data-screen', 'play');
+
+    await answerRight(game, (n) => page.keyboard.type(String(n)));
+    // A slip fixed with Backspace still counts as right.
+    await answerRight(game, async (n) => {
+      await page.keyboard.type(String((n + 1) % 10));
+      await page.keyboard.press('Backspace');
+      await page.keyboard.type(String(n));
+    });
+    await expect(game.locator('#score')).toHaveText('20');
+
+    const answer = await answerOf(game);
+    await page.keyboard.type(String(answer + 1));
+    await expect(game.locator('#answer')).toHaveText(String(answer + 1)); // a wrong answer is not taken by itself
+    await page.keyboard.press('Enter');
+    await expect(game.getByRole('status')).toContainText(`= ${answer}`);
+    await expect(game.locator('#combo-mult')).toHaveText('×1');
+    expect(problems).toEqual([]);
+  });
+
+  test('sideways 800×360 by touch: Trudny with the minus key, practice without a clock and without a record', async ({ page, account }) => {
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Szybkie liczenie');
+    await reopenFrameWith(page, host, 'seed=21');
+    await game.getByRole('radio', { name: 'Trening' }).click();
+    await expect(game.getByRole('radio', { name: 'Trening' })).toHaveAttribute('aria-checked', 'true');
+    await game.getByRole('button', { name: /Trudny/ }).click();
+
+    // Question beside the keypad; every key fits the height and is at least 48 px.
+    const frameBox = await host.locator('iframe').boundingBox();
+    for (const name of ['7', '0', 'Usuń', 'Minus', 'OK']) {
+      const box = await game.getByRole('button', { name, exact: true }).boundingBox();
+      expect(box.height).toBeGreaterThanOrEqual(48);
+      expect(box.y).toBeGreaterThanOrEqual(frameBox.y - 1);
+      expect(box.y + box.height).toBeLessThanOrEqual(frameBox.y + frameBox.height + 1);
+    }
+    const card = await game.locator('#card').boundingBox();
+    const keypad = await game.locator('#keypad').boundingBox();
+    expect(card.x + card.width).toBeLessThanOrEqual(keypad.x);
+    await expect(game.locator('#time')).toBeHidden(); // practice: no clock
+
+    // Answer until one is negative (typed with the minus key) or a few are done.
+    for (let i = 0; i < 6; i++) {
+      await answerRight(game, async (n) => {
+        for (const ch of (n < 0 ? ['Minus'] : []).concat([...String(Math.abs(n))])) {
+          await game.getByRole('button', { name: ch, exact: true }).click();
+        }
+      });
+    }
+    await expect(game.locator('#score')).not.toHaveText('0');
+
+    await game.getByRole('button', { name: 'Zakończ trening' }).click();
+    await expect(game.getByRole('heading', { name: 'Koniec treningu' })).toBeVisible();
+    await expect(game.locator('#end-accuracy')).toContainText('100%');
+    expect(await page.evaluate(() => localStorage.getItem('lifexp-quickmath-best-hard'))).toBeNull();
     expect(problems).toEqual([]);
   });
 });

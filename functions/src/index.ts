@@ -131,7 +131,7 @@ const alertOptions = { region: alerts.REGION, memory: alerts.MEMORY, maxInstance
 export const parentAlertOnGaming = onDocumentWritten({ ...alertOptions, document: 'users/{uid}/dailyLog/{day}' }, async (event) => {
   const after = event.data?.after;
   if (!after?.exists) return;
-  await alertHandlers.gaming(event.params.uid, event.params.day, event.data?.before?.data()?.gamingMinutes, after.data()?.gamingMinutes);
+  await alertHandlers.gaming(event.params.uid, event.data?.before?.data()?.gamingMinutes, after.data()?.gamingMinutes);
 });
 
 export const parentAlertOnPurchase = onDocumentCreated({ ...alertOptions, document: 'users/{uid}/purchases/{id}' }, async (event) => {

@@ -15,10 +15,13 @@ const verifiedChild = (tag, profile = {}) =>
     tag,
     profile: { name: 'Ola', accountMode: 'supervised', parentEmail: 'mama@poczta.pl', parentEmailVerifiedAt: new Date().toISOString(), ...profile },
   });
+/** The parent's day (Warsaw) at `at`: alerts count one e-mail per kind on it (functions/src/alerts). */
+const warsawDay = (at = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Warsaw' }).format(at);
 const mail = async (uid, kind) => (await db.doc(`emulatorMail/${uid}_alert_${kind}`).get()).data();
 
 test('61 minutes of gaming in a day and a purchase each send one e-mail to the verified parent', async () => {
   const child = await verifiedChild('alert-on');
+  const firstDay = warsawDay();
   const day = db.doc(`users/${child.uid}/dailyLog/${todayUtcKey()}`);
   await day.set({ pointsEarned: 0, gamingMinutes: 30 });
   await day.set({ pointsEarned: 0, gamingMinutes: 61 });
@@ -30,8 +33,13 @@ test('61 minutes of gaming in a day and a purchase each send one e-mail to the v
 
   await db.collection(`users/${child.uid}/purchases`).add({ description: 'Gra', amount: 8.5, pointsCost: 85, timestamp: Timestamp.now() });
   await expect.poll(() => mail(child.uid, 'purchase').then((m) => m?.params.alert_body)).toBe('Zakup: Gra, 8,50 zł (85 pkt).');
-  const log = (await db.collection('parentAlertLog').where('kinds', 'array-contains', 'gaming').get()).docs.find((d) => d.id.startsWith(child.uid));
-  expect(log?.data().kinds.sort()).toEqual(['gaming', 'purchase']);
+  // Both on the parent's (Warsaw) day, whatever the time: the gaming log's key is a UTC day,
+  // which from 22:00/23:00 UTC is already yesterday in Warsaw (CI 2026-10-26 ran at 23:26 UTC).
+  const days = new Set([firstDay, warsawDay()]);
+  const logs = (await db.collection('parentAlertLog').get()).docs.filter((d) => d.id.startsWith(`${child.uid}_`));
+  expect(logs.map((d) => d.id).every((id) => days.has(id.slice(child.uid.length + 1)))).toBe(true);
+  expect(logs.flatMap((d) => d.data().kinds).sort()).toEqual(['gaming', 'purchase']);
+  if (days.size === 1) expect(logs).toHaveLength(1);
 });
 
 test('with alerts turned off in Settings nothing is sent', async ({ page }) => {

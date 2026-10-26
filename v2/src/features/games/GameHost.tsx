@@ -24,7 +24,7 @@ import { usePlayTime } from './usePlayTime';
 
 interface GameHostProps {
   uid: string;
-  game: GameDef & { src: string };
+  game: GameDef;
   onExit: () => void;
 }
 

@@ -104,32 +104,46 @@ test('uncommitted changes in the source are refused', () => {
   expect(run.stderr).toContain('niezapisane zmiany');
 });
 
-// Flappy Bird (g-3) is LifeXP's own game, written in this repo rather than copied, so the
-// script never sees it: the same rules are checked here on its files.
-test("LifeXP's own game: a CSP no looser than the vendored games', no external host, nothing beyond itself", async () => {
-  const { BASE_CSP, FORBIDDEN, externalUrls } = await import(SCRIPT);
-  const dir = path.join(__dirname, '..', 'v2', 'public', 'games', 'flappy');
-  expect(JSON.parse(fs.readFileSync(path.join(dir, 'GAME.json'), 'utf8')).source).toBe('lifexp');
-  expect(fs.existsSync(path.join(dir, 'VENDORED.json'))).toBe(false);
+// LifeXP's own games (Flappy Bird g-3, Szybkie liczenie g-4) are written in this repo
+// rather than copied, so the script never sees them: the same rules are checked here.
+const OWN_GAMES = [
+  { id: 'flappy', prefix: 'lifexp-flappy-', storageArgs: ['BEST_KEY'] },
+  // (the argument is read up to its first parenthesis: recordKey(level) → "recordKey(level")
+  { id: 'quick-math', prefix: 'lifexp-quickmath-', storageArgs: ['MODE_KEY', 'recordKey(level'] },
+];
 
-  const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
-  const csp = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1];
-  // The base policy, with styles tightened to files only (the game has no inline styles).
-  expect(csp).toBe(BASE_CSP.replace("style-src 'self' 'unsafe-inline'", "style-src 'self'"));
-  expect(html).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/); // no inline scripts
-  expect(html).toContain('<link rel="icon" href="data:,">');
+for (const game of OWN_GAMES) {
+  test(`LifeXP's own game ${game.id}: a CSP no looser than the vendored games', no external host, nothing beyond itself`, async () => {
+    const { BASE_CSP, FORBIDDEN, externalUrls } = await import(SCRIPT);
+    const dir = path.join(__dirname, '..', 'v2', 'public', 'games', game.id);
+    expect(JSON.parse(fs.readFileSync(path.join(dir, 'GAME.json'), 'utf8')).source).toBe('lifexp');
+    expect(fs.existsSync(path.join(dir, 'VENDORED.json'))).toBe(false);
 
-  const files = fs.readdirSync(dir, { recursive: true }).map((f) => path.join(dir, f)).filter((f) => fs.statSync(f).isFile());
-  const problems = [];
-  for (const file of files) {
-    const text = fs.readFileSync(file, 'utf8');
-    for (const url of externalUrls(text)) problems.push(`${path.basename(file)}: ${url}`);
-    for (const { pattern, why } of FORBIDDEN) if (pattern.test(text)) problems.push(`${path.basename(file)}: ${why}`);
-    if (/\beval\s*\(|new Function\s*\(/.test(text)) problems.push(`${path.basename(file)}: eval`);
-  }
-  expect(problems).toEqual([]);
-  // The only storage it touches is its own record.
-  const keys = files.flatMap((f) => [...fs.readFileSync(f, 'utf8').matchAll(/localStorage\.(?:getItem|setItem|removeItem)\(([^,)]+)/g)].map((m) => m[1]));
-  expect([...new Set(keys)]).toEqual(['BEST_KEY']);
-  expect(fs.readFileSync(path.join(dir, 'js', 'main.js'), 'utf8')).toContain("const BEST_KEY = 'lifexp-flappy-best';");
-});
+    const html = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+    const csp = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1];
+    // The base policy, with styles tightened to files only (no inline styles).
+    expect(csp).toBe(BASE_CSP.replace("style-src 'self' 'unsafe-inline'", "style-src 'self'"));
+    expect(html).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/); // no inline scripts
+    expect(html).not.toMatch(/\sstyle=/); // no inline styles (the CSP would block them)
+    expect(html).toContain('<link rel="icon" href="data:,">');
+
+    const files = fs.readdirSync(dir, { recursive: true }).map((f) => path.join(dir, f)).filter((f) => fs.statSync(f).isFile());
+    const problems = [];
+    for (const file of files) {
+      const text = fs.readFileSync(file, 'utf8');
+      for (const url of externalUrls(text)) problems.push(`${path.basename(file)}: ${url}`);
+      for (const { pattern, why } of FORBIDDEN) if (pattern.test(text)) problems.push(`${path.basename(file)}: ${why}`);
+      if (/\beval\s*\(|new Function\s*\(/.test(text)) problems.push(`${path.basename(file)}: eval`);
+      // Every storage key it names is its own.
+      for (const [, key] of text.matchAll(/['"`](lifexp-[a-z-]*)/g)) {
+        if (!key.startsWith(game.prefix)) problems.push(`${path.basename(file)}: key ${key}`);
+      }
+    }
+    expect(problems).toEqual([]);
+    // Storage is reached only through those keys.
+    const args = files.flatMap((f) =>
+      [...fs.readFileSync(f, 'utf8').matchAll(/(?:localStorage|storage\??)\.(?:getItem|setItem|removeItem)\(([^,)]+)/g)].map((m) => m[1].trim()),
+    );
+    expect([...new Set(args)].sort()).toEqual([...game.storageArgs].sort());
+  });
+}
