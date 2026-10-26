@@ -15,11 +15,16 @@ concurrency:
 permissions:
   contents: read
 
+# Runners are pinned to ubuntu-24.04 rather than ubuntu-latest, which moves to a new
+# Ubuntu from 2026-10-19: an image change should be a reviewed commit, not a surprise
+# (a new image first ran apt for ~10 min and cut the v2 job off). The cost: moving on
+# is a manual bump here and in fps.yml before GitHub retires 24.04.
+
 jobs:
   app:
     name: App
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -27,7 +32,32 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # Chromium for Playwright: the browser is cached per
+      # Playwright version; system libraries cannot be cached, so they are installed
+      # only when the runner image lacks some (apt on the runners can take ~10 min).
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright-core'].version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}-chromium
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 5
+        run: npx playwright install chromium
+      - name: Install Chromium's system libraries (only if the image lacks some)
+        timeout-minutes: 12
+        run: |
+          missing=$(find ~/.cache/ms-playwright -type f \( -name chrome -o -name chrome-headless-shell -o -name headless_shell \) -perm -u+x -exec ldd {} \; | grep 'not found' | sort -u || true)
+          if [ -n "$missing" ]; then
+            echo "Missing libraries:"; echo "$missing"
+            npx playwright install-deps chromium
+          else
+            echo "The runner image has every library Chromium needs."
+          fi
       - run: npx playwright test --project=app
       # The agent sandbox cannot read artifacts (blob host blocked), so failures print their page snapshots here.
       - name: Print Playwright error contexts
@@ -46,8 +76,9 @@ jobs:
 
   v2:
     name: v2 checks and site build
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    # Checks, build and ~6 min of browser tests; the rest is room for a slow install.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -78,7 +109,32 @@ jobs:
       # The app in a real browser, signed in on the emulators: login and boot
       # gates, drawer, sidebar, themes, layout (tests/v2). Rebuilds v2 (seconds).
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # Chromium for Playwright: the browser is cached per
+      # Playwright version; system libraries cannot be cached, so they are installed
+      # only when the runner image lacks some (apt on the runners can take ~10 min).
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright-core'].version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}-chromium
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 5
+        run: npx playwright install chromium
+      - name: Install Chromium's system libraries (only if the image lacks some)
+        timeout-minutes: 12
+        run: |
+          missing=$(find ~/.cache/ms-playwright -type f \( -name chrome -o -name chrome-headless-shell -o -name headless_shell \) -perm -u+x -exec ldd {} \; | grep 'not found' | sort -u || true)
+          if [ -n "$missing" ]; then
+            echo "Missing libraries:"; echo "$missing"
+            npx playwright install-deps chromium
+          else
+            echo "The runner image has every library Chromium needs."
+          fi
       - run: npm run test:v2
       # The agent sandbox cannot read artifacts (blob host blocked), so failures print their page snapshots here.
       - name: Print Playwright error contexts
@@ -99,7 +155,7 @@ jobs:
 
   functions:
     name: Cloud Functions build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
@@ -115,8 +171,8 @@ jobs:
 
   emulator:
     name: v1 against Firebase emulators
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -133,7 +189,32 @@ jobs:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ hashFiles('package-lock.json') }}
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # Chromium for Playwright: the browser is cached per
+      # Playwright version; system libraries cannot be cached, so they are installed
+      # only when the runner image lacks some (apt on the runners can take ~10 min).
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright-core'].version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}-chromium
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 5
+        run: npx playwright install chromium
+      - name: Install Chromium's system libraries (only if the image lacks some)
+        timeout-minutes: 12
+        run: |
+          missing=$(find ~/.cache/ms-playwright -type f \( -name chrome -o -name chrome-headless-shell -o -name headless_shell \) -perm -u+x -exec ldd {} \; | grep 'not found' | sort -u || true)
+          if [ -n "$missing" ]; then
+            echo "Missing libraries:"; echo "$missing"
+            npx playwright install-deps chromium
+          else
+            echo "The runner image has every library Chromium needs."
+          fi
       - run: npm run test:emulator
       # The agent sandbox cannot read artifacts (blob host blocked), so failures print their page snapshots here.
       - name: Print Playwright error contexts

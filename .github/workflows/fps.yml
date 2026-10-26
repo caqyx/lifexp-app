@@ -35,7 +35,8 @@ permissions:
 jobs:
   fps:
     name: FPS gameplay
-    runs-on: ubuntu-latest
+    # Pinned like the Tests workflow (see test.yml).
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -44,7 +45,32 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # Chromium for Playwright: the browser is cached per
+      # Playwright version; system libraries cannot be cached, so they are installed
+      # only when the runner image lacks some (apt on the runners can take ~10 min).
+      - name: Playwright version
+        id: playwright
+        run: echo "version=$(node -p "require('./package-lock.json').packages['node_modules/playwright-core'].version")" >> "$GITHUB_OUTPUT"
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}-chromium
+      - name: Install Chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 5
+        run: npx playwright install chromium
+      - name: Install Chromium's system libraries (only if the image lacks some)
+        timeout-minutes: 12
+        run: |
+          missing=$(find ~/.cache/ms-playwright -type f \( -name chrome -o -name chrome-headless-shell -o -name headless_shell \) -perm -u+x -exec ldd {} \; | grep 'not found' | sort -u || true)
+          if [ -n "$missing" ]; then
+            echo "Missing libraries:"; echo "$missing"
+            npx playwright install-deps chromium
+          else
+            echo "The runner image has every library Chromium needs."
+          fi
       # Software-WebGL scenes; own workflow so they do not compete for CPU with the app tests.
       - run: npx playwright test --project=fps-gameplay
       - uses: actions/upload-artifact@v4
