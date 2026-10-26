@@ -33,7 +33,8 @@ const layerRules = Object.entries(FORBIDDEN_IMPORTS).map(([layer, forbidden]) =>
 const HTML_INJECTION = 'HTML wstawia wyłącznie komponent Markdown (sanityzowany).';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**'] },
+  // Vendored games are copies of other repositories (scripts/vendor-game.mjs), not v2 code.
+  { ignores: ['dist/**', 'node_modules/**', 'public/games/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {

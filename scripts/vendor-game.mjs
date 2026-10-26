@@ -18,10 +18,22 @@
  *  4. Wpisuje do każdej strony HTML gry Content-Security-Policy, która pozwala tylko na
  *     ten origin: gra nie pobierze ani nie wyśle niczego gdzie indziej (grają dzieci).
  *  5. Odmawia, gdy w skopiowanych plikach zostaje adres zewnętrznego hosta (poza
- *     przestrzeniami nazw XML, np. SVG).
+ *     przestrzeniami nazw XML, np. SVG) albo coś, co sięga poza grę na wspólnym
+ *     originie (FORBIDDEN: czyszczenie całego localStorage, kasowanie baz i cache,
+ *     własny Service Worker). Gra działa na tym samym originie co LifeXP, więc np.
+ *     localStorage.clear() skasowałoby motyw, szkice offline i kopie sesji grania.
  *  6. Zapisuje VENDORED.json: źródło, commit, data, łatki, liczba plików.
  *
  * Bez zależności; Node 18+.
+ *
+ * Aktualizacja gry (właściciel mówi „jest nowa wersja X”): pobrać najnowszy commit
+ * repozytorium gry i uruchomić jedno polecenie, potem `npm run test:v2` i commit:
+ *
+ *   git -C <klon-Wartime> pull && node scripts/vendor-game.mjs wartime <klon-Wartime>
+ *   git -C <klon-gridlock> pull && node scripts/vendor-game.mjs gridlock <klon-gridlock>
+ *
+ * Gdy łatka przestanie pasować albo pojawi się zewnętrzny host, skrypt się zatrzyma
+ * i powie, co poprawić na liście gry niżej.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -46,6 +58,15 @@ const BASE_CSP = [
   "form-action 'none'",
 ].join('; ');
 
+/** Rzeczy, które sięgają poza grę na wspólnym originie; każda wymaga łatki. */
+const FORBIDDEN = [
+  { pattern: /\b(?:localStorage|sessionStorage)\.clear\s*\(/, why: 'czyści cały magazyn originu, także dane LifeXP' },
+  { pattern: /\bindexedDB\.deleteDatabase\s*\(/, why: 'kasuje bazę IndexedDB (Firestore i logowanie LifeXP są w IndexedDB)' },
+  { pattern: /\bcaches\.(?:delete|keys)\s*\(/, why: 'sięga do cache Service Workerów LifeXP' },
+  { pattern: /\bserviceWorker\.register\s*\(/, why: 'własny Service Worker gry pod zakresem v2' },
+  { pattern: /\bdocument\.cookie\b/, why: 'ciasteczka są wspólne dla originu' },
+];
+
 /** Adresy, które nie są żądaniami: przestrzenie nazw XML (SVG, XHTML, XLink). */
 const ALLOWED_URL = /^https?:\/\/www\.w3\.org\//;
 
@@ -69,6 +90,13 @@ export const GAMES = {
         why: 'Bez CrazyGames SDK: zewnętrzny skrypt platformy z reklamami. Bez niego js/sdk.js działa „standalone”, a reklamy i nagrody za reklamy się nie pokazują.',
         find: /<!-- \[2\.0-sdk\] CrazyGames SDK\.[\s\S]*?-->\s*<script src="https:\/\/sdk\.crazygames\.com\/crazygames-sdk-v3\.js"><\/script>\n?/,
         replace: '',
+      },
+      {
+        file: 'js/main.js',
+        why: '„Reset” gry kasuje tylko jej klucze (cm_*), nie cały localStorage wspólny z LifeXP.',
+        find: /localStorage\.clear\(\);/,
+        replace:
+          "Object.keys(localStorage).filter((k) => k.startsWith('cm_')).forEach((k) => localStorage.removeItem(k));",
       },
       {
         file: 'js/constants.js',
@@ -113,7 +141,9 @@ export function withCsp(html, csp = BASE_CSP) {
   if (/http-equiv=["']Content-Security-Policy["']/i.test(html)) {
     throw new Error('strona ma już własną Content-Security-Policy; połącz ją ręcznie z BASE_CSP');
   }
-  const meta = `<meta http-equiv="Content-Security-Policy" content="${csp}">`;
+  // Bez <link rel="icon"> przeglądarka pyta o /favicon.ico, którego strona nie ma (404 w konsoli).
+  const icon = /<link[^>]+rel=["'](?:shortcut )?icon["']/i.test(html) ? '' : '\n<link rel="icon" href="data:,">';
+  const meta = `<meta http-equiv="Content-Security-Policy" content="${csp}">${icon}`;
   const charset = html.match(/<meta charset=[^>]*>/i);
   if (charset) return html.replace(charset[0], `${charset[0]}\n${meta}`);
   const head = html.match(/<head[^>]*>/i);
@@ -182,10 +212,13 @@ function main() {
       fs.writeFileSync(file, text);
     }
     for (const url of externalUrls(text)) external.push(`${path.relative(outDir, file)}: ${url}`);
+    for (const { pattern, why } of FORBIDDEN) {
+      if (pattern.test(text)) external.push(`${path.relative(outDir, file)}: ${pattern.source} — ${why}`);
+    }
   }
   if (external.length) {
     fs.rmSync(outDir, { recursive: true, force: true });
-    fail(`gra nadal odwołuje się do zewnętrznych hostów (dodaj łatkę):\n  ${[...new Set(external)].join('\n  ')}`);
+    fail(`gra odwołuje się do zewnętrznych hostów albo sięga poza siebie (dodaj łatkę):\n  ${[...new Set(external)].join('\n  ')}`);
   }
 
   const vendored = {

@@ -62,7 +62,7 @@ async function openGame(page, account) {
 test.describe('on a phone', () => {
   test.use({ viewport: PHONE });
 
-  test('the list: four games, each with a line, its time today and "Wkrótce" until it is added', async ({ page, account }) => {
+  test('the list: four games, each with a line, its time today and "Graj", or "Wkrótce" until it is added', async ({ page, account }) => {
     await openSignedIn(page, account, '#/today');
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.getByLabel('Nawigacja').getByRole('link', { name: 'Gry' }).click();
@@ -71,16 +71,17 @@ test.describe('on a phone', () => {
     const cards = page.getByRole('list', { name: 'Gry' }).getByRole('listitem');
     await expect(cards).toHaveCount(4);
     await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie']);
-    for (const card of await cards.all()) {
-      await expect(card.getByText('Wkrótce')).toBeVisible();
-      await expect(card.getByText('Dziś jeszcze nie grano')).toBeVisible();
-    }
+    for (const card of await cards.all()) await expect(card.getByText('Dziś jeszcze nie grano')).toBeVisible();
+    // Wartime and Gridlock are in (g-2); Flappy Bird and Szybkie liczenie come with g-3 and g-4.
+    await expect(page.getByRole('link', { name: 'Graj: Wartime' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Graj: Gridlock' })).toBeVisible();
+    await expect(cards.filter({ hasText: 'Wkrótce' }).getByRole('heading')).toHaveText(['Flappy Bird', 'Szybkie liczenie']);
     // The test game exists only by address, never in the list.
     await expect(page.getByText(GAME)).toHaveCount(0);
     // Nothing sticks out at 360 px.
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(PHONE.width);
 
-    await page.goto(page.url().replace('#/games', '#/games/wartime'));
+    await page.goto(page.url().replace('#/games', '#/games/flappy-bird'));
     await expect(page.getByText('Wkrótce. Ta gra pojawi się w jednej z kolejnych wersji.')).toBeVisible();
     await page.getByRole('link', { name: 'Wszystkie gry' }).click();
     await expect(page).toHaveURL(/#\/games$/);
@@ -225,6 +226,11 @@ test.describe('v1 on a desktop', () => {
       await v1.fill('#game-minutes', '5');
       await v1.click('#page-log-gaming button.btn-primary');
       await expect.poll(async () => (await gamingState(account.uid)).sessions.length).toBe(2);
+      // v1 adds the session, then the day's minutes: wait for both before closing v1.
+      const v1Day = (await gamingState(account.uid)).sessions.find((s) => s.game === 'Minecraft').date;
+      if (v1Day === v2Session.date) {
+        await expect.poll(async () => (await gamingState(account.uid)).days[v1Day]?.gamingMinutes).toBe(7);
+      }
     } finally {
       await v1Context.close();
     }
@@ -233,9 +239,182 @@ test.describe('v1 on a desktop', () => {
     const shape = (s) => Object.fromEntries(Object.entries(s).map(([k, v]) => [k, v?.constructor?.name ?? typeof v]));
     expect(shape(v2Session)).toEqual(shape(v1Session));
     expect(shape(v2Session)).toEqual({ game: 'String', duration: 'Number', date: 'String', timestamp: 'Timestamp' });
-    const day = v2Session.date;
-    if (v1Session.date === day) {
-      await expect.poll(async () => (await gamingState(account.uid)).days[day]).toEqual({ pointsEarned: 0, gamingMinutes: 7 });
+    if (v1Session.date === v2Session.date) {
+      expect((await gamingState(account.uid)).days[v2Session.date]).toEqual({ pointsEarned: 0, gamingMinutes: 7 });
     }
+  });
+});
+
+// ── The vendored games (stage g-2): they play inside the host, offline-safe and sealed ──
+
+/**
+ * Collects what a game must never do: a request off this origin (the context aborts it
+ * anyway), a CSP violation (reported from inside every frame), an error in the console
+ * or an uncaught exception. Chrome's warning about the sandbox flags is a warning, not
+ * an error.
+ */
+async function watchProblems(page) {
+  const problems = [];
+  await page.addInitScript(() => {
+    document.addEventListener('securitypolicyviolation', (e) =>
+      console.error(`CSP violation: ${e.violatedDirective} ${e.blockedURI}`),
+    );
+  });
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (url.protocol.startsWith('http') && !['localhost', '127.0.0.1'].includes(url.hostname)) {
+      problems.push(`external request: ${request.url()}`);
+    }
+  });
+  page.on('console', (message) => {
+    if (message.type() === 'error') problems.push(`console: ${message.text()}`);
+  });
+  page.on('pageerror', (error) => problems.push(`exception: ${error.message}`));
+  return problems;
+}
+
+async function playFromList(page, account, name) {
+  await openSignedIn(page, account, '#/games');
+  await page.getByRole('link', { name: `Graj: ${name}` }).click();
+  const host = page.getByRole('region', { name });
+  await expect(host).toBeVisible();
+  return { host, game: host.frameLocator('iframe') };
+}
+
+async function endAndExpectSession(page, account, name) {
+  await page.clock.fastForward('01:00');
+  await page.getByRole('button', { name: 'Zakończ' }).click();
+  await expect(page).toHaveURL(/#\/games$/);
+  await expect.poll(async () => (await gamingState(account.uid)).sessions.map((s) => s.game)).toEqual([name]);
+}
+
+test.describe('Wartime', () => {
+  test('sideways: a new game, the map, one turn, a save that survives a reload, and Zakończ records the time', async ({ page, account }) => {
+    test.setTimeout(90000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    await page.clock.install();
+    const { host, game } = await playFromList(page, account, 'Wartime');
+    // Held sideways, the host bar is a rail on the left and the game has the full height.
+    await host.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const frame = await host.locator('iframe').boundingBox();
+    expect(frame.height).toBe(360);
+    expect(frame.width).toBeGreaterThan(680);
+    await expect(host.getByRole('note')).toBeHidden(); // no "turn your phone" while sideways
+
+    await game.locator('#start-search').fill('Polska');
+    await game.locator('#start-results .country-item[data-cc="POL"]').click();
+    await game.locator('#btn-start').click();
+    await expect(game.locator('#topbar')).toBeVisible({ timeout: 30000 });
+    await expect(game.locator('#tb-name')).toHaveText('Polska');
+    const firstWeek = await game.locator('#tb-date').textContent();
+    await game.locator('#btn-endturn').click();
+    await expect(game.locator('#tb-date')).not.toHaveText(firstWeek, { timeout: 30000 });
+    const savedWeek = await game.locator('#tb-date').textContent();
+
+    // Menu → save into slot 1 (localStorage, shared with nothing of LifeXP's).
+    await game.locator('#btn-more').click();
+    await game.locator('#btn-menu').click();
+    await game.locator('#menu [data-act="save"]').click();
+    await game.locator('[data-save="1"]').click();
+    expect(await page.evaluate(() => localStorage.getItem('wartime2026_slot_1'))).toBeTruthy();
+    // The save can also be exported as a file (the frame allows downloads for Wartime only).
+    const [download] = await Promise.all([page.waitForEvent('download'), game.locator('#sv-export').click()]);
+    expect(download.suggestedFilename()).toMatch(/^wartime2026_.*\.json$/);
+
+    await page.reload();
+    await expect(game.locator('#btn-load')).toBeVisible({ timeout: 30000 });
+    await game.locator('#btn-load').click();
+    await game.locator('[data-load="1"]').click();
+    await expect(game.locator('#tb-date')).toHaveText(savedWeek, { timeout: 30000 });
+    await expect(game.locator('#tb-name')).toHaveText('Polska');
+
+    await endAndExpectSession(page, account, 'Wartime');
+    expect(problems).toEqual([]);
+  });
+
+  test.describe('on a touch phone held upright', () => {
+    test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+
+    test('asks to turn the phone, and a tap on the map picks a country', async ({ page, account }) => {
+      const problems = await watchProblems(page);
+      const { host, game } = await playFromList(page, account, 'Wartime');
+      const hint = host.getByRole('note');
+      await expect(hint).toContainText('Obróć telefon');
+      await expect(game.locator('#start-card')).toHaveClass(/empty/, { timeout: 30000 });
+
+      // A tap on the map (the game's touch control) picks the country under it.
+      const map = await host.locator('iframe').boundingBox();
+      const card = game.locator('#start-card');
+      // The map is still settling after the start screen opens; tap until it takes it.
+      await expect
+        .poll(async () => {
+          await page.touchscreen.tap(map.x + map.width * 0.5, map.y + 80);
+          return card.getAttribute('class');
+        }, { timeout: 15000 })
+        .not.toContain('empty');
+
+      await hint.getByRole('button', { name: 'OK' }).click();
+      await expect(hint).toBeHidden();
+      expect(problems).toEqual([]);
+    });
+  });
+});
+
+test.describe('Gridlock', () => {
+  test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+
+  test('starts, a dash moves the cube, a round completes, coins stay after a reload, Zakończ records the time', async ({ page, account }) => {
+    test.setTimeout(60000);
+    const problems = await watchProblems(page);
+    await page.clock.install();
+    const { game } = await playFromList(page, account, 'Gridlock');
+    // The first start opens the tutorial; skip it into a normal game.
+    await game.locator('#tut-skip').click();
+    await game.locator('#btn-start').click();
+    await expect(game.locator('#hud-info')).toContainText('Round 1');
+
+    // A dash: tap a cell two to the right of the cube (start 8,8 on the 16×16 board).
+    const cells = game.locator('#board .cell');
+    await expect(cells).toHaveCount(256);
+    const dashes = game.locator('#hud-dash');
+    const before = await dashes.textContent();
+    await cells.nth(8 * 16 + 10).tap();
+    await expect(dashes).not.toHaveText(before);
+
+    // A round completes and pays. Every round fires a laser along the cube's row or
+    // column, so standing still loses: a small autopilot inside the game's frame dodges
+    // the way a player does (press a highlighted cell, release), and a run that still
+    // ends early is played again, up to a few times.
+    const frame = page.frames().find((f) => f.url().includes('/games/gridlock/'));
+    await frame.evaluate(() => {
+      setInterval(() => {
+        /* global alive, lasers, cube */
+        if (!alive) return;
+        const hit = lasers.some((l) => l.state === 'charge' && (l.type === 'row' ? l.idx === cube.y : l.idx === cube.x));
+        if (!hit) return;
+        const safe = document.querySelector('#board .cell.dashable:not(.block-charge)');
+        if (!safe) return;
+        safe.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        window.dispatchEvent(new PointerEvent('pointerup'));
+      }, 100);
+    });
+    const info = game.locator('#hud-info');
+    const dead = game.locator('#death-overlay.show');
+    for (let run = 0; run < 6; run++) {
+      await expect(info.filter({ hasText: /Round [2-9]/ }).or(dead)).toBeVisible({ timeout: 20000 });
+      if (/Round [2-9]/.test(await info.textContent())) break;
+      await game.locator('#btn-retry').click();
+      await expect(dead).toBeHidden();
+    }
+    await expect(info).toContainText(/Round [2-9]/);
+    await expect.poll(() => page.evaluate(() => Number(localStorage.getItem('cm_coins') || 0)), { timeout: 20000 }).toBeGreaterThan(0);
+    const coins = await page.evaluate(() => Number(localStorage.getItem('cm_coins')));
+
+    await page.reload();
+    await expect(game.locator('#menu-coins')).toContainText(String(coins), { timeout: 20000 });
+
+    await endAndExpectSession(page, account, 'Gridlock');
+    expect(problems).toEqual([]);
   });
 });
