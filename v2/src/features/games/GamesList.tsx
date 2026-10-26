@@ -36,10 +36,9 @@ function GameCard({ game, minutes }: { game: GameDef; minutes: number | undefine
           {todayText(minutes)}
         </p>
         {game.src ? (
-          <ButtonLink variant="primary" href={`#/games/${game.id}`}>
+          <ButtonLink variant="primary" href={`#/games/${game.id}`} label={t('games.playNamed', { name })}>
             <Play aria-hidden="true" />
             {t('games.play')}
-            <span class="visually-hidden">: {name}</span>
           </ButtonLink>
         ) : (
           <span class="game-card__soon">{t('games.soon')}</span>

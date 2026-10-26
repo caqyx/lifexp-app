@@ -1684,6 +1684,7 @@
       "test": "A game for automated tests."
     },
     "play": "Play",
+    "playNamed": "Play: {{name}}",
     "soon": "Coming soon",
     "soonBody": "This game arrives in one of the next versions.",
     "today": "Today: {{time}}",

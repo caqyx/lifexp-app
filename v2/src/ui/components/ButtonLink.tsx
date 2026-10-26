@@ -9,15 +9,17 @@ interface ButtonLinkProps {
   variant?: ButtonVariant;
   size?: 'md' | 'lg';
   block?: boolean;
+  /** A fuller name than the visible text, e.g. "Graj: Wartime" for a "Graj" among several. */
+  label?: string;
   children: ComponentChildren;
 }
 
-export function ButtonLink({ href, variant = 'secondary', size = 'md', block = false, children }: ButtonLinkProps) {
+export function ButtonLink({ href, variant = 'secondary', size = 'md', block = false, label, children }: ButtonLinkProps) {
   const classes = ['ui-button', `ui-button--${variant}`, `ui-button--${size}`, block ? 'ui-button--block' : '']
     .filter(Boolean)
     .join(' ');
   return (
-    <a class={classes} href={href}>
+    <a class={classes} href={href} aria-label={label}>
       {children}
     </a>
   );

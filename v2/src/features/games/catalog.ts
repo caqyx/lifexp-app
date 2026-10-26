@@ -19,12 +19,14 @@ export interface GameDef {
   src: string | null;
   /** Plays better held sideways: GameHost asks to turn a phone held upright. */
   landscape?: boolean;
+  /** The game saves files for the player (Wartime: "Eksportuj JSON" of a save): adds allow-downloads. */
+  downloads?: boolean;
 }
 
 export const GAMES: readonly GameDef[] = [
   { id: 'flappy-bird', sessionName: 'Flappy Bird', icon: Bird, src: null },
-  { id: 'wartime', sessionName: 'Wartime', icon: Swords, src: null, landscape: true },
-  { id: 'gridlock', sessionName: 'Gridlock', icon: Grid3x3, src: null },
+  { id: 'wartime', sessionName: 'Wartime', icon: Swords, src: 'games/wartime/index.html', landscape: true, downloads: true },
+  { id: 'gridlock', sessionName: 'Gridlock', icon: Grid3x3, src: 'games/gridlock/index.html' },
   { id: 'quick-math', sessionName: 'Szybkie liczenie', icon: Calculator, src: null },
 ];
 

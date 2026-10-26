@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Gridlock</title><!-- [1.9.1] renamed -->
+<link rel="stylesheet" href="cube_master.css?v=2.0-final">
+</head>
+<body>
+<div id="intro-overlay"></div>
+<canvas id="bg-canvas"></canvas>
+<div id="menu-coins">🪙 0</div>
+<!-- [2.0-capybara] Idle-menu easter egg — hidden by default, shown only by js/capybara.js
+     while #screen-start is the active screen. Fixed + independent of screen-start's own
+     stacking so it can be driven purely from JS regardless of which screen is on top. -->
+<div id="capybara-egg" class="capybara-egg" style="display:none">
+  <canvas id="capybara-sprite" class="capybara-sprite" width="18" height="10"></canvas>
+  <div id="capybara-bubble" class="capybara-bubble"></div>
+</div>
+
+<!-- MAIN MENU --> <!-- [1.9.1] translated -->
+<div id="screen-start" class="screen-base">
+  <div id="menu-title">Gridlock<br></div>
+  <div id="menu-sub">v1.0</div>
+
+  <!-- CENTER: main game buttons --> <!-- [1.9.1] translated -->
+  <div id="menu-center">
+    <button class="menu-btn menu-btn-normal" id="btn-start" style="width:100%;">▶ NORMAL</button><!-- [1.9] -->
+    <button class="menu-btn menu-btn-hard"   id="btn-hard"  style="width:100%;">
+      🔥 HARD <span class="menu-btn-desc">1.6× faster · +3 🪙</span><!-- [1.9.1] updated multiplier -->
+    </button>
+    <button class="menu-btn menu-btn-modes" id="btn-modes" style="width:100%;"><svg class="ui-ico ui-ico-lead" viewBox="0 0 24 24"><!-- [2.0-deemoji] gamepad --><rect x="2.2" y="7.4" width="19.6" height="9.2" rx="4.6"/><line x1="7.4" y1="10.4" x2="7.4" y2="13.6"/><line x1="5.8" y1="12" x2="9" y2="12"/><circle cx="16.2" cy="11.2" r=".95"/><circle cx="18.4" cy="13.4" r=".95"/></svg>MODES</button><!-- [1.10] -->
+    <button class="menu-btn menu-btn-tutorial" id="btn-tutorial" style="width:100%;"><svg class="ui-ico ui-ico-lead" viewBox="0 0 24 24"><!-- [2.0-deemoji] open book --><path d="M12 6.6C10.3 5.2 8.2 4.5 5.4 4.5H2.8v13.4h2.6c2.8 0 4.9.7 6.6 2.1"/><path d="M12 6.6c1.7-1.4 3.8-2.1 6.6-2.1h2.6v13.4h-2.6c-2.8 0-4.9.7-6.6 2.1"/><line x1="12" y1="6.6" x2="12" y2="20"/></svg>TUTORIAL</button>
+    <button class="menu-btn" id="btn-world-switch" style="width:100%;display:none">✦ SWITCH WORLD</button><!-- [2.0-s1] -->
+  </div>
+
+  <!-- BOTTOM BAR: secondary navigation --> <!-- [1.9.1] translated -->
+  <div id="menu-bar">
+    <button class="menu-bar-btn" id="bar-missions">
+      <span class="menu-bar-icon"><!-- [2.0-deemoji] clipboard -->
+        <svg viewBox="0 0 24 24"><path d="M9 4.5H6.5A1.5 1.5 0 0 0 5 6v13.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H15"/><rect x="9" y="2.6" width="6" height="3.8" rx="1.2"/><line x1="8.5" y1="11" x2="15.5" y2="11"/><line x1="8.5" y1="14.5" x2="15.5" y2="14.5"/><line x1="8.5" y1="18" x2="13" y2="18"/></svg>
+      </span>
+      <span class="menu-bar-label">MISSIONS</span><!-- [1.9] -->
+    </button>
+    <button class="menu-bar-btn" id="bar-shop">
+      <span class="menu-bar-icon"><!-- [2.0-deemoji] cart -->
+        <svg viewBox="0 0 24 24"><path d="M2.6 3.4h2.6l2.4 11h9.8l2-7.4H6.2"/><circle cx="9.2" cy="19" r="1.5"/><circle cx="16.6" cy="19" r="1.5"/></svg>
+      </span>
+      <span class="menu-bar-label">SHOP</span><!-- [1.9] -->
+    </button>
+    <button class="menu-bar-btn" id="bar-stats">
+      <span class="menu-bar-icon"><!-- [2.0-deemoji] bar chart -->
+        <svg viewBox="0 0 24 24"><line x1="3.4" y1="20.4" x2="20.6" y2="20.4"/><line x1="7" y1="20.4" x2="7" y2="13"/><line x1="12" y1="20.4" x2="12" y2="7.5"/><line x1="17" y1="20.4" x2="17" y2="10.5"/></svg>
+      </span>
+      <span class="menu-bar-label">STATS</span><!-- [1.9] -->
+    </button>
+    <button class="menu-bar-btn" id="bar-reset">
+      <span class="menu-bar-icon"><!-- [2.0-deemoji] trash -->
+        <svg viewBox="0 0 24 24"><line x1="3.6" y1="6.2" x2="20.4" y2="6.2"/><path d="M5.9 6.2h12.2l-.9 13a1.5 1.5 0 0 1-1.5 1.4H8.3a1.5 1.5 0 0 1-1.5-1.4Z"/><path d="M9.3 6.2V4.4a1.4 1.4 0 0 1 1.4-1.4h2.6a1.4 1.4 0 0 1 1.4 1.4v1.8"/><line x1="10.4" y1="10.2" x2="10.4" y2="16.8"/><line x1="13.6" y1="10.2" x2="13.6" y2="16.8"/></svg>
+      </span>
+      <span class="menu-bar-label">RESET</span>
+    </button>
+  </div>
+</div>
+
+<!-- STATISTICS SCREEN --> <!-- [1.9.1] translated -->
+<div id="screen-stats" class="screen-base">
+  <h2><svg class="ui-ico ui-ico-lead" viewBox="0 0 24 24"><!-- [2.0-deemoji] bar chart --><line x1="3.4" y1="20.4" x2="20.6" y2="20.4"/><line x1="7" y1="20.4" x2="7" y2="13"/><line x1="12" y1="20.4" x2="12" y2="7.5"/><line x1="17" y1="20.4" x2="17" y2="10.5"/></svg>STATISTICS</h2><!-- [1.9] -->
+  <div id="stats-tabs"><!-- [2.0-s3] -->
+    <button class="stats-tab active" id="stats-tab-w1">⚡ WORLD 1</button>
+    <button class="stats-tab" id="stats-tab-w2">✦ WORLD 2</button>
+  </div>
+  <div id="stats-coins-row">
+    <div class="stat-coins-lbl" id="st-coins-lbl">WALLET</div><!-- [1.9] -->
+    <div class="stat-coins-val" id="st-coins">0 🪙</div>
+  </div>
+  <div id="stats-grid">
+    <div class="stat-box">
+      <div class="stat-val" id="st-best-time">0s</div>
+      <div class="stat-lbl">BEST TIME</div><!-- [1.9] -->
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="st-best-round">0</div>
+      <div class="stat-lbl">BEST ROUND</div><!-- [1.9] -->
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="st-games">0</div>
+      <div class="stat-lbl">GAMES PLAYED</div><!-- [1.9] -->
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="st-skins">0</div>
+      <div class="stat-lbl">SKINS</div><!-- [1.9] -->
+    </div>
+  </div>
+  <div id="stats-grid-2"><!-- [1.9.2] -->
+    <div class="stat-box">
+      <div class="stat-val" id="st-lasers">0</div>
+      <div class="stat-lbl" id="st-lasers-lbl">LASERS DODGED</div><!-- [2.0-s3] -->
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="st-time">0m</div>
+      <div class="stat-lbl">TIME PLAYED</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="st-coins-total">0</div>
+      <div class="stat-lbl" id="st-coins-total-lbl">COINS EARNED</div><!-- [2.0-s3] -->
+    </div>
+    <div class="stat-box">
+      <div class="stat-val" id="st-best-combo">—</div>
+      <div class="stat-lbl">BEST COMBO</div>
+    </div>
+  </div>
+  <button id="stats-close">← BACK TO MENU</button><!-- [1.9] -->
+</div>
+
+<!-- MISSIONS SCREEN --> <!-- [1.9.1] translated -->
+<div id="screen-missions" class="screen-base">
+  <div id="missions-header">
+    <div id="missions-title"><svg class="ui-ico ui-ico-lead" viewBox="0 0 24 24"><!-- [2.0-deemoji] clipboard --><path d="M9 4.5H6.5A1.5 1.5 0 0 0 5 6v13.5A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H15"/><rect x="9" y="2.6" width="6" height="3.8" rx="1.2"/><line x1="8.5" y1="11" x2="15.5" y2="11"/><line x1="8.5" y1="14.5" x2="15.5" y2="14.5"/><line x1="8.5" y1="18" x2="13" y2="18"/></svg>MISSIONS</div><!-- [1.9] -->
+    <div id="missions-week-badge">Normal Day</div><!-- [2.0-s4] daily -->
+  </div>
+  <div id="missions-timer">Loading...</div><!-- [1.9] -->
+  <div id="missions-list"></div>
+  <div id="missions-bonus-card">
+    <div id="missions-bonus-title"><svg class="ui-ico ui-ico-lead" viewBox="0 0 24 24"><!-- [2.0-deemoji] trophy --><path d="M7.6 3.4h8.8v5.2a4.4 4.4 0 0 1-8.8 0Z"/><path d="M7.6 4.8H4.9v1.9a3.2 3.2 0 0 0 3 3.2"/><path d="M16.4 4.8h2.7v1.9a3.2 3.2 0 0 1-3 3.2"/><line x1="12" y1="13" x2="12" y2="17"/><path d="M8.6 20.6h6.8l-.7-3.6H9.3Z"/></svg>BONUS FOR ALL MISSIONS</div><!-- [1.9] -->
+    <div id="missions-bonus-desc">Complete all 3 missions</div><!-- [1.9] -->
+    <button id="missions-bonus-btn" disabled>CLAIM BONUS</button><!-- [1.9] -->
+  </div>
+  <button id="missions-close">← BACK TO MENU</button><!-- [1.9] -->
+</div>
+
+<!-- GAME MODES SCREEN --> <!-- [1.10] -->
+<div id="screen-modes" class="screen-base">
+  <div id="modes-header">
+    <span id="modes-title">GAME MODES</span>
+  </div>
+  <div id="modes-list">
+    <div class="mode-card" id="mode-card-timeattack">
+      <div class="mode-card-icon"><!-- [2.0-w1fix] stopwatch -->
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="13.5" r="7.5"/><polyline points="12,9 12,13.5 15,15.5"/><line x1="9.5" y1="2.5" x2="14.5" y2="2.5"/><line x1="12" y1="2.5" x2="12" y2="6"/></svg>
+      </div>
+      <div class="mode-card-name">TIME ATTACK</div>
+      <div class="mode-card-desc">60 seconds — score as many rounds as possible</div>
+      <div class="mode-card-status"></div>
+    </div>
+    <div class="mode-card" id="mode-card-hardcore">
+      <div class="mode-card-icon"><!-- [2.0-w1fix] cracked heart — one life -->
+        <svg viewBox="0 0 24 24"><path d="M12 20.5 3.8 12.3a4.9 4.9 0 0 1 6.9-6.9l1.3 1.3 1.3-1.3a4.9 4.9 0 0 1 6.9 6.9Z"/><polyline points="12,6.7 10,12 13.5,13.2 11.4,20.1"/></svg>
+      </div>
+      <div class="mode-card-name">HARDCORE</div>
+      <div class="mode-card-desc">One life per day — death locks you out till midnight</div>
+      <div class="mode-card-status"></div>
+    </div>
+    <div class="mode-card" id="mode-card-daily">
+      <div class="mode-card-icon"><!-- [2.0-w1fix] calendar -->
+        <svg viewBox="0 0 24 24"><rect x="3.2" y="5" width="17.6" height="16" rx="2.5"/><line x1="3.2" y1="10" x2="20.8" y2="10"/><line x1="8" y1="2.6" x2="8" y2="6.4"/><line x1="16" y1="2.6" x2="16" y2="6.4"/><circle cx="12" cy="15.5" r="1.6"/></svg>
+      </div>
+      <div class="mode-card-name">DAILY</div>
+      <div class="mode-card-desc">Today's fixed challenge — one attempt, shared by all</div>
+      <div class="mode-card-status"></div>
+    </div>
+  </div>
+  <button class="menu-btn" id="btn-modes-back" style="width:min(300px,88vw);margin-top:8px;">← BACK</button>
+</div>
+
+<!-- [2.0-s4h] old text tutorial removed — tutorial now runs live on #app -->
+
+<!-- WORLD CHOICE --> <!-- [2.0-s1] -->
+<div id="screen-world-choice" class="screen-base">
+  <div id="wc-title">✦ VOID KING DEFEATED</div>
+  <div id="wc-subtitle">You have torn a rift in the grid.</div>
+  <div id="wc-options">
+    <div class="wc-card" id="wc-world1">
+      <div class="wc-card-icon">⚡</div>
+      <div class="wc-card-name">CONTINUE</div>
+      <div class="wc-card-desc">Keep playing in the neon grid — Round 61 awaits</div>
+    </div>
+    <div class="wc-card" id="wc-world2">
+      <div class="wc-card-icon">✦</div>
+      <div class="wc-card-name">ENTER THE VOID</div>
+      <div class="wc-card-desc">Step into the cosmic world — new dangers, new rewards</div>
+    </div>
+  </div>
+  <div id="wc-note">You can switch worlds from the main menu at any time.</div>
+</div>
+
+<!-- CUBEK 2.0 INTRO --> <!-- [2.0-s1] -->
+<div id="screen-cubek2" class="screen-base">
+  <div id="cubek2-face">✦</div>
+  <div id="cubek2-bubble">
+    <div id="cubek2-name">CUBEK 2.0</div>
+    <div id="cubek2-text"></div>
+  </div>
+  <button id="cubek2-next">NEXT →</button>
+</div>
+
+<!-- RESET DIALOG --> <!-- [1.9.1] translated -->
+<div id="reset-dialog" style="position:fixed;inset:0;width:100vw;height:100dvh;
+  background:rgba(0,0,0,.85);z-index:100;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:16px;
+  visibility:hidden;pointer-events:none;">
+  <div style="font-size:16px;color:#ff4444;letter-spacing:2px;"><svg class="ui-ico ui-ico-lead" viewBox="0 0 24 24"><!-- [2.0-deemoji] trash --><line x1="3.6" y1="6.2" x2="20.4" y2="6.2"/><path d="M5.9 6.2h12.2l-.9 13a1.5 1.5 0 0 1-1.5 1.4H8.3a1.5 1.5 0 0 1-1.5-1.4Z"/><path d="M9.3 6.2V4.4a1.4 1.4 0 0 1 1.4-1.4h2.6a1.4 1.4 0 0 1 1.4 1.4v1.8"/><line x1="10.4" y1="10.2" x2="10.4" y2="16.8"/><line x1="13.6" y1="10.2" x2="13.6" y2="16.8"/></svg>RESET DATA</div><!-- [1.9] -->
+  <div style="font-size:13px;color:#88aacc;text-align:center;max-width:260px;line-height:1.6;">
+    Delete all coins, skins and statistics?<br>This cannot be undone.<!-- [1.9] -->
+  </div>
+  <div style="display:flex;gap:12px;">
+    <button id="reset-confirm" style="background:#f44;color:#fff;border:none;
+      padding:12px 28px;font-family:monospace;font-size:14px;font-weight:bold;
+      border-radius:8px;cursor:pointer;">YES, DELETE</button><!-- [1.9] -->
+    <button id="reset-cancel" style="background:#0f0f22;color:#88aacc;
+      border:1.5px solid #334;padding:12px 28px;font-family:monospace;
+      font-size:14px;border-radius:8px;cursor:pointer;">CANCEL</button><!-- [1.9] -->
+  </div>
+</div>
+
+<!-- GAME --> <!-- [1.9.1] translated -->
+<div id="app" class="screen-base">
+  <div id="hud">
+    <div id="hud-coins">🪙 0</div>
+    <div id="hud-info">Round 0 · 0.0s</div><!-- [1.9] -->
+    <!-- [2.0-deemoji] HUD icons are static SVG + a value span, so the 100ms HUD tick only
+         writes text and never re-parses markup. stroke:currentColor makes each icon follow
+         its element's state colour (.urgent, .bh-ready, .bh-cooldown, body.world2). -->
+    <div id="hud-dash"><svg class="hud-ico" viewBox="0 0 24 24"><!-- bolt --><path d="M13.4 2.2 4.8 13.6h5.6l-.8 8.2 8.6-11.4h-5.6Z"/></svg> <span id="hud-dash-val">–</span></div>
+    <div id="hud-blackhole" style="display:none"><svg class="hud-ico" viewBox="0 0 24 24"><!-- singularity --><ellipse cx="12" cy="12" rx="9.6" ry="4.4"/><circle cx="12" cy="12" r="2.9"/></svg> <span id="hud-blackhole-val"></span></div><!-- [2.0-s2] -->
+    <div id="hud-timer" style="display:none"><svg class="hud-ico" viewBox="0 0 24 24"><!-- stopwatch --><circle cx="12" cy="13.5" r="7.5"/><polyline points="12,9 12,13.5 15,15.5"/><line x1="9.5" y1="2.5" x2="14.5" y2="2.5"/><line x1="12" y1="2.5" x2="12" y2="6"/></svg> <span id="hud-timer-val"></span></div><!-- [1.10] -->
+    <div id="hud-combo" style="display:none"><svg class="hud-ico" viewBox="0 0 24 24"><!-- flame --><path d="M12 21.4c3.5 0 6-2.4 6-5.6 0-4.4-4.3-6-4.3-9.6 0-1.3.5-2.4 1.1-3.2-4 .9-7.3 4.3-7.3 8.6 0 1.7.7 3 .7 4.1 0 1-.7 1.7-1.5 1.7 0 2.3 2.3 4 5.3 4Z"/></svg> <span id="hud-combo-val"></span></div><!-- [1.9.2] -->
+    <div id="hud-gridlock" style="display:none"><svg class="hud-ico" viewBox="0 0 24 24"><!-- bolt --><path d="M13.4 2.2 4.8 13.6h5.6l-.8 8.2 8.6-11.4h-5.6Z"/></svg> <span id="hud-gridlock-val"></span></div><!-- [1.12] -->
+    <button id="hud-pause-btn" aria-label="Pause"><!-- [2.0-pause] pauses the game -->
+      <svg class="hud-ico" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+    </button>
+  </div>
+  <div id="board-wrap">
+    <div id="board"></div>
+    <canvas id="anim-canvas"></canvas>
+    <div id="board-tear"><!-- [2.0-s3.4] Grid Glitch lightning bolt overlay -->
+      <svg id="bolt-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <polyline id="bolt-line" vector-effect="non-scaling-stroke"></polyline>
+      </svg>
+    </div>
+  </div>
+  <div id="msg">Click a cell to Dash (max 5 cells). Lasers and blocks are deadly!</div><!-- [1.9] -->
+  <div id="combo-flash"></div><!-- [1.9.2] -->
+  <div id="round-mod-banner"></div><!-- [2.0-s3] -->
+  <div id="tut-coach" style="display:none"></div><!-- [2.0-s4h] one-line coachmark bubble -->
+  <button id="tut-skip" style="display:none">Skip ✕</button><!-- [2.0-s4h] corner skip, whole tutorial -->
+</div>
+
+<!-- [2.0-pause] PAUSE OVERLAY — same skeleton as #death-overlay, but visually distinct so the
+     two states never read alike: lighter scrim, calm cyan title, no flicker animation. -->
+<div id="pause-overlay">
+  <div id="pause-title">PAUSED</div>
+  <div style="display:flex;gap:10px;margin-top:16px;">
+    <button class="btn-glass" id="pause-resume-btn" style="font-size:13px;padding:12px 20px;">▶ RESUME</button>
+    <button class="btn-glass" id="pause-menu-btn" style="font-size:13px;padding:12px 20px;background:rgba(100,100,150,.15);color:#88aacc;box-shadow:none;border:1.5px solid #334;">☰ MENU</button>
+  </div>
+</div>
+
+<!-- DEATH OVERLAY -->
+<div id="death-overlay">
+  <div id="death-title">GAME OVER</div>
+  <div id="death-stats"></div>
+  <!-- [2.0-ads] Rewarded offers, on their own row ABOVE the real actions so they never read as the
+       primary path out of this screen. Static elements, not part of the #death-stats innerHTML
+       rebuild, so their .onclick survives between deaths. js/ads-rewards.js shows them; with no
+       CrazyGames SDK they stay hidden forever. -->
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;align-items:center;">
+    <button class="btn-glass" id="death-revive-btn" style="display:none;font-size:12px;padding:10px 16px;background:linear-gradient(135deg,#00dd88,#00aa55);color:#000;">▶ WATCH AD TO CONTINUE</button>
+    <button class="btn-glass" id="death-ad-btn" style="display:none;font-size:12px;padding:10px 16px;background:linear-gradient(135deg,#ffd700,#ff8800);color:#000;">▶ WATCH AD FOR 2× COINS</button>
+  </div>
+  <div style="display:flex;gap:10px;margin-top:4px;">
+    <button class="btn-glass" id="btn-retry" style="font-size:13px;padding:12px 20px;">↺ PLAY AGAIN</button><!-- [1.9] -->
+    <button class="btn-glass" id="btn-to-menu" style="font-size:13px;padding:12px 20px;background:rgba(100,100,150,.15);color:#88aacc;box-shadow:none;border:1.5px solid #334;">☰ MENU</button>
+  </div>
+</div>
+
+<!-- SHOP --> <!-- [1.9.1] translated -->
+<div id="shop">
+  <div id="shop-header">
+    <h2>SHOP</h2><!-- [1.9] -->
+    <div id="shop-bal">🪙 0</div>
+  </div>
+  <!-- [1.9] Shop tabs -->
+  <div id="shop-tabs">
+    <button class="shop-tab active" id="shop-tab-cube">CUBE</button>
+    <button class="shop-tab" id="shop-tab-bl">BOARD &amp; LASERS</button>
+  </div>
+  <div id="shop-grid"></div>
+  <!-- [1.9] Board & Laser tab content -->
+  <div id="shop-grid-bl" style="display:none;"></div>
+  <button id="shop-close">← Back</button><!-- [1.9] -->
+</div>
+
+<!-- VOID SHOP (World 2 loot box) --> <!-- [2.0-s5c] -->
+<div id="void-shop">
+  <div id="void-shop-header">
+    <h2>VOID SHOP</h2>
+    <div id="void-bal">✦ 0</div>
+  </div>
+  <div id="void-opener"></div>
+  <div id="void-collection"></div>
+  <button id="void-shop-close">← Back</button>
+</div>
+<!-- VOID reveal modal (reel + item reveal) --> <!-- [2.0-s5c] -->
+<div id="void-reveal">
+  <div id="void-reel-viewport">
+    <div id="void-reel-strip"></div>
+    <div id="void-reel-pointer"></div>
+  </div>
+  <div id="void-reveal-card"></div>
+  <button id="void-reveal-ok">CONTINUE</button>
+</div>
+
+<!-- [MODULE] LOAD ORDER IS SIGNIFICANT. These are plain scripts sharing one global
+     scope (no build step - GitHub Pages serves this as-is), so any binding must be
+     declared before top-level code that runs at load time uses it. Hence:
+     constants -> state -> dom -> everything else -> main last.
+     main.js holds all the event wiring and the bootstrap, so it must stay last. -->
+<script src="js/constants.js?v=2.0-final"></script>
+<script src="js/state.js?v=2.0-final"></script>
+<script src="js/dom.js?v=2.0-final"></script>
+<script src="js/persistence.js?v=2.0-final"></script>
+<script src="js/skins.js?v=2.0-final"></script>
+<script src="js/sound.js?v=2.0-final"></script>
+<script src="js/board-render.js?v=2.0-final"></script>
+<script src="js/hazards.js?v=2.0-final"></script>
+<script src="js/rounds.js?v=2.0-final"></script>
+<script src="js/bosses.js?v=2.0-final"></script>
+<script src="js/world2.js?v=2.0-final"></script>
+<script src="js/screens.js?v=2.0-final"></script>
+<script src="js/shop.js?v=2.0-final"></script>
+<script src="js/lootbox.js?v=2.0-final"></script>
+<script src="js/missions.js?v=2.0-final"></script>
+<script src="js/tutorial.js?v=2.0-final"></script>
+<script src="js/capybara.js?v=2.0-final"></script>
+<script src="js/pause.js?v=2.0-final"></script><!-- [2.0-pause] pauseGame/resumeGame — sdk.js and ads-rewards.js both call them -->
+<script src="js/sdk.js?v=2.0-final"></script><!-- [2.0-sdk] after sound.js (audioCtx) and pause.js -->
+<script src="js/ads-rewards.js?v=2.0-final"></script><!-- [2.0-ads] after sdk.js (ad helpers) and lootbox.js (_resolveBoxOpen) -->
+<script src="js/main.js?v=2.0-final"></script>
+</body>
+</html>

@@ -170,3 +170,36 @@
   border: 0;
   background: var(--color-bg);
 }
+
+/* A phone held sideways has little height: the bar becomes a narrow rail on the left,
+   so the game keeps the full height (Wartime's menu needs ~350 px). */
+@media (orientation: landscape) and (max-height: 500px) {
+  .game-host {
+    flex-direction: row;
+  }
+
+  .game-host__bar {
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: var(--space-2);
+    border-right: 1px solid var(--color-border);
+    border-bottom: 0;
+  }
+
+  .game-host__bar .ui-button {
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xs);
+  }
+
+  .game-host__title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

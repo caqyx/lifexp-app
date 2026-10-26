@@ -4,8 +4,9 @@
 // Sandbox: vendored games keep their saves and records in localStorage, which an
 // opaque-origin frame cannot use (it throws), so the frame is same-origin:
 // `allow-scripts allow-same-origin` and nothing else — no popups, no top-level
-// navigation, no forms, no modal dialogs, no downloads, and an empty `allow` (no
-// camera, microphone, geolocation, fullscreen…). With these two flags the sandbox
+// navigation, no forms, no modal dialogs, and an empty `allow` (no camera, microphone,
+// geolocation, fullscreen…). Downloads only for a game that saves files for the player
+// (GameDef.downloads: Wartime's save export). With these two flags the sandbox
 // does not wall the game off from this page, so the trust lies in what is framed:
 // only files vendored into this repo from the owner's own repositories at a pinned
 // commit (scripts/vendor-game.mjs, VENDORED.json). The vendoring script removes
@@ -58,7 +59,7 @@ export function GameHost({ uid, game, onExit }: GameHostProps) {
         class="game-host__frame"
         src={game.src}
         title={t('games.frameTitle', { name })}
-        sandbox="allow-scripts allow-same-origin"
+        sandbox={`allow-scripts allow-same-origin${game.downloads ? ' allow-downloads' : ''}`}
         allow=""
         referrerpolicy="no-referrer"
       />

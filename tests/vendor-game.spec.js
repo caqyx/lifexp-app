@@ -19,7 +19,7 @@ function fakeRepo(files = {}) {
       '<svg xmlns="http://www.w3.org/2000/svg"></svg></body></html>\n',
     'cube_master.css': 'body { margin: 0; }\n',
     'js/constants.js': 'const ADS_ENABLED = false;\n',
-    'js/main.js': 'console.log("game");\n',
+    'js/main.js': 'console.log("game");\nfunction reset() { localStorage.clear(); location.reload(); }\n',
     'README.md': 'not copied\n',
     ...files,
   };
@@ -53,6 +53,12 @@ test('copies the game, drops the CrazyGames SDK, adds the CSP and VENDORED.json'
   expect(html).toContain('<script src="js/main.js"></script>');
   expect(html).toMatch(/<meta charset="UTF-8">\n<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self';/);
   expect(html).toContain("connect-src 'self'");
+  // No favicon request (404) from the game page.
+  expect(html).toContain('<link rel="icon" href="data:,">');
+  // Its reset clears only the game's own keys, not LifeXP's.
+  const main = fs.readFileSync(path.join(out, 'js', 'main.js'), 'utf8');
+  expect(main).not.toContain('localStorage.clear');
+  expect(main).toContain("k.startsWith('cm_')");
 
   const vendored = JSON.parse(fs.readFileSync(path.join(out, 'VENDORED.json'), 'utf8'));
   expect(vendored).toMatchObject({
@@ -62,7 +68,7 @@ test('copies the game, drops the CrazyGames SDK, adds the CSP and VENDORED.json'
     dirty: false,
     files: 4,
   });
-  expect(vendored.patches).toHaveLength(2);
+  expect(vendored.patches).toHaveLength(3);
   expect(Date.parse(vendored.vendoredAt)).not.toBeNaN();
 });
 
@@ -74,12 +80,20 @@ test('a patch that no longer matches stops the copy', () => {
 });
 
 test('an external host left in the game stops the copy and leaves nothing behind', () => {
-  const { dir } = fakeRepo({ 'js/main.js': 'fetch("https://tracker.example.com/hit");\n' });
+  const { dir } = fakeRepo({ 'js/extra.js': 'fetch("https://tracker.example.com/hit");\n' });
   const out = outDir();
   const run = vendor(dir, out);
   expect(run.status).toBe(1);
-  expect(run.stderr).toContain('js/main.js: https://tracker.example.com/hit');
+  expect(run.stderr).toContain('js/extra.js: https://tracker.example.com/hit');
   expect(fs.existsSync(out)).toBe(false);
+});
+
+test('a game that reaches beyond itself on the shared origin is refused', () => {
+  const { dir } = fakeRepo({ 'js/extra.js': 'indexedDB.deleteDatabase("x");\n' });
+  const run = vendor(dir, outDir());
+  expect(run.status).toBe(1);
+  expect(run.stderr).toContain('js/extra.js');
+  expect(run.stderr).toContain('IndexedDB');
 });
 
 test('uncommitted changes in the source are refused', () => {

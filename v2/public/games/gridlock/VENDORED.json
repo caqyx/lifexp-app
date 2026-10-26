@@ -1,0 +1,19 @@
+{
+  "game": "gridlock",
+  "source": "https://github.com/szymonrogalski098-collab/gridlock",
+  "commit": "876da06b2a65aace6baf4584912c5ad07dffc2ca",
+  "vendoredAt": "2026-10-26T21:08:55.190Z",
+  "dirty": false,
+  "include": [
+    "index.html",
+    "cube_master.css",
+    "js"
+  ],
+  "patches": [
+    "index.html: Bez CrazyGames SDK: zewnętrzny skrypt platformy z reklamami. Bez niego js/sdk.js działa „standalone”, a reklamy i nagrody za reklamy się nie pokazują.",
+    "js/main.js: „Reset” gry kasuje tylko jej klucze (cm_*), nie cały localStorage wspólny z LifeXP.",
+    "js/constants.js: Reklamy i nagrody za reklamy wyłączone w samej grze (ADS_ENABLED = false)."
+  ],
+  "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'",
+  "files": 23
+}
