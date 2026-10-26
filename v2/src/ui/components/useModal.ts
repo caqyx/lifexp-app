@@ -2,15 +2,15 @@
 // <dialog>: showModal() gives the focus trap, inert background, Escape and the
 // top layer for free. On top of that:
 // - opening adds a history entry, so the system Back closes the layer (PLAN.md 4.7);
-// - closing ends the modal at once (the page is usable again: a message typed right
-//   after a button of the layer is not lost) and plays the exit animation on the
+// - closing ends the modal at once, in the same commit as the parent's change (the page
+//   is usable again: a message typed right after a button of the layer is not lost) and plays the exit animation on the
 //   closed dialog, which the CSS keeps in the top layer while it animates (taps
 //   are held off the page until it is gone);
 // - a dialog the browser closes by itself (Chrome on Android closes the top dialog
 //   on Back through its close watcher, sometimes without a cancel event) reports
 //   it to the parent, which would otherwise keep `open` true: the button that
 //   opens it would then do nothing until the page was reloaded.
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
 
 const HISTORY_KEY = 'lifexpModal';
 let counter = 0;
@@ -125,7 +125,12 @@ export function useModal(open: boolean, onClose: () => void) {
   /** Bumped by every open and close, so a push that waited for a Back knows whether it is still wanted. */
   const turn = useRef(0);
 
-  useEffect(() => {
+  // A layout effect, not a passive one: the dialog opens and closes in the same commit as
+  // the change that asked for it. A passive effect runs after paint, and until then a
+  // closed dialog still made the page inert: the parent's reply ("Anulowano…") was on
+  // screen while the message field took no typing, so a message typed right away was
+  // lost and "Wyślij" sent an empty field (CI 2026-10-26, tests/v2/exus.spec.js).
+  useLayoutEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
     if (open) {

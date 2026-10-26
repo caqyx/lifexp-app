@@ -43,13 +43,15 @@ function setup(opts: { templateId?: string | null; at?: () => Date } = {}) {
 describe('gaming alert', () => {
   it('crossing 60 minutes sends once; staying above does not resend; the next day sends again', async () => {
     const t = setup();
-    assert.equal(await t.handlers.gaming('ola', '2026-10-25', 30, 45), 'notCrossed');
-    assert.equal(await t.handlers.gaming('ola', '2026-10-25', 45, 65), 'sent');
-    assert.equal(await t.handlers.gaming('ola', '2026-10-25', 65, 120), 'notCrossed');
+    assert.equal(await t.handlers.gaming('ola', 30, 45), 'notCrossed');
+    assert.equal(await t.handlers.gaming('ola', 45, 65), 'sent');
+    assert.equal(await t.handlers.gaming('ola', 65, 120), 'notCrossed');
     // A write that drops and climbs again the same day is still one e-mail.
-    assert.equal(await t.handlers.gaming('ola', '2026-10-25', 30, 70), 'alreadySent');
-    assert.equal(await t.handlers.gaming('ola', '2026-10-26', 0, 60), 'sent');
-    assert.equal(t.sent.length, 2);
+    assert.equal(await t.handlers.gaming('ola', 30, 70), 'alreadySent');
+    const nextDay = setup({ at: () => new Date('2026-10-26T15:00:00Z') });
+    nextDay.store.docs.set('parentAlertLog/ola_2026-10-25', { kinds: ['gaming'] });
+    assert.equal(await nextDay.handlers.gaming('ola', 0, 60), 'sent');
+    assert.equal(t.sent.length, 1);
     assert.deepEqual(t.sent[0], {
       uid: 'ola',
       kind: 'gaming',
@@ -80,8 +82,28 @@ describe('purchase alert', () => {
   it('gaming and purchase are counted apart', async () => {
     const t = setup();
     await t.handlers.purchase('ola', { amount: 1 });
-    assert.equal(await t.handlers.gaming('ola', '2026-10-25', 0, 60), 'sent');
+    assert.equal(await t.handlers.gaming('ola', 0, 60), 'sent');
     assert.deepEqual(t.store.docs.get('parentAlertLog/ola_2026-10-25'), { kinds: ['purchase', 'gaming'] });
+  });
+});
+
+describe('one day for the parent', () => {
+  it('at 23:30 UTC (already tomorrow in Warsaw) gaming and a purchase count on the same Warsaw day', async () => {
+    // The dailyLog the gaming came from is still the UTC 25th; the parent's day is the 26th.
+    const t = setup({ at: () => new Date('2026-10-25T23:30:00Z') });
+    assert.equal(await t.handlers.gaming('ola', 0, 61), 'sent');
+    assert.equal(await t.handlers.purchase('ola', { description: 'Gra', amount: 1, pointsCost: 10 }), 'sent');
+    assert.deepEqual(t.store.docs.get('parentAlertLog/ola_2026-10-26'), { kinds: ['gaming', 'purchase'] });
+    assert.equal(t.store.docs.has('parentAlertLog/ola_2026-10-25'), false);
+    assert.equal(t.sent[0]?.params.alert_day, 'poniedziałek, 26 października');
+    // A second crossing the same Warsaw day (the new UTC day's log) is not a second e-mail.
+    assert.equal(await t.handlers.gaming('ola', 10, 60), 'alreadySent');
+  });
+
+  it('at 21:30 UTC in summer time it is still the same day in Warsaw', async () => {
+    const t = setup({ at: () => new Date('2026-07-10T21:30:00Z') });
+    assert.equal(await t.handlers.gaming('ola', 0, 61), 'sent');
+    assert.deepEqual(t.store.docs.get('parentAlertLog/ola_2026-07-10'), { kinds: ['gaming'] });
   });
 });
 
@@ -89,7 +111,7 @@ describe('who gets it', () => {
   it('nobody for a solo account, an unverified address, or alerts turned off', async () => {
     const t = setup();
     for (const uid of ['solo', 'unverified', 'off', 'nobody']) {
-      assert.equal(await t.handlers.gaming(uid, '2026-10-25', 0, 61), 'noRecipient', uid);
+      assert.equal(await t.handlers.gaming(uid, 0, 61), 'noRecipient', uid);
       assert.equal(await t.handlers.purchase(uid, { amount: 1 }), 'noRecipient', uid);
     }
     assert.equal(t.sent.length, 0);
@@ -98,14 +120,14 @@ describe('who gets it', () => {
   it('nothing is sent until the owner sets up the EmailJS template', async () => {
     assert.equal(PARENT_ALERT_TEMPLATE_ID, null, 'set once the owner created the template; then update this test');
     const t = setup({ templateId: null });
-    assert.equal(await t.handlers.gaming('ola', '2026-10-25', 0, 61), 'templateMissing');
+    assert.equal(await t.handlers.gaming('ola', 0, 61), 'templateMissing');
     assert.equal(t.sent.length, 0);
     assert.equal(t.store.docs.has('parentAlertLog/ola_2026-10-25'), false);
   });
 
   it('a failed mail frees the day for a retry and is not fatal', async () => {
     const t = setup();
-    assert.equal(await t.handlers.gaming('fails', '2026-10-25', 0, 61), 'failed');
+    assert.equal(await t.handlers.gaming('fails', 0, 61), 'failed');
     assert.deepEqual(t.store.docs.get('parentAlertLog/fails_2026-10-25'), { kinds: [] });
   });
 });
@@ -113,9 +135,9 @@ describe('who gets it', () => {
 describe('logs and template', () => {
   it('logs the kind and outcome only: no names, addresses, uids or purchases', async () => {
     const t = setup();
-    await t.handlers.gaming('ola', '2026-10-25', 0, 61);
+    await t.handlers.gaming('ola', 0, 61);
     await t.handlers.purchase('ola', { description: 'Gra', amount: 8.5 });
-    await t.handlers.gaming('fails', '2026-10-25', 0, 61);
+    await t.handlers.gaming('fails', 0, 61);
     const all = t.logs.join('\n');
     assert.match(all, /"kind":"gaming","outcome":"sent"/);
     for (const pii of ['Ola', 'ola', 'poczta', 'Gra', 'fails', 'Fred']) assert.ok(!all.includes(pii), pii);
@@ -123,7 +145,7 @@ describe('logs and template', () => {
 
   it('the params fill exactly the variables of email-templates/parent-alert.html', async () => {
     const t = setup();
-    await t.handlers.gaming('ola', '2026-10-25', 0, 61);
+    await t.handlers.gaming('ola', 0, 61);
     const html = readFileSync(resolve(__dirname, '../../../email-templates/parent-alert.html'), 'utf8');
     // The variables used in the body, plus those the header comment names for the template settings.
     const body = html.slice(html.indexOf('-->'));
