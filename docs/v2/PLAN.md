@@ -80,7 +80,7 @@ Spis treści
 | `tests/` | ~2800 | Playwright: Redstone, FPS, offline SW, Ex-us (na **kopii** kodu w harnessie) |
 | `firebase.json` | 16 | Konfiguracja `functions/` — **katalog nie istnieje** |
 
-Hosting: GitHub Pages (`szymonrogalski098-collab.github.io/lifexp-app/`), brak build stepu, Firebase SDK 10.12.0
+Hosting: GitHub Pages (`caqyx.github.io/lifexp-app/`), brak build stepu, Firebase SDK 10.12.0
 ładowane jako moduły ES z `gstatic.com`, i18next/EmailJS/Tabler Icons/marked/DOMPurify z jsDelivr.
 
 ### 1.2 Boot i autoryzacja
@@ -1328,6 +1328,8 @@ Kolejność 3a → 3e jest celowa: od modułów izolowanych do tych, które pisz
 nie przeszedł parytetu, nie blokuje kolejnych — ale nie wchodzi do cutover.
 
 ### 9.1 Stan realizacji
+
+**Przeniesienie repo (2026-10-28):** repo przeniesiono na `caqyx/lifexp-app`; aplikacja działa pod `https://caqyx.github.io/lifexp-app/` (stary adres Pages już jej nie serwuje). Linki w powiadomieniach push, testach i dokumentacji zaktualizowane; źródła gier (Wartime, gridlock) bez zmian.
 
 **Etap 0 (2026-09-27)** — zrobione w repo:
 

@@ -8,7 +8,7 @@ const { test, expect } = require('../support/v2');
 
 const AUTH = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=demo';
 const CALL = 'http://127.0.0.1:5001/demo-lifexp/europe-west1/sendMyPushNow';
-const APP = 'https://szymonrogalski098-collab.github.io/lifexp-app/app.html';
+const APP = 'https://caqyx.github.io/lifexp-app/app.html';
 
 async function call(request, account, data) {
   const auth = await request.post(AUTH, { data: { email: account.email, password: account.password, returnSecureToken: true } });
