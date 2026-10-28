@@ -1,16 +1,16 @@
 import { describe, expect, test } from 'vitest';
 import { DEFAULT_TITLE, clickUrl, parsePushData, readPush } from './swPush';
 
-const SCOPE = 'https://szymonrogalski098-collab.github.io/lifexp-app/v2/';
+const SCOPE = 'https://caqyx.github.io/lifexp-app/v2/';
 
 describe('readPush', () => {
   test('the payload pushReminders sends (notification + webpush.fcmOptions.link)', () => {
     expect(
       readPush({
         notification: { title: '🔥 Seria: 2 dni', body: 'Dziś jeszcze nic nie ma.' },
-        webpush: { fcmOptions: { link: 'https://szymonrogalski098-collab.github.io/lifexp-app/app.html' } },
+        webpush: { fcmOptions: { link: 'https://caqyx.github.io/lifexp-app/app.html' } },
       }),
-    ).toEqual({ title: '🔥 Seria: 2 dni', body: 'Dziś jeszcze nic nie ma.', link: 'https://szymonrogalski098-collab.github.io/lifexp-app/app.html' });
+    ).toEqual({ title: '🔥 Seria: 2 dni', body: 'Dziś jeszcze nic nie ma.', link: 'https://caqyx.github.io/lifexp-app/app.html' });
   });
 
   test('as FCM delivers it to a worker (fcmOptions at the top) and as a data-only message', () => {
@@ -46,15 +46,15 @@ describe('clickUrl', () => {
 
   test('a relative link resolves against the scope', () => {
     expect(clickUrl('#/today', SCOPE)).toBe(`${SCOPE}#/today`);
-    expect(clickUrl('../app.html', SCOPE)).toBe('https://szymonrogalski098-collab.github.io/lifexp-app/app.html');
+    expect(clickUrl('../app.html', SCOPE)).toBe('https://caqyx.github.io/lifexp-app/app.html');
   });
 
   test('an absolute link on our origin is kept, also outside the scope (v1 until the cutover)', () => {
-    const v1 = 'https://szymonrogalski098-collab.github.io/lifexp-app/app.html';
+    const v1 = 'https://caqyx.github.io/lifexp-app/app.html';
     expect(clickUrl(v1, SCOPE)).toBe(v1);
   });
 
-  test.each(['https://evil.example/phish', 'http://szymonrogalski098-collab.github.io/lifexp-app/', 'javascript:alert(1)', 'data:text/html,hi', '//evil.example/x'])(
+  test.each(['https://evil.example/phish', 'http://caqyx.github.io/lifexp-app/', 'javascript:alert(1)', 'data:text/html,hi', '//evil.example/x'])(
     'a foreign origin or scheme (%s) falls back to the start',
     (link) => {
       expect(clickUrl(link, SCOPE)).toBe(SCOPE);

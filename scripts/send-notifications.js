@@ -51,7 +51,7 @@ async function main() {
 
   const message = {
     notification: { title: msg.title, body: msg.body },
-    webpush: { fcmOptions: { link: 'https://szymonrogalski098-collab.github.io/lifexp-app/app.html' } },
+    webpush: { fcmOptions: { link: 'https://caqyx.github.io/lifexp-app/app.html' } },
   };
 
   const res = await admin.messaging().sendEachForMulticast({ ...message, tokens });

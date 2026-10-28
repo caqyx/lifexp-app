@@ -9,7 +9,7 @@ function memoryStorage(initial: Record<string, string> = {}) {
 describe('emulator switch', () => {
   test('production hosts never use the emulator, whatever the URL says', () => {
     const storage = memoryStorage({ [EMULATOR_FLAG_KEY]: '1' });
-    expect(emulatorTarget('szymonrogalski098-collab.github.io', '?emulator=1', storage)).toBeNull();
+    expect(emulatorTarget('caqyx.github.io', '?emulator=1', storage)).toBeNull();
   });
 
   test('localhost needs ?emulator=1 once, then remembers it for the tab', () => {
