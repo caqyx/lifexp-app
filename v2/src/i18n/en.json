@@ -1616,7 +1616,7 @@
       "typing": "Ex-us is typing…",
       "noAccess": "Ex-us AI is still in testing and this account has no access to it. Commands work: type /help.",
       "budget": "Today's Ex-us AI limit is used up. It renews at midnight. Commands with / still work.",
-      "unavailable": "Ex-us AI is unavailable right now. Please try again in a moment.",
+      "unavailable": "Ex-us AI is unavailable right now. Slash commands work as usual — type /help.",
       "network": "Could not reach Ex-us AI. Check the connection and try again.",
       "failed": "Something went wrong with Ex-us AI. Please try again.",
       "usage": "AI limit for today: {{percent}}%",

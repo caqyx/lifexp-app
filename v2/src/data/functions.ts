@@ -17,13 +17,13 @@ const isFunctionsError = (error: unknown): error is FunctionsError =>
   typeof error === 'object' && error !== null && typeof (error as { code?: unknown }).code === 'string';
 
 /** One turn of Ex-us with the AI; rejects with an AiError that says why not. */
-export async function callExusTurn(request: AiTurnRequest): Promise<AiTurnResponse> {
+export async function callExusTurn(request: AiTurnRequest, online: boolean): Promise<AiTurnResponse> {
   let raw: unknown;
   try {
     raw = (await exusTurn(request)).data;
   } catch (error) {
     if (!isFunctionsError(error)) throw new AiError('failed');
-    const kind = aiErrorKind(error.code.replace(/^functions\//, ''));
+    const kind = aiErrorKind(error.code.replace(/^functions\//, ''), online);
     const details = error.details as { usage?: unknown } | undefined;
     throw new AiError(kind, kind === 'budget' ? readUsage(details?.usage) : undefined);
   }
