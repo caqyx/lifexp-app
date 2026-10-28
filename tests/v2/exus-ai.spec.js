@@ -184,6 +184,19 @@ test('offline, plain text makes no call', async ({ page, context }) => {
   expect(turns).toHaveLength(1);
 });
 
+test('online, a function that does not answer is "unavailable", not a connection problem; slash commands still work', async ({ page }) => {
+  const account = await aiAccount('exus-ai-down');
+  await page.route('**/exusTurn', (route) => route.abort());
+  await openSignedIn(page, account, '#/exus');
+  await send(page, 'cześć');
+  await expect(replies(page).last()).toContainText('Ex-us AI jest teraz niedostępne. Komendy z / działają normalnie — wpisz /pomoc.');
+  // Not remembered as a denial: the next message tries again.
+  await send(page, 'a teraz?');
+  await expect(replies(page).last()).toContainText('Ex-us AI jest teraz niedostępne.');
+  await send(page, '/dzis');
+  await expect(replies(page).last()).not.toContainText('niedostępne');
+});
+
 test('the context sent names things by short refs, never by Firestore ids', async ({ page }) => {
   const account = await aiAccount('exus-ai-context');
   const ids = { task: 'seededTaskDocId7Q', chore: 'seededChoreDocId3Z', category: 'seededCategoryDocId9X' };

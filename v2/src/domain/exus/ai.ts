@@ -57,8 +57,8 @@ export class AiError extends Error {
   }
 }
 
-/** The Functions error code (without "functions/") as one of ours. */
-export function aiErrorKind(code: string): AiErrorKind {
+/** The Functions error code (without "functions/") as one of ours; `online` is the browser's connection state. */
+export function aiErrorKind(code: string, online: boolean): AiErrorKind {
   switch (code) {
     case 'unauthenticated':
     case 'permission-denied':
@@ -70,9 +70,10 @@ export function aiErrorKind(code: string): AiErrorKind {
     case 'unavailable':
     case 'deadline-exceeded':
       return 'unavailable';
-    // The SDK reports a request that got no response (offline, CORS, a crash) as "internal".
+    // The SDK reports a request that got no response (offline, CORS, 404, a crash) as "internal":
+    // offline that is the connection, online it is the service that did not answer.
     case 'internal':
-      return 'network';
+      return online ? 'unavailable' : 'network';
     default:
       return 'failed';
   }

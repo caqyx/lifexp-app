@@ -5,14 +5,15 @@ const usage = { tokensUsedToday: 100, tokensLimitDaily: 20000, remainingPercent:
 
 describe('Ex-us AI turn', () => {
   it('tells the Functions error codes apart', () => {
-    expect(aiErrorKind('unauthenticated')).toBe('no-access');
-    expect(aiErrorKind('permission-denied')).toBe('no-access');
-    expect(aiErrorKind('resource-exhausted')).toBe('budget');
-    expect(aiErrorKind('invalid-argument')).toBe('invalid');
-    expect(aiErrorKind('unavailable')).toBe('unavailable');
-    expect(aiErrorKind('deadline-exceeded')).toBe('unavailable');
-    expect(aiErrorKind('internal')).toBe('network');
-    expect(aiErrorKind('not-found')).toBe('failed');
+    expect(aiErrorKind('unauthenticated', true)).toBe('no-access');
+    expect(aiErrorKind('permission-denied', true)).toBe('no-access');
+    expect(aiErrorKind('resource-exhausted', true)).toBe('budget');
+    expect(aiErrorKind('invalid-argument', true)).toBe('invalid');
+    expect(aiErrorKind('unavailable', true)).toBe('unavailable');
+    expect(aiErrorKind('deadline-exceeded', true)).toBe('unavailable');
+    expect(aiErrorKind('internal', false)).toBe('network');
+    expect(aiErrorKind('internal', true)).toBe('unavailable');
+    expect(aiErrorKind('not-found', true)).toBe('failed');
   });
 
   it('reads the usage and the answer, and nothing that has another shape', () => {

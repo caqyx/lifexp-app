@@ -6,15 +6,16 @@ import { AiError, type AiTurnRequest, type AiTurnResponse } from '@/domain/exus/
 import { aiDeniedFor, aiUsage } from '@/stores/exusAi';
 
 export async function askExus(uid: string, request: AiTurnRequest): Promise<AiTurnResponse> {
+  const online = navigator.onLine;
   let data: typeof import('@/data/functions');
   try {
     data = await import('@/data/functions');
   } catch {
     // The chunk could not load (offline on a first visit).
-    throw new AiError('network');
+    throw new AiError(online ? 'unavailable' : 'network');
   }
   try {
-    const response = await data.callExusTurn(request);
+    const response = await data.callExusTurn(request, online);
     aiUsage.value = response.usage;
     return response;
   } catch (error) {
