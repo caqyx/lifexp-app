@@ -72,3 +72,32 @@ export function room(spec) {
   const floor = [`${JOINT.floor}`, `r${lead}`, slopeThenFlat(JOINT.floor, spec.bottom, funnel), `r${spec.inner}`, slopeThenFlat(spec.bottom, JOINT.floor, funnel), `r${tail}`];
   return { ceil: ceil.filter(Boolean).join(' '), floor: floor.filter(Boolean).join(' '), length: lead + funnel * 2 + spec.inner + tail, innerAt: lead + funnel };
 }
+
+/**
+ * Parts (each starting and ending at the joint) one after another, as one section.
+ * @param {...{ ceil: string, floor: string, length: number }} parts
+ * @returns {{ ceil: string, floor: string, length: number, at: number[] }} at: where each part starts
+ */
+export function join(...parts) {
+  const at = [];
+  let length = 0;
+  const ceil = [];
+  const floor = [];
+  for (const [i, part] of parts.entries()) {
+    at.push(length);
+    const c = part.ceil.split(' ');
+    const f = part.floor.split(' ');
+    ceil.push(...(i === 0 ? c : c.slice(1)));
+    floor.push(...(i === 0 ? f : f.slice(1)));
+    length += part.length;
+  }
+  return { ceil: ceil.join(' '), floor: floor.join(' '), length: Math.round(length * 1000) / 1000, at };
+}
+
+/**
+ * An open stretch of the joint corridor.
+ * @param {number} length
+ */
+export function open(length) {
+  return { ceil: `${JOINT.ceil} r${length}`, floor: `${JOINT.floor} r${length}`, length };
+}

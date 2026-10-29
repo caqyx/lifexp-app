@@ -104,7 +104,7 @@ export const SHIP = { up: 34, down: 30, maxV: 8.5, radius: 0.3, size: 1.15 };
 /** @param {number} from @param {number} to */
 const range = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
-/** The run: sectors 1–6. Finishing it (the whole Demon) unlocks the finale. @type {SectorDef[]} */
+/** The run: sectors 1–6. Finishing it (the whole Demon) unlocks the last skin and the finale. @type {SectorDef[]} */
 export const SECTORS = [
   { id: 1, key: 'easy', tier: 'easy', theme: 'lagoon', groups: [range(1, 10)], portals: [] },
   { id: 2, key: 'normal', tier: 'normal', theme: 'mesa', groups: [range(1, 5), range(6, 15)], portals: [] },
@@ -131,6 +131,27 @@ export const SECTORS = [
     theme: 'aurora',
     groups: [range(1, 5), range(6, 10)],
     portals: [{ kind: 'gravity', count: 2, span: 1 }, { kind: 'mini', count: 1 }],
+  },
+  {
+    id: 6,
+    key: 'demon',
+    tier: 'easyDemon',
+    theme: 'demonBlue',
+    groups: [range(1, 10), range(11, 15), range(16, 25), range(26, 30)],
+    bands: [
+      { from: 1, to: 10, tier: 'easyDemon', theme: 'demonBlue', key: 'easyDemon' },
+      { from: 11, to: 15, tier: 'hardDemon', theme: 'demonPurple', key: 'hardDemon' },
+      { from: 16, to: 25, tier: 'insaneDemon', theme: 'demonRed', key: 'insaneDemon' },
+      { from: 26, to: 30, tier: 'extremeDemon', theme: 'demonExtreme', key: 'extremeDemon' },
+    ],
+    portals: [
+      { kind: 'gravity', count: 1, span: 2, band: 0 },
+      { kind: 'mini', count: 1, band: 1 },
+      { kind: 'gravity', count: 2, span: 1, band: 2 },
+      { kind: 'mini', count: 1, band: 2 },
+      { kind: 'gravity', count: 1, span: 1, band: 3 },
+      { kind: 'mini', count: 1, band: 3 },
+    ],
   },
 ];
 

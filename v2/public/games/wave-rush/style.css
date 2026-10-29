@@ -213,6 +213,7 @@ body {
 .stage[data-state='ready'] .panel--ready,
 .stage[data-state='dead'] .panel--dead,
 .stage[data-state='finished'] .panel--finished,
+.stage[data-state='achievement'] .panel--achievement,
 .stage[data-state='paused'] .panel--paused {
   opacity: 1;
   visibility: visible;
@@ -268,7 +269,8 @@ body {
 .stage[data-state='menu'] .panel--menu .card,
 .stage[data-state='skins'] .panel--skins .card,
 .stage[data-state='dead'] .panel--dead .card,
-.stage[data-state='finished'] .panel--finished .card {
+.stage[data-state='finished'] .panel--finished .card,
+.stage[data-state='achievement'] .panel--achievement .card {
   pointer-events: auto;
 }
 
@@ -438,6 +440,57 @@ body {
 .skin:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 3px;
+}
+
+/* ── Achievement ─────────────────────────────────────────────────────────── */
+
+.panel--achievement {
+  background: radial-gradient(70% 60% at 50% 45%, rgb(255 209 102 / 18%), transparent 70%), rgb(6 8 14 / 55%);
+}
+
+.card--achievement {
+  width: min(100%, 400px);
+  border-color: rgb(255 209 102 / 45%);
+  box-shadow: 0 0 0 1px rgb(255 209 102 / 20%), 0 16px 48px rgb(0 0 0 / 55%), 0 0 48px rgb(255 209 102 / 18%);
+}
+
+.card__eyebrow {
+  margin: 0 0 4px;
+  color: var(--color-warning);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.card__title--big {
+  font-size: 30px;
+}
+
+.unlocks {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.unlocks__item {
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 6%);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.stage[data-state='achievement'] .card--achievement {
+  animation: pop var(--duration-enter) var(--ease-out);
+}
+
+@keyframes pop {
+  from {
+    transform: scale(0.92);
+  }
 }
 
 /* ── Skin picker ─────────────────────────────────────────────────────────── */

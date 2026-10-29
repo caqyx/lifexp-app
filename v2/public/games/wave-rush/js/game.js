@@ -22,7 +22,8 @@ import {
 /**
  * @typedef {'ready' | 'playing' | 'dead' | 'finished'} Phase
  * @typedef {'normal' | 'practice'} Mode
- * @typedef {'start' | 'sector' | 'section' | 'portal' | 'death' | 'finish' | 'restart'} GameEvent
+ * @typedef {'start' | 'sector' | 'tier' | 'section' | 'portal' | 'death' | 'finish' | 'restart'} GameEvent
+ *   tier: a new Demon tier began (inside the same sector).
  * @typedef {{ sector: number, section: number, percent: number }} Result
  * @typedef {{ x: number, y: number }} Point
  * @typedef {{
@@ -31,7 +32,7 @@ import {
  *   phase: Phase, phaseTime: number, time: number,
  *   wave: import('./physics.js').Wave, previous: { x: number, y: number },
  *   trail: Point[], attempt: number, checkpoint: number,
- *   where: { sector: number, section: number }, result: Result | null, lastPortal: import('./run.js').Portal | null,
+ *   where: { sector: number, section: number }, band: number, result: Result | null, lastPortal: import('./run.js').Portal | null,
  * }} Game
  * @typedef {{ holding: boolean, tap: boolean }} Input
  */
@@ -51,6 +52,7 @@ function placeWave(game, x) {
   game.previous = { x, y: START_Y };
   game.trail = [{ x, y: START_Y }];
   game.where = locate(game.run, x);
+  game.band = pieceAt(game.run, x).band;
   game.lastPortal = null;
 }
 
@@ -79,6 +81,7 @@ export function createGame(options) {
     attempt: 1,
     checkpoint: target === null ? run.startX : checkpointX(run, target, options.checkpointBy ?? 'sector'),
     where: { sector: 1, section: 1 },
+    band: -1,
     result: null,
     lastPortal: null,
   };
@@ -120,8 +123,13 @@ function trackPlace(game, events) {
     game.wave = { ...game.wave, gravity: 1, mini: false };
     events.push('sector');
   }
+  const piece = pieceAt(game.run, game.wave.x);
+  if (piece.kind === 'section' && piece.band !== game.band) {
+    if (where.sector === game.where.sector && piece.band >= 0) events.push('tier');
+    game.band = piece.band;
+  }
   if (where.sector !== game.where.sector || where.section !== game.where.section) {
-    if (pieceAt(game.run, game.wave.x).kind === 'section') events.push('section');
+    if (piece.kind === 'section') events.push('section');
     game.checkpoint = Math.max(game.checkpoint, checkpointX(game.run, game.wave.x, game.checkpointBy));
   }
   game.where = where;

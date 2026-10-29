@@ -37,6 +37,7 @@ import {
   readBest,
   readCheckpointBy,
   readProgress,
+  unlock,
   readSkin,
   saveBest,
   saveCheckpointBy,
@@ -100,7 +101,8 @@ describe('authored sectors', () => {
   });
 
   test('speeds: 0.5, 0.5 and 1.0 of the base speed; tiers ramp up and stay humanly possible', () => {
-    expect(SECTORS.slice(0, 5).map((s) => sectorTier(s).speed)).toEqual([0.5, 0.5, 1.0, 1.1, 1.3]);
+    expect(SECTORS.map((s) => sectorTier(s).speed)).toEqual([0.5, 0.5, 1.0, 1.1, 1.3, 1.3]);
+    expect(sector(6).bands!.map((b) => TIERS[b.tier]!.speed)).toEqual([1.3, 1.5, 1.7, 1.9]);
     expect(sectorSpeed(sector(3))).toBeCloseTo(BASE_SPEED);
     const order = ['easy', 'normal', 'hard', 'harder', 'insane', 'easyDemon', 'hardDemon', 'insaneDemon', 'extremeDemon'];
     const tiers = order.map((k) => TIERS[k]!);
@@ -316,6 +318,45 @@ describe('a run', () => {
         expect(profileY(piece.g.ceil, local, 'ceil')).toBe(JOINT.ceil);
         expect(profileY(piece.g.floor, local, 'floor')).toBe(JOINT.floor);
       }
+    }
+  });
+
+  test('the Demon: tiers in order, each shuffled within itself, at its own speed and look, with its own portals', () => {
+    const demon = sector(6);
+    const bands = demon.bands!;
+    for (let seed = 1; seed <= 100; seed++) {
+      const run = buildRun(createRng(seed));
+      const placed = run.sectors[5]!;
+      const pieces = run.pieces.slice(placed.first, placed.first + placed.count);
+      bands.forEach((band, b) => {
+        const mine = pieces.filter((p) => p.band === b);
+        expect(sorted(mine.map((p) => p.number))).toEqual(range(band.from, band.to));
+        for (const p of mine) expect(p).toMatchObject({ tier: band.tier, theme: band.theme });
+        for (const p of mine) expect(p.speed).toBeCloseTo(TIERS[band.tier]!.speed * BASE_SPEED);
+      });
+      // Tiers in order.
+      expect(pieces.map((p) => p.band)).toEqual([...pieces.map((p) => p.band)].sort((a, b) => a - b));
+      // Gravity: 1 + 2 + 1 flips, each back inside its own tier; mini around each tier's mini section.
+      const portals = run.portals.filter((p) => p.sector === 5);
+      expect(portals.filter((p) => p.kind === 'gravity' && p.on)).toHaveLength(4);
+      expect(portals.filter((p) => p.kind === 'mini' && p.on)).toHaveLength(3);
+      for (const b of [1, 2, 3]) {
+        const small = pieces.filter((p) => p.band === b && stateAt(run, (p.x0 + p.x1) / 2).mini);
+        expect(small.map((p) => p.g.mini)).toEqual([true]);
+      }
+      expect(stateAt(run, placed.x1 - 0.1)).toMatchObject({ gravity: 1, mini: false });
+    }
+  });
+
+  test('practice checkpoints in the Demon are per tier', () => {
+    const run = buildRun(createRng(3));
+    const placed = run.sectors[5]!;
+    const pieces = run.pieces.slice(placed.first, placed.first + placed.count);
+    for (const b of [0, 1, 2, 3]) {
+      const mine = pieces.filter((p) => p.band === b);
+      const last = mine[mine.length - 1]!;
+      expect(checkpointX(run, (last.x0 + last.x1) / 2, 'sector')).toBe(mine[0]!.x0);
+      expect(checkpointX(run, (last.x0 + last.x1) / 2, 'section')).toBe(last.x0);
     }
   });
 
@@ -569,8 +610,25 @@ describe('records', () => {
     expect(readAttempts(storage)).toBe(0);
     expect(readBest(blockedStorage)).toBeNull();
     expect(saveBest(blockedStorage, { sector: 1, section: 1, percent: 1 }).isNew).toBe(true);
-    expect(readProgress(blockedStorage)).toEqual({ demonComplete: false });
+    expect(readProgress(blockedStorage)).toEqual({ demonComplete: false, finaleComplete: false });
     expect(readSkin(null)).toBeNull();
+  });
+});
+
+describe('achievements', () => {
+  test('finishing the Demon unlocks once: the achievement, the last skin; the finale has its own', () => {
+    const storage = memoryStorage();
+    expect(readProgress(storage)).toEqual({ demonComplete: false, finaleComplete: false });
+    const crown = SKINS[SKINS.length - 1]!;
+    expect(isUnlocked(crown, readProgress(storage))).toBe(false);
+    expect(unlock(storage, 'demonComplete')).toBe(true);
+    expect(unlock(storage, 'demonComplete')).toBe(false);
+    expect(readProgress(storage)).toEqual({ demonComplete: true, finaleComplete: false });
+    expect(isUnlocked(crown, readProgress(storage))).toBe(true);
+    expect(unlock(storage, 'finaleComplete')).toBe(true);
+    expect(readProgress(storage)).toEqual({ demonComplete: true, finaleComplete: true });
+    for (const key of storage.data.keys()) expect(key.startsWith('lifexp-waverush-')).toBe(true);
+    expect(unlock(blockedStorage, 'demonComplete')).toBe(true);
   });
 });
 
@@ -606,7 +664,8 @@ describe('texts and switches', () => {
     }
     expect(translator('pl')('result', { sector: 2, section: 3, percent: 41 })).toBe('Sektor 2, sekcja 3 · 41% trasy');
     expect(translator('en')('attempt', { n: 7 })).toBe('Attempt 7');
-    expect(translator('pl')('finishedTitle')).toBe('Ciąg dalszy wkrótce');
+    expect(translator('pl')('achDemon')).toBe('Pogromca Demona');
+    expect(translator('en')('achDemon')).toBe('Demon Slayer');
   });
 
   test('?sector, ?section and ?autopilot only work together with ?seed', () => {

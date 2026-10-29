@@ -20,6 +20,7 @@ import {
   readBest,
   readCheckpointBy,
   readProgress,
+  unlock,
   readSkin,
   saveBest,
   saveCheckpointBy,
@@ -30,7 +31,7 @@ import { createRenderer, renderFrame } from './render/index.js';
 import { drawWave, portalColor } from './render/sprites.js';
 import { computeView } from './render/view.js';
 import { createRng, parseSwitches } from './rng.js';
-import { progressAt } from './run.js';
+import { pieceAt, progressAt } from './run.js';
 import { isUnlocked, resolveSkin, SKINS } from './skins.js';
 
 const MAX_PIXEL_RATIO = 2;
@@ -76,6 +77,7 @@ function findElements() {
     finishedResult: byId('finished-result'),
     finishedAgain: buttonById('finished-again'),
     finishedMenu: buttonById('finished-menu'),
+    achievementNext: buttonById('achievement-next'),
   };
 }
 
@@ -117,7 +119,7 @@ let autopilot = null;
 /** The test pilot (?autopilot=k) flies the first k sections of the first attempt, up to this x. */
 const pilot = { sections: switches.autopilot ?? 0, untilX: -Infinity };
 
-/** @typedef {'menu' | 'skins' | 'ready' | 'playing' | 'dead' | 'finished' | 'paused'} Screen */
+/** @typedef {'menu' | 'skins' | 'ready' | 'playing' | 'dead' | 'finished' | 'achievement' | 'paused'} Screen */
 
 const state = {
   /** @type {Screen} */
@@ -152,7 +154,7 @@ function layoutStage() {
 function show(screen) {
   state.screen = screen;
   dom.stage.dataset.state = screen;
-  const focus = { menu: dom.play, skins: dom.skinsDone, finished: dom.finishedAgain }[/** @type {string} */ (screen)];
+  const focus = { menu: dom.play, skins: dom.skinsDone, finished: dom.finishedAgain, achievement: dom.achievementNext }[/** @type {string} */ (screen)];
   if (focus) focus.focus({ preventScroll: true });
 }
 
@@ -314,6 +316,7 @@ function bindInput() {
   dom.skinsDone.addEventListener('click', backToMenu);
   dom.deadMenu.addEventListener('click', backToMenu);
   dom.finishedMenu.addEventListener('click', backToMenu);
+  dom.achievementNext.addEventListener('click', () => show('finished'));
   dom.finishedAgain.addEventListener('click', () => startGame(state.game.mode));
   for (const [button, by] of /** @type {const} */ ([[dom.cpSector, 'sector'], [dom.cpSection, 'section']])) {
     button.addEventListener('click', () => {
@@ -340,6 +343,7 @@ function reactToEvents(events) {
     if (event === 'start' && pilot.sections > 0) pilot.untilX = pilotEnd(game.run, game.wave.x, pilot.sections);
     if (event === 'death') pilot.sections = 0;
     if (event === 'sector') showToast(t('sectorLabel', { n: game.where.sector, name: sectorName(game.where.sector) }));
+    if (event === 'tier') showToast(bandName(game) ?? '');
     if (event === 'portal' && game.lastPortal) {
       const p = game.lastPortal;
       fx.ring = { x: p.x, color: portalColor(p), at: clock.time };
@@ -369,14 +373,42 @@ function handleFinish() {
   if (keepsRecords(game)) state.newBest = saveBest(storage, result).isNew;
   dom.finishedResult.textContent = t('result', result);
   dom.stage.classList.toggle('is-new-best', state.newBest);
+  // The whole run, Demon included: the achievement, the last skin and the finale. A run
+  // jumped into with the test switches counts only in a test (?seed=).
+  const earned = keepsRecords(game) || debug;
+  if (earned && unlock(storage, 'demonComplete')) {
+    celebrate();
+    show('achievement');
+    return;
+  }
   show('finished');
+}
+
+/** Shards in every skin colour across the screen (not with reduced motion). */
+function celebrate() {
+  if (reduced()) return;
+  const w = state.game.wave;
+  const colors = SKINS.map((s) => s.trail);
+  for (let i = 0; i < 3; i++) spawnBurst(particles, w.x - 4 + i * 4, 6, colors, effectRng);
+}
+
+/**
+ * The name of the Demon tier the wave is in, or null.
+ * @param {import('./game.js').Game} game
+ */
+function bandName(game) {
+  const piece = pieceAt(game.run, game.wave.x);
+  const sector = game.run.sectors[piece.sector];
+  const band = piece.band >= 0 ? sector?.def.bands?.[piece.band] : null;
+  return band ? t(/** @type {import('./i18n.js').TextKey} */ (band.key)) : null;
 }
 
 function updateHud() {
   const game = state.game;
   const where = game.where;
   const sector = game.run.sectors[where.sector - 1];
-  dom.hudSector.textContent = `${t('sectorLabel', { n: where.sector, name: sectorName(where.sector) })} · ${t('sectionLabel', { section: where.section, count: sector ? sector.count : 0 })}`;
+  const band = bandName(game);
+  dom.hudSector.textContent = `${t('sectorLabel', { n: where.sector, name: band ?? sectorName(where.sector) })} · ${t('sectionLabel', { section: where.section, count: sector ? sector.count : 0 })}`;
   dom.hudAttempt.textContent = t('attempt', { n: game.attempt });
 }
 

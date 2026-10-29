@@ -10,8 +10,9 @@ export const KEYS = {
   best: 'lifexp-waverush-best',
   attempts: 'lifexp-waverush-attempts',
   skin: 'lifexp-waverush-skin',
-  /** Stage w-2 hook: { demonComplete } unlocks the last skin and the finale. */
+  /** Achievements: { demonComplete, finaleComplete } (the first unlocks the last skin and the finale). */
   progress: 'lifexp-waverush-progress',
+  finaleBest: 'lifexp-waverush-finale-best',
   checkpoint: 'lifexp-waverush-checkpoint',
 };
 
@@ -86,13 +87,28 @@ export function saveSkin(storage, id) {
   writeJson(storage, KEYS.skin, id);
 }
 
-/** @typedef {{ demonComplete: boolean }} Progress */
+/**
+ * @typedef {{ demonComplete: boolean, finaleComplete: boolean }} Progress
+ *   demonComplete: the whole run (Demon included) was finished — the "Pogromca Demona"
+ *   achievement, the last skin and the finale; finaleComplete: the finale's achievement.
+ */
 
 /** @param {GameStorage | null} storage @returns {Progress} */
 export function readProgress(storage) {
   const value = readJson(storage, KEYS.progress);
-  const done = value && typeof value === 'object' && /** @type {Record<string, unknown>} */ (value).demonComplete === true;
-  return { demonComplete: Boolean(done) };
+  const v = value && typeof value === 'object' ? /** @type {Record<string, unknown>} */ (value) : {};
+  return { demonComplete: v.demonComplete === true, finaleComplete: v.finaleComplete === true };
+}
+
+/**
+ * Records an achievement; says whether it is new.
+ * @param {GameStorage | null} storage @param {'demonComplete' | 'finaleComplete'} which
+ */
+export function unlock(storage, which) {
+  const progress = readProgress(storage);
+  if (progress[which]) return false;
+  writeJson(storage, KEYS.progress, { ...progress, [which]: true });
+  return true;
 }
 
 /** @param {GameStorage | null} storage @returns {'sector' | 'section'} */
