@@ -28,11 +28,13 @@ WT.turn = (function () {
       timed('fleets', function () { WT.naval.moveFleets(); WT.naval.shellAll(); });
       timed('air', function () { WT.air.processTurn(); });
       timed('armies', function () { WT.military.moveAll(); });
-      timed('occupation', function () { WT.military.resolveOccupations(); WT.military.applyAttrition(); });
+      timed('occupation', function () { WT.military.resolveOccupations(); WT.military.applyAttrition(); if (WT.warfare) WT.warfare.processTurn(); });
       timed('economy', runEconomy);
       timed('research', function () { WT.tech.processTurn(); });
       timed('diplomacy', function () { WT.diplomacy.processTurn(); });
+      timed('world', function () { if (WT.world) WT.world.processTurn(); if (WT.goals) WT.goals.processTurn(); });
       updateExhaustion();
+      recordHistory();
       advanceTime();
     } finally {
       WT.events.off('log', collect);
@@ -53,6 +55,18 @@ WT.turn = (function () {
       else c.warExhaustion -= 1.5;
       c.warExhaustion = Math.max(0, Math.min(100, c.warExhaustion));
     });
+  }
+
+  /** Historia gracza do wykresów (maks. 600 punktów; starsze rzednięte co drugi). */
+  var HISTORY_MAX = 600;
+  function recordHistory() {
+    var g = G(), cc = g.player, c = S.country(cc);
+    if (!c || !c.alive) return;
+    var h = g.history = g.history || [];
+    h.push({ t: g.turn, d: g.date, gdp: Math.round(WT.economy.countryGdp(cc) * 10) / 10, bal: Math.round((c.lastIncome - c.lastExpense) * 1000) / 1000,
+      cash: Math.round(c.treasury * 10) / 10, army: S.armiesOf(cc).reduce(function (s, a) { return s + a.size; }, 0), provs: S.provincesOf(cc).length,
+      tech: Math.round(c.tech * 100) / 100, stab: Math.round(c.stability) });
+    if (h.length > HISTORY_MAX) g.history = h.filter(function (x, i) { return i % 2 === 0 || i > h.length - 50; });
   }
 
   function advanceTime() {

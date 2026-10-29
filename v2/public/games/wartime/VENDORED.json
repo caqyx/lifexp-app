@@ -1,8 +1,8 @@
 {
   "game": "wartime",
   "source": "https://github.com/szymonrogalski098-collab/Wartime",
-  "commit": "8713c3506b593c07c6d17d70718195ea0988eef9",
-  "vendoredAt": "2026-10-26T21:08:55.087Z",
+  "commit": "4f2eef23f710c57b410974cab17a161b9ca2c0dc",
+  "vendoredAt": "2026-10-29T22:18:12.851Z",
   "dirty": false,
   "include": [
     "index.html",
@@ -12,5 +12,5 @@
   ],
   "patches": [],
   "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'",
-  "files": 22
+  "files": 27
 }
