@@ -2,7 +2,7 @@
   "game": "wartime",
   "source": "https://github.com/szymonrogalski098-collab/Wartime",
   "commit": "4f2eef23f710c57b410974cab17a161b9ca2c0dc",
-  "vendoredAt": "2026-10-29T22:18:12.851Z",
+  "vendoredAt": "2026-10-29T22:34:47.787Z",
   "dirty": false,
   "include": [
     "index.html",
@@ -10,7 +10,9 @@
     "data",
     "js"
   ],
-  "patches": [],
+  "patches": [
+    "css/mobile.css: Menu (arkusz u dołu) mieści się w ekranie i przewija: na telefonie w poziomie (360 px wysokości) górne pozycje wychodziły poza ekran i nie dało się ich stuknąć."
+  ],
   "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'",
   "files": 27
 }

@@ -89,7 +89,9 @@ button, .country-item, .army-row, .log-head, .check { -webkit-tap-highlight-colo
   .topbar.tb-expanded .btn.tb-secondary.hidden { display: none; }
 
   /* Menu jako arkusz u dołu ekranu */
-  .dropdown { position: fixed; top: auto; left: calc(8px + var(--sa-l)); right: calc(8px + var(--sa-r)); bottom: calc(8px + var(--sa-b)); min-width: 0; z-index: 75; padding: 6px; }
+  .dropdown { position: fixed; top: auto; left: calc(8px + var(--sa-l)); right: calc(8px + var(--sa-r)); bottom: calc(8px + var(--sa-b)); min-width: 0; z-index: 75; padding: 6px;
+    max-height: calc(100vh - 16px - var(--sa-t) - var(--sa-b)); max-height: calc(100dvh - 16px - var(--sa-t) - var(--sa-b));
+    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .menu-item { min-height: 48px; font-size: 15px; }
 
   /* ----- Panele jako bottom sheet ----- */

@@ -301,6 +301,24 @@ async function endAndExpectSession(page, account, name) {
   await expect.poll(async () => (await gamingState(account.uid)).sessions.map((s) => s.game)).toEqual([name]);
 }
 
+/**
+ * After a Wartime turn the game can ask things (a world event, a diplomatic proposal) in a
+ * dialog that cannot be dismissed, and opens the next one 150 ms after the last closes:
+ * answer each with its first choice, as a player would, until none comes for a moment.
+ */
+async function answerWartimeDialogs(page, game) {
+  const dialog = game.locator('#modal-root .modal-backdrop');
+  for (let quiet = 0; quiet < 3; ) {
+    if (await dialog.count()) {
+      quiet = 0;
+      await dialog.locator('.event-opt, .modal-foot .btn').first().click();
+    } else {
+      quiet += 1;
+      await page.waitForTimeout(250);
+    }
+  }
+}
+
 test.describe('Wartime', () => {
   test('sideways: a new game, the map, one turn, a save that survives a reload, and Zakończ records the time', async ({ page, account }) => {
     test.setTimeout(90000);
@@ -320,9 +338,13 @@ test.describe('Wartime', () => {
     await game.locator('#btn-start').click();
     await expect(game.locator('#topbar')).toBeVisible({ timeout: 30000 });
     await expect(game.locator('#tb-name')).toHaveText('Polska');
+    // A first game opens the tutorial over the map; skip it, as a player would.
+    await game.locator('#tut-skip').click();
+    await expect(game.locator('#tutorial')).toHaveCount(0);
     const firstWeek = await game.locator('#tb-date').textContent();
     await game.locator('#btn-endturn').click();
     await expect(game.locator('#tb-date')).not.toHaveText(firstWeek, { timeout: 30000 });
+    await answerWartimeDialogs(page, game);
     const savedWeek = await game.locator('#tb-date').textContent();
 
     // Menu → save into slot 1 (localStorage, shared with nothing of LifeXP's).
