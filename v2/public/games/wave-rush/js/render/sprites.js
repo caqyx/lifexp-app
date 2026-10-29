@@ -322,3 +322,46 @@ export function drawTrail(ctx, points, width, color) {
   ctx.stroke(path);
   ctx.restore();
 }
+
+/**
+ * The ship (the finale): a sleek hull in the skin's colours with a canopy, tilted with
+ * its climb, and a short flame while thrusting.
+ * @param {CanvasRenderingContext2D} ctx @param {Skin} skin @param {number} x @param {number} y @param {number} size
+ * @param {number} tilt radians @param {boolean} thrust @param {boolean} [flipped]
+ */
+export function drawShip(ctx, skin, x, y, size, tilt, thrust, flipped = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(tilt);
+  ctx.scale(size, flipped ? -size : size);
+  ctx.lineJoin = 'round';
+  if (thrust) {
+    ctx.fillStyle = 'rgba(255, 170, 80, 0.85)';
+    ctx.beginPath();
+    ctx.moveTo(-0.55, -0.12);
+    ctx.lineTo(-0.92, 0.04);
+    ctx.lineTo(-0.55, 0.18);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.moveTo(0.62, 0.06);
+  ctx.quadraticCurveTo(0.3, -0.16, -0.2, -0.2);
+  ctx.lineTo(-0.58, -0.3);
+  ctx.lineTo(-0.5, 0.0);
+  ctx.lineTo(-0.58, 0.24);
+  ctx.lineTo(0.3, 0.24);
+  ctx.closePath();
+  ctx.fillStyle = skin.body;
+  ctx.fill();
+  ctx.strokeStyle = skin.edge;
+  ctx.lineWidth = 0.08;
+  ctx.stroke();
+  ctx.fillStyle = skin.accent;
+  ctx.beginPath();
+  ctx.ellipse(0.05, -0.12, 0.2, 0.12, 0, Math.PI, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}

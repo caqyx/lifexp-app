@@ -1,7 +1,8 @@
 // @ts-check
 // Seeded randomness and the query switches. ?seed=<n> (tests only) makes the shuffles
 // repeatable; only with it, ?sector=<n>&section=<m> jumps straight to a section and
-// ?autopilot=<k> lets the solver fly the next k sections, then lets go.
+// ?autopilot=<k> lets the solver fly the next k sections, then lets go; ?finale=<n> starts
+// the (unlocked) finale at its section n.
 
 /**
  * A small seeded generator (mulberry32): the same seed gives the same runs.
@@ -46,15 +47,17 @@ function smallInt(raw, max) {
 /**
  * The test switches of a query string: `seed` (or null); the jump and the autopilot, only with a seed.
  * @param {string} search
- * @returns {{ seed: number | null, jump: { sector: number, section: number } | null, autopilot: number | null }}
+ *   finale: a section of the finale to start at (the finale must be unlocked).
+ * @returns {{ seed: number | null, jump: { sector: number, section: number } | null, autopilot: number | null, finale: number | null }}
  */
 export function parseSwitches(search) {
   const params = new URLSearchParams(search);
   const raw = params.get('seed');
   const seed = raw !== null && /^\d{1,9}$/.test(raw) ? Number(raw) : null;
-  if (seed === null) return { seed: null, jump: null, autopilot: null };
+  if (seed === null) return { seed: null, jump: null, autopilot: null, finale: null };
   const autopilot = smallInt(params.get('autopilot'), 99);
+  const finale = smallInt(params.get('finale'), 99);
   const sector = smallInt(params.get('sector'), 99);
-  if (sector === null) return { seed, jump: null, autopilot };
-  return { seed, jump: { sector, section: smallInt(params.get('section'), 99) ?? 1 }, autopilot };
+  if (sector === null) return { seed, jump: null, autopilot, finale };
+  return { seed, jump: { sector, section: smallInt(params.get('section'), 99) ?? 1 }, autopilot, finale };
 }

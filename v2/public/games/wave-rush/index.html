@@ -39,6 +39,14 @@
         <div class="stats__item"><dt data-t="best"></dt><dd id="menu-best"></dd></div>
         <div class="stats__item"><dt data-t="attempts"></dt><dd id="menu-attempts">0</dd></div>
       </dl>
+      <div id="finale-box" class="finale" role="group" aria-labelledby="finale-title">
+        <p id="finale-title" class="finale__title" data-t="finaleName"></p>
+        <div class="actions actions--row">
+          <button id="finale-play" class="button button--finale" type="button" data-t="finalePlay"></button>
+          <button id="finale-practice" class="button" type="button" data-t="finalePractice"></button>
+        </div>
+        <p id="finale-note" class="card__hint"></p>
+      </div>
       <div class="choice" role="group" aria-labelledby="cp-title">
         <p id="cp-title" class="choice__title" data-t="checkpoints"></p>
         <div class="choice__options">
@@ -79,7 +87,7 @@
       <h2 id="finished-title" class="card__title" data-t="finishedTitle"></h2>
       <p class="badge" data-t="newBest"></p>
       <p id="finished-result" class="card__body"></p>
-      <p class="card__hint" data-t="finishedBody"></p>
+      <p id="finished-body" class="card__hint" data-t="finishedBody"></p>
       <div class="actions actions--row">
         <button id="finished-again" class="button button--primary" type="button" data-t="again"></button>
         <button id="finished-menu" class="button" type="button" data-t="menu"></button>
@@ -90,12 +98,9 @@
   <section id="achievement" class="panel panel--achievement" aria-labelledby="achievement-title" aria-live="polite">
     <div class="card card--achievement">
       <p class="card__eyebrow" data-t="achievement"></p>
-      <h2 id="achievement-title" class="card__title card__title--big" data-t="achDemon"></h2>
-      <p class="card__body" data-t="achDemonBody"></p>
-      <ul class="unlocks">
-        <li class="unlocks__item" data-t="unlockSkin"></li>
-        <li class="unlocks__item" data-t="unlockFinale"></li>
-      </ul>
+      <h2 id="achievement-title" class="card__title card__title--big"></h2>
+      <p id="achievement-body" class="card__body"></p>
+      <ul id="achievement-unlocks" class="unlocks"></ul>
       <button id="achievement-next" class="button button--primary" type="button" data-t="continue"></button>
     </div>
   </section>

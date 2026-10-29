@@ -82,7 +82,7 @@ export const TIERS = {
  * The ship (finale only): hold to thrust up, let go and gravity pulls it down; the
  * vertical speed changes smoothly and is capped. Cells and seconds.
  */
-export const SHIP = { up: 34, down: 30, maxV: 8.5, radius: 0.3, size: 1.15 };
+export const SHIP = { up: 34, down: 30, maxV: 8.5, radius: 0.3, size: 1.45 };
 
 /**
  * @typedef {{ kind: 'gravity' | 'mini', count: number, span?: number, band?: number }} PortalRule

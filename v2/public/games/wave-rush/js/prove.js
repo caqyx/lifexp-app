@@ -3,7 +3,9 @@
 // (docs/v2/PLAN.md 9.1, stage w-1). Used by v2/tests/wave-rush.test.ts on every section.
 import { JOINT, WAVE, sectionStyle, tierOf, tierSpeed } from './config.js';
 import { buildGeometry, capsuleHits, checkSection } from './geometry.js';
-import { entryHeights, proveFrom, toleranceBand } from './solver.js';
+import { PORTAL_OFFSET } from './run.js';
+import { solveShip } from './ship.js';
+import { changesOf, entryHeights, proveFrom, toleranceBand } from './solver.js';
 
 /**
  * @typedef {import('./config.js').SectorDef} SectorDef
@@ -59,6 +61,31 @@ export function proveSection(data, tier, state, spacing = 0.5) {
   });
 }
 
+/** Where a ship stretch is proven from: across the joint, flying level (a portal stops it). */
+export const SHIP_ENTRIES = [3.6, 4.8, 6, 7.2, 8.4];
+
+/**
+ * Proves a ship section from every entry height, from its ship portal on.
+ * @param {SectionData} data @param {string} tier
+ * @returns {EntryResult[]}
+ */
+export function proveShipSection(data, tier) {
+  const g = buildGeometry(data);
+  return SHIP_ENTRIES.map((y) => {
+    const result = solveShip({
+      hits: (x, ya, yb, r, dir, slope) => capsuleHits(g, x, ya, yb, r, dir, slope),
+      x0: PORTAL_OFFSET.ship,
+      x1: g.length,
+      speed: tierSpeed(tier),
+      limits: tierOf(tier),
+      gravity: 1,
+      y,
+      vy: 0,
+    });
+    return { y, problem: result.problem, changes: result.holds ? changesOf(result.holds).length : -1 };
+  });
+}
+
 /**
  * Everything wrong with a section (empty = fair): its data, then its proof in every state.
  * @param {SectionData} data @param {SectorDef} sector @param {number} number its number in the sector (1-based)
@@ -67,6 +94,10 @@ export function sectionProblems(data, sector, number) {
   const tier = tierKeyOf(data, sector, number);
   const problems = checkSection(data, minGapOf(tier));
   if (problems.length) return problems;
+  if (data.mode === 'ship') {
+    for (const entry of proveShipSection(data, tier)) if (entry.problem) problems.push(`${data.id} (ship) from y=${entry.y.toFixed(2)}: ${entry.problem}`);
+    return problems;
+  }
   for (const state of statesOf(sector, data)) {
     for (const entry of proveSection(data, tier, state)) {
       if (entry.problem) problems.push(`${data.id} (gravity ${state.gravity}${state.mini ? ', mini' : ''}) from y=${entry.y.toFixed(2)}: ${entry.problem}`);

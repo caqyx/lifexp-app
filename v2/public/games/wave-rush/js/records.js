@@ -45,21 +45,24 @@ function isResult(value) {
   return [v.sector, v.section, v.percent].every((n) => typeof n === 'number' && Number.isFinite(n) && n >= 0);
 }
 
-/** The best normal run, or null. @param {GameStorage | null} storage @returns {Result | null} */
-export function readBest(storage) {
-  const value = readJson(storage, KEYS.best);
+/**
+ * The best normal run (or the finale's, with `key`), or null.
+ * @param {GameStorage | null} storage @param {string} [key] @returns {Result | null}
+ */
+export function readBest(storage, key = KEYS.best) {
+  const value = readJson(storage, key);
   return isResult(value) ? value : null;
 }
 
 /**
  * Keeps a result if it got further than the best (a crash before 1% is no record).
- * @param {GameStorage | null} storage @param {Result} result
+ * @param {GameStorage | null} storage @param {Result} result @param {string} [key] the finale's own record
  * @returns {{ best: Result | null, isNew: boolean }}
  */
-export function saveBest(storage, result) {
-  const previous = readBest(storage);
+export function saveBest(storage, result, key = KEYS.best) {
+  const previous = readBest(storage, key);
   if (result.percent < 1 || (previous && previous.percent >= result.percent)) return { best: previous, isNew: false };
-  writeJson(storage, KEYS.best, result);
+  writeJson(storage, key, result);
   return { best: result, isNew: true };
 }
 

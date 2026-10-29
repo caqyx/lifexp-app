@@ -10,6 +10,7 @@ import {
   SECTORS,
   STEP,
   TIERS,
+  SHIP,
   WAVE,
   flatCorridorMinHeight,
   sectorSpeed,
@@ -28,7 +29,9 @@ import {
   type SectionData,
 } from '../public/games/wave-rush/js/geometry.js';
 import { pickLang, textsOf, translator, TEXT_KEYS } from '../public/games/wave-rush/js/i18n.js';
-import { advanceClock, createWave, directionFor, holdFor, isBuffered, stepWave } from '../public/games/wave-rush/js/physics.js';
+import { advanceClock, createWave, directionFor, holdFor, isBuffered, stepShip, stepWave } from '../public/games/wave-rush/js/physics.js';
+import { solveShip, verifyShip } from '../public/games/wave-rush/js/ship.js';
+import { FINALE_SECTIONS } from '../public/games/wave-rush/js/sections/finale.js';
 import { minGapOf, proveSection, sectionProblems, statesOf, tierKeyOf } from '../public/games/wave-rush/js/prove.js';
 import {
   KEYS,
@@ -46,6 +49,7 @@ import {
 import { createRng, parseSwitches, shuffle } from '../public/games/wave-rush/js/rng.js';
 import {
   PORTAL_OFFSET,
+  buildFinale,
   buildRun,
   checkpointX,
   jumpX,
@@ -56,7 +60,7 @@ import {
   progressAt,
   stateAt,
 } from '../public/games/wave-rush/js/run.js';
-import { SECTION_LIBRARY } from '../public/games/wave-rush/js/sections/index.js';
+import { FINALE, SECTION_LIBRARY } from '../public/games/wave-rush/js/sections/index.js';
 import { createAutopilot } from '../public/games/wave-rush/js/autopilot.js';
 import { DEFAULT_SKIN, SKINS, isUnlocked, resolveSkin } from '../public/games/wave-rush/js/skins.js';
 import { buildTable, changesOf, peakRate, planSteps, readPlan, replay, rowOf, shiftTap, toleranceBand } from '../public/games/wave-rush/js/solver.js';
@@ -409,8 +413,10 @@ describe('physics', () => {
     expect(directionFor(true, 1)).toBe(-1);
     expect(holdFor(1, -1)).toBe(true);
     expect(holdFor(-1, -1)).toBe(false);
-    // No horizontal state: only x, y, direction, gravity and size.
-    expect(Object.keys(w).sort()).toEqual(['dir', 'gravity', 'mini', 'x', 'y']);
+    // No horizontal state: x, y, direction, gravity, size — and the ship's vertical speed,
+    // which the wave never uses.
+    expect(Object.keys(w).sort()).toEqual(['dir', 'gravity', 'mini', 'ship', 'vy', 'x', 'y']);
+    expect(stepWave(w, true, 10, 0.1).vy).toBe(0);
   });
 
   test('a fixed step: 60, 120 and 144 Hz run the same number of steps and end in the same place', () => {
@@ -443,6 +449,105 @@ describe('physics', () => {
     expect(isBuffered(1000, 1100)).toBe(true);
     expect(isBuffered(1000, 1200)).toBe(false);
     expect(isBuffered(null, 1000)).toBe(false);
+  });
+});
+
+describe('the ship (finale)', () => {
+  test('holding thrusts up, letting go falls, smoothly and capped; flipped gravity mirrors it', () => {
+    let ship = { ...createWave(0, 6), ship: true };
+    ship = stepShip(ship, true, 10, 0.1);
+    expect(ship.vy).toBeCloseTo(-SHIP.up * 0.1);
+    expect(ship.y).toBeLessThan(6);
+    expect(ship.x).toBeCloseTo(1);
+    for (let i = 0; i < 100; i++) ship = stepShip(ship, true, 10, STEP);
+    expect(ship.vy).toBe(-SHIP.maxV);
+    for (let i = 0; i < 400; i++) ship = stepShip(ship, false, 10, STEP);
+    expect(ship.vy).toBe(SHIP.maxV);
+    const flipped = stepShip({ ...createWave(0, 6), ship: true, gravity: -1 }, true, 10, 0.1);
+    expect(flipped.vy).toBeCloseTo(SHIP.up * 0.1);
+    // stepWave flies the ship when it is one.
+    expect(stepWave({ ...createWave(0, 6), ship: true }, true, 10, 0.1).vy).toBeCloseTo(-SHIP.up * 0.1);
+  });
+
+  test('a fixed step: the ship ends in the same place at 60, 120 and 144 Hz', () => {
+    const results = [60, 120, 144].map((hz) => {
+      let acc = 0;
+      let steps = 0;
+      let ship = { ...createWave(0, 6), ship: true };
+      for (let f = 0; f < hz * 2; f++) {
+        const tick = advanceClock(acc, 1 / hz);
+        acc = tick.accumulator;
+        for (let i = 0; i < tick.steps; i++) {
+          ship = stepShip(ship, Math.floor(steps / 90) % 2 === 0, 12, STEP);
+          steps += 1;
+        }
+      }
+      return { steps, x: ship.x, y: ship.y, vy: ship.vy };
+    });
+    for (const r of results) expect(Math.abs(r.steps - 480)).toBeLessThanOrEqual(1);
+    expect(results[0]!.y).toBeCloseTo(results[1]!.y, 1);
+    expect(results[1]!.y).toBeCloseTo(results[2]!.y, 1);
+    expect(results[0]!.x).toBeCloseTo(results[2]!.x, 1);
+  });
+
+  test('the ship never grazes: a 45° slope it flies along is still a crash', () => {
+    const g = room([], '2 r20', '10 r6 u4 r10');
+    const y = profileY(g.floor, 8, 'floor') - 0.1;
+    expect(capsuleHits(g, 8, y, y, SHIP.radius, 0, 0)).toBe(true);
+  });
+
+  test('the ship validator finds a fair path through an open room and none through a wall', () => {
+    const limits = TIERS.finale!;
+    const open: SectionData = { id: 'open', length: 30, ceil: '2 r30', floor: '10 r30', hazards: [] };
+    const g = buildGeometry(open);
+    const spec = { hits: (x: number, ya: number, yb: number, r: number, d: number, sl: number) => capsuleHits(g, x, ya, yb, r, d, sl), x0: 1, x1: 30, speed: limits.speed * BASE_SPEED, limits, gravity: 1 as const, y: 6, vy: 0 };
+    const ok = solveShip(spec);
+    expect(ok.problem).toBeNull();
+    expect(verifyShip(spec, ok.holds!)).toBeNull();
+    const wall = buildGeometry({ ...open, id: 'wall', hazards: [{ type: 'block', x: 12, y: 2, w: 1, h: 8 }] });
+    expect(solveShip({ ...spec, hits: (x, ya, yb, r, d, sl) => capsuleHits(wall, x, ya, yb, r, d, sl) }).holds).toBeNull();
+  });
+});
+
+describe('the finale', () => {
+  test('a fixed sequence that alternates wave and ship, with a portal at every change, never shuffled', () => {
+    const a = buildFinale();
+    const b = buildFinale();
+    expect(a.sectors[0]!.order).toEqual(range(1, FINALE_SECTIONS.length));
+    expect(b.sectors[0]!.order).toEqual(a.sectors[0]!.order);
+    const pieces = a.pieces.filter((p) => p.kind === 'section');
+    const modes = pieces.map((p) => p.mode);
+    expect(modes).toEqual(modes.map((_, i) => (i % 2 === 0 ? 'wave' : 'ship')));
+    expect(a.portals.filter((p) => p.kind === 'ship').map((p) => p.on)).toEqual(modes.slice(1).map((m) => m === 'ship'));
+    for (const p of pieces) expect(p.tier).toBe(p.mode === 'ship' ? 'finale' : 'extremeDemon');
+    for (const p of pieces) expect(stateAt(a, p.x0 + 2).ship).toBe(p.mode === 'ship');
+  });
+
+  test('every stretch of the finale is passable for a human: wave stretches at Extreme limits, ship stretches by the ship validator', { timeout: 300_000 }, () => {
+    const problems = FINALE_SECTIONS.flatMap((data, i) => sectionProblems(data, FINALE, i + 1));
+    expect(problems).toEqual([]);
+  });
+
+  test('practice in the finale goes back to the section; a crash in normal play to its start', () => {
+    const practice = createGame({ rng: createRng(1), mode: 'practice', level: 'finale', checkpointBy: 'sector', jump: { sector: 1, section: 4 } });
+    expect(practice.checkpointBy).toBe('section');
+    expect(practice.checkpoint).toBe(jumpX(practice.run, 1, 4));
+    const normal = createGame({ rng: createRng(1), mode: 'normal', level: 'finale' });
+    expect(normal.run.kind).toBe('finale');
+    expect(keepsRecords(normal)).toBe(true);
+  });
+
+  test('the pilot flies the whole finale, ship and wave', { timeout: 120_000 }, () => {
+    const game = createGame({ rng: createRng(1), mode: 'normal', level: 'finale' });
+    stepGame(game, { holding: true, tap: true }, STEP);
+    const pilot = createAutopilot();
+    let shipSteps = 0;
+    for (let i = 0; i < 240 * 60 && game.phase === 'playing'; i++) {
+      if (game.wave.ship) shipSteps += 1;
+      stepGame(game, { holding: pilot.advise(game.run, game.wave), tap: false }, STEP);
+    }
+    expect(game.phase).toBe('finished');
+    expect(shipSteps).toBeGreaterThan(240);
   });
 });
 
@@ -669,10 +774,11 @@ describe('texts and switches', () => {
   });
 
   test('?sector, ?section and ?autopilot only work together with ?seed', () => {
-    expect(parseSwitches('?seed=5&sector=3&section=4')).toEqual({ seed: 5, jump: { sector: 3, section: 4 }, autopilot: null });
-    expect(parseSwitches('?seed=5&sector=2&autopilot=2')).toEqual({ seed: 5, jump: { sector: 2, section: 1 }, autopilot: 2 });
-    expect(parseSwitches('?sector=3&section=4&autopilot=3')).toEqual({ seed: null, jump: null, autopilot: null });
-    expect(parseSwitches('?seed=x')).toEqual({ seed: null, jump: null, autopilot: null });
+    expect(parseSwitches('?seed=5&sector=3&section=4')).toEqual({ seed: 5, jump: { sector: 3, section: 4 }, autopilot: null, finale: null });
+    expect(parseSwitches('?seed=5&sector=2&autopilot=2')).toEqual({ seed: 5, jump: { sector: 2, section: 1 }, autopilot: 2, finale: null });
+    expect(parseSwitches('?seed=5&finale=4&autopilot=1')).toEqual({ seed: 5, jump: null, autopilot: 1, finale: 4 });
+    expect(parseSwitches('?sector=3&section=4&autopilot=3&finale=2')).toEqual({ seed: null, jump: null, autopilot: null, finale: null });
+    expect(parseSwitches('?seed=x')).toEqual({ seed: null, jump: null, autopilot: null, finale: null });
   });
 
   test('a shuffle keeps every item', () => {

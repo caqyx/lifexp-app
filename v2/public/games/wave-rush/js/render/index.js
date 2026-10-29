@@ -3,11 +3,11 @@
 // sector change), the visible sections from their painted canvases, solid terrain beyond
 // the band on tall screens, spinning hazards, portals, the trail and the wave, shards,
 // a portal ring and the crash flash. Painted sections are kept only while near the screen.
-import { JOINT, WAVE } from '../config.js';
+import { JOINT, SHIP, WAVE } from '../config.js';
 import { pieceIndexAt } from '../run.js';
 import { drawBackground } from './background.js';
 import { paintPattern, paintSection, STRIP_BOTTOM, STRIP_TOP } from './section.js';
-import { drawOrb, drawPortal, drawSaw, drawTrail, drawWave } from './sprites.js';
+import { drawOrb, drawPortal, drawSaw, drawShip, drawTrail, drawWave } from './sprites.js';
 import { themeOf } from './themes.js';
 import { screenX, screenY } from './view.js';
 
@@ -18,7 +18,7 @@ import { screenX, screenY } from './view.js';
  * @typedef {import('../run.js').Piece} Piece
  * @typedef {import('./section.js').Painted} Painted
  * @typedef {{
- *   view: View, run: Run, wave: { x: number, y: number, dir: number, mini: boolean, alive: boolean, flipped: boolean },
+ *   view: View, run: Run, wave: { x: number, y: number, dir: number, mini: boolean, alive: boolean, flipped: boolean, ship: boolean, tilt: number, thrust: boolean },
  *   trail: { x: number, y: number }[], skin: import('../skins.js').Skin, time: number, reduced: boolean,
  *   pulse: number, particles: import('../effects.js').Particle[], shake: { x: number, y: number },
  *   flash: number, ring: { x: number, color: string, progress: number } | null,
@@ -213,6 +213,10 @@ function drawPlayer(ctx, s, camX) {
   points.push({ x: screenX(v, camX, w.x), y: screenY(v, w.y) });
   drawTrail(ctx, points, v.cell * (w.mini ? 0.2 : 0.3), s.skin.trail);
   if (!w.alive) return;
+  if (w.ship) {
+    drawShip(ctx, s.skin, screenX(v, camX, w.x), screenY(v, w.y), SHIP.size * v.cell, w.tilt, w.thrust && !s.reduced, w.flipped);
+    return;
+  }
   const slope = w.mini ? WAVE.miniSlope : WAVE.slope;
   const size = (w.mini ? WAVE.miniSize : WAVE.size) * v.cell;
   drawWave(ctx, s.skin, screenX(v, camX, w.x), screenY(v, w.y), size, Math.atan2(w.dir * slope, 1), w.flipped);

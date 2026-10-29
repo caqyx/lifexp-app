@@ -15,6 +15,7 @@ import { createGame, keepsRecords, resultOf, stepGame } from './game.js';
 import { pickLang, translator } from './i18n.js';
 import { advanceClock, isBuffered } from './physics.js';
 import {
+  KEYS,
   countAttempt,
   readAttempts,
   readBest,
@@ -78,6 +79,15 @@ function findElements() {
     finishedAgain: buttonById('finished-again'),
     finishedMenu: buttonById('finished-menu'),
     achievementNext: buttonById('achievement-next'),
+    achievementTitle: byId('achievement-title'),
+    achievementBody: byId('achievement-body'),
+    achievementUnlocks: byId('achievement-unlocks'),
+    finishedTitle: byId('finished-title'),
+    finishedBody: byId('finished-body'),
+    finaleBox: byId('finale-box'),
+    finalePlay: buttonById('finale-play'),
+    finalePractice: buttonById('finale-practice'),
+    finaleNote: byId('finale-note'),
   };
 }
 
@@ -166,14 +176,22 @@ function sectorName(/** @type {number} */ n) {
 function updateMenu() {
   const best = readBest(storage);
   dom.menuBest.textContent = best ? t('bestValue', best) : t('bestNone');
+  const unlocked = readProgress(storage).demonComplete;
+  dom.finalePlay.disabled = !unlocked;
+  dom.finalePractice.disabled = !unlocked;
+  dom.finaleBox.classList.toggle('is-locked', !unlocked);
+  const finaleBest = readBest(storage, KEYS.finaleBest);
+  dom.finaleNote.textContent = !unlocked ? t('finaleLocked') : finaleBest ? `${t('finaleBest')}: ${finaleBest.percent}%` : t('finaleReady');
   dom.menuAttempts.textContent = String(readAttempts(storage));
   dom.cpSector.setAttribute('aria-pressed', String(state.checkpointBy === 'sector'));
   dom.cpSection.setAttribute('aria-pressed', String(state.checkpointBy === 'section'));
 }
 
-/** @param {'normal' | 'practice'} mode */
-function startGame(mode) {
-  state.game = createGame({ rng: gameRng, mode, checkpointBy: state.checkpointBy, jump: switches.jump });
+/** @param {'normal' | 'practice'} mode @param {'run' | 'finale'} [level] */
+function startGame(mode, level = 'run') {
+  if (level === 'finale' && !readProgress(storage).demonComplete) return;
+  const jump = level === 'finale' ? (switches.finale ? { sector: 1, section: switches.finale } : null) : switches.jump;
+  state.game = createGame({ rng: gameRng, mode, level, checkpointBy: state.checkpointBy, jump });
   state.newBest = false;
   dom.stage.classList.toggle('is-practice', mode === 'practice');
   input.pressedAt = null;
@@ -317,7 +335,9 @@ function bindInput() {
   dom.deadMenu.addEventListener('click', backToMenu);
   dom.finishedMenu.addEventListener('click', backToMenu);
   dom.achievementNext.addEventListener('click', () => show('finished'));
-  dom.finishedAgain.addEventListener('click', () => startGame(state.game.mode));
+  dom.finishedAgain.addEventListener('click', () => startGame(state.game.mode, state.game.level));
+  dom.finalePlay.addEventListener('click', () => startGame('normal', 'finale'));
+  dom.finalePractice.addEventListener('click', () => startGame('practice', 'finale'));
   for (const [button, by] of /** @type {const} */ ([[dom.cpSector, 'sector'], [dom.cpSection, 'section']])) {
     button.addEventListener('click', () => {
       state.checkpointBy = by;
@@ -348,6 +368,7 @@ function reactToEvents(events) {
       const p = game.lastPortal;
       fx.ring = { x: p.x, color: portalColor(p), at: clock.time };
       if (p.kind === 'gravity') showToast(t(p.on ? 'gravityFlip' : 'gravityBack'));
+      if (p.kind === 'ship') showToast(t(p.on ? 'shipOn' : 'waveOn'));
     }
     if (event === 'death') handleDeath();
     if (event === 'finish') handleFinish();
@@ -369,19 +390,40 @@ function handleDeath() {
 
 function handleFinish() {
   const game = state.game;
+  const finale = game.level === 'finale';
   const result = game.result ?? resultOf(game);
-  if (keepsRecords(game)) state.newBest = saveBest(storage, result).isNew;
-  dom.finishedResult.textContent = t('result', result);
+  if (keepsRecords(game)) state.newBest = saveBest(storage, result, finale ? KEYS.finaleBest : KEYS.best).isNew;
+  dom.finishedResult.textContent = finale ? t('finaleResult') : t('result', result);
+  dom.finishedTitle.textContent = t(finale ? 'finaleDoneTitle' : 'finishedTitle');
+  dom.finishedBody.textContent = t(finale ? 'finaleDoneBody' : 'finishedBody');
   dom.stage.classList.toggle('is-new-best', state.newBest);
-  // The whole run, Demon included: the achievement, the last skin and the finale. A run
-  // jumped into with the test switches counts only in a test (?seed=).
-  const earned = keepsRecords(game) || debug;
-  if (earned && unlock(storage, 'demonComplete')) {
-    celebrate();
-    show('achievement');
+  // The whole run (Demon included) and the finale each give an achievement. A level
+  // jumped into with the test switches counts only in a test (?seed=); practice never.
+  const earned = game.mode === 'normal' && (keepsRecords(game) || debug);
+  if (earned && unlock(storage, finale ? 'finaleComplete' : 'demonComplete')) {
+    showAchievement(finale);
     return;
   }
   show('finished');
+}
+
+/**
+ * The celebratory screen: the achievement, and what it unlocked.
+ * @param {boolean} finale
+ */
+function showAchievement(finale) {
+  dom.achievementTitle.textContent = t(finale ? 'achFinale' : 'achDemon');
+  dom.achievementBody.textContent = t(finale ? 'achFinaleBody' : 'achDemonBody');
+  dom.achievementUnlocks.replaceChildren(
+    ...(finale ? [] : /** @type {const} */ (['unlockSkin', 'unlockFinale'])).map((key) => {
+      const item = document.createElement('li');
+      item.className = 'unlocks__item';
+      item.textContent = t(key);
+      return item;
+    }),
+  );
+  celebrate();
+  show('achievement');
 }
 
 /** Shards in every skin colour across the screen (not with reduced motion). */
@@ -397,6 +439,7 @@ function celebrate() {
  * @param {import('./game.js').Game} game
  */
 function bandName(game) {
+  if (game.level === 'finale') return t('finaleName');
   const piece = pieceAt(game.run, game.wave.x);
   const sector = game.run.sectors[piece.sector];
   const band = piece.band >= 0 ? sector?.def.bands?.[piece.band] : null;
@@ -408,7 +451,8 @@ function updateHud() {
   const where = game.where;
   const sector = game.run.sectors[where.sector - 1];
   const band = bandName(game);
-  dom.hudSector.textContent = `${t('sectorLabel', { n: where.sector, name: band ?? sectorName(where.sector) })} · ${t('sectionLabel', { section: where.section, count: sector ? sector.count : 0 })}`;
+  const label = game.level === 'finale' ? t('finaleName') : t('sectorLabel', { n: where.sector, name: band ?? sectorName(where.sector) });
+  dom.hudSector.textContent = `${label} · ${t('sectionLabel', { section: where.section, count: sector ? sector.count : 0 })}`;
   dom.hudAttempt.textContent = t('attempt', { n: game.attempt });
 }
 
@@ -437,7 +481,11 @@ function writeDebug() {
   d.debugAttempt = String(game.attempt);
   d.debugCheckpoint = game.checkpoint.toFixed(2);
   d.debugOrder = game.run.sectors.map((s) => s.order.join('.')).join('|');
-  d.debugPortals = game.run.portals.map((p) => `${p.x}:${p.on ? 'on' : 'off'}`).join(',');
+  d.debugPortals = game.run.portals.map((p) => `${p.kind}:${p.x.toFixed(1)}:${p.on ? 'on' : 'off'}`).join(',');
+  d.debugTier = pieceAt(game.run, w.x).tier;
+  d.debugMini = w.mini ? '1' : '0';
+  d.debugShip = w.ship ? '1' : '0';
+  d.debugLevel = game.level;
   d.debugPilot = piloting() ? '1' : '0';
 }
 
@@ -491,6 +539,9 @@ function drawFrame(alpha) {
       mini: w.mini,
       alive: game.phase !== 'dead',
       flipped: w.gravity === -1,
+      ship: w.ship,
+      tilt: Math.atan2(w.vy, pieceAt(game.run, w.x).speed) * 0.9,
+      thrust: input.down && game.phase === 'playing',
     },
     trail: game.trail,
     skin: state.skin,
