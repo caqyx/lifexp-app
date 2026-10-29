@@ -27,7 +27,7 @@ import {
 } from './records.js';
 import { beatPulse } from './render/background.js';
 import { createRenderer, renderFrame } from './render/index.js';
-import { drawWave, PORTAL_COLORS } from './render/sprites.js';
+import { drawWave, portalColor } from './render/sprites.js';
 import { computeView } from './render/view.js';
 import { createRng, parseSwitches } from './rng.js';
 import { progressAt } from './run.js';
@@ -342,7 +342,7 @@ function reactToEvents(events) {
     if (event === 'sector') showToast(t('sectorLabel', { n: game.where.sector, name: sectorName(game.where.sector) }));
     if (event === 'portal' && game.lastPortal) {
       const p = game.lastPortal;
-      fx.ring = { x: p.x, color: p.on ? PORTAL_COLORS.gravityOn : PORTAL_COLORS.gravityOff, at: clock.time };
+      fx.ring = { x: p.x, color: portalColor(p), at: clock.time };
       if (p.kind === 'gravity') showToast(t(p.on ? 'gravityFlip' : 'gravityBack'));
     }
     if (event === 'death') handleDeath();

@@ -93,15 +93,27 @@ export const PORTAL_COLORS = {
   gravityOff: '#62b6e6',
   miniOn: '#e07ac8',
   miniOff: '#7fcf7a',
+  shipOn: '#ff8a5c',
+  shipOff: '#7fe0ff',
 };
+
+/**
+ * A portal's colour.
+ * @param {{ kind: 'gravity' | 'mini' | 'ship', on: boolean }} p
+ */
+export function portalColor(p) {
+  if (p.kind === 'gravity') return p.on ? PORTAL_COLORS.gravityOn : PORTAL_COLORS.gravityOff;
+  if (p.kind === 'mini') return p.on ? PORTAL_COLORS.miniOn : PORTAL_COLORS.miniOff;
+  return p.on ? PORTAL_COLORS.shipOn : PORTAL_COLORS.shipOff;
+}
 
 /**
  * A portal: a tall ring across the joint's corridor with arrows for the new gravity.
  * @param {CanvasRenderingContext2D} ctx @param {number} x px @param {number} top px @param {number} bottom px
- * @param {number} cell px @param {{ kind: 'gravity' | 'mini', on: boolean }} p @param {number} time @param {boolean} reduced
+ * @param {number} cell px @param {{ kind: 'gravity' | 'mini' | 'ship', on: boolean }} p @param {number} time @param {boolean} reduced
  */
 export function drawPortal(ctx, x, top, bottom, cell, p, time, reduced) {
-  const color = p.kind === 'gravity' ? (p.on ? PORTAL_COLORS.gravityOn : PORTAL_COLORS.gravityOff) : p.on ? PORTAL_COLORS.miniOn : PORTAL_COLORS.miniOff;
+  const color = portalColor(p);
   const cy = (top + bottom) / 2;
   const ry = (bottom - top) / 2;
   const rx = cell * 0.55;

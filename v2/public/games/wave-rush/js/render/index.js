@@ -34,9 +34,6 @@ export function createRenderer() {
   return { painted: new Map(), key: '', run: null, patterns: new Map() };
 }
 
-/** @param {Run} run @param {Piece} piece */
-const themeOfPiece = (run, piece) => themeOf(/** @type {import('../run.js').PlacedSector} */ (run.sectors[piece.sector]).def.theme);
-
 /**
  * Forgets painted sections when the view or the run changes.
  * @param {Renderer} r @param {Scene} s
@@ -72,16 +69,21 @@ function visiblePieces(run, camX, v) {
 function drawBackdrop(ctx, s, camX) {
   const centre = camX + s.view.cells / 2;
   const clock = { time: s.time, pulse: s.reduced ? 0 : s.pulse, reduced: s.reduced };
-  const index = s.run.pieces[pieceIndexAt(s.run, centre)]?.sector ?? 0;
-  const current = /** @type {import('../run.js').PlacedSector} */ (s.run.sectors[index]);
-  drawBackground(ctx, s.view, themeOf(current.def.theme), camX, clock);
-  // Half-way at the boundary, fading over FADE cells.
-  const into = centre - current.x0;
-  const next = s.run.sectors[index + 1];
-  const neighbour = index > 0 && into < FADE / 2 ? { def: /** @type {import('../run.js').PlacedSector} */ (s.run.sectors[index - 1]).def, d: into } : next && next.x0 - centre < FADE / 2 ? { def: next.def, d: next.x0 - centre } : null;
+  const i = pieceIndexAt(s.run, centre);
+  const here = /** @type {Piece} */ (s.run.pieces[i]);
+  drawBackground(ctx, s.view, themeOf(here.theme), camX, clock);
+  // Half-way at a change of look (a sector or a Demon tier), fading over FADE cells.
+  const before = s.run.pieces[i - 1];
+  const after = s.run.pieces[i + 1];
+  const neighbour =
+    before && before.theme !== here.theme && centre - here.x0 < FADE / 2
+      ? { theme: before.theme, d: centre - here.x0 }
+      : after && after.theme !== here.theme && after.x0 - centre < FADE / 2
+        ? { theme: after.theme, d: after.x0 - centre }
+        : null;
   if (neighbour) {
     ctx.globalAlpha = Math.max(0, 0.5 - neighbour.d / FADE);
-    drawBackground(ctx, s.view, themeOf(neighbour.def.theme), camX, clock);
+    drawBackground(ctx, s.view, themeOf(neighbour.theme), camX, clock);
     ctx.globalAlpha = 1;
   }
 }
@@ -95,7 +97,7 @@ function drawPieces(ctx, r, s, pieces, camX) {
   for (const piece of pieces) {
     let painted = r.painted.get(piece);
     if (!painted) {
-      painted = paintSection(piece.g, themeOfPiece(s.run, piece), v);
+      painted = paintSection(piece.g, themeOf(piece.theme), v);
       r.painted.set(piece, painted);
     }
     const dx = screenX(v, camX, piece.x0 + painted.left);
@@ -138,7 +140,7 @@ function drawBeyondBand(ctx, r, s, camX) {
   const bottom = screenY(v, STRIP_BOTTOM);
   if (top <= 0 && bottom >= v.height) return;
   const piece = /** @type {Piece} */ (s.run.pieces[pieceIndexAt(s.run, camX + v.cells / 2)]);
-  const th = themeOfPiece(s.run, piece);
+  const th = themeOf(piece.theme);
   const pattern = patternOf(r, th, v.cell);
   ctx.save();
   if (pattern) {
@@ -173,12 +175,19 @@ function drawBeyondBand(ctx, r, s, camX) {
 function drawSpinners(ctx, s, pieces, camX) {
   const v = s.view;
   for (const piece of pieces) {
-    const th = themeOfPiece(s.run, piece);
+    const th = themeOf(piece.theme);
     for (const h of piece.g.hazards) {
       if (h.shape !== 'circle') continue;
       const x = screenX(v, camX, piece.x0 + h.x);
       const y = screenY(v, h.y);
       const spin = s.reduced ? 0 : s.time * (h.type === 'saw' ? -5 : 1.4);
+      if (th.fx?.hazardGlow) {
+        const halo = ctx.createRadialGradient(x, y, h.r * v.cell * 0.5, x, y, h.r * v.cell * 1.6);
+        halo.addColorStop(0, th.fx.hazardGlow);
+        halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = halo;
+        ctx.fillRect(x - h.r * v.cell * 1.6, y - h.r * v.cell * 1.6, h.r * v.cell * 3.2, h.r * v.cell * 3.2);
+      }
       if (h.type === 'saw') drawSaw(ctx, x, y, h.r * v.cell, spin, th);
       else drawOrb(ctx, x, y, h.r * v.cell, spin, th);
     }

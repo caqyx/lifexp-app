@@ -2,9 +2,9 @@
 // Test-only pilot (loaded by main.js only with ?seed=&autopilot=<k>): the solver's plan
 // from where the wave really is, applied as the input on every physics step, so the
 // browser test can fly through sections. Replans when the plan ends or the wave drifts.
-import { STEP, sectorTier } from './config.js';
+import { STEP, tierOf } from './config.js';
 import { holdFor, waveSlope } from './physics.js';
-import { pieceAt, runHits, sectorAt } from './run.js';
+import { pieceAt, runHits, sectorAt, speedAt } from './run.js';
 import { buildTable, readPlan, rowOf } from './solver.js';
 
 /**
@@ -14,12 +14,16 @@ import { buildTable, readPlan, rowOf } from './solver.js';
 const DRIFT = 0.08;
 
 /**
- * The span to plan over: to just past the section ahead, never past the sector's end.
+ * The span to plan over: to just past the section ahead, but never past a change of
+ * speed (sector or Demon tier), a size portal or the sector's end.
  * @param {import('./run.js').Run} run @param {number} x
  */
 function horizon(run, x) {
-  const ahead = pieceAt(run, x + 4);
-  return Math.min(ahead.x1 + 2, sectorAt(run, x).x1 + 0.5);
+  let end = Math.min(pieceAt(run, x + 4).x1 + 2, sectorAt(run, x).x1 + 0.5);
+  const speed = speedAt(run, x);
+  for (const p of run.pieces) if (p.x0 > x && p.x0 < end && p.speed !== speed) end = Math.min(end, p.x0 + 0.5);
+  for (const p of run.portals) if (p.kind !== 'gravity' && p.x > x + 0.05 && p.x < end) end = p.x - 0.01;
+  return end;
 }
 
 /**
@@ -28,7 +32,7 @@ function horizon(run, x) {
  * @returns {Course | null}
  */
 function planCourse(run, wave) {
-  const sector = sectorAt(run, wave.x);
+  const piece = pieceAt(run, wave.x);
   const x1 = horizon(run, wave.x);
   const x0 = wave.x;
   const y0 = wave.y;
@@ -38,9 +42,9 @@ function planCourse(run, wave) {
       hits: /** @type {import('./solver.js').HitTest} */ ((x, ya, yb, r, dir, slope) => runHits(run, x, ya, yb, r, dir, slope)),
       x0,
       x1,
-      speed: sector.speed,
+      speed: piece.speed,
       mini: wave.mini,
-      limits: { ...sectorTier(sector.def), minInterval: 0.08 },
+      limits: { ...tierOf(piece.tier), minInterval: 0.08 },
       yAnchor: y0,
       band,
     };
@@ -84,7 +88,7 @@ export function createAutopilot() {
       }
       if (!course) return false;
       // The direction for the step about to be taken.
-      const next = Math.min(course.x1 - 0.01, wave.x + sectorAt(run, wave.x).speed * STEP * 0.5);
+      const next = Math.min(course.x1 - 0.01, wave.x + speedAt(run, wave.x) * STEP * 0.5);
       return holdFor(expected(course, next).dir, wave.gravity);
     },
   };

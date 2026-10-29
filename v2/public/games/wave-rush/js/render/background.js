@@ -149,6 +149,14 @@ function silhouetteY(kind, u, layer) {
     const rise = Math.min(local - 1, span - 1 - local);
     return rise <= 0 ? ground : Math.max(top, ground - rise * 1.6);
   }
+  if (kind === 'spires') {
+    // Crystal spires: sharp peaks every 1.5 cells, taller every few.
+    const cell = Math.floor(u / 1.5);
+    const local = (u - cell * 1.5) / 1.5;
+    const h = hash(cell * 7 + layer * 31);
+    const peak = base + 1.5 - (0.6 + h * h * 3.2);
+    return peak + Math.abs(local - 0.5) * 2 * (base + 1.5 - peak);
+  }
   const cell = Math.floor(u / 6);
   return base - 1 - hash(cell * 3 + layer * 17) * 2.4;
 }
@@ -165,7 +173,7 @@ function drawSilhouettes(ctx, v, th, camX) {
     ctx.fillStyle = th.midColor[layer] ?? th.midColor[0];
     ctx.beginPath();
     ctx.moveTo(0, bottom);
-    const step = th.mid === 'hills' ? 0.5 : 0.25;
+    const step = th.mid === 'hills' ? 0.5 : th.mid === 'spires' ? 0.75 : 0.25;
     for (let u = Math.floor(left / step) * step; ; u += step) {
       const x = (u - left) * v.cell;
       let y = silhouetteY(th.mid, u, layer);
@@ -228,9 +236,182 @@ function drawColumns(ctx, v, th, camX) {
  */
 export function drawBackground(ctx, v, th, camX, clock) {
   drawSky(ctx, v, th);
+  if (th.fx && th.fx.bg !== 'none') drawGeometry(ctx, v, th, camX, clock);
   if (th.far === 'grid') drawGrid(ctx, v, th, camX, clock.pulse);
   else if (th.far === 'sun') drawSun(ctx, v, th, clock.pulse);
-  else drawMoon(ctx, v, th, camX, clock.time, clock.reduced);
-  drawSilhouettes(ctx, v, th, camX);
+  else if (th.far === 'moon') drawMoon(ctx, v, th, camX, clock.time, clock.reduced);
+  else if (th.far === 'aurora') drawAurora(ctx, v, th, clock.time, clock.reduced);
+  else if (th.far === 'eclipse') drawEclipse(ctx, v, th, clock.pulse);
+  if (th.mid !== 'none') drawSilhouettes(ctx, v, th, camX);
   drawColumns(ctx, v, th, camX);
+  if (th.fx?.particles && !clock.reduced) drawMotes(ctx, v, th.fx.particles, camX, clock.time);
+}
+
+/**
+ * Ribbons of light across the sky, swaying slowly.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} time @param {boolean} reduced
+ */
+function drawAurora(ctx, v, th, time, reduced) {
+  const t = reduced ? 0 : time;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = th.farColor;
+  ctx.lineCap = 'round';
+  for (let k = 0; k < 3; k++) {
+    ctx.globalAlpha = 0.35 - k * 0.08;
+    ctx.lineWidth = v.cell * (1.6 - k * 0.4);
+    ctx.beginPath();
+    for (let x = -v.cell; x <= v.width + v.cell; x += v.cell) {
+      const y = screenY(v, 2.6 + k * 1.1 + Math.sin(x / (v.cell * 6) + t * 0.4 + k) * 0.8);
+      if (x < 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * A black sun with a bright corona, high in the sky.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} pulse
+ */
+function drawEclipse(ctx, v, th, pulse) {
+  const r = 2.4 * v.cell;
+  const cx = v.width * 0.72;
+  const cy = screenY(v, 3.6);
+  const corona = ctx.createRadialGradient(cx, cy, r * 0.9, cx, cy, r * (2.6 + pulse * 0.25));
+  corona.addColorStop(0, th.farColor);
+  corona.addColorStop(0.18, th.block.glow);
+  corona.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = corona;
+  ctx.fillRect(cx - r * 3, cy - r * 3, r * 6, r * 6);
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = th.farColor;
+  ctx.lineWidth = Math.max(1, v.cell * 0.06);
+  ctx.stroke();
+}
+
+/** Pattern tiles, by theme and cell size. @type {Map<string, CanvasPattern | null>} */
+const tiles = new Map();
+
+/**
+ * One tile of a theme's background geometry.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th
+ */
+function geometryTile(ctx, v, th) {
+  const key = `${th.id}@${v.cell}`;
+  if (tiles.has(key)) return tiles.get(key) ?? null;
+  const fx = /** @type {import('./themes.js').Fx} */ (th.fx);
+  const size = Math.max(8, Math.round(v.cell * 4));
+  const tile = document.createElement('canvas');
+  tile.width = size;
+  tile.height = size;
+  const t = /** @type {CanvasRenderingContext2D} */ (tile.getContext('2d'));
+  t.strokeStyle = fx.bgColor;
+  t.fillStyle = fx.bgColor;
+  t.lineWidth = Math.max(1, v.cell * 0.06);
+  t.beginPath();
+  if (fx.bg === 'triangles') {
+    // Two rows of up and down triangles.
+    for (const [y0, flip] of /** @type {[number, boolean][]} */ ([[0, false], [size / 2, true]])) {
+      for (let x = flip ? -size / 4 : 0; x < size; x += size / 2) {
+        const h = size / 2;
+        t.moveTo(x, y0 + h);
+        t.lineTo(x + size / 4, y0);
+        t.lineTo(x + size / 2, y0 + h);
+        t.closePath();
+      }
+    }
+    t.stroke();
+  } else if (fx.bg === 'diamonds') {
+    t.moveTo(size / 2, 0);
+    t.lineTo(size, size / 2);
+    t.lineTo(size / 2, size);
+    t.lineTo(0, size / 2);
+    t.closePath();
+    t.moveTo(size / 2, size * 0.3);
+    t.lineTo(size * 0.7, size / 2);
+    t.lineTo(size / 2, size * 0.7);
+    t.lineTo(size * 0.3, size / 2);
+    t.closePath();
+    t.stroke();
+  } else {
+    // Shards: a few sharp triangles scattered over the tile.
+    for (let i = 0; i < 4; i++) {
+      const x = hash(i * 3 + 1) * size;
+      const y = hash(i * 3 + 2) * size;
+      const r = size * (0.08 + hash(i * 3 + 3) * 0.12);
+      t.moveTo(x, y - r * 1.6);
+      t.lineTo(x + r, y + r);
+      t.lineTo(x - r, y + r * 0.6);
+      t.closePath();
+    }
+    t.fill();
+  }
+  const pattern = ctx.createPattern(tile, 'repeat');
+  tiles.set(key, pattern);
+  return pattern;
+}
+
+/**
+ * Background geometry: a tiled pattern (triangles, diamonds, shards) or light rays,
+ * drifting slower than the level and brightening a little on the beat.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX
+ * @param {{ time: number, pulse: number, reduced: boolean }} clock
+ */
+function drawGeometry(ctx, v, th, camX, clock) {
+  const fx = /** @type {import('./themes.js').Fx} */ (th.fx);
+  ctx.save();
+  ctx.globalAlpha = 0.85 + clock.pulse * 0.3;
+  if (fx.bg === 'rays') {
+    const cx = v.width * 0.72;
+    const cy = screenY(v, 3.6);
+    const spin = clock.reduced ? 0 : clock.time * 0.05;
+    ctx.fillStyle = fx.bgColor;
+    ctx.beginPath();
+    const reach = Math.hypot(v.width, v.height);
+    for (let i = 0; i < 18; i++) {
+      const a = spin + (i / 18) * Math.PI * 2;
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(a) * reach, cy + Math.sin(a) * reach);
+      ctx.lineTo(cx + Math.cos(a + 0.09) * reach, cy + Math.sin(a + 0.09) * reach);
+      ctx.closePath();
+    }
+    ctx.fill();
+  } else {
+    const pattern = geometryTile(ctx, v, th);
+    if (pattern) {
+      pattern.setTransform(new DOMMatrix().translate(-camX * 0.15 * v.cell, v.top));
+      ctx.fillStyle = pattern;
+      ctx.fillRect(0, 0, v.width, v.height);
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * Floating motes: a fixed number, each placed by its own seed and time (no state),
+ * drifting up and scrolling at their own depth; lighter where they overlap.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {{ color: string, count: number }} p @param {number} camX @param {number} time
+ */
+function drawMotes(ctx, v, p, camX, time) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = p.color;
+  const span = v.width + v.cell * 2;
+  for (let i = 0; i < p.count; i++) {
+    const depth = 0.2 + hash(i + 900) * 0.6;
+    const x = (((hash(i + 300) * span - camX * depth * v.cell) % span) + span) % span - v.cell;
+    const rise = (time * (0.15 + hash(i + 500) * 0.35) + hash(i + 700)) % 1;
+    const y = v.height * (1 - rise);
+    const size = v.cell * (0.05 + hash(i + 100) * 0.09) * (0.6 + depth);
+    ctx.globalAlpha = 0.25 + 0.5 * Math.sin(rise * Math.PI);
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
 }

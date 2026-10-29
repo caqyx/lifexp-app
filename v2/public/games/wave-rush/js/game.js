@@ -15,7 +15,7 @@ import {
   progressAt,
   respawnX,
   runHits,
-  sectorAt,
+  speedAt,
   stateAt,
 } from './run.js';
 
@@ -103,7 +103,7 @@ function passPortals(game, from, to, events) {
   for (const p of game.run.portals) {
     if (p.x <= from || p.x > to) continue;
     if (p.kind === 'gravity') game.wave = { ...game.wave, gravity: p.on ? -1 : 1 };
-    else game.wave = { ...game.wave, mini: p.on };
+    else if (p.kind === 'mini') game.wave = { ...game.wave, mini: p.on };
     game.lastPortal = p;
     events.push('portal');
   }
@@ -152,7 +152,7 @@ function crashed(game) {
 function fly(game, holding, dt, events) {
   const before = game.wave;
   game.previous = { x: before.x, y: before.y };
-  game.wave = stepWave(before, holding, sectorAt(game.run, before.x).speed, dt);
+  game.wave = stepWave(before, holding, speedAt(game.run, before.x), dt);
   passPortals(game, before.x, game.wave.x, events);
   trackPlace(game, events);
   trackTrail(game, before.dir);

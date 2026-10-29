@@ -23,17 +23,22 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './config.js';
  * @typedef {{ type: 'spike' | 'halfSpike', x: number, on?: 'floor' | 'ceil', count?: number, y?: number, dir?: 'up' | 'down' }} SpikeData
  * @typedef {{ type: 'block', x: number, y: number, w: number, h: number }} BlockData
  * @typedef {{ type: 'pillar', x: number, on: 'floor' | 'ceil', h: number, w?: number }} PillarData
- * @typedef {{ type: 'saw' | 'orb', x: number, y: number, r: number }} RoundData
+ * @typedef {{ type: 'saw' | 'orb', x: number, y: number, r: number, chain?: boolean }} RoundData
+ *   chain: hangs on a chain from the ceiling (drawn only; the chain never hurts).
  * @typedef {SpikeData | BlockData | PillarData | RoundData} HazardData
  * @typedef {{ type: 'chain', x: number, len: number, ornament?: 'diamond' | 'star' | 'triangle' | 'none' }
  *   | { type: 'star' | 'diamond' | 'gear', x: number, y: number, size: number }
  *   | { type: 'sawtooth', from: number, to: number, on: 'floor' | 'ceil' }} DecoData
- * @typedef {{ id: string, length: number, ceil: string, floor: string, hazards: HazardData[], deco?: DecoData[] }} SectionData
+ * @typedef {{ id: string, length: number, ceil: string, floor: string, hazards: HazardData[], deco?: DecoData[],
+ *   mini?: boolean, tier?: string, mode?: 'wave' | 'ship' }} SectionData
+ *   mini: designed (and proven) for the mini wave, flown between its own mini portals;
+ *   tier: its own speed and limits (the finale); mode: flown as the wave (default) or the ship.
  *
  * @typedef {{ type: 'spike' | 'halfSpike' | 'block' | 'pillar', shape: 'poly', pts: Pt[], vis: Pt[], dir: 'up' | 'down' | 'none', bbox: number[] }} PolyHazard
- * @typedef {{ type: 'saw' | 'orb', shape: 'circle', x: number, y: number, r: number, hit: number, bbox: number[] }} CircleHazard
+ * @typedef {{ type: 'saw' | 'orb', shape: 'circle', x: number, y: number, r: number, hit: number, bbox: number[], chain: boolean }} CircleHazard
  * @typedef {PolyHazard | CircleHazard} Hazard
  * @typedef {{ id: string, length: number, ceil: Pt[], floor: Pt[], ceilSegs: Seg[], floorSegs: Seg[],
+ *   mini: boolean, tier: string | null, mode: 'wave' | 'ship',
  *   hazards: Hazard[], deco: DecoData[], buckets: Map<number, Hazard[]>, segBuckets: Map<number, Seg[]> }} Geometry
  */
 
@@ -73,6 +78,8 @@ export function parseProfile(text) {
     }
     else if (m[1] === '+') y += n;
     else y -= n;
+    x = Math.round(x * 1e6) / 1e6;
+    y = Math.round(y * 1e6) / 1e6;
     points.push([x, y]);
   }
   return points;
@@ -210,7 +217,7 @@ function resolveHazard(data, ceil, floor) {
   }
   if (data.type !== 'saw' && data.type !== 'orb') throw new Error('unknown hazard');
   const hit = data.r * ROUND_HIT[data.type];
-  return [{ type: data.type, shape: 'circle', x: data.x, y: data.y, r: data.r, hit, bbox: [data.x - data.r, data.y - data.r, data.x + data.r, data.y + data.r] }];
+  return [{ type: data.type, shape: 'circle', x: data.x, y: data.y, r: data.r, hit, bbox: [data.x - data.r, data.y - data.r, data.x + data.r, data.y + data.r], chain: data.chain === true }];
 }
 
 /**
@@ -246,6 +253,9 @@ export function buildGeometry(data) {
   return {
     id: data.id,
     length: data.length,
+    mini: data.mini === true,
+    tier: data.tier ?? null,
+    mode: data.mode ?? 'wave',
     ceil,
     floor,
     ceilSegs,

@@ -1,29 +1,34 @@
 // @ts-check
 // A run: every sector in order, each built from its hand-authored sections in the
-// sector's shuffle (docs/v2/PLAN.md 9.1, stage w-1), with its portals placed at
-// section boundaries. Positions are world x in cells; a section's own geometry is local
-// (0..length) and placed at x0.
-import { JOINT, RESPAWN_BACK, SECTORS, START_PAD, sectorSpeed } from './config.js';
+// sector's shuffle (docs/v2/PLAN.md 9.1, stages w-1 and w-2), with its portals placed
+// at section boundaries. The finale is built the same way from one fixed sector.
+// Positions are world x in cells; a section's own geometry is local (0..length) and
+// placed at x0. Every piece knows its tier (speed and human limits) and its look.
+import { FINALE_ID, JOINT, RESPAWN_BACK, SECTORS, START_PAD, sectionStyle, tierSpeed } from './config.js';
 import { buildGeometry, capsuleHits } from './geometry.js';
 import { shuffle } from './rng.js';
-import { SECTION_LIBRARY } from './sections/index.js';
+import { FINALE, SECTION_LIBRARY } from './sections/index.js';
 
 /**
  * @typedef {import('./config.js').SectorDef} SectorDef
  * @typedef {import('./geometry.js').Geometry} Geometry
  * @typedef {import('./geometry.js').SectionData} SectionData
- * @typedef {{ g: Geometry, x0: number, x1: number, sector: number, number: number, place: number, kind: 'section' | 'pad' }} Piece
+ * @typedef {{ g: Geometry, x0: number, x1: number, sector: number, number: number, place: number, kind: 'section' | 'pad',
+ *   tier: string, theme: string, speed: number, band: number, mode: 'wave' | 'ship' }} Piece
  *   sector: index into run.sectors; number: the section's number in its data (1-based);
- *   place: its position in the sector's shuffle (1-based); pads have 0.
- * @typedef {{ boundary: number, kind: 'gravity' | 'mini', on: boolean }} PortalSlot
- * @typedef {{ x: number, kind: 'gravity' | 'mini', on: boolean, sector: number }} Portal
- * @typedef {{ def: SectorDef, x0: number, x1: number, speed: number, order: number[], first: number, count: number }} PlacedSector
+ *   place: its position in the sector's shuffle (1-based); pads have 0; band: index of
+ *   its Demon tier in the sector's bands, or -1.
+ * @typedef {{ kind: 'gravity', boundary: number, on: boolean } | { kind: 'mini', place: number, on: boolean }} PortalSlot
+ *   gravity: at a boundary (b = between places b and b+1); mini: inside its section's own joints.
+ * @typedef {'gravity' | 'mini' | 'ship'} PortalKind
+ * @typedef {{ x: number, kind: PortalKind, on: boolean, sector: number }} Portal
+ * @typedef {{ def: SectorDef, x0: number, x1: number, order: number[], first: number, count: number }} PlacedSector
  *   first: index of its first piece.
- * @typedef {{ sectors: PlacedSector[], pieces: Piece[], portals: Portal[], startX: number, finishX: number, length: number }} Run
+ * @typedef {{ kind: 'run' | 'finale', sectors: PlacedSector[], pieces: Piece[], portals: Portal[], startX: number, finishX: number, length: number }} Run
  */
 
-/** Where a portal stands after the boundary it belongs to: inside the next section's open lead. */
-export const PORTAL_OFFSET = 1;
+/** Where portals stand inside a section's open lead-in (and a mini's way back in its lead-out). */
+export const PORTAL_OFFSET = { gravity: 0.7, mini: 1.3, miniBack: 0.7, ship: 1 };
 /** Open corridor drawn before the start and after the last sector (the camera sees that far). */
 export const END_PAD = 40;
 const BEFORE_PAD = 40;
@@ -47,53 +52,77 @@ export function padGeometry(id, length) {
 }
 
 /**
- * The order a sector's sections are played in this run: each group shuffled, groups in order.
+ * The order a sector's sections are played in this run: each group shuffled, groups in
+ * order (a fixed sector, the finale, is never shuffled).
  * @param {SectorDef} sector @param {() => number} rng
  */
 export function orderSections(sector, rng) {
-  return sector.groups.flatMap((group) => shuffle(group, rng));
+  return sector.groups.flatMap((group) => (sector.fixed ? group.slice() : shuffle(group, rng)));
 }
 
 /**
- * The sector's portals at section boundaries (boundary b = between places b and b+1).
- * Each rule's `count` pairs turn the state on and, `span` sections later, off. Pairs do
- * not overlap or touch, never stand at the sector's very start, and each boundary holds
- * at most one portal. Seeded, so the count is exact every run.
- * @param {SectorDef} sector @param {number} sections @param {() => number} rng
+ * The places (1-based) a rule may use: the whole sector, or its band.
+ * @param {SectorDef} sector @param {number[]} order @param {number | undefined} band
+ */
+function placesOf(sector, order, band) {
+  const b = band === undefined ? null : sector.bands?.[band];
+  const places = [];
+  for (let p = 1; p <= order.length; p++) {
+    const n = /** @type {number} */ (order[p - 1]);
+    if (!b || (n >= b.from && n <= b.to)) places.push(p);
+  }
+  return places;
+}
+
+/**
+ * The sector's portals. Gravity: each flip upside down at a boundary inside the rule's
+ * range (never at the sector's or the band's very start) and the way back `span`
+ * sections later, still inside it; flips never overlap or share a boundary, so the
+ * sector always ends upright. Mini: one pair around every section marked `mini` in the
+ * range, wherever the shuffle put it. Seeded, so every count is exact on every run.
+ * @param {SectorDef} sector @param {number[]} order @param {SectionData[]} data @param {() => number} rng
  * @returns {PortalSlot[]}
  */
-export function placePortals(sector, sections, rng) {
+export function placePortals(sector, order, data, rng) {
   for (let attempt = 0; attempt < 200; attempt++) {
-    const placed = tryPlacePortals(sector, sections, rng);
-    if (placed) return placed.sort((a, b) => a.boundary - b.boundary);
+    const placed = tryPlacePortals(sector, order, data, rng);
+    if (placed) return placed;
   }
   throw new Error(`no room for the portals of sector ${sector.id}`);
 }
 
 /**
- * One random try at placing every portal pair; null when it painted itself into a corner.
- * @param {SectorDef} sector @param {number} sections @param {() => number} rng
+ * One random try at placing every gravity pair; null when it painted itself into a corner.
+ * @param {SectorDef} sector @param {number[]} order @param {SectionData[]} data @param {() => number} rng
  * @returns {PortalSlot[] | null}
  */
-function tryPlacePortals(sector, sections, rng) {
+function tryPlacePortals(sector, order, data, rng) {
   /** @type {PortalSlot[]} */
   const slots = [];
   const used = new Set();
   for (const rule of sector.portals) {
+    const places = placesOf(sector, order, rule.band);
+    if (rule.kind === 'mini') {
+      const minis = places.filter((p) => data[/** @type {number} */ (order[p - 1]) - 1]?.mini);
+      if (minis.length !== rule.count) throw new Error(`sector ${sector.id}: ${minis.length} mini sections for ${rule.count} mini portals`);
+      for (const place of minis) slots.push({ kind: 'mini', place, on: true }, { kind: 'mini', place, on: false });
+      continue;
+    }
+    const span = rule.span ?? 1;
+    const first = /** @type {number} */ (places[0]);
+    const last = /** @type {number} */ (places[places.length - 1]);
     for (let n = 0; n < rule.count; n++) {
       const options = [];
-      for (let b = 1; b + rule.span <= sections - 1; b++) {
+      // Boundary b lies between places b and b+1: the flip starts with place b+1.
+      for (let b = first; b + span <= last - 1; b++) {
         let clash = false;
-        for (let k = b - 1; k <= b + rule.span + 1; k++) if (used.has(`${rule.kind}:${k}`)) clash = true;
-        if (used.has(`any:${b}`) || used.has(`any:${b + rule.span}`)) clash = true;
+        for (let k = b; k <= b + span; k++) if (used.has(k)) clash = true;
         if (!clash) options.push(b);
       }
       if (!options.length) return null;
       const b = /** @type {number} */ (options[Math.floor(rng() * options.length)]);
-      for (let k = b; k <= b + rule.span; k++) used.add(`${rule.kind}:${k}`);
-      used.add(`any:${b}`);
-      used.add(`any:${b + rule.span}`);
-      slots.push({ boundary: b, kind: rule.kind, on: true }, { boundary: b + rule.span, kind: rule.kind, on: false });
+      for (let k = b; k <= b + span; k++) used.add(k);
+      slots.push({ kind: 'gravity', boundary: b, on: true }, { kind: 'gravity', boundary: b + span, on: false });
     }
   }
   return slots;
@@ -110,39 +139,91 @@ function sectionsOf(sector, library) {
 }
 
 /**
- * Builds a whole run. Pads before and after; sectors back to back.
+ * Places one sector's sections and portals after x.
+ * @param {SectorDef} def @param {number} s its index @param {number} x
+ * @param {{ pieces: Piece[], portals: Portal[], library: Record<number, SectionData[]>, rng: () => number }} into
+ */
+function placeSector(def, s, x, into) {
+  const data = sectionsOf(def, into.library);
+  const order = orderSections(def, into.rng);
+  const first = into.pieces.length;
+  const x0 = x;
+  order.forEach((number, i) => {
+    const d = /** @type {SectionData} */ (data[number - 1]);
+    const g = geometryOf(d);
+    const style = sectionStyle(def, number);
+    const tier = d.tier ?? style.tier;
+    const band = def.bands ? def.bands.findIndex((b) => number >= b.from && number <= b.to) : -1;
+    into.pieces.push({ g, x0: x, x1: x + g.length, sector: s, number, place: i + 1, kind: 'section', tier, theme: style.theme, speed: tierSpeed(tier), band, mode: g.mode });
+    x += g.length;
+  });
+  for (const slot of placePortals(def, order, data, into.rng)) {
+    if (slot.kind === 'gravity') {
+      const next = /** @type {Piece} */ (into.pieces[first + slot.boundary]);
+      into.portals.push({ x: next.x0 + PORTAL_OFFSET.gravity, kind: 'gravity', on: slot.on, sector: s });
+    } else {
+      const piece = /** @type {Piece} */ (into.pieces[first + slot.place - 1]);
+      into.portals.push({ x: slot.on ? piece.x0 + PORTAL_OFFSET.mini : piece.x1 - PORTAL_OFFSET.miniBack, kind: 'mini', on: slot.on, sector: s });
+    }
+  }
+  // Ship and wave portals where the vehicle changes (the finale).
+  for (let i = first; i < into.pieces.length; i++) {
+    const piece = /** @type {Piece} */ (into.pieces[i]);
+    const before = i === first ? 'wave' : /** @type {Piece} */ (into.pieces[i - 1]).mode;
+    if (piece.mode !== before) into.portals.push({ x: piece.x0 + PORTAL_OFFSET.ship, kind: 'ship', on: piece.mode === 'ship', sector: s });
+  }
+  into.portals.sort((a, b) => a.x - b.x);
+  return { def, x0, x1: x, order, first, count: order.length };
+}
+
+/**
+ * The pads around a level: they fly like the piece they touch.
+ * @param {string} id @param {number} x0 @param {number} length @param {Piece} like
+ * @returns {Piece}
+ */
+function pad(id, x0, length, like) {
+  return { g: padGeometry(id, length), x0, x1: x0 + length, sector: like.sector, number: 0, place: 0, kind: 'pad', tier: like.tier, theme: like.theme, speed: like.speed, band: like.band, mode: 'wave' };
+}
+
+/**
+ * Builds a level from sectors: pads before and after, sectors back to back.
+ * @param {'run' | 'finale'} kind @param {SectorDef[]} defs @param {Record<number, SectionData[]>} library @param {() => number} rng
+ * @returns {Run}
+ */
+function buildLevel(kind, defs, library, rng) {
+  /** @type {Piece[]} */
+  const pieces = [];
+  /** @type {Portal[]} */
+  const portals = [];
+  /** @type {PlacedSector[]} */
+  const sectors = [];
+  let x = 0;
+  defs.forEach((def, s) => {
+    const placed = placeSector(def, s, x, { pieces, portals, library, rng });
+    sectors.push(placed);
+    x = placed.x1;
+  });
+  const first = /** @type {Piece} */ (pieces[0]);
+  const last = /** @type {Piece} */ (pieces[pieces.length - 1]);
+  pieces.unshift(pad('pad-start', -BEFORE_PAD, BEFORE_PAD, first));
+  pieces.push(pad('pad-end', x, END_PAD, last));
+  for (const s of sectors) s.first += 1;
+  return { kind, sectors, pieces, portals, startX: -START_PAD + 2, finishX: x + 2, length: x };
+}
+
+/**
+ * The run: sectors 1–6 (or the given ones).
  * @param {() => number} rng
  * @param {{ sectors?: SectorDef[], library?: Record<number, SectionData[]> }} [options]
  * @returns {Run}
  */
 export function buildRun(rng, options = {}) {
-  const defs = options.sectors ?? SECTORS;
-  const library = options.library ?? SECTION_LIBRARY;
-  /** @type {Piece[]} */
-  const pieces = [{ g: padGeometry('pad-start', BEFORE_PAD), x0: -BEFORE_PAD, x1: 0, sector: 0, number: 0, place: 0, kind: 'pad' }];
-  /** @type {PlacedSector[]} */
-  const sectors = [];
-  /** @type {Portal[]} */
-  const portals = [];
-  let x = 0;
-  defs.forEach((def, s) => {
-    const data = sectionsOf(def, library);
-    const order = orderSections(def, rng);
-    const first = pieces.length;
-    const x0 = x;
-    order.forEach((number, i) => {
-      const g = geometryOf(/** @type {SectionData} */ (data[number - 1]));
-      pieces.push({ g, x0: x, x1: x + g.length, sector: s, number, place: i + 1, kind: 'section' });
-      x += g.length;
-    });
-    for (const slot of placePortals(def, order.length, rng)) {
-      const next = /** @type {Piece} */ (pieces[first + slot.boundary]);
-      portals.push({ x: next.x0 + PORTAL_OFFSET, kind: slot.kind, on: slot.on, sector: s });
-    }
-    sectors.push({ def, x0, x1: x, speed: sectorSpeed(def), order, first, count: order.length });
-  });
-  pieces.push({ g: padGeometry('pad-end', END_PAD), x0: x, x1: x + END_PAD, sector: sectors.length - 1, number: 0, place: 0, kind: 'pad' });
-  return { sectors, pieces, portals, startX: -START_PAD + 2, finishX: x + 2, length: x };
+  return buildLevel('run', options.sectors ?? SECTORS, options.library ?? SECTION_LIBRARY, rng);
+}
+
+/** The finale: one fixed sequence of ship and wave stretches. @returns {Run} */
+export function buildFinale() {
+  return buildLevel('finale', [FINALE], { [FINALE_ID]: SECTION_LIBRARY[FINALE_ID] ?? [] }, () => 0);
 }
 
 // ── Questions about a place in the run ───────────────────────────────────────
@@ -167,6 +248,9 @@ export function sectorAt(run, x) {
   return /** @type {PlacedSector} */ (run.sectors[pieceAt(run, x).sector]);
 }
 
+/** The flying speed at x (cells per second): the tier of the piece there. @param {Run} run @param {number} x */
+export const speedAt = (run, x) => pieceAt(run, x).speed;
+
 /**
  * Does a wave at (x, ya..yb) touch anything? (The game asks with ya = yb.)
  * @param {Run} run @param {number} x @param {number} ya @param {number} yb @param {number} r @param {number} dir @param {number} slope
@@ -182,21 +266,23 @@ export function runHits(run, x, ya, yb, r, dir, slope) {
 }
 
 /**
- * Gravity and size at x: the portals of x's sector already passed (a sector starts normal).
+ * Gravity, size and vehicle at x: the portals of x's sector already passed (a sector starts normal).
  * @param {Run} run @param {number} x
- * @returns {{ gravity: 1 | -1, mini: boolean }}
+ * @returns {{ gravity: 1 | -1, mini: boolean, ship: boolean }}
  */
 export function stateAt(run, x) {
   const sector = pieceAt(run, x).sector;
   /** @type {1 | -1} */
   let gravity = 1;
   let mini = false;
+  let ship = false;
   for (const p of run.portals) {
     if (p.sector !== sector || p.x > x) continue;
     if (p.kind === 'gravity') gravity = p.on ? -1 : 1;
-    else mini = p.on;
+    else if (p.kind === 'mini') mini = p.on;
+    else ship = p.on;
   }
-  return { gravity, mini };
+  return { gravity, mini, ship };
 }
 
 /** How far x is through the whole run, 0..100. @param {Run} run @param {number} x */
@@ -218,13 +304,28 @@ export function locate(run, x) {
 }
 
 /**
- * Where a practice attempt starts again: the start of x's sector, or of its section.
+ * The start of the checkpoint unit holding a piece: its sector, or its Demon tier.
+ * @param {Run} run @param {Piece} piece
+ */
+function unitStart(run, piece) {
+  const sector = /** @type {PlacedSector} */ (run.sectors[piece.sector]);
+  if (piece.band < 0) return sector.x0;
+  for (let i = sector.first; i < sector.first + sector.count; i++) {
+    const p = /** @type {Piece} */ (run.pieces[i]);
+    if (p.band === piece.band) return p.x0;
+  }
+  return sector.x0;
+}
+
+/**
+ * Where a practice attempt starts again: the start of x's sector (each Demon tier counts
+ * as one), or of its section.
  * @param {Run} run @param {number} x @param {'sector' | 'section'} by
  */
 export function checkpointX(run, x, by) {
   const piece = pieceAt(run, x);
   if (piece.kind === 'pad') return piece.x0 < 0 ? run.startX : /** @type {PlacedSector} */ (run.sectors[piece.sector]).x0;
-  return by === 'section' ? piece.x0 : /** @type {PlacedSector} */ (run.sectors[piece.sector]).x0;
+  return by === 'section' ? piece.x0 : unitStart(run, piece);
 }
 
 /** The x a wave restarts from for a checkpoint (a little before it, in the open joint). @param {Run} run @param {number} cp */

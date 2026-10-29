@@ -74,23 +74,37 @@ export const TIERS = {
   hardDemon: { speed: 1.5, minInterval: 0.14, tolerance: 0.023, clearance: 3.2, maxRate: 6.5 },
   insaneDemon: { speed: 1.7, minInterval: 0.125, tolerance: 0.02, clearance: 3, maxRate: 7 },
   extremeDemon: { speed: 1.9, minInterval: 0.115, tolerance: 0.018, clearance: 3, maxRate: 7.5 },
+  // The finale's ship stretches (its wave stretches use extremeDemon).
+  finale: { speed: 1.5, minInterval: 0.12, tolerance: 0.02, clearance: 3.5, maxRate: 7 },
 };
 
 /**
- * @typedef {{ kind: 'gravity' | 'mini', count: number, span: number }} PortalRule
- *   `count` portal pairs per run of the sector; each turns the state on at a section
- *   boundary and back off `span` sections later.
+ * The ship (finale only): hold to thrust up, let go and gravity pulls it down; the
+ * vertical speed changes smoothly and is capped. Cells and seconds.
+ */
+export const SHIP = { up: 34, down: 30, maxV: 8.5, radius: 0.3, size: 1.15 };
+
+/**
+ * @typedef {{ kind: 'gravity' | 'mini', count: number, span?: number, band?: number }} PortalRule
+ *   gravity: `count` flips upside down, each with its own portal back `span` sections
+ *   later, at section boundaries (within `band` when given), so a sector always ends
+ *   upright. mini: one pair around each of the band's sections marked `mini` (in its own
+ *   open lead-in and lead-out), so mini is only ever flown where it was designed and
+ *   proven; `count` must equal the number of those sections.
+ * @typedef {{ from: number, to: number, tier: string, theme: string, key: string }} Band
+ *   Demon: the sections from..to (numbers) fly at their own tier, look and checkpoint.
  * @typedef {{
  *   id: number, key: string, tier: string, theme: string,
- *   groups: number[][], portals: PortalRule[],
+ *   groups: number[][], portals: PortalRule[], bands?: Band[], fixed?: boolean,
  * }} SectorDef
- *   `groups`: section numbers (1-based) shuffled among themselves and played in this order.
+ *   `groups`: section numbers (1-based) shuffled among themselves and played in this
+ *   order (`fixed`: not shuffled at all, the finale).
  */
 
 /** @param {number} from @param {number} to */
 const range = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
-/** The sectors built so far (w-1: 1–3). Finishing the last shows "coming soon". @type {SectorDef[]} */
+/** The run: sectors 1–6. Finishing it (the whole Demon) unlocks the finale. @type {SectorDef[]} */
 export const SECTORS = [
   { id: 1, key: 'easy', tier: 'easy', theme: 'lagoon', groups: [range(1, 10)], portals: [] },
   { id: 2, key: 'normal', tier: 'normal', theme: 'mesa', groups: [range(1, 5), range(6, 15)], portals: [] },
@@ -102,30 +116,64 @@ export const SECTORS = [
     groups: [range(1, 5), range(6, 15)],
     portals: [{ kind: 'gravity', count: 1, span: 2 }],
   },
+  {
+    id: 4,
+    key: 'harder',
+    tier: 'harder',
+    theme: 'forge',
+    groups: [range(1, 10)],
+    portals: [{ kind: 'gravity', count: 3, span: 1 }, { kind: 'mini', count: 1 }],
+  },
+  {
+    id: 5,
+    key: 'insane',
+    tier: 'insane',
+    theme: 'aurora',
+    groups: [range(1, 5), range(6, 10)],
+    portals: [{ kind: 'gravity', count: 2, span: 1 }, { kind: 'mini', count: 1 }],
+  },
 ];
 
+/** The finale's number among the sector-like levels (its sections live under this id). */
+export const FINALE_ID = 7;
+
+/** @param {string} key @returns {Tier} */
+export function tierOf(key) {
+  const tier = TIERS[key];
+  if (!tier) throw new Error(`unknown tier ${key}`);
+  return tier;
+}
+
+/** Cells per second of a tier. @param {string} key */
+export function tierSpeed(key) {
+  return tierOf(key).speed * BASE_SPEED;
+}
+
 /**
- * Stage w-2 hooks: the sectors still to come and the finale. The run ends after the
- * last of SECTORS; `complete` in the progress record (records.js) is what the finale
- * and the last skin will read.
+ * The band a section number belongs to, or null.
+ * @param {SectorDef} sector @param {number} number
  */
-export const PLANNED = {
-  sectors: ['harder', 'insane', 'demon'],
-  finale: null,
-};
+export function bandOf(sector, number) {
+  return sector.bands?.find((b) => number >= b.from && number <= b.to) ?? null;
+}
+
+/**
+ * The tier and look of a section of a sector (its band's, or the sector's).
+ * @param {SectorDef} sector @param {number} number
+ */
+export function sectionStyle(sector, number) {
+  const band = bandOf(sector, number);
+  return { tier: band ? band.tier : sector.tier, theme: band ? band.theme : sector.theme };
+}
 
 /** @param {SectorDef} sector */
 export function sectorSpeed(sector) {
-  const tier = TIERS[sector.tier];
-  if (!tier) throw new Error(`unknown tier ${sector.tier}`);
-  return tier.speed * BASE_SPEED;
+  return tierSpeed(sector.tier);
 }
 
 /** @param {SectorDef} sector @returns {Tier} */
 export function sectorTier(sector) {
-  const tier = TIERS[sector.tier];
-  if (!tier) throw new Error(`unknown tier ${sector.tier}`);
-  return tier;
+  return tierOf(sector.tier);
 }
 
 /**
