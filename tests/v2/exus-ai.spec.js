@@ -291,13 +291,21 @@ test('edit-pending changes the waiting card in place', async ({ page }) => {
   await openSignedIn(page, account, '#/exus');
   await send(page, 'dodaj zadanie mleko');
   const card = proposal(page, 'Nowe zadanie');
+  await expect(card.getByLabel('termin', { exact: true })).toHaveValue(localDay(1));
   await card.getByLabel('treść', { exact: true }).fill('mleko 2%');
+  // "piątek" is the nearest Friday, today included (dateFrom in domain/exus/recognizers.ts).
+  // From Thursday on, "jutro" can already be that Friday, so the person first moves the due
+  // to the Saturday after it: the edit then visibly changes the field on every weekday.
+  const friday = localDay((5 - new Date().getDay() + 7) % 7);
+  const saturday = localDay((5 - new Date().getDay() + 7) % 7 + 1);
+  await card.getByLabel('termin', { exact: true }).fill(saturday);
   await send(page, 'zmień termin na piątek');
   await expect(log(page)).toContainText('Zaktualizowano propozycję.');
+  // The same card changed in place; no second card was added.
   await expect(card).toHaveCount(1);
-  await expect(card.getByLabel('termin', { exact: true })).not.toHaveValue(localDay(1));
-  const due = await card.getByLabel('termin', { exact: true }).inputValue();
-  expect(new Date(`${due}T12:00:00Z`).getUTCDay()).toBe(5);
+  await expect(page.locator('form.exus-card')).toHaveCount(1);
+  await expect(card.getByLabel('termin', { exact: true })).toHaveValue(friday);
+  expect(new Date(`${friday}T12:00:00Z`).getUTCDay()).toBe(5);
   // What the person typed into the card stays.
   await expect(card.getByLabel('treść', { exact: true })).toHaveValue('mleko 2%');
 });

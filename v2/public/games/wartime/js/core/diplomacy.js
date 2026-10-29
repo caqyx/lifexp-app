@@ -319,6 +319,7 @@ WT.diplomacy = (function () {
       if (winners.indexOf(ctrl) >= 0) { S.setOwner(id, ctrl); taken.push(id); }
     });
     if (taken.length) WT.events.emit('annex', { loser: loser, provinces: taken });
+    if (taken.length && WT.world) winners.forEach(function (w) { WT.world.onConquest(w, taken.filter(function (id) { return G().provinces[id].owner === w; })); });
   }
 
   function payReparations(loser, winner) {
@@ -536,7 +537,10 @@ WT.diplomacy = (function () {
   }
 
   /** Agresywność AI z ustawień jako mnożnik: 0 (pokojowe) … 1 (standard) … 2 (bardzo agresywne). */
-  function aggression() { return S.settings().aiAggression / 50; }
+  function aggression() {
+    var d = WT.goals ? WT.goals.difficulty().aggr : 0;
+    return U.clamp(S.settings().aiAggression + (S.settings().aiAggression > 0 ? d : 0), 0, 100) / 50;
+  }
 
   function improveRelationsCost(a) { return U.round(1 + WT.economy.countryGdp(a) * 0.001, 2); }
 
@@ -684,6 +688,8 @@ WT.diplomacy = (function () {
     pact: function (p) { return name(p.from) + ' proponuje pakt o nieagresji.'; },
     callToArms: function (p) { return name(p.from) + ' wzywa do wojny przeciw ' + name(p.terms.enemy) + ' (sojusz obronny).'; },
     trade: function (p) { return name(p.from) + ' proponuje umowę handlową (+3% dochodu dla obu stron).'; },
+    land: function (p) { return name(p.from) + ' proponuje umowę terytorialną: ' + (WT.land ? WT.land.describe(p.terms) : '') + '.'; },
+    access: function (p) { return name(p.from) + ' proponuje pakt o przejściu wojsk (obie strony mogą wprowadzać armie na tereny drugiej przez ' + (WT.land ? WT.land.ACCESS_TURNS : 40) + ' tur).'; },
     treaty: function (p) { return name(p.from) + ' żąda traktatu pokojowego: ' + (WT.vassal ? WT.vassal.describeTerms(p.terms) : '') + '.'; },
     aidRequest: function (p) { return name(p.from) + ' przegrywa wojnę z: ' + name(p.terms.enemy) + ' i prosi o ' + U.fmtMoney(p.terms.amount) + ' wsparcia (lepsze relacje).'; }
   };
@@ -716,6 +722,18 @@ WT.diplomacy = (function () {
       if (!atWar(p.from, p.to)) return { ok: false, reason: 'Wojna już się zakończyła.' };
       concludePeace(p.from, p.to, p.terms.kind, p.terms.winner);
       return { ok: true, reason: 'Pokój zawarty.' };
+    }
+    if (p.type === 'land' && WT.land) {
+      var lerr = WT.land.checkDeal(p.terms);
+      if (lerr) return { ok: false, reason: 'Umowa nieaktualna: ' + lerr };
+      WT.land.executeDeal(p.terms);
+      return { ok: true, reason: 'Umowa terytorialna zawarta: ' + WT.land.describe(p.terms) + '.' };
+    }
+    if (p.type === 'access' && WT.land) {
+      var aerr = WT.land.checkAccess(p.from, p.to);
+      if (aerr) return { ok: false, reason: aerr };
+      WT.land.makeAccess(p.from, p.to);
+      return { ok: true, reason: 'Pakt o przejściu wojsk zawarty (' + WT.land.ACCESS_TURNS + ' tur).' };
     }
     if (p.type === 'treaty') {
       if (!atWar(p.from, p.to) || !V()) return { ok: false, reason: 'Wojna już się zakończyła.' };
@@ -762,6 +780,7 @@ WT.diplomacy = (function () {
     G().proposals = G().proposals.filter(function (p) { return t - p.turn < PROPOSAL_TTL; });
     G().wars.forEach(warScore);
     if (V()) V().processTurn();
+    if (WT.land) WT.land.processTurn();
     S.checkGoal();
     pruneTrades();
     refreshCountries();

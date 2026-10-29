@@ -43,7 +43,12 @@
       <button class="menu-item" data-act="science">Nauka i technologie</button>
       <button class="menu-item" data-act="ranking">Ranking państw</button>
       <button class="menu-item" data-act="god-toggle" id="menu-god-toggle">Włącz God Mode</button>
+      <button class="menu-item" data-act="goals">Cele, misje i osiągnięcia</button>
+      <button class="menu-item" data-act="stats">Statystyki i wykresy</button>
+      <button class="menu-item" data-act="tutorial">Samouczek</button>
+      <button class="menu-item" data-act="sound" id="menu-sound">Dźwięk: włączony</button>
       <button class="menu-item" data-act="help">Skróty klawiszowe</button>
+      <button class="menu-item" data-act="finish">Zakończ partię (wynik)</button>
       <button class="menu-item danger" data-act="exit">Wyjście do menu głównego</button>
     </div>
 
@@ -58,6 +63,7 @@
       <button class="mm-btn" data-mode="diplomatic" title="Dyplomatyczny (2)"><span class="mm-ico ico-dip"></span>Dyplomacja<kbd>2</kbd></button>
       <button class="mm-btn" data-mode="economic" title="Ekonomiczny (3)"><span class="mm-ico ico-eco"></span>Ekonomia<kbd>3</kbd></button>
       <button class="mm-btn" data-mode="terrain" title="Teren (4)"><span class="mm-ico ico-ter"></span>Teren<kbd>4</kbd></button>
+      <button class="mm-btn" data-mode="unrest" title="Niepokoje (5)"><span class="mm-ico ico-unr"></span>Niepokoje<kbd>5</kbd></button>
     </div>
     <div id="legend" class="legend hidden"></div>
 
@@ -68,6 +74,10 @@
       <button class="zc-btn zoom-btn" id="zc-multi" title="Zaznacz wiele prowincji (B) — budowa na wszystkich naraz" aria-label="Zaznacz wiele prowincji" aria-pressed="false"></button>
       <button class="zc-btn zoom-btn" id="zc-home" title="Wyśrodkuj na moim państwie" aria-label="Wyśrodkuj na moim państwie"><span class="zc-home-ico" aria-hidden="true"></span></button>
     </div>
+
+    <!-- Minimapa i podsumowanie tury -->
+    <canvas id="minimap" class="minimap hidden" width="200" height="120" aria-label="Minimapa — kliknij, aby przenieść widok"></canvas>
+    <aside id="turn-summary" class="turn-summary hidden" aria-live="polite"></aside>
 
     <!-- Pasek rozkazu -->
     <div id="order-bar" class="order-bar hidden"></div>
@@ -96,11 +106,18 @@
             <button type="button" class="seg-btn on" data-ct="AS" aria-pressed="true">Azja</button>
             <button type="button" class="seg-btn on" data-ct="AF" aria-pressed="true">Afryka</button>
           </div></div>
+          <div class="setup-row"><span class="setup-lbl">Trudność</span><div id="opt-diff" class="seg" role="radiogroup" aria-label="Poziom trudności">
+            <button type="button" class="seg-btn" data-diff="easy">Łatwy</button>
+            <button type="button" class="seg-btn on" data-diff="normal">Normalny</button>
+            <button type="button" class="seg-btn" data-diff="hard">Trudny</button>
+            <button type="button" class="seg-btn" data-diff="brutal">B. trudny</button>
+          </div></div>
         </div>
         <label class="search"><input id="start-search" type="search" placeholder="Szukaj państwa…" autocomplete="off"></label>
         <div id="start-results" class="country-list"></div>
         <div id="start-card" class="country-card empty">Kliknij państwo na mapie lub wybierz z listy.</div>
         <label class="check"><input type="checkbox" id="opt-god"> <span>God Mode (nielimitowana kasa)</span></label>
+        <label class="check"><input type="checkbox" id="opt-sandbox"> <span>Piaskownica<small>God Mode, pokojowe AI, bez losowych wydarzeń — swobodne eksperymenty</small></span></label>
         <label class="check"><input type="checkbox" id="opt-wars" checked> <span>Trwające konflikty 2026 (Rosja–Ukraina)</span></label>
         <label class="check"><input type="checkbox" id="opt-nopacts"> <span>Automatycznie odrzucaj pakty o nieagresji</span></label>
         <div class="aggr-row" id="opt-aggr-row"><span class="aggr-lbl">Agresywność AI</span><input type="range" id="opt-aggr" min="0" max="100" step="5" value="50"><span class="aggr-val" id="opt-aggr-val">Standardowa</span></div>
@@ -124,7 +141,11 @@
   <script src="js/core/economy.js"></script>
   <script src="js/core/diplomacy.js"></script>
   <script src="js/core/vassal.js"></script>
+  <script src="js/core/land.js"></script>
+  <script src="js/core/world.js"></script>
+  <script src="js/core/goals.js"></script>
   <script src="js/core/military.js"></script>
+  <script src="js/core/warfare.js"></script>
   <script src="js/core/naval.js"></script>
   <script src="js/core/air.js"></script>
   <script src="js/core/tech.js"></script>
@@ -132,6 +153,7 @@
   <script src="js/core/god.js"></script>
   <script src="js/core/turn.js"></script>
   <script src="js/core/save.js"></script>
+  <script src="js/ui/sound.js"></script>
   <script src="js/ui/render.js"></script>
   <script src="js/ui/ui.js"></script>
   <script src="js/main.js"></script>

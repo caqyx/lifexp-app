@@ -150,11 +150,14 @@
     else if (overlordOf(p) === cc) t += '<span class="tag vassal">Suzeren</span>';
     if (atWar(p, cc)) t += '<span class="tag war">Wojna</span>';
     if (allied(p, cc) && !vassalLink) t += '<span class="tag ally">Sojusz</span>';
-    if (hasPact(p, cc)) t += '<span class="tag pact">Pakt</span>';
-    if (hasTruce(p, cc)) t += '<span class="tag truce">Rozejm</span>';
+    const left = (list) => { const x = treatyWith(list, p, cc); return x ? ' · ' + Math.max(0, x.until - G().turn) + 't' : ''; };
+    if (hasPact(p, cc)) t += '<span class="tag pact" title="Pakt o nieagresji — pozostałe tury">Pakt' + left(G().pacts) + '</span>';
+    if (hasTruce(p, cc)) t += '<span class="tag truce" title="Rozejm — pozostałe tury">Rozejm' + left(G().truces) + '</span>';
+    if (WT.land && WT.land.hasAccess(p, cc)) t += '<span class="tag access" title="Pakt o przejściu wojsk — pozostałe tury">Przejście' + left(G().access) + '</span>';
     if (call('diplomacy.hasTrade', [p, cc], false)) t += '<span class="tag trade">Handel</span>';
     return t;
   }
+  function treatyWith(list, a, b) { return (list || []).find((t) => (t.a === a && t.b === b) || (t.a === b && t.b === a)) || null; }
   // Wasale (WT.vassal)
   function overlordOf(cc) { return WT.vassal && cc ? WT.vassal.overlordOf(cc) : null; }
   function relClass(v) { return v > 15 ? 'pos' : v < -15 ? 'neg' : 'dim'; }
@@ -204,6 +207,8 @@
     trade: '<path d="M4 8h13l-3.5-3.5M20 16H7l3.5 3.5"/>',
     crown: '<path d="M3.5 8.5l4.5 4L12 5.5l4 7 4.5-4-2 10.5h-13z"/><path d="M6 21h12"/>',
     scroll: '<path d="M8 4h10a2 2 0 0 1 2 2v1.5h-4"/><path d="M16 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-1.5h10"/><path d="M8 4a2 2 0 0 0-2 2v11"/><path d="M9.5 9h3.5M9.5 12.5h3.5"/>',
+    flame: '<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-4 2.5-5.5.3 1.6 1 2.5 2 3C11.5 8 11.5 5.5 12 3z"/>',
+    bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
     trophy: '<path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H4.5a3 3 0 0 0 3.5 4M16 6h3.5a3 3 0 0 1-3.5 4"/><path d="M12 13v4M8.5 20.5h7M9.5 17h5"/>',
     select: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><path d="M14 17.5l2 2 4.5-4.5"/>',
     mouse: '<rect x="6" y="3" width="12" height="18" rx="6"/><path d="M12 7v3"/>'
@@ -259,7 +264,7 @@
     if (menuBtn && !menuBtn.querySelector('.ico')) { menuBtn.innerHTML = icon('menu'); menuBtn.classList.add('btn-icon'); menuBtn.setAttribute('aria-label', 'Menu'); }
     const endLabel = document.querySelector('#btn-endturn .btn-label'); if (endLabel) endLabel.classList.remove('btn-label');
     const god = $('tb-god'); if (god && !god.querySelector('.ico')) god.innerHTML = icon('sparkles') + 'GOD';
-    const menuIcons = { settings: 'sliders', science: 'flask', ranking: 'trophy', save: 'save', 'god-toggle': 'sparkles', help: 'keyboard', exit: 'logout' };
+    const menuIcons = { goals: 'flag', finish: 'trophy', settings: 'sliders', science: 'flask', ranking: 'trophy', save: 'save', 'god-toggle': 'sparkles', help: 'keyboard', exit: 'logout', stats: 'chart', tutorial: 'info', sound: 'bell' };
     document.querySelectorAll('#menu .menu-item').forEach((b) => {
       if (b.querySelector('.ico')) return;
       const txt = document.createElement('span'); txt.textContent = b.textContent; b.textContent = '';
@@ -267,7 +272,7 @@
       b.insertAdjacentHTML('afterbegin', icon(menuIcons[b.dataset.act] || 'info'));
       b.appendChild(txt);
     });
-    const modeIcons = { political: 'flag', diplomatic: 'handshake', economic: 'chart', terrain: 'mountain' };
+    const modeIcons = { political: 'flag', diplomatic: 'handshake', economic: 'chart', terrain: 'mountain', unrest: 'flame' };
     document.querySelectorAll('#mapmodes .mm-btn').forEach((b) => { const s = b.querySelector('.mm-ico'); if (s && !s.firstChild) s.innerHTML = icon(modeIcons[b.dataset.mode]); });
     const lh = $('log-head');
     if (lh && !lh.querySelector('.ico')) { lh.firstElementChild.insertAdjacentHTML('afterbegin', icon('clock', 'ico-sm')); $('log-toggle').innerHTML = icon('chevron', 'ico-sm'); }
@@ -282,6 +287,7 @@
       const l3 = $('opt-nopacts') && $('opt-nopacts').closest('label'), ag = $('opt-aggr-row');
       if (l3) { box.appendChild(l3); l3.querySelector('span').innerHTML = 'Odrzucaj pakty automatycznie<small>Propozycje paktów o nieagresji nie będą się pojawiać</small>'; }
       if (ag) box.appendChild(ag);
+      const sb = $('opt-sandbox') && $('opt-sandbox').closest('label'); if (sb) box.appendChild(sb);
       l1.querySelector('span').innerHTML = 'God Mode<small>Nielimitowana kasa i rezerwy, narzędzia edycji</small>';
     }
     const btnStart = $('btn-start'); if (btnStart && !btnStart.querySelector('.ico')) btnStart.insertAdjacentHTML('beforeend', icon('next'));
@@ -457,8 +463,10 @@
   }
   function scenarioInfo(id) { return scenarioList().find((x) => x.id === id) || SCEN_2026; }
   function startOpts() {
+    const sandbox = $('opt-sandbox') && $('opt-sandbox').checked;
     return { scenario: S.scen, continents: S.conts.slice(), startWars: $('opt-wars').checked, seed: S.previewSeed,
-      god: $('opt-god').checked, autoRejectPacts: $('opt-nopacts').checked, aiAggression: +$('opt-aggr').value };
+      god: $('opt-god').checked || sandbox, autoRejectPacts: $('opt-nopacts').checked, aiAggression: sandbox ? 0 : +$('opt-aggr').value,
+      difficulty: S.difficulty || 'normal', events: !sandbox };
   }
   function buildPreview() {
     if (!has('state.newGame')) return;
@@ -505,6 +513,11 @@
     applySetup();
   }
   function showStart() {
+    while (S.modals.length) closeModal(S.modals[S.modals.length - 1]);   // powrót do menu zamyka otwarte okna
+    S.proposalOpen = false;
+    if ($('minimap')) $('minimap').classList.add('hidden');
+    if ($('turn-summary')) $('turn-summary').classList.add('hidden');
+    if ($('tutorial')) $('tutorial').remove();
     S.inGame = false; S.goalShow = false; if ($('goal-chip')) $('goal-chip').classList.add('hidden'); S.airSel = null; S.shellSel = null; S.selSea = -1; R().view.shellRange = null; R().view.selSea = -1; R().view.airRange = null; R().view.radarRing = null; S.multi = null; R().view.multi = null; S.sel = null; S.selProv = -1; S.godTool = null;
     document.body.classList.remove('in-game', 'ob-open');
     ['topbar', 'mapmodes', 'log', 'province-panel', 'diplo-panel', 'god-panel', 'order-bar', 'menu', 'legend'].forEach((id) => $(id).classList.add('hidden'));
@@ -536,6 +549,167 @@
     if (g && !WT.G) WT.G = g;
     enterGame(true);
   }
+  // ===========================================================================
+  // Podsumowanie tury i podpowiedzi
+  // ===========================================================================
+  function turnSnapshot() {
+    const g = G(), cc = me(), c = liveCountry(cc) || {}, armies = {}, fleets = {};
+    Object.keys(g.armies).forEach((id) => { armies[id] = g.armies[id].prov; });
+    Object.keys(g.fleets || {}).forEach((id) => { fleets[id] = g.fleets[id].prov; });
+    return { armies, fleets, treasury: c.treasury || 0, provs: provincesOf(cc).length, ctrl: (call('state.controlledBy', [cc], []) || []).length,
+      soldiers: armiesOf(cc).reduce((s, a) => s + a.size, 0), wars: (g.wars || []).filter((w) => w.attackers.concat(w.defenders).indexOf(cc) >= 0).length };
+  }
+  function showTurnSummary(snap, fx) {
+    const el = $('turn-summary'); if (!el || !G() || !S.inGame || S.summaryOff) return;
+    const now = turnSnapshot(), p = me();
+    const battles = fx.filter((f) => f[0] === 'battle' && (f[2].attacker === p || f[2].defender === p));
+    const won = battles.filter((f) => f[2].winnerCc === p).length;
+    const occ = fx.filter((f) => f[0] === 'occupy');
+    const gained = occ.filter((f) => f[2].by === p).length, lost = occ.filter((f) => f[2].from === p && f[2].by !== p).length;
+    const dCash = now.treasury - snap.treasury, dSold = now.soldiers - snap.soldiers;
+    const line = (ic, txt, cls) => '<li class="' + (cls || '') + '">' + icon(ic, 'ico-sm') + '<span>' + txt + '</span></li>';
+    let h = '<div class="ts-head"><b>Tura ' + G().turn + '</b><span class="dim">' + esc(dateStr()) + '</span><button class="close" id="ts-close" aria-label="Zamknij">' + icon('x') + '</button></div><ul class="ts-list">';
+    h += line('coins', 'Skarbiec ' + (dCash >= 0 ? '+' : '') + fmtNum(dCash, 2) + ' mld $', dCash < 0 ? 'neg' : '');
+    if (dSold) h += line('users', 'Armia ' + (dSold > 0 ? '+' : '') + fmtK(dSold), dSold < 0 ? 'neg' : '');
+    if (battles.length) h += line('swords', 'Bitwy: ' + battles.length + ' (wygrane ' + won + ', przegrane ' + (battles.length - won) + ')', won < battles.length - won ? 'neg' : 'pos');
+    if (gained || lost) h += line('pin', 'Prowincje: zajęte ' + gained + ', utracone ' + lost, lost > gained ? 'neg' : 'pos');
+    if (now.provs !== snap.provs) h += line('flag', 'Twoje prowincje: ' + snap.provs + ' → ' + now.provs, now.provs < snap.provs ? 'neg' : 'pos');
+    h += '</ul>';
+    const tips = adviceList();
+    if (tips.length) h += '<div class="ts-tips-title">Co warto zrobić</div><ul class="ts-list ts-tips">' + tips.slice(0, 4).map((t) => '<li' + (t.prov != null ? ' data-prov="' + t.prov + '"' : '') + (t.act ? ' data-tact="' + t.act + '"' : '') + ' class="' + (t.cls || '') + '">' + icon(t.icon || 'info', 'ico-sm') + '<span>' + t.text + '</span></li>').join('') + '</ul>';
+    h += '<label class="ts-off"><input type="checkbox" id="ts-off"> nie pokazuj podsumowań</label>';
+    el.innerHTML = h;
+    el.classList.remove('hidden');
+    clearTimeout(S.tsTimer);
+    if (isMobile()) S.tsTimer = setTimeout(() => el.classList.add('hidden'), 7000);   // na telefonie znika sam
+    $('ts-close').addEventListener('click', () => el.classList.add('hidden'));
+    $('ts-off').addEventListener('change', (e) => { S.summaryOff = e.target.checked; if (S.summaryOff) el.classList.add('hidden'); });
+    el.querySelectorAll('[data-prov]').forEach((li) => li.addEventListener('click', () => { R().centerOnProvince(+li.dataset.prov, 1.4); openProvince(+li.dataset.prov); }));
+    el.querySelectorAll('[data-tact]').forEach((li) => li.addEventListener('click', () => {
+      const a = li.dataset.tact;
+      if (a === 'science') openScience(); else if (a.indexOf('conf:') === 0) openConference(a.slice(5)); else if (a === 'diplo') openDiplomacy(null);
+    }));
+  }
+  /** Podpowiedzi: najważniejsze problemy i okazje gracza. */
+  function adviceList() {
+    const p = me(), c = liveCountry(p) || {}, out = [], g = G();
+    if (!isGod() && c.lastIncome - c.lastExpense < 0) out.push({ icon: 'chart', cls: 'neg', text: 'Bilans ujemny (' + fmtNum(c.lastIncome - c.lastExpense, 2) + ' mld/tura) — podnieś podatek, zmniejsz armię lub buduj fabryki.' });
+    if (WT.warfare) {
+      const cut = armiesOf(p).filter((a) => !a.embarked && !WT.warfare.isSupplied(a))[0];
+      if (cut) out.push({ icon: 'swords', cls: 'neg', prov: cut.prov, text: 'Okrążona armia w: ' + esc(provStatic(cut.prov).name) + ' — przebij się do swoich.' });
+      const tired = armiesOf(p).filter((a) => WT.warfare.orgOf(a) < 0.35)[0];
+      if (tired) out.push({ icon: 'users', prov: tired.prov, text: 'Armia w ' + esc(provStatic(tired.prov).name) + ' ma niską organizację — daj jej odpocząć na swojej ziemi.' });
+    }
+    const riot = provincesOf(p).filter((id) => (provDyn(id).unrest || 0) >= 60).sort((a, b) => provDyn(b).unrest - provDyn(a).unrest)[0];
+    if (riot != null) out.push({ icon: 'flame', cls: 'neg', prov: riot, text: 'Grozi bunt w: ' + esc(provStatic(riot).name) + ' (niepokoje ' + provDyn(riot).unrest + ') — postaw garnizon lub fort.' });
+    if (WT.vassal) {
+      const enemies = call('diplomacy.enemiesOf', [p], []) || [];
+      const best = enemies.map((e) => ({ e, pts: WT.vassal.warPoints(p, e).total })).filter((x) => x.pts >= 20).sort((a, b) => b.pts - a.pts)[0];
+      if (best) out.push({ icon: 'trophy', cls: 'pos', act: 'conf:' + best.e, text: 'Masz ' + best.pts + ' pkt wojennych wobec: ' + esc(countryName(best.e)) + ' — otwórz konferencję pokojową.' });
+    }
+    if (WT.tech && WT.tech.TREE) {
+      const cheap = WT.tech.TREE.filter((t) => call('tech.canResearch', [p, t.id], { ok: false }).ok)[0];
+      if (cheap) out.push({ icon: 'flask', cls: 'pos', act: 'science', text: 'Stać cię na technologię: ' + esc(cheap.name) + '.' });
+    }
+    if (WT.world && WT.world.aeOf(p) >= WT.world.AE_COALITION) out.push({ icon: 'handshake', cls: 'neg', act: 'diplo', text: 'Agresywna ekspansja ' + Math.round(WT.world.aeOf(p)) + ' — sąsiedzi tworzą koalicję. Zrób przerwę od podbojów.' });
+    const atWar = (call('diplomacy.enemiesOf', [p], []) || []).length > 0;
+    if (atWar && (c.manpower || 0) > 50 && !isGod() && c.treasury > 5) out.push({ icon: 'users', text: 'Masz ' + fmtInt(c.manpower) + ' tys. rezerw — rekrutuj w prowincjach z koszarami.' });
+    return out;
+  }
+
+  // ===========================================================================
+  // Statystyki: małe wykresy liniowe (jedna seria na wykres, wspólna oś czasu)
+  // ===========================================================================
+  const STAT_SERIES = [
+    { k: 'gdp', label: 'PKB', unit: ' mld $', fmt: (v) => fmtInt(v) },
+    { k: 'cash', label: 'Skarbiec', unit: ' mld $', fmt: (v) => fmtNum(v, 1) },
+    { k: 'army', label: 'Armia', unit: '', fmt: (v) => fmtK(v) },
+    { k: 'provs', label: 'Prowincje', unit: '', fmt: (v) => fmtInt(v) },
+    { k: 'tech', label: 'Technologia', unit: '', fmt: (v) => fmtNum(v, 2) },
+    { k: 'stab', label: 'Stabilność', unit: '%', fmt: (v) => fmtInt(v) }
+  ];
+  function openStats() {
+    const h = (G().history || []).slice();
+    if (h.length < 2) { toast('Wykresy pojawią się po kilku turach', '', 2500); return; }
+    const body = '<div class="stats-grid">' + STAT_SERIES.map((s) => statChart(h, s)).join('') + '</div><div class="hint">Najedź na wykres, aby zobaczyć wartość w danej turze.</div>';
+    openModal({ title: icon('chart') + ' Statystyki: ' + esc(countryName(me())), wide: true, body, onOpen: (el) => bindStatCharts(el, h) });
+  }
+  function statChart(h, s) {
+    const W = 300, H = 110, P = { l: 6, r: 6, t: 8, b: 18 };
+    const vals = h.map((x) => +x[s.k] || 0), min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+    const lo = min >= 0 && min < (max - min) * 0.5 ? 0 : min, hi = max === lo ? lo + 1 : max;
+    const X = (i) => P.l + (W - P.l - P.r) * (h.length === 1 ? 0 : i / (h.length - 1)), Y = (v) => P.t + (H - P.t - P.b) * (1 - (v - lo) / (hi - lo));
+    const pts = vals.map((v, i) => X(i).toFixed(1) + ',' + Y(v).toFixed(1)).join(' ');
+    const last = vals[vals.length - 1], first = vals[0], d = last - first;
+    return '<figure class="stat-chart" data-k="' + s.k + '"><figcaption><span>' + esc(s.label) + '</span><b>' + s.fmt(last) + s.unit + '</b><span class="' + (d >= 0 ? 'pos' : 'neg') + '">' + (d >= 0 ? '+' : '−') + s.fmt(Math.abs(d)) + '</span></figcaption>' +
+      '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="' + esc(s.label) + ' w czasie">' +
+      '<line class="base" x1="' + P.l + '" x2="' + (W - P.r) + '" y1="' + Y(lo) + '" y2="' + Y(lo) + '"/>' +
+      '<polyline class="line" points="' + pts + '"/><line class="cross hidden" y1="' + P.t + '" y2="' + (H - P.b) + '"/><circle class="dot hidden" r="4"/>' +
+      '</svg><div class="stat-axis"><span>tura ' + h[0].t + '</span><span>tura ' + h[h.length - 1].t + '</span></div>' +
+      '<div class="stat-tip hidden"></div></figure>';
+  }
+  function bindStatCharts(el, h) {
+    el.querySelectorAll('.stat-chart').forEach((fig) => {
+      const s = STAT_SERIES.find((x) => x.k === fig.dataset.k), svg = fig.querySelector('svg'), tip = fig.querySelector('.stat-tip');
+      const vals = h.map((x) => +x[s.k] || 0), min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+      const lo = min >= 0 && min < (max - min) * 0.5 ? 0 : min, hi = max === lo ? lo + 1 : max;
+      const move = (e) => {
+        const r = svg.getBoundingClientRect(), fx = (e.clientX - r.left) / r.width;
+        const i = Math.max(0, Math.min(h.length - 1, Math.round((fx * 300 - 6) / 288 * (h.length - 1))));
+        const x = 6 + 288 * (h.length === 1 ? 0 : i / (h.length - 1)), y = 8 + 84 * (1 - (vals[i] - lo) / (hi - lo));
+        const cr = svg.querySelector('.cross'), dot = svg.querySelector('.dot');
+        cr.setAttribute('x1', x); cr.setAttribute('x2', x); cr.classList.remove('hidden');
+        dot.setAttribute('cx', x); dot.setAttribute('cy', y); dot.classList.remove('hidden');
+        tip.innerHTML = '<b>' + s.fmt(vals[i]) + s.unit + '</b> · tura ' + h[i].t + (h[i].d ? ' · ' + esc(h[i].d) : '');
+        tip.style.left = Math.min(r.width - 150, Math.max(0, x / 300 * r.width - 60)) + 'px';
+        tip.classList.remove('hidden');
+      };
+      svg.addEventListener('pointermove', move);
+      svg.addEventListener('pointerdown', move);
+      svg.addEventListener('pointerleave', () => { svg.querySelector('.cross').classList.add('hidden'); svg.querySelector('.dot').classList.add('hidden'); tip.classList.add('hidden'); });
+    });
+  }
+
+  // ===========================================================================
+  // Samouczek (pierwsza gra; ponownie z menu)
+  // ===========================================================================
+  const TUTORIAL = [
+    { sel: '#tb-country', title: 'Twoje państwo', text: 'Górny pasek: data, skarbiec, bilans na turę, rezerwy, stabilność i armia. Kliknij nazwę państwa, aby wyśrodkować mapę.' },
+    { sel: '#map', title: 'Mapa i armie', text: 'Kliknij swoją armię (pigułka z liczbą), potem PPM na cel — albo przeciągnij armię. Pasek rozkazu pozwala wysłać część wojska, wybrać trasę lądem/morzem i punkty pośrednie.' },
+    { sel: '#map', title: 'Prowincje', text: 'Kliknij prowincję: budynki (fabryka, fort, port, koszary, uniwersytet), rekrutacja (piechota, wojska szybkie, wsparcie), stocznia. Przycisk zaznaczania wielu prowincji buduje na wszystkich naraz.' },
+    { sel: '#btn-diplomacy', title: 'Dyplomacja', text: 'Wojny, sojusze, pakty, handel prowincjami, konferencja pokojowa za punkty wojenne, wasale i agresywna ekspansja.' },
+    { sel: '#mapmodes', title: 'Tryby mapy', text: 'Polityczna, dyplomatyczna, ekonomiczna, teren i niepokoje (klawisze 1–5).' },
+    { sel: '#btn-endturn', title: 'Koniec tury', text: 'Spacja kończy turę (tydzień). Po turze zobaczysz podsumowanie i podpowiedzi, co warto zrobić. Powodzenia!' }
+  ];
+  function startTutorial(force) {
+    let done = false; try { done = localStorage.getItem('wartime_tutorial') === 'done'; } catch (e) { /* brak */ }
+    if (done && !force) return;
+    S.tutStep = 0; renderTutorial();
+  }
+  function endTutorial() {
+    S.tutStep = null; const el = $('tutorial'); if (el) el.remove();
+    try { localStorage.setItem('wartime_tutorial', 'done'); } catch (e) { /* brak */ }
+  }
+  function renderTutorial() {
+    let el = $('tutorial');
+    if (S.tutStep == null || S.tutStep >= TUTORIAL.length) { endTutorial(); return; }
+    if (!el) { el = document.createElement('div'); el.id = 'tutorial'; el.className = 'tutorial'; document.querySelector('#app').appendChild(el); }
+    const st = TUTORIAL[S.tutStep], tgt = document.querySelector(st.sel), r = tgt && tgt.offsetWidth ? tgt.getBoundingClientRect() : null;
+    const big = !r || r.width > window.innerWidth * 0.6;
+    el.innerHTML = (big ? '' : '<div class="tut-ring" style="left:' + (r.left - 6) + 'px;top:' + (r.top - 6) + 'px;width:' + (r.width + 12) + 'px;height:' + (r.height + 12) + 'px"></div>') +
+      '<div class="tut-card glass"><div class="tut-step">' + (S.tutStep + 1) + ' / ' + TUTORIAL.length + '</div><h3>' + esc(st.title) + '</h3><p>' + esc(st.text) + '</p>' +
+      '<div class="row-actions"><button class="btn btn-ghost btn-sm" id="tut-skip">Pomiń</button><button class="btn btn-primary btn-sm" id="tut-next">' + (S.tutStep === TUTORIAL.length - 1 ? 'Zaczynamy' : 'Dalej') + '</button></div></div>';
+    const card = el.querySelector('.tut-card');
+    if (!big) {
+      const cw = Math.min(340, window.innerWidth - 24), below = r.bottom + 14 + 180 < window.innerHeight;
+      card.style.left = Math.max(12, Math.min(window.innerWidth - cw - 12, r.left + r.width / 2 - cw / 2)) + 'px';
+      card.style.top = (below ? r.bottom + 14 : Math.max(12, r.top - 200)) + 'px';
+    } else card.classList.add('center');
+    $('tut-next').addEventListener('click', () => { S.tutStep++; renderTutorial(); });
+    $('tut-skip').addEventListener('click', endTutorial);
+  }
+  function syncSoundLabel() { const b = $('menu-sound'); if (b) { const t = b.querySelector('span:last-child') || b; t.textContent = 'Dźwięk: ' + (WT.sound && WT.sound.enabled() ? 'włączony' : 'wyłączony'); } }
+
   function aggressionLabel(v) { return v <= 0 ? 'Pokojowa (bez nowych wojen)' : v < 35 ? 'Niska' : v <= 65 ? 'Standardowa' : v < 90 ? 'Wysoka' : 'Bardzo wysoka'; }
   function bindStart() {
     const ag = $('opt-aggr');
@@ -543,6 +717,11 @@
     $('start-search').addEventListener('input', renderStartList);
     $('opt-scen').addEventListener('click', (e) => { const b = e.target.closest('[data-scen]'); if (b) setScenario(b.dataset.scen); });
     $('opt-conts').addEventListener('click', (e) => { const b = e.target.closest('[data-ct]'); if (b) toggleContinent(b.dataset.ct); });
+    $('opt-diff').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-diff]'); if (!b) return;
+      S.difficulty = b.dataset.diff;
+      document.querySelectorAll('#opt-diff .seg-btn').forEach((x) => x.classList.toggle('on', x === b));
+    });
     $('opt-wars').addEventListener('change', applySetup);
     $('start-results').addEventListener('click', (e) => { const it = e.target.closest('[data-cc]'); if (it) selectStartCountry(it.dataset.cc, true); });
     $('btn-start').addEventListener('click', startGame);
@@ -564,6 +743,8 @@
     S.godCC = me();
     R().invalidate();
     if (centerView) R().centerOnCountry(me(), 0.8);
+    $('minimap').classList.remove('hidden'); $('turn-summary').classList.add('hidden');
+    setTimeout(() => startTutorial(false), 600);
     refreshAll();
     setTimeout(checkProposals, 300);
   }
@@ -608,6 +789,7 @@
     el.classList.remove('hidden');
     if (done && !g.goal.shown) {
       g.goal.shown = true;
+      if (WT.sound) WT.sound.play('win');
       openModal({ title: icon('trophy') + ' Niepodległość odzyskana!', body: '<p><b>' + esc(countryName(me())) + '</b> odzyskuje wszystkie ziemie rdzenne. Nowy cel: podbój świata — licznik pokazuje udział prowincji twoich i twoich wasali.</p>', buttons: [{ label: 'Dalej', cls: 'btn-primary' }] });
     }
   }
@@ -664,6 +846,11 @@
     else if (act === 'science') openScience();
     else if (act === 'settings') openSettings();
     else if (act === 'help') openHelp();
+    else if (act === 'stats') openStats();
+    else if (act === 'goals') openGoals();
+    else if (act === 'finish') confirmModal('Zakończ partię', 'Zakończyć partię i zobaczyć wynik? Możesz potem grać dalej.', 'Pokaż wynik', () => openEndScreen(false));
+    else if (act === 'tutorial') startTutorial(true);
+    else if (act === 'sound') { WT.sound.setEnabled(!WT.sound.enabled()); syncSoundLabel(); if (WT.sound.enabled()) WT.sound.play('click'); }
     else if (act === 'exit') confirmModal('Wyjście', 'Wrócić do menu głównego? Niezapisany postęp zostanie utracony (autozapis co 5 tur).', 'Wyjdź', () => { WT.G = null; showStart(); }, true);
   }
   function openHelp() {
@@ -693,7 +880,7 @@
   // ===========================================================================
   // Tryby mapy + legenda
   // ===========================================================================
-  const MODES = ['political', 'diplomatic', 'economic', 'terrain'];
+  const MODES = ['political', 'diplomatic', 'economic', 'terrain', 'unrest'];
   function setMapMode(m) {
     R().setMode(m);
     document.querySelectorAll('.mm-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === m));
@@ -706,6 +893,7 @@
     let html = '';
     if (m === 'diplomatic') html = legendItem('#d9b86a', 'Ty') + legendItem('#a585f0', 'Wasal') + legendItem('#5b8def', 'Sojusznik') + legendItem('#3fb8b0', 'Pakt') + legendItem('#e5484d', 'Wojna') +
       '<span class="li">Relacje <span class="grad" style="background:linear-gradient(90deg,#94464a,#5d6673,#3f9466)"></span></span>';
+    else if (m === 'unrest') html = '<span class="li">Niepokoje: spokój <span class="grad" style="background:linear-gradient(90deg,#2e4a3c,#9a8a3a,#c2413c)"></span> bunt (≥70)</span>';
     else if (m === 'economic') html = '<span class="li">Rozwój i fabryki: niski <span class="grad" style="background:linear-gradient(90deg,#262a4a,#2c7d78,#d6e06c)"></span> wysoki</span>';
     else if (m === 'terrain') html = [['#8fa865', 'plains'], ['#a99a63', 'hills'], ['#867a70', 'mountains'], ['#4e7a4c', 'forest'], ['#cdb882', 'desert'], ['#a3b2b8', 'tundra'], ['#33735a', 'jungle']]
       .map((t) => legendItem(t[0], TERRAIN_PL[t[1]])).join('');
@@ -780,30 +968,43 @@
     const fl = fleetsIn(army.prov).filter((f) => f.owner === army.owner);
     return { fleets: fl.length, cap: fl.reduce((m, f) => Math.max(m, fleetFree(f)), 0) };
   }
+  // Trasa armii: lądowa (także przez punkty pośrednie S.via) albo desant morski; gdy obie możliwe — wybór S.routePref.
   function planArmy(a, target) {
-    const from = a.prov;
-    const path = call('military.findPath', [a, target], null);
+    const from = a.prov, via = S.via || [];
+    const path = via.length ? call('military.findPathVia', [a, via, target], null) : call('military.findPath', [a, target], null);
+    let land = null, sea = null;
     if (path && path.length) {
       const turns = estimateLandTurns(a, path);
-      return { ok: true, kind: 'land', target, path, turns, points: R().landPoints(from, path), label: turnsText(turns) };
+      land = { ok: true, kind: 'land', target, path, turns, points: R().landPoints(from, path), label: turnsText(turns) + (via.length ? ' · przez ' + via.length : ''), via: via.slice() };
     }
     const ps = provStatic(target), pf = provStatic(from);
-    if (ps.coastal && pf.coastal) {
+    if (!via.length && ps.coastal && pf.coastal) {
       const sp = call('naval.seaPath', [from, target], null);
       if (sp && sp.length) {
         const pts = [R().provPoint(from)].concat(R().seaPoints(from, sp), [R().provPoint(target)]);
         const cap = ownFleetCapacity(a);
         const turns = seaTurns(sp);
-        const plan = { ok: true, kind: 'sea', target, path: sp, turns, points: pts, label: turnsText(turns) + ' · desant', capacity: cap.cap };
-        if (!cap.fleets) { plan.ok = false; plan.reason = 'Desant wymaga własnej floty w tej prowincji'; plan.label = 'brak floty'; }
-        else if (cap.cap <= 0) { plan.ok = false; plan.reason = 'Flota nie ma wolnej pojemności'; plan.label = 'brak miejsca'; }
-        return plan;
+        sea = { ok: true, kind: 'sea', target, path: sp, turns, points: pts, label: turnsText(turns) + ' · desant', capacity: cap.cap };
+        if (!cap.fleets) { sea.ok = false; sea.reason = 'Desant wymaga własnej floty w tej prowincji'; sea.label = 'brak floty'; }
+        else if (cap.cap <= 0) { sea.ok = false; sea.reason = 'Flota nie ma wolnej pojemności'; sea.label = 'brak miejsca'; }
       }
     }
-    return { ok: false, kind: 'land', target, points: [R().provPoint(from), R().provPoint(target)], label: 'brak trasy',
-      reason: 'Brak trasy — prowincja niedostępna (neutralne państwo bez wojny) lub brak połączenia' };
+    let plan = S.routePref === 'sea' && sea ? sea : land || sea;
+    if (!plan) {
+      return { ok: false, kind: 'land', target, points: [R().provPoint(from)].concat(via.map((v) => R().provPoint(v)), [R().provPoint(target)]), label: 'brak trasy', via: via.slice(),
+        reason: via.length ? 'Brak trasy przez wskazane punkty pośrednie (usuń punkt albo wybierz inny)' : 'Brak trasy — prowincja niedostępna (neutralne państwo bez wojny) lub brak połączenia' };
+    }
+    if (land && sea) plan.routes = { land: land.turns, sea: sea.ok ? sea.turns : null, seaReason: sea.reason || '' };
+    return plan;
   }
   function planFleet(f, target) {
+    const via = S.via || [];
+    if (via.length) {   // rejs przez punkty pośrednie (strefy morskie / porty)
+      const sp = call('naval.seaPathVia', [f.prov, via, target], null);
+      if (!sp || !sp.length) return { ok: false, kind: 'fleet', target, points: [R().portPoint(f.prov)].concat(via.map((v) => R().portPoint(v)), [R().portPoint(target)]), label: 'brak trasy', via: via.slice(), reason: 'Brak trasy morskiej przez wskazane punkty' };
+      const turns = seaTurns(sp);
+      return { ok: true, kind: 'fleet', target, path: sp, turns, points: R().seaPoints(f.prov, sp), label: turnsText(turns) + ' · przez ' + via.length, via: via.slice() };
+    }
     if (isSeaNode(target)) {
       const sp = call('naval.seaPath', [f.prov, target], null);
       if (!sp || !sp.length) return { ok: false, kind: 'fleet', target, points: [R().portPoint(f.prov), R().portPoint(target)], label: 'brak trasy', reason: 'Brak trasy morskiej' };
@@ -843,16 +1044,17 @@
     const routeTxt = plan.ok ? (plan.kind === 'land' ? 'Trasa lądowa: ' : plan.kind === 'sea' ? 'Desant morski: ' : 'Rejs: ') + turnsText(plan.turns) : '';
     const routeHtml = plan.ok ? '<span class="ob-route' + routeCls + '">' + routeTxt + '</span>' : '<span class="reason">' + esc(plan.reason) + '</span>';
     const buttons = '<button class="btn btn-primary" id="ob-go"' + (plan.ok ? '' : ' disabled') + '>Rozkaż <kbd>Enter</kbd></button><button class="btn btn-ghost" id="ob-cancel">Anuluj <kbd>Esc</kbd></button>';
+    const routeRow = routeRowHtml(plan);
     let html;
     if (S.sel.type === 'army') {
       // Suwak w procentach (0–100), a nie w żołnierzach: 100% zawsze oznacza dokładnie całą armię, bez reszty z zaokrąglenia kroku.
       const capPct = plan.kind === 'sea' && plan.capacity ? Math.max(1, Math.min(100, Math.floor(100 * plan.capacity / u.size))) : 100;
       html = '<div class="ob-head"><span class="ob-title">' + icon('swords') + 'Armia ' + fmtK(u.size) + ' → ' + name + '</span>' + routeHtml + '</div>' +
         '<div class="ob-row"><span class="dim">Wyślij:</span><input type="range" id="ob-size" min="1" max="100" step="1" value="' + capPct + '"' + (plan.ok ? '' : ' disabled') + '>' +
-        '<span class="ob-count" id="ob-count"></span><button class="btn btn-sm" id="ob-all"' + (plan.ok ? '' : ' disabled') + '>Całość</button>' + buttons + '</div>';
+        '<span class="ob-count" id="ob-count"></span><button class="btn btn-sm" id="ob-all"' + (plan.ok ? '' : ' disabled') + '>Całość</button>' + buttons + '</div>' + routeRow;
     } else {
       html = '<div class="ob-head"><span class="ob-title">' + icon('ship') + 'Flota (' + u.ships + ' ' + plural(u.ships, 'eskadra', 'eskadry', 'eskadr') + ') → ' + name + '</span>' + routeHtml + '</div>' +
-        '<div class="ob-row" style="justify-content:flex-end">' + buttons + '</div>';
+        '<div class="ob-row" style="justify-content:flex-end">' + buttons + '</div>' + routeRow;
     }
     bar.innerHTML = html;
     bar.classList.remove('hidden');
@@ -864,8 +1066,38 @@
       $('ob-all').addEventListener('click', () => { slider.value = 100; syncRange(slider); upd(); });
     }
     $('ob-go').addEventListener('click', confirmOrder);
+    bar.querySelectorAll('[data-route]').forEach((b) => b.addEventListener('click', () => { S.routePref = b.dataset.route; openOrderBar(target); }));
+    bar.querySelectorAll('[data-via-del]').forEach((b) => b.addEventListener('click', () => { S.via.splice(+b.dataset.viaDel, 1); openOrderBar(target); }));
+    const vadd = $('ob-via-add'); if (vadd) vadd.addEventListener('click', () => { S.viaPick = !S.viaPick; openOrderBar(target); if (S.viaPick) toast((isTouch() ? 'Stuknij' : 'Kliknij') + ' prowincję, przez którą ma przejść ' + (S.sel.type === 'fleet' ? 'flota (strefa morska lub port)' : 'armia'), '', 2600); });
+    const vclr = $('ob-via-clear'); if (vclr) vclr.addEventListener('click', () => { S.via = []; S.viaPick = false; openOrderBar(target); });
     $('ob-cancel').addEventListener('click', () => { closeOrderBar(); R().requestDraw(); });
     R().requestDraw();
+  }
+  /** Wiersz trasy w pasku rozkazu: wybór lądem/morzem (gdy obie możliwe) i punkty pośrednie. */
+  function routeRowHtml(plan) {
+    let h = '<div class="ob-route-row">';
+    if (plan.routes) {
+      const r = plan.routes;
+      h += '<div class="seg ob-seg"><button type="button" class="seg-btn' + (plan.kind === 'land' ? ' on' : '') + '" data-route="land">' + icon('swords') + ' Lądem · ' + turnsText(r.land) + '</button>' +
+        '<button type="button" class="seg-btn' + (plan.kind === 'sea' ? ' on' : '') + '" data-route="sea"' + (r.sea == null ? ' title="' + esc(r.seaReason) + '"' : '') + '>' + icon('ship') + ' Morzem · ' + (r.sea == null ? 'niedostępne' : turnsText(r.sea)) + '</button></div>';
+    }
+    const via = S.via || [];
+    h += '<div class="ob-via"><span class="dim">Przez:</span>' + (via.length ? via.map((v, i) => '<span class="via-chip"><b>' + (i + 1) + '</b>' + esc(nodeName(v)) + '<button type="button" data-via-del="' + i + '" aria-label="Usuń">×</button></span>').join('') : '<span class="dim">najkrótszą drogą</span>') +
+      '<button type="button" class="btn btn-sm' + (S.viaPick ? ' active' : '') + '" id="ob-via-add">' + (S.viaPick ? 'Wskaż na mapie…' : '+ Punkt pośredni') + '</button>' +
+      (via.length ? '<button type="button" class="btn btn-sm btn-ghost" id="ob-via-clear">Wyczyść</button>' : '') + '</div>';
+    return h + '</div>';
+  }
+  /** Tryb wskazywania punktu pośredniego: kliknięta prowincja/strefa trafia do S.via (przed celem). */
+  function addWaypoint(node) {
+    const plan = R().view.pending; if (!plan || node == null || node < 0) return false;
+    const u = unitObj(S.sel);
+    if (!u || node === plan.target || node === u.prov) return true;
+    if (S.sel.type === 'army' && isSeaNode(node)) { toast('Armia przechodzi tylko przez prowincje lądowe', 'bad', 2000); return true; }
+    if (S.sel.type === 'fleet' && !call('naval.isNode', [node], false)) { toast('Flota płynie tylko przez strefy morskie i porty', 'bad', 2000); return true; }
+    S.via = (S.via || []).filter((v) => v !== node).concat([node]);
+    S.viaPick = false;
+    openOrderBar(plan.target);
+    return true;
   }
   /** Liczba wysyłanych żołnierzy z suwaka %; gdy w prowincji zostałaby drobna resztka — cała armia. */
   function orderSize(u) {
@@ -875,6 +1107,7 @@
     return n >= u.size - WT.military.MIN_REMAINDER ? u.size : n;
   }
   function closeOrderBar() {
+    S.via = []; S.viaPick = false; S.routePref = null;
     $('order-bar').classList.add('hidden');
     $('order-bar').innerHTML = '';
     document.body.classList.remove('ob-open');
@@ -885,14 +1118,16 @@
     const plan = R().view.pending, u = unitObj(S.sel);
     if (!plan || !u || !plan.ok) return;
     let res;
-    if (S.sel.type === 'fleet') res = call('naval.orderFleet', [u.id, plan.target], null);
+    const via = (plan.via || []).slice();
+    if (S.sel.type === 'fleet') res = call('naval.orderFleet', [u.id, plan.target, via], null);
     else {
       const size = orderSize(u);
       const sizeArg = size < u.size ? size : undefined;
       if (plan.kind === 'sea') res = call('naval.planInvasion', [u.id, plan.target, sizeArg], null);
-      else res = call('military.order', [u.id, plan.target, sizeArg], null);
+      else res = call('military.order', [u.id, plan.target, sizeArg, { via }], null);
     }
     closeOrderBar();
+    if (WT.sound) WT.sound.play(!res || res.ok === false ? 'bad' : 'order');
     if (!res || res.ok === false) toast((res && res.reason) || 'Nie można wydać rozkazu', 'bad');
     else toast(res.reason || (plan.kind === 'sea' ? 'Desant zaplanowany' : 'Rozkaz wydany: ' + nodeName(plan.target) + ' (' + turnsText(plan.turns) + ')'), 'ok', 2200);
     R().view.preview = null;
@@ -981,8 +1216,22 @@
       const rl = (pd.buildings || {}).radar || 0;
       if (rl) h += '<span class="k">Radar</span><span class="v">' + fmtInt(WT.air.radarRangeKm(rl, me())) + ' km</span>';
     }
-    if (pd.unrest) h += '<span class="k">Niepokoje</span><span class="v ' + (pd.unrest > 30 ? 'neg' : '') + '">' + fmtInt(pd.unrest) + '</span>';
+    if (pd.unrest || (WT.world && WT.world.unrestTarget(S.selProv) > 0)) {
+      const tgt = WT.world ? Math.round(WT.world.unrestTarget(S.selProv)) : pd.unrest;
+      h += '<span class="k">Niepokoje</span><span class="v ' + (pd.unrest >= 50 ? 'neg' : '') + '" title="Dochód prowincji −' + Math.round((pd.unrest || 0) / 2) + '%; od 70 grozi bunt. Uspokaja garnizon i fort.">' + fmtInt(pd.unrest || 0) + (tgt !== (pd.unrest || 0) ? ' → ' + tgt : '') + (pd.unrest >= 70 ? ' · grozi bunt' : '') + '</span>';
+    }
     return h + '</div></div>';
+  }
+  /** Skład (pasek piechota/szybkie/wsparcie), organizacja i zaopatrzenie armii. */
+  function armyDetailHtml(a) {
+    const W = WT.warfare; if (!W) return '';
+    const sh = W.shares(a), org = Math.round(W.orgOf(a) * 100), sup = W.isSupplied(a);
+    const pct = (v) => Math.round(v * 100);
+    return '<div class="army-detail"><span class="mixbar" title="' + esc(W.typeName('inf') + ' ' + pct(sh.inf) + '% · ' + W.typeName('arm') + ' ' + pct(sh.arm) + '% · ' + W.typeName('art') + ' ' + pct(sh.art) + '%') + '">' +
+      '<i class="inf" style="width:' + pct(sh.inf) + '%"></i><i class="arm" style="width:' + pct(sh.arm) + '%"></i><i class="art" style="width:' + pct(sh.art) + '%"></i></span>' +
+      '<span class="dim">' + esc(W.typeName('arm')) + ' ' + pct(sh.arm) + '% · ' + esc(W.typeName('art')) + ' ' + pct(sh.art) + '%</span>' +
+      '<span class="org ' + (org < 35 ? 'neg' : org < 70 ? 'mid' : '') + '" title="Organizacja: mnożnik siły 40–100%; spada po bitwach i bez zaopatrzenia">Org. ' + org + '%</span>' +
+      (sup ? '' : '<span class="tag war" title="Brak zaopatrzenia: −4% stanu i organizacji na turę">okrążona</span>') + '</div>';
   }
   function armyStatus(a) {
     if (a.embarked) return 'na okrętach';
@@ -998,7 +1247,7 @@
       const c = countryColor(a.owner), light = R().luminance(c) > 0.62;
       const sel = S.sel && S.sel.type === 'army' && S.sel.id === a.id;
       h += '<div class="army-row' + (sel ? ' sel' : '') + '" data-army="' + esc(a.id) + '"><span class="army-chip" style="background:' + c + ';color:' + (light ? '#111' : '#fff') + '">' + fmtK(a.size) +
-        '</span><span>' + esc(countryName(a.owner)) + '</span><span class="faint" style="margin-left:auto">' + esc(armyStatus(a)) + '</span></div>';
+        '</span><span>' + esc(countryName(a.owner)) + '</span><span class="faint" style="margin-left:auto">' + esc(armyStatus(a)) + '</span></div>' + armyDetailHtml(a);
     });
     fleets.forEach((f) => {
       const sel = S.sel && S.sel.type === 'fleet' && S.sel.id === f.id;
@@ -1074,16 +1323,25 @@
     if (!has('economy.recruit')) return '';
     const max = recruitMax();
     S.recruitK = Math.min(Math.max(1, S.recruitK), max);
-    const can = call('economy.canRecruit', [me(), id, S.recruitK], { ok: true }) || { ok: true };
-    return '<div class="section"><div class="section-title">Rekrutacja</div>' +
+    const type = S.recruitType || 'inf';
+    const can = call('economy.canRecruit', [me(), id, S.recruitK, type], { ok: true }) || { ok: true };
+    const W = WT.warfare;
+    const typeSeg = W ? '<div class="seg rec-types">' + W.TYPES.map((t) => '<button type="button" class="seg-btn' + (t === type ? ' on' : '') + '" data-rtype="' + t + '" title="' + esc(unitTypeHint(t)) + '">' + esc(W.typeName(t)) + (W.COST_MULT[t] > 1 ? ' <span class="dim">×' + W.COST_MULT[t] + '</span>' : '') + '</button>').join('') + '</div>' +
+      '<div class="hint rec-type-hint">' + esc(unitTypeHint(type)) + '</div>' : '';
+    return '<div class="section"><div class="section-title">Rekrutacja</div>' + typeSeg +
       '<div class="slider-row"><input type="range" id="rec-k" min="1" max="' + max + '" value="' + S.recruitK + '"><span class="num" id="rec-k-val">' + fmtInt(S.recruitK) + ' tys.</span></div>' +
       '<div class="slider-row" style="margin-top:6px"><span class="dim">Koszt: <span class="num" id="rec-cost">' + recruitCostText(id, S.recruitK) + '</span></span>' +
       '<button class="btn btn-sm btn-ok" id="rec-go" style="margin-left:auto"' + (can.ok ? '' : ' disabled') + '>Rekrutuj</button></div>' +
       '<div class="reason" id="rec-reason">' + (can.ok ? '' : esc(can.reason || '')) + '</div></div>';
   }
+  function unitTypeHint(t) {
+    return t === 'arm' ? 'Szybkie, uderzeniowe: ×2 siły na równinach, słabe w górach, lasach i dżungli; od 35% składu armia ma +1 punkt ruchu. Koszt ×3, droższe utrzymanie.'
+      : t === 'art' ? 'Wsparcie: ×1,6 siły w każdym terenie, osłabia forty wroga, od 25% składu oblężenie trwa 2× krócej. Koszt ×2.'
+      : 'Piechota: najtańsza, równa w każdym terenie.';
+  }
   function recruitCostText(id, k) {
     if (isGod()) return '0 (God Mode)';
-    const c = call('economy.recruitCost', [me(), id, k], null);
+    const c = call('economy.recruitCost', [me(), id, k, S.recruitType || 'inf'], null);
     return c == null ? '—' : fmtNum(c, 2) + ' mld $';
   }
   function shipsSection(id, ps, pd) {
@@ -1150,11 +1408,12 @@
       S.recruitK = +s.value;
       $('rec-k-val').textContent = fmtInt(S.recruitK) + ' tys.';
       $('rec-cost').textContent = recruitCostText(id, S.recruitK);
-      const can = call('economy.canRecruit', [me(), id, S.recruitK], { ok: true }) || { ok: true };
+      const can = call('economy.canRecruit', [me(), id, S.recruitK, S.recruitType || 'inf'], { ok: true }) || { ok: true };
       $('rec-go').disabled = !can.ok; $('rec-reason').textContent = can.ok ? '' : (can.reason || '');
     });
+    document.querySelectorAll('#province-panel [data-rtype]').forEach((b) => b.addEventListener('click', () => { S.recruitType = b.dataset.rtype; renderProvincePanel(); }));
     $('rec-go').addEventListener('click', () => {
-      const a = call('economy.recruit', [me(), id, S.recruitK], null);
+      const a = call('economy.recruit', [me(), id, S.recruitK, S.recruitType || 'inf'], null);
       if (a) toast('Zrekrutowano ' + fmtInt(S.recruitK * 1000) + ' żołnierzy w: ' + provStatic(id).name, 'ok', 2500);
       else toast('Rekrutacja nieudana', 'bad');
       refreshAll();
@@ -1217,6 +1476,7 @@
   function toggleDiplomacy() { if ($('diplo-panel').classList.contains('hidden')) openDiplomacy(S.diploCC); else closeDiplomacy(); }
   function openDiplomacy(cc) {
     $('god-panel').classList.add('hidden');
+    if ($('turn-summary')) $('turn-summary').classList.add('hidden');
     if (isMobile() && S.selProv >= 0) closeProvince();
     if (cc && cc !== me()) S.diploCC = cc;
     $('diplo-panel').classList.remove('hidden', 'sheet-collapsed', 'sheet-expanded');
@@ -1233,7 +1493,11 @@
     const panel = $('diplo-panel');
     const focused = document.activeElement && document.activeElement.id === 'dip-search';
     let html = '<div class="panel-head"><h2>Dyplomacja</h2><button class="close" data-act="close" title="Zamknij (Esc)" aria-label="Zamknij">' + icon('x') + '</button></div><div class="panel-body">';
-    html += '<div class="section dip-settings"><label class="check"><input type="checkbox" id="dip-nopacts"' + (settingsOf().autoRejectPacts ? ' checked' : '') + '> <span>Automatycznie odrzucaj pakty o nieagresji</span></label></div>';
+    const pausedUntil = settingsOf().landOffersPausedUntil, paused = pausedUntil != null && pausedUntil > G().turn;
+    html += '<div class="section dip-settings"><label class="check"><input type="checkbox" id="dip-nopacts"' + (settingsOf().autoRejectPacts ? ' checked' : '') + '> <span>Automatycznie odrzucaj pakty o nieagresji</span></label>' +
+      (WT.land ? '<div class="land-pause"><span>Oferty ziemi od AI<small>' + (paused ? (pausedUntil >= 1e9 ? 'wstrzymane do odwołania' : 'wstrzymane jeszcze ' + (pausedUntil - G().turn) + ' tur') : 'maks. 1 oferta na ' + WT.land.OFFER_EVERY + ' tur') + '</small></span>' +
+        '<select id="dip-landpause"><option value="0"' + (paused ? '' : ' selected') + '>Przyjmuj</option><option value="10">Wstrzymaj 10 tur</option><option value="25">Wstrzymaj 25 tur</option><option value="52">Wstrzymaj 52 tury</option><option value="inf"' + (paused && pausedUntil >= 1e9 ? ' selected' : '') + '>Wstrzymaj do odwołania</option></select></div>' : '') + '</div>';
+    html += myStateHtml();
     if (WT.vassal && !overlordOf(me())) html += '<div class="section"><button class="btn" id="dip-release" style="width:100%;justify-content:center">' + icon('crown') + ' Utwórz państwo-wasala (odtwórz upadłe)</button></div>';
     html += '<div class="section"><input type="search" id="dip-search" placeholder="Szukaj państwa…" value="' + esc(S.diploQuery) + '" style="width:100%"></div>';
     html += '<div class="section"><div class="country-list" id="dip-list" style="max-height:200px">' + diploListHtml() + '</div></div>';
@@ -1276,6 +1540,7 @@
       '<span class="k">Stabilność</span><span class="v">' + Math.round(c.stability || 0) + '%</span>' +
       (overlordOf(cc) ? '<span class="k">Suzeren</span><span class="v txt">' + swatch(overlordOf(cc)) + esc(countryName(overlordOf(cc))) + '</span>' : '') + '</div>';
     if (war && WT.vassal) h += warPointsLineHtml(cc);
+    h += treatyTimesHtml(cc);
     const vassalLink = overlordOf(cc) === p || overlordOf(p) === cc;
     const impCost = has('diplomacy.improveRelationsCost') ? call('diplomacy.improveRelationsCost', [p], 1) : 1 + 0.001 * (staticCountry(p).gdp || 0);
     h += '<div class="action-grid" style="margin-top:10px">';
@@ -1288,10 +1553,109 @@
     }
     h += call('diplomacy.hasTrade', [p, cc], false) ? '<button class="btn" data-dip="trade-cancel">Zerwij handel</button>'
       : '<button class="btn" data-dip="trade"' + (war ? ' disabled' : '') + ' title="+3% dochodu dla obu stron; wymaga relacji ≥ 15">Umowa handlowa</button>';
+    if (WT.land && !war) {
+      h += WT.land.hasAccess(p, cc) ? '<button class="btn" data-dip="access-cancel">Zerwij przejście wojsk</button>'
+        : vassalLink || ally ? '' : '<button class="btn" data-dip="access" title="Obie strony mogą wprowadzać armie na tereny drugiej przez ' + WT.land.ACCESS_TURNS + ' tur; wymaga relacji ≥ 30">Pakt o przejściu wojsk</button>';
+      h += '<button class="btn btn-primary" data-dip="land">' + icon('pin') + ' Handel prowincjami</button>';
+    }
     h += '<button class="btn" data-dip="improve" title="Koszt ok. ' + fmtNum(impCost, 1) + ' mld $">Popraw relacje</button>';
     h += '<button class="btn" data-dip="insult">Obraź</button>';
     h += '<button class="btn btn-ghost" data-dip="show">Pokaż na mapie</button>';
     return h + '</div>' + countryWarsHtml(cc) + reparationsHtml(cc) + vassalSectionHtml(cc) + overlordSectionHtml(cc) + aidSectionHtml(cc) + '</div>';
+  }
+
+  /** Agresywna ekspansja i modyfikatory stabilności gracza (góra panelu dyplomacji). */
+  function myStateHtml() {
+    if (!WT.world) return '';
+    const c = liveCountry(me()), ae = Math.round(WT.world.aeOf(me())), mods = (c.stabMods || []).filter((m) => m.until > G().turn);
+    const lvl = ae >= WT.world.AE_WAR ? 'war' : ae >= WT.world.AE_COALITION ? 'high' : ae >= 25 ? 'mid' : 'low';
+    return '<div class="section my-state"><div class="threat"><div class="threat-head"><span class="k">Agresywna ekspansja</span><span class="threat-lbl ' + lvl + '">' + esc(WT.world.aeLabel(ae)) + ' · ' + ae + '</span></div>' +
+      '<div class="threat-bar"><i class="' + lvl + '" style="width:' + Math.min(100, ae) + '%"></i></div></div>' +
+      '<div class="hint">Rośnie z podbojami obcych ziem (traktaty, aneksje); od ' + WT.world.AE_COALITION + ' sąsiedzi zawierają sojusze przeciw tobie, od ' + WT.world.AE_WAR + ' koalicja może zaatakować. Maleje w czasie pokoju.</div>' +
+      (mods.length ? '<div class="kv" style="margin-top:6px">' + mods.map((m) => '<span class="k">' + esc(m.why) + '</span><span class="v ' + (m.v >= 0 ? 'pos' : 'neg') + '">' + (m.v > 0 ? '+' : '') + m.v + ' stab. · ' + (m.until - G().turn) + 't</span>').join('') + '</div>' : '') + '</div>';
+  }
+  /** Pozostały czas paktów i rozejmu z `cc`. */
+  function treatyTimesHtml(cc) {
+    const p = me(), rows = [];
+    const row = (label, t) => { if (t) rows.push('<span class="k">' + label + '</span><span class="v">jeszcze ' + Math.max(0, t.until - G().turn) + ' ' + plural(Math.max(0, t.until - G().turn), 'tura', 'tury', 'tur') + ' <span class="dim">(do tury ' + t.until + ')</span></span>'); };
+    row('Pakt o nieagresji', treatyWith(G().pacts, p, cc));
+    row('Rozejm', treatyWith(G().truces, p, cc));
+    row('Przejście wojsk', treatyWith(G().access, p, cc));
+    return rows.length ? '<div class="kv treaty-times">' + rows.join('') + '</div>' : '';
+  }
+
+  // ===========================================================================
+  // Handel prowincjami: daj, sprzedaj (pieniądze / wojsko), wymień
+  // ===========================================================================
+  function openLandDeal(cc) {
+    const L = WT.land, p = me(); if (!L) return;
+    const T = { a: p, b: cc, aProvs: [], bProvs: [], aMoney: 0, bMoney: 0, aTroops: 0, bTroops: 0 };
+    const nbOf = (owner, other) => (id) => (provStatic(id).nb || []).some((n) => G().provinces[n] && G().provinces[n].owner === other);
+    const listFor = (owner, other) => provincesOf(owner).filter((id) => provDyn(id).ctrl === owner && liveCountry(owner).capital !== id)
+      .sort((x, y) => (nbOf(owner, other)(y) - nbOf(owner, other)(x)) || provStatic(x).name.localeCompare(provStatic(y).name, 'pl'));
+    const mine = listFor(p, cc), theirs = listFor(cc, p), myCores = new Set(call('state.coresOf', [p], []) || []);
+    const sync = () => { R().view.multi = T.aProvs.concat(T.bProvs); R().requestDraw(); };
+    const provList = (ids, key, owner) => ids.length ? ids.map((id) => '<label class="conf-item"><input type="checkbox" data-' + key + '="' + id + '"' + (T[key].indexOf(id) >= 0 ? ' checked' : '') + '><span>' + esc(provStatic(id).name) +
+      (owner === cc && myCores.has(id) ? ' <span class="tag rebel">twoja rdzenna</span>' : '') + '</span><span class="num">' + fmtNum(L.price(id), 1) + ' mld</span></label>').join('') : '<div class="hint">Brak prowincji do przekazania (stolica nie podlega handlowi).</div>';
+    const render = (el) => {
+      const err = L.checkDeal(T), v = err ? null : L.aiAccepts(cc, T), bal = L.balanceFor(cc, T);
+      let h = '<div class="deal-presets"><button class="btn btn-sm" data-preset="gift">Daj za darmo</button><button class="btn btn-sm" data-preset="money">Sprzedaj za uczciwą cenę</button>' +
+        '<button class="btn btn-sm" data-preset="troops">Sprzedaj za wojsko</button><button class="btn btn-sm" data-preset="buy">Kup za uczciwą cenę</button><button class="btn btn-sm btn-ghost" data-preset="clear">Wyczyść</button></div>';
+      h += '<div class="conf-cols"><div class="conf-col"><div class="section-title">Oddajesz (' + esc(countryName(p)) + ')</div><div class="conf-list deal-list">' + provList(mine, 'aProvs', p) + '</div>' +
+        dealInputs('a', T, liveCountry(p).treasury, L.idleTroops(p)) + '</div>' +
+        '<div class="conf-col"><div class="section-title">Dostajesz (' + esc(countryName(cc)) + ')</div><div class="conf-list deal-list">' + provList(theirs, 'bProvs', cc) + '</div>' +
+        dealInputs('b', T, liveCountry(cc).treasury, L.idleTroops(cc)) + '</div></div>';
+      h += '<div class="deal-verdict ' + (err ? '' : v.ok ? 'ok' : 'bad') + '">' + (err ? esc(err) : (v.ok ? icon('check') + ' ' + esc(countryName(cc)) + ' przyjmie tę umowę' : esc(v.reason))) +
+        '<span class="dim"> · wycena ' + esc(countryName(cc)) + ': dostaje ' + fmtBn(bal.got) + ', oddaje ' + fmtBn(bal.gave) + '</span></div>';
+      el.querySelector('#deal-body').innerHTML = h;
+      const go = el.querySelector('#deal-go'); if (go) go.disabled = !!err;
+      el.querySelectorAll('[data-aProvs],[data-bProvs]').forEach((b) => b.addEventListener('change', () => {
+        const key = b.hasAttribute('data-aProvs') ? 'aProvs' : 'bProvs', id = +b.getAttribute('data-' + key);
+        T[key] = b.checked ? T[key].concat([id]) : T[key].filter((x) => x !== id);
+        sync(); render(el);
+      }));
+      el.querySelectorAll('[data-deal]').forEach((inp) => inp.addEventListener('change', () => {
+        const k = inp.dataset.deal, val = Math.max(0, +inp.value || 0);
+        T[k] = /Troops/.test(k) ? Math.round(val * 1000) : val;
+        render(el);
+      }));
+      el.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => { dealPreset(T, b.dataset.preset, cc); sync(); render(el); }));
+    };
+    openModal({ title: icon('pin') + ' Handel prowincjami: ' + esc(countryName(cc)), wide: true, body: '<div id="deal-body"></div>',
+      buttons: [{ label: 'Anuluj' }, { label: 'Zaproponuj umowę', cls: 'btn-primary', close: false, onClick: (close) => {
+        const res = L.proposeDeal(T);
+        resultToast(res, 'Umowa zawarta');
+        if (res && res.accepted) { close(); R().invalidate(); refreshAll(); }
+      } }],
+      onOpen: (el) => { const b = el.querySelectorAll('.modal-foot .btn'); b[b.length - 1].id = 'deal-go'; render(el); },
+      onClose: () => { R().view.multi = S.multi ? S.multi.slice() : null; R().requestDraw(); } });
+  }
+  function dealInputs(side, T, treasury, troops) {
+    const god = side === 'a' && isGod();
+    return '<div class="deal-inputs"><label>Pieniądze (mld $)<input type="number" min="0" step="0.5" data-deal="' + side + 'Money" value="' + T[side + 'Money'] + '"><small>' + (god ? 'God Mode' : 'skarbiec ' + fmtBn(treasury || 0)) + '</small></label>' +
+      '<label>Wojsko (tys.)<input type="number" min="0" step="1" data-deal="' + side + 'Troops" value="' + Math.round(T[side + 'Troops'] / 1000) + '"><small>stojące ' + fmtK(troops) + '</small></label></div>';
+  }
+  /** Szybkie ustawienia: cena liczona tak, by AI przyjęło (wg jego wyceny + 5%). */
+  function dealPreset(T, kind, cc) {
+    const L = WT.land;
+    const need = () => { const bal = L.balanceFor(cc, Object.assign({}, T, { aMoney: 0, bMoney: 0, aTroops: 0, bTroops: 0 })); return bal; };
+    if (kind === 'clear') { Object.assign(T, { aProvs: [], bProvs: [], aMoney: 0, bMoney: 0, aTroops: 0, bTroops: 0 }); return; }
+    T.aMoney = T.bMoney = T.aTroops = T.bTroops = 0;
+    if (kind === 'gift') { T.bProvs = []; if (!T.aProvs.length) toast('Zaznacz po lewej prowincje, które oddajesz', '', 2200); return; }
+    if (kind === 'buy') {
+      T.aProvs = [];
+      if (!T.bProvs.length) { toast('Zaznacz po prawej prowincje, które chcesz kupić', '', 2200); return; }
+      T.aMoney = Math.ceil(need().gave * 1.12 * 2) / 2;
+      return;
+    }
+    T.bProvs = [];
+    if (!T.aProvs.length) { toast('Zaznacz po lewej prowincje na sprzedaż', '', 2200); return; }
+    const worth = need().got * 0.95;   // ile warte są dla kupującego (zostawia mu margines)
+    if (kind === 'money') T.bMoney = Math.max(0.5, Math.floor(Math.min(worth, (liveCountry(cc).treasury || 0) * 0.9) * 2) / 2);
+    if (kind === 'troops') {
+      const per = L.troopValue(cc, 1000) || 1;
+      T.bTroops = Math.max(WT.military.MIN_ARMY, Math.min(Math.floor(worth / per) * 1000, Math.floor(L.idleTroops(cc) * 0.5 / 1000) * 1000));
+    }
   }
 
   // ===========================================================================
@@ -1453,6 +1817,13 @@
     bindAidSection(S.diploCC);
     bindVassalSection(S.diploCC);
     const rb = $('dip-release'); if (rb) rb.addEventListener('click', () => { closeDiplomacy(); startRelease(); });
+    const lp = $('dip-landpause');
+    if (lp) lp.addEventListener('change', () => {
+      const v = lp.value === 'inf' ? Infinity : +lp.value;
+      WT.land.pauseOffers(v);
+      toast(v ? (isFinite(v) ? 'Oferty ziemi wstrzymane na ' + v + ' tur' : 'Oferty ziemi wstrzymane do odwołania') : 'Oferty ziemi od AI znów będą przychodzić (maks. 1 na ' + WT.land.OFFER_EVERY + ' tur)', '', 2400);
+      renderDiplomacy();
+    });
     $('dip-nopacts').addEventListener('change', (e) => { settingsOf().autoRejectPacts = e.target.checked; toast(e.target.checked ? 'Pakty o nieagresji będą odrzucane automatycznie' : 'Propozycje paktów znów trafią do ciebie', '', 2200); });
   }
   function diploAction(act, cc) {
@@ -1468,6 +1839,9 @@
       case 'peace-white': resultToast(call('diplomacy.proposePeace', [p, cc, 'white'], null), 'Zawarto biały pokój'); break;
       case 'peace-annex': resultToast(call('diplomacy.proposePeace', [p, cc, 'annex'], null), 'Pokój: aneksja okupowanych prowincji'); break;
       case 'conference': openConference(cc); return;
+      case 'land': openLandDeal(cc); return;
+      case 'access': resultToast(WT.land.proposeAccess(p, cc), 'Pakt o przejściu wojsk zawarty'); break;
+      case 'access-cancel': resultToast(WT.land.cancelAccess(p, cc)); break;
       case 'alliance': resultToast(call('diplomacy.proposeAlliance', [p, cc], null), 'Sojusz zawarty'); break;
       case 'break': resultToast(call('diplomacy.breakAlliance', [p, cc], null), 'Sojusz zerwany'); break;
       case 'pact': resultToast(call('diplomacy.proposePact', [p, cc], null), 'Pakt podpisany'); break;
@@ -1775,18 +2149,26 @@
     $('busy').classList.remove('hidden');
     $('btn-endturn').disabled = true;
     const before = new Set(G().log || []);
+    const snap = turnSnapshot(), fx = [], onBattle = (r) => { if (fx.length < 40) fx.push(['battle', r.prov, r]); }, onOcc = (r) => { if (fx.length < 60) fx.push(['occupy', r.prov, r]); };
+    WT.events.on('battle', onBattle); WT.events.on('occupy', onOcc);
     setTimeout(() => {
       let res = null;
       try { res = WT.turn && WT.turn.end ? WT.turn.end() : null; if (!res && !(WT.turn && WT.turn.end)) toast('Brak WT.turn.end', 'bad'); }
       catch (e) { console.error(e); toast('Błąd podczas przetwarzania tury: ' + e.message, 'bad', 6000); }
+      WT.events.off('battle', onBattle); WT.events.off('occupy', onOcc);
       S.busy = false;
       $('busy').classList.add('hidden');
       R().invalidate();
+      if (R().animateFrom) R().animateFrom(snap);
+      fx.forEach((f, i) => { if (R().flash) R().flash(f[1], f[0], Math.min(i, 12) * 60); });
+      const myBattle = fx.some((f) => f[0] === 'battle' && (f[2].attacker === me() || f[2].defender === me()));
+      if (WT.sound) WT.sound.play(myBattle ? 'battle' : 'turn');
       validateSelection();
       turnToasts(before, res);
+      showTurnSummary(snap, fx);
       refreshAll();
       checkGameOver();
-      checkProposals();
+      checkEvents();
     }, 30);
   }
   UI.endTurn = endTurn;
@@ -1803,16 +2185,56 @@
     const c = liveCountry(me());
     if (((c && c.alive === false) || G().gameOver) && !S.gameOverShown) {
       S.gameOverShown = true;
+      if (WT.goals) { openEndScreen(true); return; }
       openModal({ title: 'Koniec gry', body: '<p>' + esc(countryName(me())) + ' przestało istnieć.</p>', buttons: [
         { label: 'Obserwuj dalej' }, { label: 'Menu główne', cls: 'btn-primary', onClick: () => { WT.G = null; showStart(); } }] });
     }
+  }
+  // ===========================================================================
+  // Cele, misje, osiągnięcia i ekran końca partii
+  // ===========================================================================
+  function missionsHtml() {
+    return '<div class="missions">' + WT.goals.missions().map((m) => {
+      const pr = WT.goals.progress(m), pct = Math.max(0, Math.min(100, Math.round(100 * pr.have / Math.max(0.0001, pr.need))));
+      return '<div class="mission' + (m.done ? ' done' : '') + '"><div class="m-head">' + icon(m.done ? 'check' : 'flag', 'ico-sm') + '<span>' + esc(m.text) + '</span><b class="num">' + (m.done ? 'wykonana' : (typeof pr.have === 'number' && pr.have % 1 ? fmtNum(pr.have, 2) : fmtInt(pr.have)) + ' / ' + (pr.need % 1 ? fmtNum(pr.need, 2) : fmtInt(pr.need))) + '</b></div>' +
+        '<div class="progress"><i style="width:' + (m.done ? 100 : pct) + '%"></i></div></div>';
+    }).join('') + '</div><div class="hint">Nagroda za misję: pieniądze (ok. 15 tygodniowych dochodów) i stabilność +8 na rok.</div>';
+  }
+  function achievementsHtml() {
+    const un = WT.goals.unlocked(), n = WT.goals.ACHIEVEMENTS.filter((a) => un[a.id]).length;
+    return '<div class="section-title" style="margin-top:14px">Osiągnięcia (' + n + '/' + WT.goals.ACHIEVEMENTS.length + ')</div><div class="ach-grid">' +
+      WT.goals.ACHIEVEMENTS.map((a) => '<div class="ach' + (un[a.id] ? ' on' : '') + '" title="' + esc(a.desc) + '">' + icon(un[a.id] ? 'trophy' : 'info', 'ico-sm') + '<span><b>' + esc(a.name) + '</b><small>' + esc(a.desc) + '</small></span></div>').join('') + '</div>';
+  }
+  function openGoals() {
+    if (!WT.goals || !G()) return;
+    const st = WT.goals.summary();
+    openModal({ title: icon('flag') + ' Cele: ' + esc(countryName(me())), wide: true,
+      body: '<div class="section-title">Misje</div>' + missionsHtml() + achievementsHtml() +
+        '<div class="kv" style="margin-top:14px"><span class="k">Poziom trudności</span><span class="v txt">' + esc(st.difficulty) + '</span><span class="k">Bieżący wynik</span><span class="v">' + fmtInt(st.score) + ' pkt</span></div>' });
+  }
+  /** Ekran końca partii: statystyki, osiągnięcia tej partii, wynik. */
+  function openEndScreen(dead) {
+    if (!WT.goals) return;
+    const s = WT.goals.summary(), un = WT.goals.unlocked();
+    const tile = (k, v) => '<div class="stat-tile"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>';
+    if (WT.sound) WT.sound.play(dead ? 'bad' : 'win');
+    openModal({ title: icon('trophy') + (dead ? ' Koniec gry — ' + esc(countryName(me())) + ' upada' : ' Wynik partii: ' + esc(countryName(me()))), wide: true,
+      body: '<div class="end-score"><span>Wynik</span><b>' + fmtInt(s.score) + '</b><small>poziom: ' + esc(s.difficulty) + '</small></div>' +
+        '<div class="stat-grid end-grid">' + tile('Tury', fmtInt(s.turns)) + tile('Prowincje (szczyt)', s.provs + ' (' + s.maxProvs + ')') + tile('Bitwy wygrane', fmtInt(s.battlesWon)) +
+        tile('Bitwy przegrane', fmtInt(s.battlesLost)) + tile('Wojny', fmtInt(s.wars)) + tile('Traktaty', fmtInt(s.treaties)) + tile('Wasale', fmtInt(s.vassals)) +
+        tile('Zdobyte / utracone', s.gained + ' / ' + s.lost) + tile('Misje', fmtInt(s.missions)) + '</div>' +
+        (s.achievements.length ? '<div class="section-title" style="margin-top:12px">Osiągnięcia w tej partii</div><div class="ach-grid">' + s.achievements.map((id) => {
+          const a = WT.goals.ACHIEVEMENTS.find((x) => x.id === id); return a ? '<div class="ach on">' + icon('trophy', 'ico-sm') + '<span><b>' + esc(a.name) + '</b><small>' + esc(a.desc) + '</small></span></div>' : '';
+        }).join('') + '</div>' : '') +
+        '<div class="hint" style="margin-top:10px">Odblokowane osiągnięcia (wszystkie partie): ' + Object.keys(un).length + ' / ' + WT.goals.ACHIEVEMENTS.length + '.</div>',
+      buttons: [{ label: dead ? 'Obserwuj dalej' : 'Graj dalej' }, { label: 'Menu główne', cls: 'btn-primary', onClick: () => { WT.G = null; showStart(); } }] });
   }
 
   // ===========================================================================
   // Propozycje AI → gracz
   // ===========================================================================
   const PROPOSAL_TITLES = { peace: 'Propozycja pokoju', alliance: 'Propozycja sojuszu', pact: 'Propozycja paktu o nieagresji',
-    trade: 'Propozycja umowy handlowej', aidRequest: 'Prośba o pomoc', callToArms: 'Wezwanie do wojny', treaty: 'Żądania pokojowe' };
+    trade: 'Propozycja umowy handlowej', aidRequest: 'Prośba o pomoc', callToArms: 'Wezwanie do wojny', treaty: 'Żądania pokojowe', land: 'Umowa terytorialna', access: 'Pakt o przejściu wojsk' };
   function proposalText(pr) {
     const from = '<b>' + esc(countryName(pr.from)) + '</b>';
     let t;
@@ -1831,6 +2253,11 @@
         if (terms.war || terms.vs || terms.against) t += '<br><span class="dim">Dotyczy: ' + esc(countryName(terms.war || terms.vs || terms.against)) + '</span>';
       }
     }
+    if (pr.type === 'land' && WT.land) {
+      const bal = WT.land.balanceFor(me(), pr.terms);
+      t += '<br><span class="dim">Wycena dla ciebie: dostajesz ' + fmtBn(bal.got) + ', oddajesz ' + fmtBn(bal.gave) + ' (' + (bal.net >= 0 ? '<span class="pos">+' : '<span class="neg">') + fmtNum(bal.net, 1) + ' mld</span>).</span>';
+      R().view.multi = (pr.terms.aProvs || []).concat(pr.terms.bProvs || []); R().requestDraw();
+    }
     if (pr.type === 'treaty') t += '<br><span class="reason">' + (pr.terms.vassal ? 'Przyjęcie: zostaniesz wasalem — płacisz trybut, walczysz w wojnach suzerena, nie wypowiadasz wojen. Później możesz ogłosić niepodległość (wojna). ' : '') + 'Odrzucenie: wojna trwa dalej.</span>';
     if (pr.type === 'aidRequest' && !isGod()) {
       const tr = (liveCountry(me()) || {}).treasury || 0;
@@ -1845,6 +2272,7 @@
     const pr = (g.proposals || []).find((x) => x.to === g.player && !S.answered[x.id]);
     if (!pr) return;
     S.proposalOpen = true;
+    if (WT.sound) WT.sound.play('alert');
     const answer = (acc) => {
       S.answered[pr.id] = true;
       const res = call('diplomacy.answerProposal', [pr.id, acc], null);
@@ -1856,10 +2284,30 @@
     openModal({
       title: esc(PROPOSAL_TITLES[pr.type] || 'Propozycja dyplomatyczna'), body: '<p>' + proposalText(pr) + '</p>', dismissable: false,
       buttons: [{ label: 'Odrzuć', cls: 'btn-danger', onClick: () => answer(false) }, { label: 'Przyjmij', cls: 'btn-ok', onClick: () => answer(true) }],
-      onClose: () => { S.proposalOpen = false; setTimeout(checkProposals, 150); }
+      onClose: () => { S.proposalOpen = false; if (pr.type === 'land') { R().view.multi = S.multi ? S.multi.slice() : null; R().requestDraw(); } setTimeout(checkProposals, 150); }
     });
   }
   UI.checkProposals = checkProposals;
+  /** Wydarzenia świata dla gracza (WT.world): okno z opcjami do wyboru. */
+  function checkEvents() {
+    const g = G(); if (!g || !S.inGame || S.proposalOpen || !WT.world) return;
+    const e = WT.world.pending()[0]; if (!e) { checkProposals(); return; }
+    const v = WT.world.view(e);
+    S.proposalOpen = true;
+    if (WT.sound) WT.sound.play('event');
+    openModal({
+      title: icon('flame') + ' ' + esc(v.title), dismissable: false,
+      body: '<p>' + esc(v.text) + '</p><div class="event-opts">' + v.options.map((o, i) => '<button class="btn event-opt" data-opt="' + i + '"><b>' + esc(o.label) + '</b><small>' + esc(o.desc) + '</small></button>').join('') + '</div>',
+      buttons: [],
+      onOpen: (el, close) => el.querySelectorAll('[data-opt]').forEach((b) => b.addEventListener('click', () => {
+        const res = WT.world.answer(e.id, +b.dataset.opt);
+        toast(res.reason, 'ok', 3000);
+        close(); R().invalidate(); refreshAll();
+      })),
+      onClose: () => { S.proposalOpen = false; setTimeout(checkEvents, 150); }
+    });
+  }
+  UI.checkEvents = checkEvents;
 
   // ===========================================================================
   // Tooltip
@@ -1868,7 +2316,7 @@
     if (unit) {
       const u = unit.type === 'army' ? (G().armies || {})[unit.id] : (G().fleets || {})[unit.id];
       if (u) {
-        if (unit.type === 'army') return '<div class="tt-title">' + swatch(u.owner) + ' Armia: ' + esc(countryName(u.owner)) + '</div><div class="tt-row">Żołnierze: <b class="num">' + fmtInt(u.size) + '</b></div><div class="tt-row">' + esc(armyStatus(u)) + '</div>' +
+        if (unit.type === 'army') return '<div class="tt-title">' + swatch(u.owner) + ' Armia: ' + esc(countryName(u.owner)) + '</div><div class="tt-row">Żołnierze: <b class="num">' + fmtInt(u.size) + '</b></div><div class="tt-row">' + esc(armyStatus(u)) + '</div>' + armyTooltipExtra(u) +
           (u.owner === me() ? '<div class="tt-row faint">' + (isTouch() ? 'Przeciągnij na cel lub stuknij armię, potem cel' : 'Przeciągnij na cel lub kliknij i PPM na cel') + '</div>' : '');
         return '<div class="tt-title">' + swatch(u.owner) + ' Flota: ' + esc(countryName(u.owner)) + '</div><div class="tt-row">Eskadry: <b class="num">' + fmtInt(u.ships) + '</b></div>' +
           ((u.cargo || []).length ? '<div class="tt-row">Ładunek: <b>' + u.cargo.length + ' ' + plural(u.cargo.length, 'armia', 'armie', 'armii') + '</b></div>' : '');
@@ -1897,6 +2345,12 @@
       }
     }
     return h;
+  }
+  function armyTooltipExtra(a) {
+    const W = WT.warfare; if (!W) return '';
+    const sh = W.shares(a), pct = (v) => Math.round(v * 100);
+    return '<div class="tt-row">' + esc(W.typeName('inf')) + ' ' + pct(sh.inf) + '% · ' + esc(W.typeName('arm')) + ' ' + pct(sh.arm) + '% · ' + esc(W.typeName('art')) + ' ' + pct(sh.art) + '%</div>' +
+      '<div class="tt-row">Organizacja: <b>' + Math.round(W.orgOf(a) * 100) + '%</b>' + (W.isSupplied(a) ? '' : ' · <span style="color:#ff9c96">bez zaopatrzenia</span>') + '</div>';
   }
   function seaTooltipHtml(id) {
     const z = seaStatic(id); if (!z) return '';
@@ -2334,6 +2788,7 @@
     } else openNode(u.prov);
   }
   function onMapClick(prov, ev, sea) {
+    if (S.inGame && S.viaPick && orderBarOpen()) { addWaypoint(prov >= 0 ? prov : sea); return; }
     if (!S.inGame) { if (prov >= 0) selectStartCountry(R().ownerOf(prov) === 'XXX' ? null : R().ownerOf(prov), false); return; }
     if (S.godTool) { applyGodTool(prov); return; }
     if (S.airSel) { doRaid(prov); return; }
@@ -2363,8 +2818,10 @@
   UI.primaryArmyAt = primaryArmyAt;
   /** Cel rozkazu pod kursorem: prowincja albo (dla floty) strefa morska. */
   function orderTarget(prov, sea) { return prov >= 0 ? prov : (S.sel && S.sel.type === 'fleet' && sea >= 0 ? sea : -1); }
-  function onRightClick(prov, sx, sy, sea) {
+  function onRightClick(prov, sx, sy, sea, ev) {
     if (!S.inGame) return;
+    // Shift+PPM przy otwartym pasku rozkazu = dodaj punkt pośredni
+    if (ev && ev.shiftKey && orderBarOpen() && S.sel) { addWaypoint(orderTarget(prov, sea)); return; }
     if (S.shellSel) { stopShellTarget(); return; }
     const t = orderTarget(prov, sea);
     if (S.sel && t >= 0) openOrderBar(t);
@@ -2374,6 +2831,7 @@
   // Dotyk: stuknięcie. Gdy własna jednostka jest zaznaczona, stuknięcie innej prowincji (lub obcej armii) = wybór celu.
   function onTap(prov, sx, sy, unit, sea) {
     if (!S.inGame) { onMapClick(prov); return; }
+    if (S.viaPick && orderBarOpen()) { addWaypoint(prov >= 0 ? prov : sea); return; }
     const at = unit && !isSeaNode(unit.prov) ? unit.prov : prov;   // jednostka na morzu nie wskazuje prowincji
     if (S.godTool) { if (at >= 0) applyGodTool(at); return; }
     if (S.multi) { if (at >= 0) toggleMulti(at); return; }
@@ -2510,6 +2968,7 @@
   function escapeChain() {
     if (closeTopModal()) return;
     if (!$('menu').classList.contains('hidden')) { toggleMenu(false); return; }
+    if (S.viaPick) { S.viaPick = false; const pl = R().view.pending; if (pl) openOrderBar(pl.target); return; }
     if (orderBarOpen()) { closeOrderBar(); R().requestDraw(); return; }
     if (S.airSel) { stopAirTarget(); return; }
     if (S.shellSel) { stopShellTarget(); return; }
@@ -2535,7 +2994,7 @@
       if (!e.repeat) endTurn();
       return;
     }
-    const digit = /^Digit([1-4])$/.exec(e.code) || /^Numpad([1-4])$/.exec(e.code);
+    const digit = /^Digit([1-5])$/.exec(e.code) || /^Numpad([1-5])$/.exec(e.code);
     if (digit) { setMapMode(MODES[+digit[1] - 1]); return; }
     if (e.code === 'KeyN') { openScience(); return; }
     if (e.code === 'KeyB') { if (S.multi) exitMulti(); else startMulti(S.selProv >= 0 && provDyn(S.selProv).owner === me() ? [S.selProv] : []); return; }
@@ -2555,6 +3014,8 @@
     const mapChanged = () => { if (!S.busy) { R().invalidate(); } };
     ['occupy', 'annex', 'eliminated', 'peace'].forEach((n) => WT.events.on(n, mapChanged));
     WT.events.on('proposal', () => { if (!S.busy) setTimeout(checkProposals, 50); });
+    WT.events.on('achievement', (a) => { toast('Osiągnięcie: ' + a.name + ' — ' + a.desc, 'ok', 6000); if (WT.sound) WT.sound.play('win'); });
+    WT.events.on('mission', (m) => { toast('Misja wykonana: ' + m.mission.text + ' (+' + fmtNum(m.money, 1) + ' mld $)', 'ok', 6000); if (WT.sound) WT.sound.play('win'); });
     WT.events.on('gameover', () => { if (!S.busy) setTimeout(checkGameOver, 50); });
     // Wojny poza turą (np. sojusznik wciąga gracza) — własne wypowiedzenia mają już toast z wyniku akcji.
     WT.events.on('war', (p) => {
@@ -2579,6 +3040,8 @@
     bindSheets();
     bindKeys();
     bindGameEvents();
+    if (R().attachMinimap) R().attachMinimap($('minimap'));
+    syncSoundLabel();
   };
   UI.fatal = function (msg) { const f = $('fatal'); f.textContent = msg; f.classList.remove('hidden'); };
 })();

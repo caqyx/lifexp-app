@@ -1,0 +1,544 @@
+/* Wave Rush (docs/v2/PLAN.md 9.1, stage w-1). The tokens copy LifeXP's dark theme
+   (v2/src/ui/tokens.css): the game's page cannot load the app's CSS. The canvas fills the
+   frame; main.js sets --band-top and --band-h (CSS px) to where the playfield band is,
+   and --progress (0..1) on the progress bar. Motion only through transform and opacity,
+   timed by the tokens; reduced motion sets them to 0 ms. */
+
+:root {
+  color-scheme: dark;
+  --color-bg: #0e0f13;
+  --color-surface: rgb(18 20 28 / 90%);
+  --color-border: rgb(255 255 255 / 12%);
+  --color-text: #eef0f6;
+  --color-text-secondary: #b3b7cc;
+  --color-accent: #5f56f2;
+  --color-accent-hover: #6d65f5;
+  --color-accent-press: #5048e0;
+  --color-accent-text: #a49eff;
+  --color-on-accent: #ffffff;
+  --color-warning: #ffd166;
+  --color-focus: #a49eff;
+  --font: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --duration-enter: 260ms;
+  --duration-exit: 160ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --band-top: 0px;
+  --band-h: 100vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-enter: 0ms;
+    --duration-exit: 0ms;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.stage {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.board {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── HUD: a slim bar along the top of the band ───────────────────────────── */
+
+.hud {
+  position: absolute;
+  top: calc(var(--band-top) + 8px);
+  right: 12px;
+  left: 12px;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity var(--duration-exit) var(--ease-in),
+    transform var(--duration-exit) var(--ease-in);
+  pointer-events: none;
+}
+
+.stage[data-state='playing'] .hud,
+.stage[data-state='ready'] .hud,
+.stage[data-state='dead'] .hud,
+.stage[data-state='paused'] .hud {
+  opacity: 1;
+  transform: none;
+  transition-duration: var(--duration-enter);
+  transition-timing-function: var(--ease-out);
+}
+
+.hud__bar {
+  height: 6px;
+  margin: 0 auto;
+  max-width: 520px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 40%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 14%);
+}
+
+.hud__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #f3d27a, #ffffff);
+  transform: scaleX(var(--progress, 0));
+  transform-origin: left center;
+}
+
+.hud__row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.hud__label {
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 35%);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 rgb(0 0 0 / 60%);
+}
+
+.hud__label--num {
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__practice {
+  display: none;
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgb(98 182 230 / 30%);
+  color: #d8f0ff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.stage.is-practice .hud__practice {
+  display: block;
+}
+
+@media (max-width: 520px) {
+  #hud-attempt {
+    display: none;
+  }
+}
+
+/* ── Toast: a sector's name, a gravity flip ──────────────────────────────── */
+
+.toast {
+  position: absolute;
+  top: calc(var(--band-top) + var(--band-h) * 0.2);
+  left: 50%;
+  margin: 0;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 50%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -6px);
+  transition:
+    opacity var(--duration-exit) var(--ease-in),
+    transform var(--duration-exit) var(--ease-in);
+  pointer-events: none;
+}
+
+.toast.is-on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  transition-duration: var(--duration-enter);
+  transition-timing-function: var(--ease-out);
+}
+
+/* ── Panels ──────────────────────────────────────────────────────────────── */
+
+.panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition:
+    opacity var(--duration-exit) var(--ease-in),
+    transform var(--duration-exit) var(--ease-in),
+    visibility 0s linear var(--duration-exit);
+}
+
+.stage[data-state='menu'] .panel--menu,
+.stage[data-state='skins'] .panel--skins,
+.stage[data-state='ready'] .panel--ready,
+.stage[data-state='dead'] .panel--dead,
+.stage[data-state='finished'] .panel--finished,
+.stage[data-state='paused'] .panel--paused {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity var(--duration-enter) var(--ease-out),
+    transform var(--duration-enter) var(--ease-out),
+    visibility 0s;
+}
+
+.panel--menu,
+.panel--skins {
+  background: rgb(6 8 14 / 45%);
+}
+
+.panel--ready {
+  align-items: flex-start;
+  padding-top: calc(var(--band-top) + var(--band-h) * 0.66);
+}
+
+.panel--dead,
+.panel--finished,
+.panel--paused {
+  background: rgb(6 8 14 / 30%);
+}
+
+.pill {
+  margin: 0;
+  padding: 10px 20px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 55%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 18%);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.card {
+  width: min(100%, 380px);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-surface);
+  box-shadow: 0 16px 40px rgb(0 0 0 / 45%);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  cursor: default;
+}
+
+/* Only the screen on show takes taps: one that is fading out must not catch them. */
+.stage[data-state='menu'] .panel--menu .card,
+.stage[data-state='skins'] .panel--skins .card,
+.stage[data-state='dead'] .panel--dead .card,
+.stage[data-state='finished'] .panel--finished .card {
+  pointer-events: auto;
+}
+
+.card--small {
+  width: min(100%, 320px);
+}
+
+.card--skins {
+  width: min(100%, 560px);
+}
+
+.card__title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.card__body {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.card__hint {
+  margin: 12px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.card__hint--portrait {
+  display: none;
+  color: var(--color-warning);
+}
+
+.stage.is-portrait .card__hint--portrait {
+  display: block;
+}
+
+.badge {
+  display: none;
+  margin: 8px auto 0;
+  padding: 4px 12px;
+  width: fit-content;
+  border-radius: 999px;
+  background: rgb(255 209 102 / 16%);
+  color: var(--color-warning);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.stage.is-new-best .badge {
+  display: block;
+}
+
+.actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.actions--row {
+  grid-template-columns: 1fr 1fr;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.stats__item {
+  padding: 8px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 5%);
+}
+
+.stats dt {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.stats dd {
+  margin: 2px 0 0;
+  font-size: 14px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.choice {
+  margin-top: 12px;
+}
+
+.choice__title {
+  margin: 0 0 6px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.choice__options {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.button,
+.chip {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 9%);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--duration-exit) var(--ease-in);
+}
+
+.button:hover:not(:disabled),
+.chip:hover {
+  background: rgb(255 255 255 / 15%);
+}
+
+.button--primary {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.button--primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.button--primary:active:not(:disabled) {
+  background: var(--color-accent-press);
+}
+
+.button--quiet {
+  margin-top: 12px;
+  min-height: 40px;
+  background: transparent;
+  color: var(--color-accent-text);
+  font-size: 15px;
+}
+
+.chip {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.button:focus-visible,
+.chip:focus-visible,
+.skin:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+/* ── Skin picker ─────────────────────────────────────────────────────────── */
+
+.skins {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 14px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.skin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 4px;
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 5%);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--duration-exit) var(--ease-in);
+}
+
+.skin:hover:not(:disabled) {
+  background: rgb(255 255 255 / 10%);
+}
+
+.skin[aria-pressed='true'] {
+  border-color: var(--color-accent-text);
+  background: rgb(95 86 242 / 18%);
+}
+
+.skin:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.skin__preview {
+  width: 72px;
+  height: 48px;
+}
+
+.skin__name {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.skin__note {
+  min-height: 1.3em;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+/* Sideways phones: a compact menu in two columns. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .card {
+    padding: 14px 16px;
+  }
+
+  .card--menu {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 16px;
+    width: min(100%, 620px);
+    text-align: left;
+  }
+
+  .card--menu .card__title,
+  .card--menu .card__body {
+    grid-column: 1;
+  }
+
+  .card--menu .actions {
+    grid-column: 2;
+    grid-row: 1 / span 3;
+    margin-top: 0;
+  }
+
+  .card--menu .stats,
+  .card--menu .choice,
+  .card--menu .card__hint {
+    grid-column: 1 / -1;
+  }
+
+  .choice__options {
+    justify-content: flex-start;
+  }
+
+  .skins {
+    grid-template-columns: repeat(5, 1fr);
+    margin: 10px 0;
+  }
+
+  .card__title {
+    font-size: 22px;
+  }
+}

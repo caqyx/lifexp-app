@@ -1674,6 +1674,7 @@
       "wartime": "Wartime",
       "gridlock": "Gridlock",
       "quick-math": "Szybkie liczenie",
+      "wave-rush": "Wave Rush",
       "test": "Gra testowa"
     },
     "descriptions": {
@@ -1681,6 +1682,7 @@
       "wartime": "Turowa strategia: Europa, Azja i Afryka, od 1385 do 2026 roku.",
       "gridlock": "Neonowa gra zręcznościowa: unikaj laserów na planszy 16×16.",
       "quick-math": "Liczenie w pamięci na czas: poziomy trudności i rekordy.",
+      "wave-rush": "Przytrzymaj, by lecieć w górę, puść, by w dół: sektory coraz trudniejszych korytarzy.",
       "test": "Gra do testów automatycznych."
     },
     "play": "Graj",

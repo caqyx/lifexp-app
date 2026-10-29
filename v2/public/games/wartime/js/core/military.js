@@ -28,6 +28,7 @@ WT.military = (function () {
     var p = G().provinces[provId], d = D();
     if (p.owner === cc || p.ctrl === cc) return true;
     if (d.friendly(cc, p.owner) || d.friendly(cc, p.ctrl)) return true;
+    if (WT.land && WT.land.hasAccess(cc, p.owner) && p.ctrl === p.owner) return true;   // pakt o przejściu wojsk
     return d.atWar(cc, p.owner) || d.atWar(cc, p.ctrl);
   }
   /** Prowincja kontrolowana przez wroga (wejście kończy ruch, kosztuje 2). */
@@ -86,6 +87,23 @@ WT.military = (function () {
     return findPathFor(army.owner, army.prov, destProv);
   }
 
+  /**
+   * Trasa przez punkty pośrednie (w podanej kolejności): sklejone odcinki A*. null, gdy któryś odcinek nie istnieje
+   * (pole `failedAt` funkcji = indeks punktu, do którego nie ma drogi; via.length = cel).
+   */
+  function findPathVia(army, via, destProv) {
+    if (!army || army.embarked) return null;
+    var pts = (via || []).filter(function (v) { return v !== destProv; }).concat([destProv]), cur = army.prov, path = [];
+    findPathVia.failedAt = -1;
+    for (var i = 0; i < pts.length; i++) {
+      if (pts[i] === cur) continue;
+      var seg = findPathFor(army.owner, cur, pts[i]);
+      if (!seg) { findPathVia.failedAt = i; return null; }
+      path = path.concat(seg); cur = pts[i];
+    }
+    return path;
+  }
+
   /** Szacowana liczba tur przejścia trasą (dla UI). */
   function estimateTurns(cc, path) {
     var turns = path.length ? 1 : 0, pts = 0;
@@ -102,13 +120,15 @@ WT.military = (function () {
   // Rozkazy
   // =====================================================================
 
-  function order(armyId, destProv, sizeSoldiers) {
+  /** opts.via — prowincje, przez które armia musi przejść (w tej kolejności). */
+  function order(armyId, destProv, sizeSoldiers, opts) {
+    var via = opts && opts.via && opts.via.length ? opts.via : null;
     var army = G().armies[armyId];
     if (!army) return { ok: false, reason: 'Nie ma takiej armii.' };
     if (army.embarked) return { ok: false, reason: 'Armia jest na okrętach.' };
     if (destProv === army.prov) { army.path = []; return { ok: true, reason: 'Armia pozostaje na miejscu.', armyId: armyId }; }
-    var path = findPath(army, destProv);
-    if (!path) return { ok: false, reason: noPathReason(army, destProv) };
+    var path = via ? findPathVia(army, via, destProv) : findPath(army, destProv);
+    if (!path) return { ok: false, reason: via && findPathVia.failedAt < via.length ? 'Brak drogi do punktu pośredniego: ' + S.provStatic(via[findPathVia.failedAt]).name + '.' : noPathReason(army, destProv) };
     var mover = splitForOrder(army, sizeSoldiers);
     if (!mover) return { ok: false, reason: 'Wyślij co najmniej ' + MIN_ARMY + ' żołnierzy.' };
     mover.path = path;
@@ -138,6 +158,8 @@ WT.military = (function () {
     army.size -= size;
     var part = S.createArmy(army.owner, army.prov, size);
     part.moved = army.moved;
+    if (army.mix) part.mix = { arm: army.mix.arm, art: army.mix.art };
+    if (army.org != null) part.org = army.org;
     return part;
   }
 
@@ -164,6 +186,7 @@ WT.military = (function () {
     var moved = pool.reduce(function (m, a) { return Math.max(m, a.moved); }, 0);
     for (var i = 0; i < idle.length; i++) {
       if (idle[i] === main) continue;
+      if (W()) { var o = W().orgOf(main) * main.size + W().orgOf(idle[i]) * idle[i].size; main.mix = W().blend(main, idle[i], main.size, idle[i].size); main.org = U.round(o / (main.size + idle[i].size), 3); }
       main.size += idle[i].size;
       S.removeArmy(idle[i].id);
     }
@@ -219,18 +242,20 @@ WT.military = (function () {
 
   function morale(cc) { return 0.6 + 0.4 * S.country(cc).stability / 100; }
 
+  function W() { return WT.warfare || null; }
   function defenseBonus(defenders, provId, opts) {
     var p = G().provinces[provId], owners = defenders.map(function (a) { return a.owner; });
     var fortFriendly = owners.some(function (o) { return D().friendly(o, p.ctrl); });
     var bonus = 1 + (TERRAIN_DEFENSE[terrain(provId)] || 0);
-    if (fortFriendly) bonus += 0.25 * p.buildings.fort * (WT.tech ? WT.tech.mod(p.ctrl, 'fort') : 1);
+    if (fortFriendly) bonus += 0.25 * p.buildings.fort * (WT.tech ? WT.tech.mod(p.ctrl, 'fort') : 1) * (opts && opts.fortK != null ? opts.fortK : 1);
     if (opts && opts.landing) bonus += LANDING_PENALTY;
     return bonus;
   }
 
-  function sideStrength(armies, multiplier) {
-    var s = 0;
-    armies.forEach(function (a) { s += a.size * S.country(a.owner).tech * morale(a.owner); });
+  /** Siła strony: żołnierze × technologia × morale kraju × (skład, teren, organizacja armii). */
+  function sideStrength(armies, multiplier, provId, attacking) {
+    var s = 0, t = provId != null ? terrain(provId) : 'plains';
+    armies.forEach(function (a) { s += a.size * S.country(a.owner).tech * morale(a.owner) * (W() ? W().combatFactor(a, t, attacking) : 1); });
     return s * multiplier * U.randRange(0.85, 1.15);
   }
 
@@ -246,7 +271,8 @@ WT.military = (function () {
   function battle(attackers, defenders, provId, opts) {
     var sizeA = totalSize(attackers), sizeD = totalSize(defenders);
     var engA = engagedFraction(sizeA, sizeD), engD = engagedFraction(sizeD, sizeA);
-    var strA = sideStrength(attackers, engA), strD = sideStrength(defenders, engD * defenseBonus(defenders, provId, opts));
+    var dOpts = Object.assign({}, opts || {}, { fortK: W() ? W().fortFactor(attackers) : 1 });
+    var strA = sideStrength(attackers, engA, provId, true), strD = sideStrength(defenders, engD * defenseBonus(defenders, provId, dOpts), provId, false);
     var attWins = strA > strD;
     var fr = lossFractions(attWins ? strA : strD, attWins ? strD : strA);
     var lossesA = applyLosses(attackers, (attWins ? fr.winner : fr.loser) * engA);
@@ -257,6 +283,7 @@ WT.military = (function () {
       sizeA: sizeA, sizeD: sizeD, lossesA: lossesA, lossesD: lossesD, annihilated: fr.loser >= 1 };
     D().recordLosses(ownerA, ownerD, lossesA, lossesD);
     addExhaustion(ownerA, lossesA); addExhaustion(ownerD, lossesD);
+    if (W()) W().afterBattle(attWins ? attackers : defenders, attWins ? defenders : attackers);
     removeDead(attackers.concat(defenders));
     retreatLosers(attWins ? defenders : attackers);
     logBattle(result);
@@ -369,23 +396,27 @@ WT.military = (function () {
     var byOwner = {}, armies = G().armies;
     for (var id in armies) {
       var a = armies[id];
-      if (a.path.length && !a.embarked && a.moved < MOVE_POINTS) (byOwner[a.owner] = byOwner[a.owner] || []).push(a);
+      if (a.path.length && !a.embarked && a.moved < movePointsOf(a)) (byOwner[a.owner] = byOwner[a.owner] || []).push(a);
     }
     return byOwner;
   }
 
+  /** Punkty ruchu armii: wojska szybkie (≥35% składu) dają +1. */
+  function movePointsOf(a) { return W() ? W().movePoints(a, MOVE_POINTS) : MOVE_POINTS; }
+
   /** Jeden krok armii po trasie. Zwraca true, gdy armia się przesunęła. */
   function stepArmy(army) {
-    if (!army.path.length || army.embarked || army.moved >= MOVE_POINTS) return false;
+    var mp = movePointsOf(army);
+    if (!army.path.length || army.embarked || army.moved >= mp) return false;
     var next = army.path[0];
     if (!isAdjacent(army.prov, next) || !canEnter(army.owner, next)) { army.path = []; return false; }
     var cost = moveCost(army.owner, next);
-    if (army.moved > 0 && army.moved + cost > MOVE_POINTS) return false;
+    if (army.moved > 0 && army.moved + cost > mp) return false;
     var hostile = isHostileTerritory(army.owner, next);
     S.moveArmy(army, next);
     army.path.shift();
     army.moved += cost;
-    if (hostile) army.moved = Math.max(army.moved, MOVE_POINTS);
+    if (hostile) army.moved = Math.max(army.moved, mp);
     engageAt(next, army);
     if (!army.path.length) mergeIfIdle(army);      // dotarła do celu → dołącza do stojącej tam armii
     return true;
@@ -435,16 +466,16 @@ WT.military = (function () {
     var defended = armies.some(function (a) { return occupiers.indexOf(a) < 0 && occupiers.some(function (o) { return D().atWar(o.owner, a.owner); }); });
     if (defended) return;
     var occ = mainOwner(occupiers);
-    if (!siegeComplete(p, occ)) return;
+    if (!siegeComplete(p, occ, occupiers)) return;
     occupy(provId, occ);
   }
 
   /** Fort poziomu f wymaga f pełnych tur oblężenia (licząc od tury przybycia). */
-  function siegeComplete(p, occ) {
+  function siegeComplete(p, occ, occupiers) {
     var fort = p.buildings.fort;
     if (!fort || !D().atWar(occ, p.ctrl)) return true;
     if (!p.siege || p.siege.by !== occ) p.siege = { by: occ, t: 0 };
-    p.siege.t++;
+    p.siege.t += W() && occupiers && W().artShare(occupiers) >= W().SIEGE_ART ? 2 : 1;   // artyleria skraca oblężenie
     return p.siege.t > fort;
   }
 
@@ -481,9 +512,9 @@ WT.military = (function () {
   function warScore(war) { return D().warScore(war); }
 
   return {
-    MOVE_POINTS: MOVE_POINTS,
+    MOVE_POINTS: MOVE_POINTS, movePointsOf: movePointsOf,
     canEnter: canEnter, isHostileTerritory: isHostileTerritory, moveCost: moveCost, hostileArmies: hostileArmies,
-    findPath: findPath, findPathFor: findPathFor, estimateTurns: estimateTurns,
+    findPath: findPath, findPathVia: findPathVia, findPathFor: findPathFor, estimateTurns: estimateTurns,
     order: order, split: split, splitForOrder: splitForOrder, cancel: cancel, merge: merge, mergeIfIdle: mergeIfIdle, mergeAll: mergeAll, disband: disband, MIN_ARMY: MIN_ARMY, MIN_REMAINDER: MIN_REMAINDER,
     power: power, invalidatePower: invalidatePower, battle: battle, retreat: retreat, engageAt: engageAt,
     moveAll: moveAll, stepArmy: stepArmy, resetMoves: resetMoves, applyAttrition: applyAttrition, engagedFraction: engagedFraction,

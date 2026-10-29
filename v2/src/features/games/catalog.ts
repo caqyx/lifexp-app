@@ -1,13 +1,13 @@
-// The games of v2 (owner's decision 2026-10-26: exactly these four; v1's Coins, Snake,
-// 2048, Redstone and FPS stay in v1 until the cutover). A game with `src` runs in
-// GameHost (all four since g-4).
+// The games of v2 (owner's decision 2026-10-26: these four, plus Wave Rush from w-1;
+// v1's Coins, Snake, 2048, Redstone and FPS stay in v1 until the cutover). Every game
+// runs in GameHost.
 // Vendored games live in v2/public/games/<id>/ (scripts/vendor-game.mjs, VENDORED.json);
-// Flappy Bird and Szybkie liczenie are LifeXP's own, written in this repo in
-// v2/public/games/flappy/ and v2/public/games/quick-math/ (GAME.json).
-import { Bird, Calculator, FlaskConical, Grid3x3, type LucideIcon, Swords } from 'lucide-preact';
+// Flappy Bird, Szybkie liczenie and Wave Rush are LifeXP's own, written in this repo in
+// v2/public/games/flappy/, quick-math/ and wave-rush/ (GAME.json).
+import { Activity, Bird, Calculator, FlaskConical, Grid3x3, type LucideIcon, Swords } from 'lucide-preact';
 import { emulatorTarget } from '@/lib/emulator';
 
-export type GameId = 'flappy-bird' | 'wartime' | 'gridlock' | 'quick-math' | 'test';
+export type GameId = 'flappy-bird' | 'wartime' | 'gridlock' | 'quick-math' | 'wave-rush' | 'test';
 
 export interface GameDef {
   id: GameId;
@@ -30,6 +30,7 @@ export const GAMES: readonly GameDef[] = [
   { id: 'wartime', sessionName: 'Wartime', icon: Swords, src: 'games/wartime/index.html', landscape: true, downloads: true },
   { id: 'gridlock', sessionName: 'Gridlock', icon: Grid3x3, src: 'games/gridlock/index.html' },
   { id: 'quick-math', sessionName: 'Szybkie liczenie', icon: Calculator, src: 'games/quick-math/index.html' },
+  { id: 'wave-rush', sessionName: 'Wave Rush', icon: Activity, src: 'games/wave-rush/index.html', landscape: true },
 ];
 
 /**

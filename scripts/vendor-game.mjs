@@ -79,7 +79,15 @@ export const GAMES = {
   wartime: {
     source: 'https://github.com/szymonrogalski098-collab/Wartime',
     include: ['index.html', 'css', 'data', 'js'],
-    patches: [],
+    patches: [
+      {
+        file: 'css/mobile.css',
+        why: 'Menu (arkusz u dołu) mieści się w ekranie i przewija: na telefonie w poziomie (360 px wysokości) górne pozycje wychodziły poza ekran i nie dało się ich stuknąć.',
+        find: /(\n {2}\.dropdown \{ position: fixed; top: auto; left: calc\(8px \+ var\(--sa-l\)\); right: calc\(8px \+ var\(--sa-r\)\); bottom: calc\(8px \+ var\(--sa-b\)\); min-width: 0; z-index: 75; padding: 6px;) \}/,
+        replace:
+          '$1\n    max-height: calc(100vh - 16px - var(--sa-t) - var(--sa-b)); max-height: calc(100dvh - 16px - var(--sa-t) - var(--sa-b));\n    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }',
+      },
+    ],
   },
   gridlock: {
     source: 'https://github.com/szymonrogalski098-collab/gridlock',

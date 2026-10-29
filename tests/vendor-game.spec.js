@@ -110,6 +110,8 @@ const OWN_GAMES = [
   { id: 'flappy', prefix: 'lifexp-flappy-', storageArgs: ['BEST_KEY'] },
   // (the argument is read up to its first parenthesis: recordKey(level) → "recordKey(level")
   { id: 'quick-math', prefix: 'lifexp-quickmath-', storageArgs: ['MODE_KEY', 'recordKey(level'] },
+  // Every key goes through records.js's readJson/writeJson (KEYS: lifexp-waverush-*).
+  { id: 'wave-rush', prefix: 'lifexp-waverush-', storageArgs: ['key'] },
 ];
 
 for (const game of OWN_GAMES) {

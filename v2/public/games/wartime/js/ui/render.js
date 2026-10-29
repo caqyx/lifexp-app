@@ -55,6 +55,8 @@
   var keysDown = {};
   var lastFrame = 0, needsDraw = true, pendingTiles = false, dashPhase = 0;
   var hitArmies = [], hitFleets = [];
+  var moveAnim = {}, effects = [];   // animacje przejścia jednostek po turze i efekty (bitwy, zajęcia)
+  var MOVE_ANIM_MS = 550, FX_MS = 1500;
   var pointer = { down: false, button: 0, sx: 0, sy: 0, lx: 0, ly: 0, moved: false, dragUnit: null, x: 0, y: 0 };
 
   // Stan interakcji ustawiany przez WT.ui
@@ -176,12 +178,17 @@
     var t = econRank ? econRank[id] : 0;
     return t < 0.5 ? mix('#262a4a', '#2c7d78', t * 2) : mix('#2c7d78', '#d6e06c', (t - 0.5) * 2);
   }
+  function unrestColor(id) {
+    var g = G(), u = g && g.provinces[id] ? (g.provinces[id].unrest || 0) / 100 : 0;
+    return u < 0.35 ? mix('#2e4a3c', '#9a8a3a', u / 0.35) : mix('#9a8a3a', '#c2413c', Math.min(1, (u - 0.35) / 0.45));
+  }
   function provinceFill(id) {
     if (isVoid(id)) return COLORS.background;
     switch (mode) {
       case 'diplomatic': return diplomacyColor(id);
       case 'economic': return economyColor(id);
       case 'terrain': return TERRAIN_COLORS[MAP.provinces[id].terrain] || '#888';
+      case 'unrest': return unrestColor(id);
       default: return countryColor(ownerOf(id));
     }
   }
@@ -873,7 +880,19 @@
     if (plan && plan.points && plan.points.length > 1) {
       var color = !plan.ok ? COLORS.routeBad : (plan.kind === 'land' ? COLORS.route : COLORS.routeSea);
       drawPolyline(plan.points, color, 2.8, plan.label || null, true);
+      if (plan.via && plan.via.length) drawWaypoints(plan.via, color);
     }
+  }
+  // Punkty pośrednie trasy: ponumerowane kółka
+  function drawWaypoints(via, color) {
+    ctx.font = '700 11px ' + FONT_SANS; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    via.forEach(function (id, i) {
+      var pt = isSeaId(id) || !MAP.provinces[id] ? portPoint(id) : provPoint(id), sp = mapToScreen(pt[0], pt[1]);
+      ctx.beginPath(); ctx.arc(sp[0], sp[1], 10, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(4,8,14,0.85)'; ctx.fill();
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = '#eef6fb'; ctx.fillText(String(i + 1), sp[0], sp[1] + 0.5);
+    });
   }
   function provPoint(id) { var p = MAP.provinces[id]; return [p.cx, p.cy]; }
   function portPoint(id) {
@@ -1013,7 +1032,7 @@
     Object.keys(byProv).forEach(function (pid) {
       var list = byProv[pid].sort(function (a, b) { return a.owner === me ? -1 : b.owner === me ? 1 : a.owner < b.owner ? -1 : 1; });
       var c = mapToScreen(MAP.provinces[pid].cx, MAP.provinces[pid].cy);
-      layoutBoxes(list, c[0], c[1]).forEach(function (b) { drawArmyBox(b, me); });
+      layoutBoxes(list, c[0], c[1]).forEach(function (b) { var o = animOffset(b.army.id); b.x += o[0]; b.y += o[1]; drawArmyBox(b, me); });
     });
     setLetterSpacing(0);
   }
@@ -1046,7 +1065,19 @@
       roundRect(b.x - 2.5, b.y - 2.5, b.w + 5, b.h + 5, (b.h + 5) / 2); ctx.fillStyle = COLORS.select; ctx.fill();
     }
     ctx.globalAlpha = dragging ? 0.55 : 1;
+    var lead = a.lead || a, cut = WT.warfare && mine && !WT.warfare.isSupplied(lead);
+    if (cut) {   // okrążona (bez zaopatrzenia): czerwony przerywany pierścień
+      roundRect(b.x - 3, b.y - 3, b.w + 6, b.h + 6, (b.h + 6) / 2);
+      ctx.setLineDash([3, 3]); ctx.strokeStyle = COLORS.war; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
+    }
     drawPill(b.x, b.y, b.w, b.h, color, mine ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.45)', mine ? 1.3 : 1);
+    if (WT.warfare && mine) {   // pasek organizacji pod pigułką
+      var org = WT.warfare.orgOf(lead);
+      if (org < 0.99) {
+        ctx.fillStyle = 'rgba(4,8,14,0.75)'; ctx.fillRect(b.x + 6, b.y + b.h + 1, b.w - 12, 3);
+        ctx.fillStyle = org < 0.35 ? COLORS.war : org < 0.7 ? '#e8b84a' : COLORS.ok; ctx.fillRect(b.x + 6, b.y + b.h + 1, (b.w - 12) * org, 3);
+      }
+    }
     var light = luminance(color) > 0.6;
     ctx.fillStyle = light ? '#0b1118' : '#ffffff';
     ctx.fillText(fmtK(a.size), b.x + b.w / 2, b.y + b.h / 2 + 0.5);
@@ -1078,7 +1109,7 @@
     Object.keys(byPort).forEach(function (pid) {
       var pt = portPoint(+pid), s = mapToScreen(pt[0], pt[1]);
       if (s[0] < -60 || s[0] > viewW + 60 || s[1] < -30 || s[1] > viewH + 30) return;
-      byPort[pid].forEach(function (f, i) { drawFleetIcon(f, s[0] - 4, s[1] + 4 + i * 22, me); });
+      byPort[pid].forEach(function (f, i) { var o = animOffset(f.id); drawFleetIcon(f, s[0] - 4 + o[0], s[1] + 4 + i * 22 + o[1], me); });
     });
   }
   function drawFleetIcon(f, x, y, me) {
@@ -1209,6 +1240,100 @@
     ctx.restore();
   }
 
+  // ---------------------------------------------------------------------------
+  // Animacje po turze: przejście jednostek z poprzedniej pozycji, efekty bitew i zajęć
+  // ---------------------------------------------------------------------------
+  function ease(t) { return 1 - Math.pow(1 - t, 3); }
+  /** Przesunięcie (px ekranu) markera jednostki w trakcie animacji przejścia. */
+  function animOffset(id) {
+    var a = moveAnim[id]; if (!a) return [0, 0];
+    var t = (performance.now() - a.t0) / MOVE_ANIM_MS;
+    if (t >= 1) { delete moveAnim[id]; return [0, 0]; }
+    var k = 1 - ease(Math.max(0, t));
+    return [(a.from[0] - a.to[0]) * cam.zoom * k, (a.from[1] - a.to[1]) * cam.zoom * k];
+  }
+  function nodeXY(id) { return id >= SEA_BASE || !MAP.provinces[id] ? portPoint(id) : provPoint(id); }
+  /** snapshot: { armies: {id: prov}, fleets: {id: node} } sprzed tury. */
+  R.animateFrom = function (snapshot) {
+    var g = G(); if (!g || !snapshot) return;
+    var t0 = performance.now();
+    moveAnim = {};
+    Object.keys(snapshot.armies || {}).forEach(function (id) {
+      var a = g.armies[id], from = snapshot.armies[id];
+      if (a && !a.embarked && a.prov !== from && MAP.provinces[from]) moveAnim[id] = { from: provPoint(from), to: provPoint(a.prov), t0: t0 };
+    });
+    Object.keys(snapshot.fleets || {}).forEach(function (id) {
+      var f = (g.fleets || {})[id], from = snapshot.fleets[id];
+      if (f && f.prov !== from) moveAnim[id] = { from: nodeXY(from), to: nodeXY(f.prov), t0: t0 };
+    });
+    needsDraw = true;
+  };
+  /** Efekt na mapie: kind 'battle' | 'occupy' | 'shell' | 'bomb'. */
+  R.flash = function (provId, kind, delayMs) {
+    if (!MAP.provinces[provId] || effects.length > 40) return;
+    var p = MAP.provinces[provId];
+    effects.push({ x: p.cx, y: p.cy, kind: kind || 'battle', t0: performance.now() + (delayMs || 0) });
+    needsDraw = true;
+  };
+  function drawEffects() {
+    if (!effects.length) return;
+    applyScreenTransform();
+    var now = performance.now();
+    effects = effects.filter(function (e) { return now - e.t0 < FX_MS; });
+    effects.forEach(function (e) {
+      var t = (now - e.t0) / FX_MS; if (t < 0) return;
+      var s = mapToScreen(e.x, e.y);
+      if (s[0] < -80 || s[0] > viewW + 80 || s[1] < -80 || s[1] > viewH + 80) return;
+      var rgb = e.kind === 'occupy' ? COLORS.accentRgb : e.kind === 'shell' || e.kind === 'bomb' ? '255,170,80' : '255,107,107';
+      for (var k = 0; k < 2; k++) {
+        var tt = Math.min(1, t * 1.3 - k * 0.25); if (tt <= 0) continue;
+        ctx.beginPath(); ctx.arc(s[0], s[1], 8 + ease(tt) * 34, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(' + rgb + ',' + (0.85 * (1 - tt)).toFixed(3) + ')'; ctx.lineWidth = 2.5 - tt * 1.5; ctx.stroke();
+      }
+      if (e.kind === 'battle' && t < 0.7) {   // błysk + skrzyżowane miecze
+        var a = 1 - t / 0.7;
+        ctx.beginPath(); ctx.arc(s[0], s[1], 10 * (1 - t * 0.5), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255,220,160,' + (0.55 * a).toFixed(3) + ')'; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,245,230,' + a.toFixed(3) + ')'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(s[0] - 7, s[1] - 7); ctx.lineTo(s[0] + 7, s[1] + 7); ctx.moveTo(s[0] + 7, s[1] - 7); ctx.lineTo(s[0] - 7, s[1] + 7); ctx.stroke();
+        ctx.lineCap = 'butt';
+      }
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Minimapa (obraz świata z cache + prostokąt widoku); kliknięcie przenosi kamerę
+  // ---------------------------------------------------------------------------
+  var mini = { el: null, ctx: null, key: '' };
+  R.attachMinimap = function (el) {
+    mini.el = el; mini.ctx = el.getContext('2d'); mini.key = '';
+    var jump = function (e) {
+      var r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * MAP.width, y = (e.clientY - r.top) / r.height * MAP.height;
+      R.centerOn(x, y); e.preventDefault();
+    };
+    var down = false;
+    el.addEventListener('pointerdown', function (e) { down = true; try { el.setPointerCapture(e.pointerId); } catch (err) { /* ignoruj */ } jump(e); });
+    el.addEventListener('pointermove', function (e) { if (down) jump(e); });
+    el.addEventListener('pointerup', function () { down = false; });
+    el.addEventListener('pointercancel', function () { down = false; });
+  };
+  function drawMinimap() {
+    if (!mini.el || !world || !mini.el.offsetWidth) return;
+    var key = cam.x.toFixed(0) + ',' + cam.y.toFixed(0) + ',' + cam.zoom.toFixed(3) + ',' + world.ver;
+    if (key === mini.key) return;
+    mini.key = key;
+    var d = Math.min(2, window.devicePixelRatio || 1), w = mini.el.clientWidth, h = mini.el.clientHeight;
+    if (mini.el.width !== Math.round(w * d)) { mini.el.width = Math.round(w * d); mini.el.height = Math.round(h * d); }
+    var g = mini.ctx;
+    g.setTransform(d, 0, 0, d, 0, 0);
+    g.fillStyle = COLORS.seaDeep; g.fillRect(0, 0, w, h);
+    g.drawImage(world.canvas, 0, 0, world.canvas.width, world.canvas.height, 0, 0, w, h);
+    var kx = w / MAP.width, ky = h / MAP.height;
+    var vx = cam.x * kx, vy = cam.y * ky, vw = viewW / cam.zoom * kx, vh = viewH / cam.zoom * ky;
+    g.fillStyle = 'rgba(' + COLORS.accentRgb + ',0.10)'; g.fillRect(vx, vy, vw, vh);
+    g.strokeStyle = COLORS.accent; g.lineWidth = 1.5; g.strokeRect(vx, vy, vw, vh);
+  }
+
   // Duch przeciąganej jednostki przy kursorze
   function drawDragGhost() {
     if (!pointer.dragUnit || !pointer.moved) return;
@@ -1225,7 +1350,7 @@
   // Pętla klatek
   // ---------------------------------------------------------------------------
   // animowany przesuw kresek tylko dla planowanej trasy i trasy zaznaczonej jednostki (zaznaczenie prowincji jest statyczne)
-  function hasAnimation() { return !!(view.preview || view.pending || selHasRoute() || airborne() || shelling()); }
+  function hasAnimation() { return !!(view.preview || view.pending || selHasRoute() || airborne() || shelling() || effects.length || Object.keys(moveAnim).length); }
   function shelling() {
     var g = G(); if (!g || !g.fleets) return false;
     for (var id in g.fleets) if (g.fleets[id].owner === g.player && g.fleets[id].shellTarget != null) return true;
@@ -1277,7 +1402,9 @@
     drawArmies();
     drawFleets();
     drawAir();
+    drawEffects();
     drawDragGhost();
+    drawMinimap();
   }
   var fps = { frames: 0, t0: 0, value: 0 };
   function fpsTick(now) { fps.frames++; if (now - fps.t0 > 1000) { fps.value = fps.frames * 1000 / (now - fps.t0); fps.frames = 0; fps.t0 = now; } }
@@ -1395,7 +1522,7 @@
     var m = screenToMap(p[0], p[1]), prov = pickProvince(m[0], m[1]), sea = seaAt(prov, m[0], m[1]);
     if (unit && wasDrag) { call('dragDrop', unit, prov, sea); needsDraw = true; return; }
     if (wasDrag) return;
-    if (button === 2) { call('rightClick', prov, p[0], p[1], sea); needsDraw = true; return; }
+    if (button === 2) { call('rightClick', prov, p[0], p[1], sea, e); needsDraw = true; return; }
     if (button !== 0) return;
     var u = pickUnitAt(p[0], p[1]);
     if (u) call('unitClick', u, e.shiftKey);

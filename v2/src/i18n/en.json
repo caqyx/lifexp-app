@@ -1674,6 +1674,7 @@
       "wartime": "Wartime",
       "gridlock": "Gridlock",
       "quick-math": "Quick Math",
+      "wave-rush": "Wave Rush",
       "test": "Test game"
     },
     "descriptions": {
@@ -1681,6 +1682,7 @@
       "wartime": "Turn-based strategy: Europe, Asia and Africa, from 1385 to 2026.",
       "gridlock": "A neon arcade game: dodge the lasers on a 16×16 grid.",
       "quick-math": "Mental maths against the clock: difficulty levels and records.",
+      "wave-rush": "Hold to fly up, let go to dive: sectors of ever harder corridors.",
       "test": "A game for automated tests."
     },
     "play": "Play",
