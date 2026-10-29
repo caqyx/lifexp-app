@@ -1,0 +1,210 @@
+// @ts-check
+// Sector 3 "Trudny" (docs/v2/PLAN.md 9.1, stage w-1): 15 sections at speed 1.0;
+// sections 1–5 shuffled and played first, then 6–15. One gravity portal per run at a
+// section boundary, and the portal back two sections later (run.js), so every section
+// here is proven in both gravities. Corridors ≥ 4.5 hitboxes, and the narrow ones are
+// diagonal (45° walls the wave can graze while flying along them).
+
+/** @type {import('../geometry.js').SectionData[]} */
+export const SECTOR3 = [
+  // ── 1–5 ──
+  {
+    id: 's3-01',
+    length: 36,
+    ceil: '2 r4 d2.2 d3 u3 d3 u3 d3 u3 u2.2 r9.6',
+    floor: '10 r4 u2.2 d3 u3 d3 u3 d3 u3 d2.2 r9.6',
+    hazards: [],
+    deco: [
+      { type: 'chain', x: 29.5, len: 1.5, ornament: 'diamond' },
+      { type: 'sawtooth', from: 6.2, to: 24.2, on: 'ceil' },
+    ],
+  },
+  {
+    id: 's3-02',
+    length: 36,
+    ceil: '2 r4 +1.2 r3 +1.2 r3 +1.1 r6 -1.1 r3 -1.2 r3 -1.2 r14',
+    floor: '10 r36',
+    hazards: [
+      { type: 'spike', x: 14, on: 'floor', count: 2 },
+      { type: 'spike', x: 25, on: 'floor', count: 1 },
+      { type: 'spike', x: 29, on: 'ceil', count: 2 },
+    ],
+    deco: [{ type: 'gear', x: 15, y: 7.2, size: 1.3 }],
+  },
+  {
+    id: 's3-03',
+    length: 36,
+    ceil: '2 r36',
+    floor: '10 r36',
+    hazards: [
+      { type: 'pillar', x: 8, on: 'floor', h: 4 },
+      { type: 'spike', x: 8, y: 6, dir: 'up' },
+      { type: 'pillar', x: 14, on: 'ceil', h: 4 },
+      { type: 'spike', x: 14, y: 6, dir: 'down' },
+      { type: 'pillar', x: 20, on: 'floor', h: 4 },
+      { type: 'spike', x: 20, y: 6, dir: 'up' },
+      { type: 'pillar', x: 26, on: 'ceil', h: 4 },
+      { type: 'spike', x: 26, y: 6, dir: 'down' },
+    ],
+    deco: [{ type: 'chain', x: 11.5, len: 2, ornament: 'triangle' }],
+  },
+  {
+    id: 's3-04',
+    length: 36,
+    ceil: '2 r36',
+    floor: '10 r36',
+    hazards: [
+      { type: 'saw', x: 8, y: 8, r: 1.3 },
+      { type: 'saw', x: 13, y: 4, r: 1.3 },
+      { type: 'saw', x: 18, y: 8, r: 1.3 },
+      { type: 'saw', x: 23, y: 4, r: 1.3 },
+      { type: 'saw', x: 28, y: 8, r: 1.3 },
+    ],
+  },
+  {
+    id: 's3-05',
+    length: 38,
+    ceil: '2 r5 d2 r8 u2 r6 d2 r6 u2 r5',
+    floor: '10 r38',
+    hazards: [
+      { type: 'orb', x: 11, y: 8.2, r: 0.9 },
+      { type: 'block', x: 17, y: 6.6, w: 2, h: 3.4 },
+      { type: 'spike', x: 17, y: 6.6, dir: 'up', count: 2 },
+      { type: 'orb', x: 27, y: 8.6, r: 0.8 },
+    ],
+    deco: [{ type: 'star', x: 18, y: 3.2, size: 0.8 }],
+  },
+  // ── 6–15 ──
+  {
+    id: 's3-06',
+    length: 40,
+    ceil: '2 r40',
+    floor: '10 r40',
+    hazards: [
+      { type: 'spike', x: 6, on: 'floor', count: 3 },
+      { type: 'spike', x: 11, on: 'ceil', count: 3 },
+      { type: 'halfSpike', x: 9, on: 'ceil', count: 2 },
+      { type: 'spike', x: 17, on: 'floor', count: 3 },
+      { type: 'halfSpike', x: 14, on: 'floor', count: 3 },
+      { type: 'spike', x: 23, on: 'ceil', count: 3 },
+      { type: 'halfSpike', x: 20, on: 'ceil', count: 3 },
+      { type: 'spike', x: 29, on: 'floor', count: 3 },
+      { type: 'halfSpike', x: 26, on: 'floor', count: 3 },
+      { type: 'orb', x: 34, y: 6, r: 0.8 },
+    ],
+    deco: [{ type: 'sawtooth', from: 3, to: 37, on: 'floor' }],
+  },
+  {
+    id: 's3-07',
+    length: 40,
+    ceil: '2 r4 u1 r30 d1 r4',
+    floor: '10 r4 d1 r30 u1 r4',
+    hazards: [
+      { type: 'block', x: 9, y: 1, w: 2, h: 4.6 },
+      { type: 'spike', x: 9, y: 5.6, dir: 'down', count: 2 },
+      { type: 'block', x: 15, y: 6.4, w: 2, h: 4.6 },
+      { type: 'spike', x: 15, y: 6.4, dir: 'up', count: 2 },
+      { type: 'block', x: 21, y: 1, w: 2, h: 4.6 },
+      { type: 'spike', x: 21, y: 5.6, dir: 'down', count: 2 },
+      { type: 'block', x: 27, y: 6.4, w: 2, h: 4.6 },
+      { type: 'spike', x: 27, y: 6.4, dir: 'up', count: 2 },
+    ],
+  },
+  {
+    id: 's3-08',
+    length: 36,
+    ceil: '2 r4 d1.75 r2 d2.5 u5 d5 u2.5 r2 u1.75 r9.5',
+    floor: '10 r4 u1.75 r2 d2.5 u5 d5 u2.5 r2 d1.75 r9.5',
+    hazards: [
+      { type: 'spike', x: 27, on: 'floor', count: 2 },
+      { type: 'spike', x: 31, on: 'ceil', count: 2 },
+    ],
+    deco: [{ type: 'chain', x: 33.5, len: 1.5, ornament: 'star' }],
+  },
+  {
+    id: 's3-09',
+    length: 40,
+    ceil: '2 r3 -1 r34 +1 r3',
+    floor: '10 r4 -1.5 r3 -1.5 r3 -1.5 r4 +1.5 r3 +1.5 r3 +1.5 r20',
+    hazards: [
+      { type: 'halfSpike', x: 8, on: 'floor', count: 2 },
+      { type: 'halfSpike', x: 14, on: 'ceil', count: 2 },
+      { type: 'saw', x: 33, y: 8.5, r: 1 },
+    ],
+  },
+  {
+    id: 's3-10',
+    length: 40,
+    ceil: '2 r40',
+    floor: '10 r40',
+    hazards: [
+      { type: 'orb', x: 9, y: 6, r: 1.1 },
+      { type: 'saw', x: 15, y: 9, r: 1.4 },
+      { type: 'saw', x: 15, y: 3, r: 1.4 },
+      { type: 'orb', x: 21, y: 6, r: 1.1 },
+      { type: 'saw', x: 27, y: 9, r: 1.4 },
+      { type: 'saw', x: 27, y: 3, r: 1.4 },
+      { type: 'orb', x: 33, y: 6, r: 1.1 },
+    ],
+  },
+  {
+    id: 's3-11',
+    length: 40,
+    ceil: '2 r3 d3 r3 u3 r3 d3 r3 u3 r3 d3 r3 u3 r4',
+    floor: '10 r10 u2 r3 d2 r7 u2 r3 d2 r9',
+    hazards: [
+      { type: 'spike', x: 6, on: 'ceil', count: 3 },
+      { type: 'spike', x: 18, on: 'ceil', count: 3 },
+      { type: 'spike', x: 30, on: 'ceil', count: 3 },
+    ],
+  },
+  {
+    id: 's3-12',
+    length: 40,
+    ceil: '2 r40',
+    floor: '10 r40',
+    hazards: [
+      { type: 'pillar', x: 8, on: 'floor', h: 4 },
+      { type: 'pillar', x: 13, on: 'ceil', h: 3 },
+      { type: 'spike', x: 13, y: 5, dir: 'down' },
+      { type: 'pillar', x: 17, on: 'floor', h: 3 },
+      { type: 'spike', x: 17, y: 7, dir: 'up' },
+      { type: 'pillar', x: 21, on: 'ceil', h: 5 },
+      { type: 'orb', x: 27, y: 7.5, r: 1 },
+      { type: 'spike', x: 31, on: 'ceil', count: 2 },
+    ],
+  },
+  {
+    id: 's3-13',
+    length: 36,
+    ceil: '2 r4 d2.2 d2 u4 d3 u2 d4 u3 u2.2 r9.6',
+    floor: '10 r4 u2.2 d2 u4 d3 u2 d4 u3 d2.2 r9.6',
+    hazards: [],
+    deco: [{ type: 'sawtooth', from: 6.2, to: 24.2, on: 'floor' }],
+  },
+  {
+    id: 's3-14',
+    length: 40,
+    ceil: '2 r5 d3 r4 u3 r6 d3 r4 u3 r9',
+    floor: '10 r40',
+    hazards: [
+      { type: 'spike', x: 8, on: 'ceil', count: 3 },
+      { type: 'spike', x: 24, on: 'ceil', count: 3 },
+      { type: 'spike', x: 16, on: 'floor', count: 3 },
+      { type: 'saw', x: 34, y: 6, r: 1.2 },
+    ],
+  },
+  {
+    id: 's3-15',
+    length: 42,
+    ceil: '2 r4 d2 r3 +1 r3 +1 r3 -1 r3 -1 r3 u2 r4 d3 r3 u3 r6',
+    floor: '10 r42',
+    hazards: [
+      { type: 'halfSpike', x: 10, on: 'floor', count: 2 },
+      { type: 'orb', x: 17, y: 8.5, r: 0.8 },
+      { type: 'spike', x: 22, on: 'floor', count: 2 },
+      { type: 'spike', x: 30, on: 'ceil', count: 3 },
+    ],
+    deco: [{ type: 'chain', x: 36.5, len: 2, ornament: 'diamond' }],
+  },
+];

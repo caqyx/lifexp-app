@@ -73,18 +73,18 @@ async function openGame(page, account) {
 test.describe('on a phone', () => {
   test.use({ viewport: PHONE });
 
-  test('the list: four games, each with a line, its time today and "Graj"', async ({ page, account }) => {
+  test('the list: five games, each with a line, its time today and "Graj"', async ({ page, account }) => {
     await openSignedIn(page, account, '#/today');
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.getByLabel('Nawigacja').getByRole('link', { name: 'Gry' }).click();
     await expect(page).toHaveURL(/#\/games$/);
 
     const cards = page.getByRole('list', { name: 'Gry' }).getByRole('listitem');
-    await expect(cards).toHaveCount(4);
-    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie']);
+    await expect(cards).toHaveCount(5);
+    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush']);
     for (const card of await cards.all()) await expect(card.getByText('Dziś jeszcze nie grano')).toBeVisible();
-    // All four are in (g-2, g-3, g-4): nothing is "Wkrótce" any more.
-    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie']) {
+    // All are in (g-2, g-3, g-4, w-1): nothing is "Wkrótce" any more.
+    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush']) {
       await expect(page.getByRole('link', { name: `Graj: ${name}` })).toBeVisible();
     }
     await expect(page.getByText('Wkrótce')).toHaveCount(0);
@@ -682,6 +682,139 @@ test.describe('Szybkie liczenie', () => {
     await expect(game.getByRole('heading', { name: 'Koniec treningu' })).toBeVisible();
     await expect(game.locator('#end-accuracy')).toContainText('100%');
     expect(await page.evaluate(() => localStorage.getItem('lifexp-quickmath-best-hard'))).toBeNull();
+    expect(problems).toEqual([]);
+  });
+});
+
+// ── Wave Rush (stage w-1): LifeXP's own game, in the same frame and CSP ──
+
+/** The game's state (data-debug-*), as numbers where they are. */
+const waveState = (game) =>
+  game.locator('#stage').evaluate((el) => ({
+    state: el.dataset.state,
+    x: Number(el.dataset.debugX),
+    sector: Number(el.dataset.debugSector),
+    section: Number(el.dataset.debugSection),
+    attempt: Number(el.dataset.debugAttempt),
+    checkpoint: Number(el.dataset.debugCheckpoint),
+    pilot: el.dataset.debugPilot === '1',
+  }));
+
+test.describe('Wave Rush', () => {
+  test.describe('on a touch phone held upright', () => {
+    test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+
+    test('skins (the last one locked) survive a reload; a run flies sections, a crash starts again at sector 1, Zakończ records the time', async ({ page, account }) => {
+      test.setTimeout(90000);
+      const problems = await watchProblems(page);
+      await page.clock.install();
+      const { host, game } = await playFromList(page, account, 'Wave Rush');
+      // Better sideways: the host says so, and the game still plays upright.
+      await expect(host.getByRole('note')).toBeVisible();
+      const stage = game.locator('#stage');
+      await expect(stage).toHaveAttribute('data-state', 'menu');
+      await expect(game.getByRole('heading', { name: 'Wave Rush' })).toBeVisible();
+      await expect(game.getByText('Wygodniej w poziomie')).toBeVisible(); // ?lang=pl from the host
+
+      // Skins: pick one; the last is locked and cannot be picked.
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      const skins = game.locator('#skin-list');
+      await expect(skins.getByRole('button')).toHaveCount(10);
+      await expect(skins.getByRole('button', { name: /Klasyk/ })).toHaveAttribute('aria-pressed', 'true');
+      const locked = skins.getByRole('button', { name: /Korona Demona/ });
+      await expect(locked).toBeDisabled();
+      await expect(locked).toContainText('Zablokowana');
+      await locked.tap({ force: true });
+      await expect(locked).toHaveAttribute('aria-pressed', 'false');
+      await skins.getByRole('button', { name: /Turkus/ }).tap();
+      await expect(skins.getByRole('button', { name: /Turkus/ })).toHaveAttribute('aria-pressed', 'true');
+      expect(await page.evaluate(() => localStorage.getItem('lifexp-waverush-skin'))).toBe('"teal"');
+      await page.reload();
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      await expect(skins.getByRole('button', { name: /Turkus/ })).toHaveAttribute('aria-pressed', 'true');
+      await game.getByRole('button', { name: 'Gotowe' }).tap();
+
+      // A run from the start: the solver's path for the seed (?autopilot=2, test only) flies
+      // sections 1 and 2 and lets go at the start of section 3.
+      await reopenFrameWith(page, host, 'seed=7&autopilot=2');
+      await game.getByRole('button', { name: 'Graj' }).tap();
+      await expect(stage).toHaveAttribute('data-state', 'ready');
+      await stage.tap();
+      await expect(stage).toHaveAttribute('data-state', 'playing');
+      await expect.poll(async () => (await waveState(game)).section, { timeout: 40000 }).toBeGreaterThanOrEqual(3);
+      expect(await waveState(game)).toMatchObject({ sector: 1, attempt: 1 });
+
+      // Hands off: the wave crashes, the result says where, and a tap starts again at sector 1.
+      await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 10000 });
+      const dead = game.getByRole('region', { name: 'Rozbity!' });
+      await expect(dead).toContainText('Sektor 1, sekcja 3');
+      await expect(dead.getByText('Nowy rekord!')).toBeVisible();
+      const best = JSON.parse(await page.evaluate(() => localStorage.getItem('lifexp-waverush-best')));
+      expect(best).toMatchObject({ sector: 1 });
+      expect(best.section).toBeGreaterThanOrEqual(3);
+      await page.waitForTimeout(600);
+      await stage.tap();
+      await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+      expect(await waveState(game)).toMatchObject({ sector: 1, section: 1 });
+
+      await endAndExpectSession(page, account, 'Wave Rush');
+      expect(problems).toEqual([]);
+    });
+  });
+
+  test('sideways 800×360: the full height, a jump to sector 2, a crash goes back to sector 1; Praktyka goes back to the sector’s checkpoint', async ({ page, account }) => {
+    test.setTimeout(90000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Wave Rush');
+    await expect(host.getByRole('note')).toBeHidden();
+    await host.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const frameBox = await host.locator('iframe').boundingBox();
+    expect(frameBox.height).toBe(360);
+    const stage = game.locator('#stage');
+    const stageBox = await stage.boundingBox();
+    expect(Math.abs(stageBox.height - frameBox.height)).toBeLessThan(2);
+
+    // Normal mode, jumped (test only) into sector 2: a crash still starts again at sector 1.
+    await reopenFrameWith(page, host, 'seed=11&sector=2&section=3');
+    await game.getByRole('button', { name: 'Graj' }).click();
+    await host.locator('iframe').focus();
+    await page.keyboard.down('Space');
+    await page.keyboard.up('Space');
+    await expect(stage).toHaveAttribute('data-state', 'playing');
+    expect((await waveState(game)).sector).toBe(2);
+    await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 10000 });
+    await page.waitForTimeout(600);
+    await page.keyboard.press('Space');
+    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    expect(await waveState(game)).toMatchObject({ sector: 1, section: 1 });
+    // The jumped run kept no record (only the new run from the start may, once it gets anywhere).
+    const kept = await page.evaluate(() => localStorage.getItem('lifexp-waverush-best'));
+    expect(kept === null || JSON.parse(kept).sector === 1).toBe(true);
+
+    // Praktyka from sector 2, section 3: the pilot flies that section, lets go in section 4,
+    // the wave crashes, and a tap brings it back at sector 2's start.
+    await reopenFrameWith(page, host, 'seed=12&sector=2&section=3&autopilot=1');
+    await game.getByRole('button', { name: 'Praktyka' }).click();
+    await stage.click();
+    await expect(stage).toHaveAttribute('data-state', 'playing');
+    await expect(game.locator('.hud__practice')).toBeVisible();
+    const start = await waveState(game);
+    await expect.poll(async () => (await waveState(game)).section, { timeout: 30000 }).toBeGreaterThanOrEqual(4);
+    await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 10000 });
+    expect((await waveState(game)).section).toBe(4);
+    await expect(game.getByText('Stuknij, żeby wrócić do punktu kontrolnego')).toBeVisible();
+    await page.waitForTimeout(600);
+    await stage.click();
+    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    const after = await waveState(game);
+    expect(after.checkpoint).toBe(start.checkpoint);
+    expect(after.x).toBeLessThan(start.checkpoint + 2);
+    expect(after.x).toBeLessThan(start.x);
+    await expect.poll(async () => (await waveState(game)).sector).toBe(2);
+    expect((await waveState(game)).section).toBeLessThanOrEqual(2);
+    // Practice keeps no record.
+    expect(await page.evaluate(() => localStorage.getItem('lifexp-waverush-best'))).toBe(kept);
     expect(problems).toEqual([]);
   });
 });
