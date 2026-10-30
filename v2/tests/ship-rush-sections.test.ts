@@ -5,7 +5,7 @@
 // falling. CI fails on a section nobody could fly (the validator: public/games/_engine/
 // beam.js with ship-rush/js/prove.js).
 import { describe, expect, test } from 'vitest';
-import { SECTORS } from '../public/games/ship-rush/js/config.js';
+import { FINALE, FINALE_ID, SECTORS } from '../public/games/ship-rush/js/config.js';
 import { sectionProblems } from '../public/games/ship-rush/js/prove.js';
 import { SECTION_LIBRARY } from '../public/games/ship-rush/js/sections/index.js';
 
@@ -17,3 +17,11 @@ describe('every Ship Rush section is passable for a human', () => {
     });
   }
 });
+
+describe('the finale is passable for a human', () => {
+  test('every ship stretch (from every entry) and every wave stretch (from every height, by the wave solver)', { timeout: 300_000 }, () => {
+    const problems = SECTION_LIBRARY[FINALE_ID]!.flatMap((data, i) => sectionProblems(data, FINALE, i + 1));
+    expect(problems).toEqual([]);
+  });
+});
+

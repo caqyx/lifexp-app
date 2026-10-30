@@ -203,3 +203,38 @@ export function drawShip(ctx, skin, x, y, size, angle, thrust, flipped, time) {
   ctx.fill();
   ctx.restore();
 }
+
+/**
+ * The wave (the finale's wave stretches): a dart in the skin's colours, its canopy glass
+ * as the accent, turned to its flight.
+ * @param {CanvasRenderingContext2D} ctx @param {Skin} skin @param {number} x @param {number} y @param {number} size
+ * @param {number} angle @param {boolean} flipped
+ */
+export function drawWaveIcon(ctx, skin, x, y, size, angle, flipped) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(size, flipped ? -size : size);
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0.55, 0);
+  ctx.lineTo(-0.5, -0.42);
+  ctx.lineTo(-0.28, 0);
+  ctx.lineTo(-0.5, 0.42);
+  ctx.closePath();
+  ctx.fillStyle = skin.body;
+  ctx.fill();
+  ctx.lineWidth = 0.08;
+  ctx.strokeStyle = skin.edge;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0.25, 0);
+  ctx.lineTo(-0.2, -0.15);
+  ctx.lineTo(-0.1, 0);
+  ctx.lineTo(-0.2, 0.15);
+  ctx.closePath();
+  ctx.fillStyle = skin.accent;
+  ctx.fill();
+  ctx.restore();
+}
+

@@ -5,7 +5,9 @@
 // ship may rest on or slide under (physics.js says exactly when) — and everything else
 // that hurts (spikes, half-spikes, saws, orbs, mines) is a HAZARD, deadly on any touch.
 // Ship terrain is level runs and vertical steps only: a slope would be a surface the ship
-// can neither rest on nor be told apart from a wall, so sections never have one.
+// can neither rest on nor be told apart from a wall, so ship sections never have one
+// (prove.js checks). The finale's wave stretches have 45° slopes; they are no solid for
+// the ship (it never flies there: the vehicle portal stands in the stretch's open joint).
 import { capsuleHitsHazard } from '../../_engine/geometry.js';
 import { pieceIndexAt } from '../../_engine/level.js';
 
@@ -26,7 +28,7 @@ export const isSolid = (h) => h.type === 'block' || h.type === 'pillar';
 
 /**
  * The level runs of a profile as boxes reaching away from the corridor; consecutive runs
- * at one height are one box (no seam to catch on). A slope is refused.
+ * at one height are one box (no seam to catch on). Slopes are skipped.
  * @param {Geometry} g @param {'ceil' | 'floor'} side @returns {Solid[]}
  */
 function terrainSolids(g, side) {
@@ -34,8 +36,7 @@ function terrainSolids(g, side) {
   /** @type {Solid[]} */
   const out = [];
   for (const s of segs) {
-    if (s.slope === null) continue;
-    if (s.slope !== 0) throw new Error(`${g.id}: ${side} has a slope at x=${s.x0} (ship terrain is level runs and steps)`);
+    if (s.slope === null || s.slope !== 0) continue;
     const last = out[out.length - 1];
     const level = s.y0;
     if (last && Math.abs(last.x1 - s.x0) < 1e-9 && (side === 'floor' ? last.y0 : last.y1) === level) {

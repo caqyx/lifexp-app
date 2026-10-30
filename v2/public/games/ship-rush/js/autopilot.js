@@ -2,8 +2,10 @@
 // Test-only pilot (loaded by the page only with ?seed=&autopilot=<k>): the validator's
 // plan from where the ship really is, applied as the input on every physics step, so the
 // browser test can fly through sections. Replans when the plan runs out or the ship
-// drifts from it (docs/v2/PLAN.md 9.1, stage s-1).
+// drifts from it (docs/v2/PLAN.md 9.1, stages s-1 and s-2). The finale's wave stretches
+// are flown by the wave solver's course (../../_engine/wavepilot.js).
 import { solveBeam } from '../../_engine/beam.js';
+import { courseHold, expected, planCourse } from '../../_engine/wavepilot.js';
 import { STEP, tierOf } from './config.js';
 import { roomy, stepShip } from './physics.js';
 import { SHIP_GRAINS } from './prove.js';
@@ -93,10 +95,28 @@ function planFlight(run, ship) {
 export function createAutopilot() {
   /** @type {Flight | null} */
   let flight = null;
+  /** @type {import('../../_engine/wavepilot.js').Course | null} */
+  let course = null;
   /** @type {Run | null} */
   let forRun = null;
+  /**
+   * The finale's wave stretches: the wave solver's course, replanned when it runs out or drifts.
+   * @param {Run} run @param {Ship} wave
+   */
+  const adviseWave = (run, wave) => {
+    flight = null;
+    const stale = !course || forRun !== run || wave.x < course.x0 || wave.x > course.x1 - 1 || Math.abs(expected(course, wave.x).y - wave.y) > DRIFT;
+    if (stale) {
+      const piece = pieceAt(run, wave.x);
+      course = planCourse(run, wave, horizon(run, wave.x), piece.speed, tierOf(piece.tier));
+      forRun = run;
+    }
+    return course ? courseHold(course, wave, speedAt(run, wave.x)) : false;
+  };
   return {
     advise(run, ship) {
+      if (!ship.ship) return adviseWave(run, ship);
+      course = null;
       const at = (/** @type {Flight} */ f) => Math.round((ship.x - f.x0) / (f.speed * STEP));
       const i = flight ? at(flight) : -1;
       const expected = flight && i > 0 ? (flight.ys[i - 1] ?? ship.y) : ship.y;

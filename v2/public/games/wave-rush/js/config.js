@@ -28,17 +28,8 @@ import { bandOf, range, sectionStyle } from '../../_engine/sectors.js';
 
 export { bandOf, sectionStyle };
 
-export const WAVE = {
-  /** Hit circle radius; the drawing is larger, so a near miss looks like one. */
-  radius: 0.3,
-  miniRadius: 0.2,
-  /** |dy/dx|: 45° normally, 2:1 (≈63.4°) in mini. */
-  slope: 1,
-  miniSlope: 2,
-  /** Drawn size (cells). */
-  size: 1.05,
-  miniSize: 0.68,
-};
+export { WAVE } from '../../_engine/wave.js';
+import { WAVE } from '../../_engine/wave.js';
 
 /**
  * Human limits per difficulty tier (owner, 2026-10-29: "possible for a human, not just

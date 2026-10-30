@@ -10,7 +10,7 @@ import { changesOf, peakRate } from '../public/games/_engine/limits.js';
 import { createRng, parseSwitches } from '../public/games/_engine/rng.js';
 import { easeAngle, targetAngle } from '../public/games/_engine/render/turn.js';
 import { createAutopilot } from '../public/games/ship-rush/js/autopilot.js';
-import { BASE_SPEED, JOINT, MAX_FRAME, SECTORS, SHIP, SNAP, STEP, TIERS, tierOf, tierSpeed, type SectorDef } from '../public/games/ship-rush/js/config.js';
+import { BASE_SPEED, FINALE_ID, JOINT, MAX_FRAME, SECTORS, SHIP, SNAP, STEP, TIERS, tierOf, tierSpeed, type SectorDef } from '../public/games/ship-rush/js/config.js';
 import { createGame, keepsRecords, resultOf, stepGame, type Game } from '../public/games/ship-rush/js/game.js';
 import { pickLang, textsOf, translator, TEXT_KEYS } from '../public/games/ship-rush/js/i18n.js';
 import { advanceClock, createShip, roomy, settle, stepShip, type Ship } from '../public/games/ship-rush/js/physics.js';
@@ -26,7 +26,7 @@ import {
   readSkin,
   unlock,
 } from '../public/games/ship-rush/js/records.js';
-import { buildRun, checkpointX, jumpX, locate, orderSections, pieceAt, stateAt } from '../public/games/ship-rush/js/run.js';
+import { PORTAL_OFFSET, buildFinale, buildRun, checkpointX, jumpX, locate, orderSections, pieceAt, stateAt } from '../public/games/ship-rush/js/run.js';
 import { SECTION_LIBRARY } from '../public/games/ship-rush/js/sections/index.js';
 import { DEFAULT_SKIN, SKINS, isUnlocked, resolveSkin } from '../public/games/ship-rush/js/skins.js';
 import { runWorld, sectionWorld, solidsOf, type World } from '../public/games/ship-rush/js/solids.js';
@@ -82,8 +82,8 @@ describe('the run', () => {
     expect(SECTION_LIBRARY[6]!.flatMap((d, i) => (d.mini ? [i + 1] : []))).toEqual([15, 25, 30]);
     const ids = Object.values(SECTION_LIBRARY).flat().map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
-    // Every section is flown as the ship.
-    for (const data of Object.values(SECTION_LIBRARY).flat()) expect(data.mode ?? 'ship').toBe('ship');
+    // Every section of the run is flown as the ship (the finale has wave stretches too).
+    for (const s of SECTORS) for (const data of SECTION_LIBRARY[s.id]!) expect(data.mode ?? 'ship').toBe('ship');
   });
 
   test('speeds: 0.8, 0.85, 1.0, 1.1, 1.25 for sectors 1–5 and 1.25–1.7 in the Demon (sectors 1–2 not slow, owner); tiers ramp up and stay humanly possible', () => {
@@ -512,6 +512,61 @@ describe('game', () => {
   });
 });
 
+describe('the finale', () => {
+  test('a fixed sequence, mostly the ship with wave stretches, a vehicle portal at every change, never shuffled', () => {
+    const a = buildFinale();
+    const b = buildFinale();
+    const list = SECTION_LIBRARY[FINALE_ID]!;
+    expect(a.sectors[0]!.order).toEqual(range(1, list.length));
+    expect(b.sectors[0]!.order).toEqual(a.sectors[0]!.order);
+    const pieces = a.pieces.filter((p) => p.kind === 'section');
+    const modes = pieces.map((p) => p.mode);
+    expect(modes.filter((m) => m === 'wave').length).toBeGreaterThanOrEqual(2);
+    expect(modes.filter((m) => m === 'ship').length).toBeGreaterThan(modes.filter((m) => m === 'wave').length);
+    expect(modes[0]).toBe('ship');
+    const changes = pieces.filter((p, i) => i > 0 && p.mode !== pieces[i - 1]!.mode);
+    expect(a.portals.filter((p) => p.kind === 'ship').map((p) => [p.x, p.on])).toEqual(changes.map((p) => [p.x0 + PORTAL_OFFSET.ship, p.mode === 'ship']));
+    for (const p of pieces) expect(p.tier).toBe(p.mode === 'ship' ? 'finaleShip' : 'finaleWave');
+    for (const p of pieces) expect(stateAt(a, p.x0 + 2).ship).toBe(p.mode === 'ship');
+  });
+
+  test('practice in the finale goes back to the stretch; a crash in normal play to its start', () => {
+    const practice = createGame({ rng: createRng(1), mode: 'practice', level: 'finale', jump: { sector: 1, section: 4 } });
+    expect(practice.checkpointBy).toBe('section');
+    expect(practice.checkpoint).toBe(jumpX(practice.run, 1, 4));
+    const normal = createGame({ rng: createRng(1), mode: 'normal', level: 'finale' });
+    stepGame(normal, { holding: false, tap: true }, STEP);
+    crash(normal);
+    for (let i = 0; i < 240; i++) stepGame(normal, { holding: false, tap: false }, STEP);
+    stepGame(normal, { holding: false, tap: true }, STEP);
+    expect(normal.where).toEqual({ sector: 1, section: 1 });
+    expect(normal.level).toBe('finale');
+  });
+
+  test('the wave stretches fly as the wave: at 45°, a touch is a crash', () => {
+    const game = createGame({ rng: createRng(1), mode: 'normal', level: 'finale', jump: { sector: 1, section: 3 } });
+    stepGame(game, { holding: false, tap: true }, STEP);
+    for (let i = 0; i < 240 && game.wave.ship; i++) stepGame(game, { holding: false, tap: false }, STEP);
+    expect(game.wave.ship).toBe(false);
+    const y = game.wave.y;
+    stepGame(game, { holding: true, tap: false }, STEP);
+    expect(game.wave.y - y).toBeCloseTo(-tierSpeed('finaleWave') * STEP, 6);
+  });
+
+  test('the pilot flies the whole finale, ship and wave', { timeout: 120_000 }, () => {
+    const game = createGame({ rng: createRng(1), mode: 'normal', level: 'finale' });
+    stepGame(game, { holding: false, tap: true }, STEP);
+    const pilot = createAutopilot();
+    let wave = 0;
+    for (let i = 0; i < 240 * 120 && game.phase === 'playing'; i++) {
+      stepGame(game, { holding: pilot.advise(game.run, game.wave), tap: false }, STEP);
+      if (!game.wave.ship) wave += 1;
+    }
+    expect(game.phase).toBe('finished');
+    expect(wave).toBeGreaterThan(240);
+  });
+});
+
 // ── Records, skins, texts ────────────────────────────────────────────────────
 
 describe('records and skins', () => {
@@ -525,7 +580,13 @@ describe('records and skins', () => {
     saveSkin(storage, 'manta');
     expect(readSkin(storage)).toBe('manta');
     expect(unlock(storage, 'demonComplete')).toBe(true);
-    expect(readProgress(storage).demonComplete).toBe(true);
+    expect(unlock(storage, 'demonComplete')).toBe(false);
+    expect(readProgress(storage)).toEqual({ demonComplete: true, finaleComplete: false });
+    expect(unlock(storage, 'finaleComplete')).toBe(true);
+    expect(readProgress(storage)).toEqual({ demonComplete: true, finaleComplete: true });
+    expect(saveBest(storage, { sector: 1, section: 4, percent: 40 }, KEYS.finaleBest).isNew).toBe(true);
+    expect(readBest(storage, KEYS.finaleBest)).toEqual({ sector: 1, section: 4, percent: 40 });
+    expect(readBest(storage)).toEqual({ sector: 1, section: 3, percent: 7 });
     for (const key of storage.data.keys()) expect(key.startsWith('lifexp-shiprush-')).toBe(true);
     for (const key of Object.values(KEYS)) expect(key.startsWith('lifexp-shiprush-')).toBe(true);
   });

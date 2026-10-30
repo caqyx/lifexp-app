@@ -4,6 +4,7 @@
 // rules, sectors, records, skins, texts and look. Finishing the whole run (the Demon
 // included) is the achievement that unlocks the last hull and the finale.
 import { runApp } from '../../_engine/app.js';
+import { WAVE } from '../../_engine/wave.js';
 import { SECTORS } from './config.js';
 import { RULES } from './game.js';
 import { pickLang, translator } from './i18n.js';
@@ -23,10 +24,10 @@ runApp({
   skins: SKINS,
   createRenderer,
   renderFrame,
-  slopeOf: () => 1,
+  slopeOf: (w) => (w.mini ? WAVE.miniSlope : WAVE.slope),
   loadAutopilot: () => import('./autopilot.js').then((m) => m.createAutopilot()),
   demon: true,
-  finale: false,
+  finale: true,
   /** The ship's curving trail and the hull. @param {CanvasRenderingContext2D} ctx @param {import('./skins.js').Skin} skin */
   paintSkin(ctx, skin) {
     ctx.strokeStyle = skin.trail;

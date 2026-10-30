@@ -16,12 +16,13 @@
  *   stars: number, haze: string[], galaxies: number,
  *   earth: boolean, satellites: number,
  *   planet: { x: number, y: number, r: number, body: [string, string], ring: string } | null,
- *   asteroids: number, structures: number, rays: string | null,
+ *   asteroids: number, structures: number, rays: string | null, blackHole?: boolean,
  * }} Space
  *   The far layer of space (painted once per look and size): `stars` in it, nebula `haze`
  *   blobs in these colours, spiral `galaxies`; Earth's curve below, `satellites` passing;
  *   a ringed `planet` (share of the width, world y, radius in cells); burning `asteroids`
- *   streaking past; glowing outlined `structures` far behind; light `rays`.
+ *   streaking past; glowing outlined `structures` far behind; light `rays`; a `blackHole`
+ *   with its glowing disc (the finale).
  * @typedef {import('../../../_engine/render/section.js').SurfaceTheme & {
  *   sky: [string, string, string], haze: string, backdrop: Backdrop,
  *   sun: { x: number, y: number, r: number, color: string, glow: string } | null,
@@ -85,6 +86,11 @@ export const THEMES = {
     fx: { glow: 0.8, chevrons: true, teeth: false, ground: 'rgba(120, 255, 220, 0.4)', hazardGlow: 'rgba(255, 255, 255, 0.16)' },
   },
 };
+
+/** @param {Theme} th @returns {Theme} */
+function withBlackHole(th) {
+  return { ...th, space: { .../** @type {Space} */ (th.space), blackHole: true } };
+}
 
 /**
  * The Demon's looks share their structure; only colours and the far layer change.
@@ -186,6 +192,15 @@ Object.assign(THEMES, {
     wall: ['#1a0308', '#010000', '#a0102a'], edge: '#ffffff', glow: 'rgba(255, 30, 60, 0.62)', detail: 'rgba(255, 255, 255, 0.55)', inner: '#7a0a1e',
     motes: '#ffffff', glowStrength: 1.5, ground: 'rgba(255, 40, 70, 0.6)',
   }),
+  // The finale "Horyzont Zdarzeń": a black hole and its burning disc, gold and white on black.
+  eventHorizon: withBlackHole(
+    demon({
+      id: 'eventHorizon', sky: ['#000000', '#07040a', '#160a06'], haze: 'rgba(255, 170, 80, 0.16)', stars: 320,
+      blobs: ['rgba(255, 140, 40, 0.16)', 'rgba(255, 255, 255, 0.06)', 'rgba(120, 60, 200, 0.14)'], galaxies: 1, asteroids: 0, structures: 5, rays: null,
+      wall: ['#1e1408', '#020100', '#9a6a20'], edge: '#fff4d6', glow: 'rgba(255, 180, 70, 0.6)', detail: 'rgba(255, 225, 160, 0.55)', inner: '#6a4a14',
+      motes: '#ffe6a8', glowStrength: 1.5, ground: 'rgba(255, 190, 80, 0.55)',
+    }),
+  ),
 });
 
 /** @param {string} id */

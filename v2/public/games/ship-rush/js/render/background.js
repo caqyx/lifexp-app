@@ -694,6 +694,58 @@ function drawRays(ctx, v, color, clock) {
 }
 
 /**
+ * A black hole: its burning disc seen nearly edge-on, bent over and under the dark centre,
+ * and a thin bright ring around the shadow; the disc turns slowly (still with reduced motion).
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {number} camX @param {Clock} clock
+ */
+function drawBlackHole(ctx, v, camX, clock) {
+  const r = v.cell * 2.2;
+  const cx = v.width * 0.68 - ((camX * 0.01 * v.cell) % (v.width * 0.1));
+  const cy = screenY(v, 4.2);
+  const spin = clock.reduced ? 0 : clock.time * 0.6;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const halo = ctx.createRadialGradient(cx, cy, r, cx, cy, r * 4.5);
+  halo.addColorStop(0, 'rgba(255, 170, 80, 0.35)');
+  halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(cx - r * 5, cy - r * 5, r * 10, r * 10);
+  // The disc: bands of light around an ellipse, the far side bent up over the shadow.
+  for (let k = 0; k < 4; k++) {
+    const g = ctx.createLinearGradient(cx - r * 3.4, 0, cx + r * 3.4, 0);
+    const phase = (spin + k * 0.7) % (Math.PI * 2);
+    g.addColorStop(0, 'rgba(255, 120, 40, 0)');
+    g.addColorStop(0.5 + 0.25 * Math.sin(phase), 'rgba(255, 235, 190, 0.55)');
+    g.addColorStop(1, 'rgba(255, 120, 40, 0)');
+    ctx.strokeStyle = g;
+    ctx.lineWidth = r * (0.22 - k * 0.04);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * (2.4 + k * 0.3), r * (0.42 + k * 0.05), -0.12, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * (1.25 + k * 0.08), r * (1.15 + k * 0.08), 0, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 245, 220, 0.9)';
+  ctx.lineWidth = Math.max(1, v.cell * 0.06);
+  ctx.stroke();
+  // The near side of the disc passes in front of the shadow.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = 'rgba(255, 210, 150, 0.6)';
+  ctx.lineWidth = r * 0.16;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, r * 2.4, r * 0.42, -0.12, 0.05, Math.PI - 0.05);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
  * Space: the far layer, a sun, Earth and satellites in orbit, a ringed planet, light rays,
  * structures and burning asteroids — whichever the look has.
  * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock
@@ -702,6 +754,7 @@ function drawSpace(ctx, v, th, camX, clock) {
   const space = /** @type {import('./themes.js').Space} */ (th.space);
   drawFarSpace(ctx, v, th, camX, clock);
   if (space.rays) drawRays(ctx, v, space.rays, clock);
+  if (space.blackHole) drawBlackHole(ctx, v, camX, clock);
   drawLight(ctx, v, th, clock);
   if (space.planet) drawPlanet(ctx, v, space.planet, camX);
   if (space.structures) drawStructures(ctx, v, th, camX, space.structures);

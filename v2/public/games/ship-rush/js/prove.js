@@ -5,12 +5,14 @@
 // (physics.js) through the section's solids and hazards (solids.js). Used by
 // v2/tests/ship-rush.test.ts on every section, in every state the run can fly it in.
 import { solveBeam } from '../../_engine/beam.js';
-import { checkSection, widestGapAt } from '../../_engine/geometry.js';
+import { capsuleHits, checkSection, widestGapAt } from '../../_engine/geometry.js';
+import { entryHeights, proveFrom, toleranceBand } from '../../_engine/solver.js';
+import { WAVE } from '../../_engine/wave.js';
 import { changesOf } from '../../_engine/limits.js';
 import { JOINT, sectionStyle, shipKind, tierOf, tierSpeed } from './config.js';
 import { geometryOf } from './run.js';
 import { createShip, roomy, stepShip } from './physics.js';
-import { sectionWorld, solidsOf } from './solids.js';
+import { sectionWorld } from './solids.js';
 
 /**
  * @typedef {import('./config.js').SectorDef} SectorDef
@@ -87,10 +89,9 @@ export function narrowestGap(data) {
 export function checkShipSection(data, minGap) {
   const problems = checkSection(data, minGap);
   if (problems.length) return problems;
-  try {
-    solidsOf(geometryOf(data));
-  } catch (error) {
-    problems.push(/** @type {Error} */ (error).message);
+  const g = geometryOf(data);
+  for (const seg of [...g.ceilSegs, ...g.floorSegs]) {
+    if (seg.slope !== null && seg.slope !== 0) problems.push(`${data.id}: a slope at x=${seg.x0} (ship terrain is level runs and steps)`);
   }
   const gap = narrowestGap(data);
   if (gap < minGap - 1e-9) problems.push(`${data.id}: an opening ${gap.toFixed(2)} high (< ${minGap.toFixed(2)})`);
@@ -155,6 +156,7 @@ export function proveEntry(data, tier, state, entry, options = {}) {
  */
 export function sectionProblems(data, sector, number) {
   const tier = tierKeyOf(data, sector, number);
+  if (data.mode === 'wave') return waveProblems(data, tier);
   const problems = checkShipSection(data, minGapOf(tier, data.mini === true));
   if (problems.length) return problems;
   for (const state of statesOf(sector, data)) {
@@ -165,3 +167,31 @@ export function sectionProblems(data, sector, number) {
   }
   return problems;
 }
+
+/**
+ * A finale wave stretch: Wave Rush's rules (45° slopes, its corridor checks) and its wave
+ * solver (../../_engine/solver.js), from every entry height across the joint.
+ * @param {SectionData} data @param {string} tier
+ */
+export function waveProblems(data, tier) {
+  const limits = tierOf(tier);
+  const problems = checkSection(data, limits.clearance * 2 * WAVE.radius);
+  if (problems.length) return problems;
+  const g = geometryOf(data);
+  const spec = {
+    hits: /** @type {import('../../_engine/solver.js').HitTest} */ ((x, ya, yb, r, dir, slope) => capsuleHits(g, x, ya, yb, r, dir, slope)),
+    x0: 0,
+    x1: g.length,
+    speed: tierSpeed(tier),
+    mini: false,
+    limits,
+    yAnchor: JOINT.ceil,
+  };
+  const tables = new Map();
+  for (const y of entryHeights(false, toleranceBand(spec.speed, false, limits.tolerance))) {
+    const result = proveFrom(spec, y, 1, tables);
+    if (result.problem) problems.push(`${data.id} (wave) from y=${y.toFixed(2)}: ${result.problem}`);
+  }
+  return problems;
+}
+

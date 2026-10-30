@@ -2,9 +2,9 @@
 // Ship Rush's levels (docs/v2/PLAN.md 9.1, stage s-1): the run of sectors, built by the
 // Rush engine (../../_engine/level.js) from this game's sectors, sections and tiers.
 // Every section is flown as the ship unless it says otherwise (the finale's wave
-// stretches, stage s-2).
+// stretches, stage s-2); the finale is built the same way from one fixed sector.
 import { buildLevel } from '../../_engine/level.js';
-import { SECTORS, tierSpeed } from './config.js';
+import { FINALE, FINALE_ID, SECTORS, tierSpeed } from './config.js';
 import { SECTION_LIBRARY } from './sections/index.js';
 
 export {
@@ -20,6 +20,7 @@ export {
   placePortals,
   progressAt,
   respawnX,
+  runHits,
   sectorAt,
   speedAt,
   stateAt,
@@ -45,7 +46,7 @@ export function buildRun(rng, options = {}) {
   return buildLevel('run', options.sectors ?? SECTORS, options.library ?? SECTION_LIBRARY, rng, RULES);
 }
 
-/** The finale comes in stage s-2. @returns {Run} */
+/** The finale: one fixed sequence of ship and wave stretches. @returns {Run} */
 export function buildFinale() {
-  throw new Error('Ship Rush has no finale yet (stage s-2)');
+  return buildLevel('finale', [FINALE], { [FINALE_ID]: SECTION_LIBRARY[FINALE_ID] ?? [] }, () => 0, RULES);
 }

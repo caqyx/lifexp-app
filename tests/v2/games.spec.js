@@ -987,8 +987,9 @@ test.describe('Ship Rush', () => {
       await expect(stage).toHaveAttribute('data-state', 'menu');
       await expect(game.getByRole('heading', { name: 'Ship Rush' })).toBeVisible();
       await expect(game.getByText('Przytrzymaj — statek się wznosi.')).toBeVisible();
-      // No finale yet (stage s-2): its box is not on the menu.
-      await expect(game.locator('#finale-box')).toBeHidden();
+      // The finale is there, locked until the Demon is finished.
+      await expect(game.getByRole('button', { name: 'Zagraj finał' })).toBeDisabled();
+      await expect(game.getByText('Finał odblokujesz, kończąc cały sektor Demon.')).toBeVisible();
 
       await game.getByRole('button', { name: 'Skórki' }).tap();
       const skins = game.locator('#skin-list');
@@ -1116,7 +1117,7 @@ test.describe('Ship Rush s-2', () => {
   test.describe('on a touch phone held upright', () => {
     test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
 
-    test('finishing the Demon: the achievement and the last hull unlock', async ({ page, account }) => {
+    test('finishing the Demon: the achievement, the last hull and the finale unlock', async ({ page, account }) => {
       test.setTimeout(90000);
       const problems = await watchProblems(page);
       const { host, game } = await playFromList(page, account, 'Ship Rush');
@@ -1132,11 +1133,13 @@ test.describe('Ship Rush s-2', () => {
       await expect(achievement).toBeVisible({ timeout: 40000 });
       await expect(achievement).toContainText('Osiągnięcie odblokowane');
       await expect(achievement).toContainText('Nowa skórka: Korona Pustki');
+      await expect(achievement).toContainText('Odblokowany poziom finałowy: Horyzont Zdarzeń');
       expect(JSON.parse(await page.evaluate(() => localStorage.getItem('lifexp-shiprush-progress')))).toMatchObject({ demonComplete: true });
       await achievement.getByRole('button', { name: 'Dalej' }).tap();
       const finished = game.getByRole('region', { name: 'Trasa ukończona!' });
       await expect(finished).toBeVisible();
       await finished.getByRole('button', { name: 'Menu' }).tap();
+      await expect(game.getByRole('button', { name: 'Zagraj finał' })).toBeEnabled();
 
       await game.getByRole('button', { name: 'Skórki' }).tap();
       const crown = game.locator('#skin-list').getByRole('button', { name: /Korona Pustki/ });
@@ -1148,5 +1151,30 @@ test.describe('Ship Rush s-2', () => {
       await expect(game.locator('#skin-list').getByRole('button', { name: /Korona Pustki/ })).toHaveAttribute('aria-pressed', 'true');
       expect(problems).toEqual([]);
     });
+  });
+
+  test('sideways 800×360: the finale — a ship stretch and a wave stretch flown by the pilot, its own name, a crash back to its start', async ({ page, account }) => {
+    test.setTimeout(120000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Ship Rush');
+    const stage = game.locator('#stage');
+    await page.evaluate(() => localStorage.setItem('lifexp-shiprush-progress', JSON.stringify({ demonComplete: true })));
+    await openWaveWith(page, host, 'seed=1&finale=2&autopilot=2');
+    await expect(game.getByRole('button', { name: 'Zagraj finał' })).toBeEnabled();
+    await flyFrom(game, 'Zagraj finał');
+    expect(await waveState(game)).toMatchObject({ level: 'finale', ship: true });
+    await expect(game.locator('#hud-sector')).toContainText('Horyzont Zdarzeń');
+    // Stretch 3 is the wave: the pilot flies it as the wave.
+    await expect.poll(async () => (await waveState(game)).ship, { timeout: 30000 }).toBe(false);
+    await expect(game.getByText('Fala: trzymaj — w górę, puść — w dół')).toBeVisible();
+    await expect.poll(async () => (await waveState(game)).section, { timeout: 30000 }).toBeGreaterThanOrEqual(4);
+    // Hands off: the crash starts the finale again from its first stretch.
+    await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 20000 });
+    await page.waitForTimeout(600);
+    await stage.click();
+    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    expect(await waveState(game)).toMatchObject({ level: 'finale', section: 1, ship: true });
+    expect(problems).toEqual([]);
   });
 });
