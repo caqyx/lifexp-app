@@ -4,10 +4,14 @@
 // hall of conveyor belts (sector 1), a mine with timbered shafts, rails and lanterns (2),
 // a foundry over molten metal with pouring ladles and sparks (3). Stage f-2 adds the
 // reactor and the Demon's circuits, gears, saws and chains. Hazards keep a dark body and
-// one bright edge per sector, and from sector 3 the same pale halo.
+// one bright edge per sector, and from sector 3 the same pale halo. Stage f-2: a turbine
+// hall at the reactor (4), the reactor's deep core (5), and the Demon's machine — glowing
+// circuits (Easy, blue), gears (Hard, violet), saws and chains (Insane, red), all of it at
+// once in black, red and white (Extreme, the richest); its sections also get the
+// engine's ornament (chains, gears, frames), denser tier by tier.
 
 /**
- * @typedef {'hall' | 'mine' | 'foundry'} Backdrop
+ * @typedef {'hall' | 'mine' | 'foundry' | 'reactor' | 'core' | 'circuits' | 'gears' | 'saws' | 'overdrive'} Backdrop
  * @typedef {import('../../../_engine/render/section.js').SurfaceTheme & {
  *   wall: [string, string, string], haze: string, backdrop: Backdrop,
  *   far: string, mid: string, near: string, light: string,
@@ -75,6 +79,117 @@ export const THEMES = {
     hazard: { fill: '#0a0605', inner: '#5a3020', edge: '#ffffff', metal: '#f4e6dc' },
     deco: 'rgba(255, 170, 110, 0.55)',
     fx: { glow: 0.8, chevrons: true, teeth: false, ground: 'rgba(255, 120, 40, 0.5)', hazardGlow: 'rgba(255, 255, 255, 0.18)' },
+  },
+  // Sector 4 "Trudniejszy": the turbine hall by the reactor — turbines, pipes with valves,
+  // blinking warning lights; teal steel with a green glow.
+  reactor: {
+    id: 'reactor',
+    wall: ['#04100f', '#0b2423', '#123a36'],
+    haze: 'rgba(80, 255, 200, 0.14)',
+    backdrop: 'reactor',
+    far: 'rgba(40, 90, 84, 0.7)',
+    mid: 'rgba(28, 64, 60, 0.92)',
+    near: 'rgba(10, 26, 24, 0.85)',
+    light: 'rgba(110, 255, 200, 0.85)',
+    motes: { color: '#8cffd8', count: 34 },
+    pattern: 'panels',
+    emblem: 'porthole',
+    block: { top: '#1f4a45', bottom: '#081816', tile: 'rgba(180, 255, 230, 0.12)', shade: 'rgba(0, 0, 0, 0.5)', rim: '#2f7a6e', edge: '#b8ffe8', glow: 'rgba(80, 255, 200, 0.4)', detail: 'rgba(110, 255, 200, 0.7)' },
+    hazard: { fill: '#030a09', inner: '#24504a', edge: '#ffffff', metal: '#e4fff6' },
+    deco: 'rgba(130, 255, 210, 0.5)',
+    fx: { glow: 1, chevrons: true, teeth: false, ground: 'rgba(80, 255, 200, 0.35)', hazardGlow: 'rgba(255, 255, 255, 0.18)' },
+  },
+  // Sector 5 "Insane": the reactor's core — fuel rods in blue light, containment rings, the
+  // core pulsing far below.
+  core: {
+    id: 'core',
+    wall: ['#01030c', '#06123a', '#0c2a6e'],
+    haze: 'rgba(80, 160, 255, 0.22)',
+    backdrop: 'core',
+    far: 'rgba(40, 80, 170, 0.6)',
+    mid: 'rgba(20, 40, 100, 0.9)',
+    near: 'rgba(4, 10, 30, 0.85)',
+    light: 'rgba(120, 200, 255, 0.95)',
+    motes: { color: '#9fd4ff', count: 44 },
+    pattern: 'panels',
+    emblem: 'eye',
+    block: { top: '#1c2a5a', bottom: '#060a1e', tile: 'rgba(170, 210, 255, 0.12)', shade: 'rgba(0, 0, 0, 0.5)', rim: '#2e4a9a', edge: '#cfe6ff', glow: 'rgba(90, 170, 255, 0.5)', detail: 'rgba(130, 200, 255, 0.75)' },
+    hazard: { fill: '#02040c', inner: '#24346a', edge: '#ffffff', metal: '#e6f0ff' },
+    deco: 'rgba(150, 210, 255, 0.5)',
+    fx: { glow: 1.2, chevrons: true, teeth: true, ground: 'rgba(90, 170, 255, 0.4)', hazardGlow: 'rgba(255, 255, 255, 0.2)' },
+  },
+  // The Demon, Easy: glowing circuits — traces with pulses running along them (blue).
+  circuits: {
+    id: 'circuits',
+    wall: ['#010512', '#041232', '#082456'],
+    haze: 'rgba(60, 140, 255, 0.2)',
+    backdrop: 'circuits',
+    far: 'rgba(50, 120, 255, 0.45)',
+    mid: 'rgba(30, 70, 160, 0.9)',
+    near: 'rgba(6, 14, 40, 0.85)',
+    light: 'rgba(110, 190, 255, 0.95)',
+    motes: { color: '#7fc0ff', count: 50 },
+    pattern: 'plates',
+    emblem: 'bolt',
+    block: { top: '#132a5c', bottom: '#040a1c', tile: 'rgba(140, 200, 255, 0.14)', shade: 'rgba(0, 0, 0, 0.5)', rim: '#2a56b8', edge: '#d6ecff', glow: 'rgba(70, 150, 255, 0.55)', detail: 'rgba(110, 190, 255, 0.8)' },
+    hazard: { fill: '#01030a', inner: '#203c80', edge: '#ffffff', metal: '#eaf4ff' },
+    deco: 'rgba(120, 190, 255, 0.5)',
+    fx: { glow: 1.3, chevrons: true, teeth: true, ground: 'rgba(70, 150, 255, 0.4)', hazardGlow: 'rgba(255, 255, 255, 0.22)' },
+  },
+  // The Demon, Hard: gears turning behind circuits (violet).
+  gears: {
+    id: 'gears',
+    wall: ['#07020f', '#1a0a33', '#2e1260'],
+    haze: 'rgba(170, 100, 255, 0.22)',
+    backdrop: 'gears',
+    far: 'rgba(130, 80, 230, 0.45)',
+    mid: 'rgba(80, 40, 150, 0.9)',
+    near: 'rgba(18, 8, 36, 0.85)',
+    light: 'rgba(200, 150, 255, 0.95)',
+    motes: { color: '#cfa8ff', count: 56 },
+    pattern: 'plates',
+    emblem: 'star',
+    block: { top: '#2c1658', bottom: '#0a0418', tile: 'rgba(210, 180, 255, 0.14)', shade: 'rgba(0, 0, 0, 0.5)', rim: '#6a3ac0', edge: '#f0e2ff', glow: 'rgba(170, 100, 255, 0.55)', detail: 'rgba(200, 150, 255, 0.8)' },
+    hazard: { fill: '#04020a', inner: '#3e2478', edge: '#ffffff', metal: '#f4ecff' },
+    deco: 'rgba(200, 160, 255, 0.5)',
+    fx: { glow: 1.4, chevrons: true, teeth: true, ground: 'rgba(170, 100, 255, 0.42)', hazardGlow: 'rgba(255, 255, 255, 0.22)' },
+  },
+  // The Demon, Insane: saws spinning on arms and chains swinging, over gears (red).
+  saws: {
+    id: 'saws',
+    wall: ['#0d0102', '#2e0408', '#580a10'],
+    haze: 'rgba(255, 60, 60, 0.22)',
+    backdrop: 'saws',
+    far: 'rgba(220, 60, 60, 0.4)',
+    mid: 'rgba(120, 20, 26, 0.9)',
+    near: 'rgba(30, 4, 6, 0.85)',
+    light: 'rgba(255, 120, 110, 0.95)',
+    motes: { color: '#ff9a8a', count: 64 },
+    pattern: 'plates',
+    emblem: 'diamond',
+    block: { top: '#4a0e14', bottom: '#120204', tile: 'rgba(255, 190, 180, 0.14)', shade: 'rgba(0, 0, 0, 0.5)', rim: '#a8202c', edge: '#ffe2de', glow: 'rgba(255, 70, 70, 0.55)', detail: 'rgba(255, 130, 120, 0.8)' },
+    hazard: { fill: '#060102', inner: '#5a141c', edge: '#ffffff', metal: '#fff0ee' },
+    deco: 'rgba(255, 150, 140, 0.5)',
+    fx: { glow: 1.5, chevrons: true, teeth: true, ground: 'rgba(255, 70, 70, 0.45)', hazardGlow: 'rgba(255, 255, 255, 0.24)' },
+  },
+  // The Demon, Extreme: the whole machine at once — red circuits, gears, saws and chains on
+  // black, white sparks; the richest.
+  overdrive: {
+    id: 'overdrive',
+    wall: ['#000000', '#120204', '#2a0306'],
+    haze: 'rgba(255, 30, 40, 0.24)',
+    backdrop: 'overdrive',
+    far: 'rgba(230, 40, 50, 0.45)',
+    mid: 'rgba(90, 10, 14, 0.95)',
+    near: 'rgba(0, 0, 0, 0.9)',
+    light: 'rgba(255, 255, 255, 0.95)',
+    motes: { color: '#ffffff', count: 80 },
+    pattern: 'plates',
+    emblem: 'eye',
+    block: { top: '#1a1a1e', bottom: '#000000', tile: 'rgba(255, 255, 255, 0.12)', shade: 'rgba(0, 0, 0, 0.6)', rim: '#d0202e', edge: '#ffffff', glow: 'rgba(255, 40, 50, 0.6)', detail: 'rgba(255, 60, 70, 0.85)' },
+    hazard: { fill: '#000000', inner: '#3a0a0e', edge: '#ffffff', metal: '#ffffff' },
+    deco: 'rgba(255, 90, 100, 0.55)',
+    fx: { glow: 1.7, chevrons: true, teeth: true, ground: 'rgba(255, 40, 50, 0.5)', hazardGlow: 'rgba(255, 255, 255, 0.28)' },
   },
 };
 

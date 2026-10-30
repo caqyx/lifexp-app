@@ -26,7 +26,7 @@ runApp({
   renderFrame,
   slopeOf: (w) => (w.mini ? WAVE.miniSlope : WAVE.slope),
   loadAutopilot: () => import('./autopilot.js').then((m) => m.createAutopilot()),
-  demon: false,
+  demon: true,
   finale: false,
   holdTaps: true,
   /** The ball on the floor and the spider on the ceiling. @param {CanvasRenderingContext2D} ctx @param {import('./skins.js').Skin} skin */

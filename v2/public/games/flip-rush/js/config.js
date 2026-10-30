@@ -100,7 +100,7 @@ export const TIERS = {
 
 /**
  * The run: Wave Rush's structure exactly (owner) — 10, 15, 15, 10, 10 and 30 sections in
- * the same shuffle groups and portals. Stage f-1 authors sectors 1–3; f-2 the rest.
+ * the same shuffle groups and portals (sectors 1–3 from stage f-1, 4–6 from f-2).
  * @type {SectorDef[]}
  */
 export const SECTORS = [
@@ -115,6 +115,50 @@ export const SECTORS = [
     portals: [{ kind: 'gravity', count: 1, span: 2 }],
     // From sector 3 the vehicle changes more often (owner): the shuffle is dealt out by
     // vehicle in turns, a portal at nearly every joint.
+    alternate: true,
+  },
+  {
+    id: 4,
+    key: 'harder',
+    tier: 'harder',
+    theme: 'reactor',
+    groups: [range(1, 10)],
+    portals: [{ kind: 'gravity', count: 3, span: 1 }, { kind: 'mini', count: 1 }],
+    alternate: true,
+  },
+  {
+    id: 5,
+    key: 'insane',
+    tier: 'insane',
+    theme: 'core',
+    groups: [range(1, 5), range(6, 10)],
+    portals: [{ kind: 'gravity', count: 2, span: 1 }, { kind: 'mini', count: 1 }],
+    alternate: true,
+  },
+  {
+    id: 6,
+    key: 'demon',
+    tier: 'easyDemon',
+    theme: 'circuits',
+    groups: [range(1, 10), range(11, 15), range(16, 25), range(26, 30)],
+    bands: [
+      { from: 1, to: 10, tier: 'easyDemon', theme: 'circuits', key: 'easyDemon' },
+      { from: 11, to: 15, tier: 'hardDemon', theme: 'gears', key: 'hardDemon' },
+      { from: 16, to: 25, tier: 'insaneDemon', theme: 'saws', key: 'insaneDemon' },
+      { from: 26, to: 30, tier: 'extremeDemon', theme: 'overdrive', key: 'extremeDemon' },
+    ],
+    // As Wave Rush's and Ship Rush's Demon: Easy one flip for two sections; Hard the mini
+    // stretch; Insane two flips and the mini stretch; Extreme one flip and the mini stretch.
+    // Its sections are shorter (24 cells) and dealt out by vehicle, so the ball and the
+    // spider change about every second.
+    portals: [
+      { kind: 'gravity', count: 1, span: 2, band: 0 },
+      { kind: 'mini', count: 1, band: 1 },
+      { kind: 'gravity', count: 2, span: 1, band: 2 },
+      { kind: 'mini', count: 1, band: 2 },
+      { kind: 'gravity', count: 1, span: 1, band: 3 },
+      { kind: 'mini', count: 1, band: 3 },
+    ],
     alternate: true,
   },
 ];

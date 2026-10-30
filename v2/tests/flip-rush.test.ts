@@ -67,10 +67,26 @@ function memoryStorage() {
 // ── The run ──────────────────────────────────────────────────────────────────
 
 describe('the run', () => {
-  test('Wave Rush’s structure for sectors 1–3: 10, 15 and 15 sections in its shuffle groups, at its speeds', () => {
-    expect(SECTORS.map((s) => SECTION_LIBRARY[s.id]!.length)).toEqual([10, 15, 15]);
-    expect(SECTORS.map((s) => s.groups)).toEqual([[range(1, 10)], [range(1, 5), range(6, 15)], [range(1, 5), range(6, 15)]]);
-    expect(SECTORS.map((s) => TIERS[s.tier]!.speed)).toEqual([0.8, 0.85, 1.0]);
+  test('Wave Rush’s structure: 10, 15, 15, 10, 10 and 30 sections in its shuffle groups, at its speeds; the Demon in four tiers', () => {
+    expect(SECTORS.map((s) => SECTION_LIBRARY[s.id]!.length)).toEqual([10, 15, 15, 10, 10, 30]);
+    expect(SECTORS.map((s) => s.groups)).toEqual([
+      [range(1, 10)],
+      [range(1, 5), range(6, 15)],
+      [range(1, 5), range(6, 15)],
+      [range(1, 10)],
+      [range(1, 5), range(6, 10)],
+      [range(1, 10), range(11, 15), range(16, 25), range(26, 30)],
+    ]);
+    expect(SECTORS.map((s) => TIERS[s.tier]!.speed)).toEqual([0.8, 0.85, 1.0, 1.1, 1.25, 1.25]);
+    expect(sector(6).bands!.map((b) => [b.from, b.to, b.tier, TIERS[b.tier]!.speed])).toEqual([
+      [1, 10, 'easyDemon', 1.25],
+      [11, 15, 'hardDemon', 1.4],
+      [16, 25, 'insaneDemon', 1.55],
+      [26, 30, 'extremeDemon', 1.7],
+    ]);
+    // Mini sections where the mini portals go: one in sectors 4 and 5, one in each of the Demon's last three tiers.
+    const minis = (s: number) => SECTION_LIBRARY[s]!.flatMap((d, i) => (d.mini ? [i + 1] : []));
+    expect([minis(4), minis(5), minis(6)]).toEqual([[10], [10], [15, 25, 30]]);
     expect(sector(3).portals).toEqual([{ kind: 'gravity', count: 1, span: 2 }]);
   });
 
@@ -121,6 +137,19 @@ describe('the run', () => {
     }
   });
 
+  test('the Demon’s ornament: denser tier by tier, never near a hazard, an orb or a pad', () => {
+    const tiers = [[1, 10], [11, 15], [16, 25], [26, 30]].map(([a, b]) => SECTION_LIBRARY[6]!.slice(a! - 1, b));
+    const per = tiers.map((list) => list.reduce((n, d) => n + (d.deco?.length ?? 0), 0) / list.length);
+    for (let i = 1; i < per.length; i++) expect(per[i]).toBeGreaterThan(per[i - 1]!);
+    for (const d of SECTION_LIBRARY[6]!) {
+      const g = buildGeometry(d);
+      for (const item of d.deco ?? []) {
+        if (item.type !== 'chain' && item.type !== 'gear' && item.type !== 'eye') continue;
+        for (const b of g.boosters) expect(Math.abs(item.x - b.x), d.id).toBeGreaterThan(0.5);
+      }
+    }
+  });
+
   test('from sector 3 the vehicle changes more often: dealt out in turns, a change at every joint the group allows', () => {
     const rate = (s: number) => {
       let changes = 0;
@@ -136,13 +165,17 @@ describe('the run', () => {
     for (let i = 1; i < modes.length; i++) expect(modes[i]).not.toBe(modes[i - 1]);
   });
 
-  test('sector 3: one gravity flip and its way back two sections later; sectors 1–2 none; the same seed builds the same run', () => {
+  test('gravity flips: one for two sections in sector 3, three and two (each back one section later) in sectors 4 and 5, four in the Demon; sectors 1–2 none; the same seed builds the same run', () => {
     for (const seed of [1, 2, 3, 4]) {
       const r = buildRun(createRng(seed));
       expect(r.portals.filter((p) => p.kind === 'gravity' && p.sector < 2)).toEqual([]);
-      const g = r.portals.filter((p) => p.kind === 'gravity');
+      const g = r.portals.filter((p) => p.kind === 'gravity' && p.sector === 2);
       expect(g.map((p) => p.on)).toEqual([true, false]);
       expect(pieceAt(r, g[1]!.x).place - pieceAt(r, g[0]!.x).place).toBe(2);
+      const on = (s: number) => r.portals.filter((p) => p.kind === 'gravity' && p.sector === s && p.on).length;
+      expect([on(3), on(4), on(5)]).toEqual([3, 2, 4]);
+      const mini = (s: number) => r.portals.filter((p) => p.kind === 'mini' && p.sector === s && p.on).length;
+      expect([mini(3), mini(4), mini(5)]).toEqual([1, 1, 3]);
     }
     expect(buildRun(createRng(5)).sectors.map((s) => s.order)).toEqual(buildRun(createRng(5)).sectors.map((s) => s.order));
   });
@@ -454,12 +487,14 @@ describe('orbs and pads (stage f-2)', () => {
 describe('the human-feasibility validator', () => {
   const open: SectionData = { id: 'v-open', mode: 'ball', length: 30, ceil: '2 r30', floor: '10 r30', hazards: [] };
 
-  test('every section is proven in both gravities, mini where marked; entries rest on the ground or come through the air', () => {
+  test('every section is proven in both gravities, mini where marked; entries rest on either side or come through the air', () => {
     expect(statesOf(sector(1), open)).toEqual([{ gravity: 1, mini: false }, { gravity: -1, mini: false }]);
     expect(statesOf(sector(1), { ...open, mini: true })).toEqual([{ gravity: 1, mini: true }, { gravity: -1, mini: true }]);
     expect(entriesOf(false, 1)[0]).toEqual({ y: FLOOR, vy: 0 });
     expect(entriesOf(false, -1)[0]).toEqual({ y: CEIL, vy: 0 });
-    expect(entriesOf(false, 1)).toHaveLength(7);
+    // ...and resting on the other side, as a gravity portal leaves it (it falls across).
+    expect(entriesOf(false, 1)[1]).toEqual({ y: CEIL, vy: 0 });
+    expect(entriesOf(false, 1)).toHaveLength(8);
   });
 
   test('an open room is fair from every entry, with no tap at all', () => {
@@ -550,7 +585,7 @@ describe('game', () => {
       const pilot = createAutopilot();
       for (let i = 0; i < 240 * 400 && game.phase === 'playing'; i++) stepGame(game, { holding: pilot.advise(game.run, game.wave), tap: false }, STEP);
       expect(game.phase, `seed ${seed} at ${JSON.stringify(game.where)}`).toBe('finished');
-      expect(game.result).toEqual({ sector: 3, section: 15, percent: 100 });
+      expect(game.result).toEqual({ sector: 6, section: 30, percent: 100 });
     }
   });
 });
@@ -598,9 +633,9 @@ describe('records, skins, texts, looks', () => {
     expect(parseSwitches('?sector=2')).toEqual({ seed: null, jump: null, autopilot: null, finale: null });
   });
 
-  test('every sector has its own factory look; detail grows from sector to sector', () => {
-    const looks = SECTORS.map((s) => THEMES[s.theme]!);
-    expect(looks.map((t) => t.backdrop)).toEqual(['hall', 'mine', 'foundry']);
+  test('every sector and Demon tier has its own factory look; detail grows from one to the next', () => {
+    const looks = [...SECTORS.map((s) => THEMES[s.theme]!), ...sector(6).bands!.slice(1).map((b) => THEMES[b.theme]!)];
+    expect(looks.map((t) => t.backdrop)).toEqual(['hall', 'mine', 'foundry', 'reactor', 'core', 'circuits', 'gears', 'saws', 'overdrive']);
     const detail = (t: (typeof looks)[number]) =>
       (t.fx?.glow ?? 0) + (t.fx?.chevrons ? 1 : 0) + (t.fx?.ground ? 1 : 0) + (t.fx?.hazardGlow ? 1 : 0) + (t.motes ? t.motes.count / 20 : 0);
     for (let i = 1; i < looks.length; i++) expect(detail(looks[i]!)).toBeGreaterThan(detail(looks[i - 1]!));

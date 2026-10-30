@@ -203,12 +203,12 @@ export const SECTOR2 = [
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'pad', kind: 'jump', x: 5, on: 'floor' },
-      { type: 'spike', x: 7, on: 'floor', count: 13 },
-      { type: 'ring', kind: 'jump', x: 9.1, y: 8.3 },
-      { type: 'ring', kind: 'jump', x: 12.9, y: 8.3 },
-      { type: 'ring', kind: 'jump', x: 16.7, y: 8.3 },
-      { type: 'spike', x: 7, on: 'ceil', count: 13 },
+      { type: 'pad', kind: 'jump', x: 6.5, on: 'floor' },
+      { type: 'spike', x: 8.5, on: 'floor', count: 13 },
+      { type: 'ring', kind: 'jump', x: 10.6, y: 8.3 },
+      { type: 'ring', kind: 'jump', x: 14.4, y: 8.3 },
+      { type: 'ring', kind: 'jump', x: 18.2, y: 8.3 },
+      { type: 'spike', x: 8.5, on: 'ceil', count: 13 },
     ],
   },
 ];

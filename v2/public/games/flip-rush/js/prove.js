@@ -53,7 +53,12 @@ export function minGapOf(tier, mini = false) {
 export function entriesOf(mini, g) {
   const half = bodyOf(mini).half;
   /** @type {Entry[]} */
-  const out = [{ y: g > 0 ? JOINT.floor - half : JOINT.ceil + half, vy: 0 }];
+  // Resting on its gravity's ground; resting on the other side (a gravity portal just flipped
+  // it: it falls across); in the air at several heights.
+  const out = [
+    { y: g > 0 ? JOINT.floor - half : JOINT.ceil + half, vy: 0 },
+    { y: g > 0 ? JOINT.ceil + half : JOINT.floor - half, vy: 0 },
+  ];
   for (const y of [4, 6, 8]) for (const vy of [0, 6 * g]) out.push({ y, vy });
   return out;
 }
