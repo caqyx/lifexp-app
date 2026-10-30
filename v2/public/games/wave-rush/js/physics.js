@@ -4,18 +4,14 @@
 // up or down at its slope — up while held, down while released (the other way round
 // upside down). The ship (the finale) has a vertical speed instead: holding thrusts it
 // up, letting go lets gravity pull it down, smoothly and capped.
-import { INPUT_BUFFER_MS, MAX_FRAME, SHIP, STEP, WAVE } from './config.js';
+import { createVehicle } from '../../_engine/game.js';
+import { SHIP, WAVE } from './config.js';
 
-/**
- * @typedef {{ x: number, y: number, dir: number, gravity: 1 | -1, mini: boolean, ship: boolean, vy: number }} Wave
- *   dir: +1 moving down, −1 moving up (screen y grows downwards); ship: flying the ship,
- *   with vertical speed vy (cells/s; the wave keeps 0 and never uses it).
- */
+export { advanceClock, isBuffered } from '../../_engine/clock.js';
 
-/** @param {number} x @param {number} y @returns {Wave} */
-export function createWave(x, y) {
-  return { x, y, dir: 1, gravity: 1, mini: false, ship: false, vy: 0 };
-}
+/** @typedef {import('../../_engine/game.js').Vehicle} Wave */
+
+export const createWave = createVehicle;
 
 /** The hit radius of whatever is flying. @param {Wave} w */
 export const hitRadius = (w) => (w.ship ? SHIP.radius : waveRadius(w.mini));
@@ -64,28 +60,4 @@ export function stepShip(ship, holding, speed, dt) {
   const accel = (holding ? -SHIP.up : SHIP.down) * ship.gravity;
   const vy = Math.min(SHIP.maxV, Math.max(-SHIP.maxV, ship.vy + accel * dt));
   return { ...ship, vy, dir: vy < 0 ? -1 : 1, x: ship.x + speed * dt, y: ship.y + vy * dt };
-}
-
-/**
- * Fixed timestep: adds a frame's time to the accumulator and says how many steps to
- * run. A 60, 120 or 144 Hz screen runs the same number of steps per second.
- * @param {number} accumulator @param {number} frameSeconds
- */
-export function advanceClock(accumulator, frameSeconds) {
-  let acc = accumulator + Math.min(Math.max(frameSeconds, 0), MAX_FRAME);
-  let steps = 0;
-  while (acc >= STEP - 1e-12) {
-    acc -= STEP;
-    steps += 1;
-  }
-  acc = Math.max(0, acc);
-  return { steps, accumulator: acc, alpha: acc / STEP };
-}
-
-/**
- * Is a tap made at `pressedAt` still waiting to be used at `now`? (milliseconds)
- * @param {number | null} pressedAt @param {number} now
- */
-export function isBuffered(pressedAt, now) {
-  return pressedAt !== null && now - pressedAt >= 0 && now - pressedAt <= INPUT_BUFFER_MS;
 }

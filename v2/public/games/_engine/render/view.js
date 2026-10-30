@@ -3,7 +3,7 @@
 // always fits the height (sideways and on a desktop); a narrow portrait screen keeps at
 // least MIN_VIEW_W cells across, so the band is letterboxed and the terrain fills the
 // rest. The wave sits a share of the width in from the left.
-import { CAMERA_LEAD, MIN_VIEW_W, VIEW_H, VIEW_TOP } from '../config.js';
+import { CAMERA_LEAD, MIN_VIEW_W, VIEW_H, VIEW_TOP } from '../world.js';
 
 /**
  * @typedef {{ width: number, height: number, cell: number, top: number, cells: number, lead: number, ratio: number }} View

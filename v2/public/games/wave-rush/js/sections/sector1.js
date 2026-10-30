@@ -3,7 +3,7 @@
 // 0.5, no portals. Wide corridors (≥ 7 hitboxes everywhere), few spikes, one idea per
 // section. Format: geometry.js. Every section is proven fair by v2/tests/wave-rush.test.ts.
 
-/** @type {import('../geometry.js').SectionData[]} */
+/** @type {import('../../../_engine/geometry.js').SectionData[]} */
 export const SECTOR1 = [
   {
     id: 's1-01',

@@ -4,7 +4,7 @@
 // diagonal; two gravity flips per run and one mini stretch (section 9).
 import { room, tunnel } from './kit.js';
 
-/** @type {import('../geometry.js').SectionData[]} */
+/** @type {import('../../../_engine/geometry.js').SectionData[]} */
 export const SECTOR5 = [
   // ── 1–5 ──
   { id: 's5-01', ...tunnel({ gap: 2.8, legs: [3, -3, 3, -3, 3, -3] }), hazards: [], deco: [{ type: 'sawtooth', from: 8, to: 26, on: 'ceil' }] },

@@ -1,11 +1,12 @@
 // @ts-check
 // A section's shape and what it means to touch it (docs/v2/PLAN.md 9.1, stage w-1).
 //
+// Shared by both Rush games (Ship Rush adds its solid blocks on top: ship-rush/js/solids.js).
 // The data (sections/*.js) is hand-authored. The ceiling and the floor are profiles,
 // written as short strings: the start height, then runs — `r4` flat for 4 cells, `d3`
 // a 45° slope 3 down (y grows), `u3` 3 up, `+1` / `-1` a vertical step down / up (stairs).
 // Everything else is a list of hazards (spikes, half-spikes, blocks, pillars, saws,
-// spike orbs) and deco that never hurts (chains with ornaments, stars, diamonds,
+// spike orbs, spiked mines) and deco that never hurts (chains with ornaments, stars, diamonds,
 // sawtooth edges, gears).
 //
 // Collision rule: the wave's hit circle touching any solid is a crash, EXCEPT a 45°
@@ -13,7 +14,7 @@
 // grazed (only the wave's centre crossing it counts). The same functions serve the game,
 // the solver and the tests; the solver also asks about a vertical "capsule" (the circle
 // swept over [ya, yb]) to model a mistimed tap.
-import { JOINT, JOINT_CLEAR, PLAY_H } from './config.js';
+import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
 
 /**
  * @typedef {[number, number]} Pt
@@ -23,7 +24,7 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './config.js';
  * @typedef {{ type: 'spike' | 'halfSpike', x: number, on?: 'floor' | 'ceil', count?: number, y?: number, dir?: 'up' | 'down' }} SpikeData
  * @typedef {{ type: 'block', x: number, y: number, w: number, h: number }} BlockData
  * @typedef {{ type: 'pillar', x: number, on: 'floor' | 'ceil', h: number, w?: number }} PillarData
- * @typedef {{ type: 'saw' | 'orb', x: number, y: number, r: number, chain?: boolean }} RoundData
+ * @typedef {{ type: 'saw' | 'orb' | 'mine', x: number, y: number, r: number, chain?: boolean }} RoundData
  *   chain: hangs on a chain from the ceiling (drawn only; the chain never hurts).
  * @typedef {SpikeData | BlockData | PillarData | RoundData} HazardData
  * @typedef {{ type: 'chain', x: number, len: number, ornament?: 'diamond' | 'star' | 'triangle' | 'none' }
@@ -35,7 +36,7 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './config.js';
  *   tier: its own speed and limits (the finale); mode: flown as the wave (default) or the ship.
  *
  * @typedef {{ type: 'spike' | 'halfSpike' | 'block' | 'pillar', shape: 'poly', pts: Pt[], vis: Pt[], dir: 'up' | 'down' | 'none', bbox: number[] }} PolyHazard
- * @typedef {{ type: 'saw' | 'orb', shape: 'circle', x: number, y: number, r: number, hit: number, bbox: number[], chain: boolean }} CircleHazard
+ * @typedef {{ type: 'saw' | 'orb' | 'mine', shape: 'circle', x: number, y: number, r: number, hit: number, bbox: number[], chain: boolean }} CircleHazard
  * @typedef {PolyHazard | CircleHazard} Hazard
  * @typedef {{ id: string, length: number, ceil: Pt[], floor: Pt[], ceilSegs: Seg[], floorSegs: Seg[],
  *   mini: boolean, tier: string | null, mode: 'wave' | 'ship',
@@ -46,8 +47,8 @@ const EPS = 1e-9;
 /** Spikes forgive a graze: the hit triangle is smaller than the drawing. */
 const SPIKE_HIT = { inset: 0.2, tip: 0.75 };
 const HALF_SPIKE_HIT = { inset: 0.15, tip: 0.38 };
-/** Round hazards: the hit circle is this share of the drawn radius. */
-const ROUND_HIT = { saw: 0.8, orb: 0.72 };
+/** Round hazards: the hit circle is this share of the drawn radius (a mine's spikes are thin: its core counts). */
+const ROUND_HIT = { saw: 0.8, orb: 0.72, mine: 0.66 };
 
 // ── Profiles ─────────────────────────────────────────────────────────────────
 
@@ -215,7 +216,7 @@ function resolveHazard(data, ceil, floor) {
     const pts = data.on === 'floor' ? rect(data.x, base - data.h, data.x + w, base) : rect(data.x, base, data.x + w, base + data.h);
     return [{ type: 'pillar', shape: 'poly', pts, vis: pts, dir: data.on === 'floor' ? 'up' : 'down', bbox: bboxOf(pts) }];
   }
-  if (data.type !== 'saw' && data.type !== 'orb') throw new Error('unknown hazard');
+  if (data.type !== 'saw' && data.type !== 'orb' && data.type !== 'mine') throw new Error('unknown hazard');
   const hit = data.r * ROUND_HIT[data.type];
   return [{ type: data.type, shape: 'circle', x: data.x, y: data.y, r: data.r, hit, bbox: [data.x - data.r, data.y - data.r, data.x + data.r, data.y + data.r], chain: data.chain === true }];
 }

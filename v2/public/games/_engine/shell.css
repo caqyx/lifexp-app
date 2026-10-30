@@ -1,4 +1,4 @@
-/* Wave Rush (docs/v2/PLAN.md 9.1, stage w-1). The tokens copy LifeXP's dark theme
+/* The Rush games' page (docs/v2/PLAN.md 9.1, stages w-1 and s-1: Wave Rush, Ship Rush). The tokens copy LifeXP's dark theme
    (v2/src/ui/tokens.css): the game's page cannot load the app's CSS. The canvas fills the
    frame; main.js sets --band-top and --band-h (CSS px) to where the playfield band is,
    and --progress (0..1) on the progress bar. Motion only through transform and opacity,

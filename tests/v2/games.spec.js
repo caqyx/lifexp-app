@@ -73,18 +73,18 @@ async function openGame(page, account) {
 test.describe('on a phone', () => {
   test.use({ viewport: PHONE });
 
-  test('the list: five games, each with a line, its time today and "Graj"', async ({ page, account }) => {
+  test('the list: six games, each with a line, its time today and "Graj"', async ({ page, account }) => {
     await openSignedIn(page, account, '#/today');
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.getByLabel('Nawigacja').getByRole('link', { name: 'Gry' }).click();
     await expect(page).toHaveURL(/#\/games$/);
 
     const cards = page.getByRole('list', { name: 'Gry' }).getByRole('listitem');
-    await expect(cards).toHaveCount(5);
-    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush']);
+    await expect(cards).toHaveCount(6);
+    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush', 'Ship Rush']);
     for (const card of await cards.all()) await expect(card.getByText('Dziś jeszcze nie grano')).toBeVisible();
-    // All are in (g-2, g-3, g-4, w-1): nothing is "Wkrótce" any more.
-    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush']) {
+    // All are in (g-2, g-3, g-4, w-1, s-1): nothing is "Wkrótce" any more.
+    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush', 'Ship Rush']) {
       await expect(page.getByRole('link', { name: `Graj: ${name}` })).toBeVisible();
     }
     await expect(page.getByText('Wkrótce')).toHaveCount(0);
@@ -968,5 +968,111 @@ test.describe('Wave Rush w-2', () => {
       await expect(game.locator('#skin-list').getByRole('button', { name: /Korona Demona/ })).toHaveAttribute('aria-pressed', 'true');
       expect(problems).toEqual([]);
     });
+  });
+});
+
+// ── Ship Rush (stage s-1): Wave Rush's sibling for the ship, on the same engine ──
+
+test.describe('Ship Rush', () => {
+  test.describe('on a touch phone held upright', () => {
+    test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+
+    test('skins (the last one locked) survive a reload; the pilot flies sections, a crash starts again at sector 1, Zakończ records the time', async ({ page, account }) => {
+      test.setTimeout(90000);
+      const problems = await watchProblems(page);
+      await page.clock.install();
+      const { host, game } = await playFromList(page, account, 'Ship Rush');
+      await expect(host.getByRole('note')).toBeVisible();
+      const stage = game.locator('#stage');
+      await expect(stage).toHaveAttribute('data-state', 'menu');
+      await expect(game.getByRole('heading', { name: 'Ship Rush' })).toBeVisible();
+      await expect(game.getByText('Przytrzymaj — statek się wznosi.')).toBeVisible();
+      // No finale yet (stage s-2): its box is not on the menu.
+      await expect(game.locator('#finale-box')).toBeHidden();
+
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      const skins = game.locator('#skin-list');
+      await expect(skins.getByRole('button')).toHaveCount(10);
+      await expect(skins.getByRole('button', { name: /Jaskółka/ })).toHaveAttribute('aria-pressed', 'true');
+      const locked = skins.getByRole('button', { name: /Korona Pustki/ });
+      await expect(locked).toBeDisabled();
+      await expect(locked).toContainText('Zablokowana');
+      await skins.getByRole('button', { name: /Manta/ }).tap();
+      await expect(skins.getByRole('button', { name: /Manta/ })).toHaveAttribute('aria-pressed', 'true');
+      expect(await page.evaluate(() => localStorage.getItem('lifexp-shiprush-skin'))).toBe('"manta"');
+      await page.reload();
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      await expect(skins.getByRole('button', { name: /Manta/ })).toHaveAttribute('aria-pressed', 'true');
+      await game.getByRole('button', { name: 'Gotowe' }).tap();
+
+      // The validator's path for the seed (?autopilot=2, test only) flies sections 1 and 2
+      // as the ship and lets go at the start of section 3.
+      await reopenFrameWith(page, host, 'seed=7&autopilot=2');
+      await game.getByRole('button', { name: 'Graj', exact: true }).tap();
+      await expect(stage).toHaveAttribute('data-state', 'ready');
+      await stage.tap();
+      await expect(stage).toHaveAttribute('data-state', 'playing');
+      expect((await waveState(game)).ship).toBe(true);
+      await expect.poll(async () => (await waveState(game)).section, { timeout: 40000 }).toBeGreaterThanOrEqual(3);
+      expect(await waveState(game)).toMatchObject({ sector: 1, attempt: 1, tier: 'easy' });
+
+      // Hands off: the ship sinks onto whatever is below and crashes; a tap starts again.
+      await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 15000 });
+      const dead = game.getByRole('region', { name: 'Rozbity!' });
+      await expect(dead).toContainText('Sektor 1, sekcja');
+      await expect(dead.getByText('Nowy rekord!')).toBeVisible();
+      const best = JSON.parse(await page.evaluate(() => localStorage.getItem('lifexp-shiprush-best')));
+      expect(best).toMatchObject({ sector: 1 });
+      expect(best.section).toBeGreaterThanOrEqual(3);
+      await page.waitForTimeout(600);
+      await stage.tap();
+      await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+      expect(await waveState(game)).toMatchObject({ sector: 1, section: 1 });
+
+      await endAndExpectSession(page, account, 'Ship Rush');
+      expect(problems).toEqual([]);
+    });
+  });
+
+  test('sideways 800×360: the full height; sector 3 by the pilot through its gravity flip; Praktyka goes back to the sector’s checkpoint', async ({ page, account }) => {
+    test.setTimeout(150000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Ship Rush');
+    await expect(host.getByRole('note')).toBeHidden();
+    await host.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const frameBox = await host.locator('iframe').boundingBox();
+    expect(frameBox.height).toBe(360);
+    const stage = game.locator('#stage');
+
+    // Sector 3 flown by the validator's path: the gravity flip and the way back.
+    const frame = await openWaveWith(page, host, 'seed=5&sector=3&section=1&autopilot=15');
+    await recordStates(frame);
+    await flyFrom(game, 'Graj');
+    await expect.poll(async () => (await waveState(game)).sector).toBe(3);
+    expect(await waveState(game)).toMatchObject({ tier: 'hard', ship: true });
+    await expect(game.locator('#hud-sector')).toContainText('Sektor 3: Trudny');
+    await expect.poll(() => game.locator('html').getAttribute('data-seen'), { timeout: 90000 }).toContain('flipped');
+    await expect.poll(async () => (await waveState(game)).gravity, { timeout: 60000 }).toBe(1);
+    expect((await waveState(game)).state).toBe('playing');
+
+    // Praktyka from sector 2, section 3: the pilot flies it and lets go; after the crash a
+    // tap brings the ship back to sector 2's start, and practice keeps no record.
+    const kept = await page.evaluate(() => localStorage.getItem('lifexp-shiprush-best'));
+    await openWaveWith(page, host, 'seed=12&sector=2&section=3&autopilot=1');
+    await flyFrom(game, 'Praktyka');
+    await expect(game.locator('.hud__practice')).toBeVisible();
+    const start = await waveState(game);
+    await expect.poll(async () => (await waveState(game)).section, { timeout: 30000 }).toBeGreaterThanOrEqual(4);
+    await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 20000 });
+    await expect(game.getByText('Stuknij, żeby wrócić do punktu kontrolnego')).toBeVisible();
+    await page.waitForTimeout(600);
+    await stage.click();
+    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    const after = await waveState(game);
+    expect(after.checkpoint).toBe(start.checkpoint);
+    expect(after.x).toBeLessThan(start.x);
+    expect(await page.evaluate(() => localStorage.getItem('lifexp-shiprush-best'))).toBe(kept);
+    expect(problems).toEqual([]);
   });
 });

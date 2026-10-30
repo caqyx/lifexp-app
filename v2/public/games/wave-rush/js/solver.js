@@ -14,7 +14,10 @@
 // then read forward and replayed through the game's own physics (physics.js,
 // geometry.js) with the exact hit circle, nominal and with every tap shifted early and
 // late: only a replay that survives all of them counts as the proof.
+import { changesOf, peakRate, shiftTap, toleranceSteps } from '../../_engine/limits.js';
 import { JOINT, PLAY_H, STEP } from './config.js';
+
+export { changesOf, peakRate, shiftTap, toleranceSteps };
 import { createWave, holdFor, stepWave, waveRadius, waveSlope } from './physics.js';
 
 /**
@@ -197,13 +200,6 @@ export function planSteps(plan, n) {
   return out;
 }
 
-/** Step indices where the direction changes (not the first). @param {Int8Array} dirs */
-export function changesOf(dirs) {
-  const out = [];
-  for (let s = 1; s < dirs.length; s++) if (dirs[s] !== dirs[s - 1]) out.push(s);
-  return out;
-}
-
 /**
  * Flies a direction-per-step input through the game's physics; true when it survives.
  * The input is given as holds for this gravity, the way a player gives it.
@@ -239,39 +235,6 @@ function trace(spec, y, dirs, gravity) {
     ys[s + 1] = wave.y;
   }
   return { xs, ys };
-}
-
-/**
- * The same input with one tap moved by `shift` steps: the change at `changes[k]` and
- * the next one (the tap keeps its length); the last change moves alone.
- * @param {Int8Array} dirs @param {number[]} changes @param {number} k @param {number} shift
- */
-export function shiftTap(dirs, changes, k, shift) {
-  const out = Int8Array.from(dirs);
-  const moved = [/** @type {number} */ (changes[k])];
-  if (k + 1 < changes.length) moved.push(/** @type {number} */ (changes[k + 1]));
-  for (const at of moved) {
-    const before = /** @type {number} */ (dirs[at - 1]);
-    const after = /** @type {number} */ (dirs[at]);
-    if (shift > 0) out.fill(before, at, Math.min(dirs.length, at + shift));
-    else out.fill(after, Math.max(0, at + shift), at);
-  }
-  return out;
-}
-
-/**
- * Most changes inside any one second.
- * @param {number[]} changes step indices
- */
-export function peakRate(changes) {
-  const window = Math.round(1 / STEP);
-  let best = 0;
-  let start = 0;
-  for (let end = 0; end < changes.length; end++) {
-    while (/** @type {number} */ (changes[end]) - /** @type {number} */ (changes[start]) >= window) start += 1;
-    best = Math.max(best, end - start + 1);
-  }
-  return best;
 }
 
 /**
@@ -354,7 +317,3 @@ export function toleranceBand(speed, mini, tolerance) {
   return 2 * speed * waveSlope(mini) * toleranceSteps(tolerance) * STEP;
 }
 
-/** The tolerance in whole physics steps (rounded up: never tested more leniently). @param {number} tolerance */
-export function toleranceSteps(tolerance) {
-  return Math.ceil(tolerance / STEP - 1e-9);
-}

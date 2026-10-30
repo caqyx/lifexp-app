@@ -16,7 +16,7 @@ const S = 'finale';
 const w3 = join(tunnel({ gap: 3, legs: [3, -4, 4, -3], tail: 2 }), room({ lead: 2, top: 1, bottom: 11, inner: 12 }), tunnel({ lead: 2, gap: 3, legs: [-3, 3, -4, 4] }));
 const w9 = join(tunnel({ gap: 3, legs: [4, -4, 3, -3, 4, -4], tail: 2 }), open(3), tunnel({ lead: 2, gap: 3, legs: [-4, 4, -3, 3, -4, 4, -3, 3] }));
 
-/** @type {import('../geometry.js').SectionData[]} */
+/** @type {import('../../../_engine/geometry.js').SectionData[]} */
 export const FINALE_SECTIONS = [
   { id: 'f1', tier: W, ...tunnel({ gap: 3, legs: [3, -3, 4, -4, 3, -3, 4, -4] }), hazards: [] },
   {
