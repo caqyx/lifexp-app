@@ -14,13 +14,19 @@
 //   across (above it if gravity pulled down, below if up) and flips gravity. The way
 //   across is instant: only the spot it lands on counts — a hazard there is a crash; a
 //   hazard it passes is not. With no surface across, the spider is lost (a crash).
+// - ORBS and PADS (stage f-2, boosters.js): an orb fires on a fresh press while touched
+//   (before the ground takes the press), a pad on touch; both set the vertical speed.
 // Collision, as for the ship (../../_engine/solids.js `settle`): a solid's top and
 // underside carry the body; coming in from the side — a block's, a pillar's, a step's —
 // is a crash; any hazard touching the body's circle is a crash; leaving the playfield is a
 // crash. Walking off a ledge, the vehicle falls.
 import { createVehicle } from '../../_engine/game.js';
 import { roomyAt, settle } from '../../_engine/solids.js';
+import { boostOf, padAt, ringAt } from './boosters.js';
 import { PLAY_H, SNAP, STREAK_TIME, bodyOf } from './config.js';
+
+/** How long an orb's or a pad's flash lasts, seconds (drawing only). */
+export const BURST_TIME = 0.3;
 
 export { advanceClock, isBuffered } from '../../_engine/clock.js';
 
@@ -59,9 +65,10 @@ export function snapTarget(world, x, y, half, gravity) {
 /**
  * One fixed step of the ball or the spider in a world.
  * @param {Body} body @param {boolean} holding @param {number} speed cells/s @param {number} dt @param {World} world
+ * @param {number} [ringShrink] cells off every orb's reach (the validator's search only)
  * @returns {{ vehicle: Body, crashed: boolean }}
  */
-export function stepBody(body, holding, speed, dt, world) {
+export function stepBody(body, holding, speed, dt, world, ringShrink = 0) {
   const kind = bodyOf(body.mini);
   const spider = body.mode === 'spider';
   // A press waits while it is held; letting go drops it.
@@ -73,8 +80,23 @@ export function stepBody(body, holding, speed, dt, world) {
   let streak = Math.max(0, (body.streak ?? 0) - dt);
   let streakFrom = body.streakFrom ?? y;
   let sinceAct = (body.sinceAct ?? 1) + dt;
+  let grounded = body.grounded === true;
+  let spentRing = body.spentRing;
+  let spentPad = body.spentPad;
+  let burst = Math.max(0, (body.burst ?? 0) - dt);
+  let burstAt = body.burstAt;
   const x = body.x + speed * dt;
-  if (queued && body.grounded) {
+  // An orb takes a fresh press before the ground does.
+  const ring = queued ? ringAt(world, x, y, body.mini, spentRing, ringShrink) : null;
+  if (ring) {
+    queued = false;
+    sinceAct = 0;
+    ({ gravity, vy } = boostOf('ring', ring.kind, gravity, body.mini));
+    grounded = false;
+    spentRing = ring.id;
+    burst = BURST_TIME;
+    burstAt = { x: ring.x, y: ring.y, type: 'ring', kind: ring.kind };
+  } else if (queued && grounded) {
     queued = false;
     sinceAct = 0;
     gravity = /** @type {1 | -1} */ (-gravity);
@@ -93,11 +115,20 @@ export function stepBody(body, holding, speed, dt, world) {
   const fall = Math.min(kind.terminal, vy * gravity + kind.gravity * dt);
   vy = fall * gravity;
   const moved = settle(world, y, x, y + vy * dt, kind.half, SNAP);
-  const grounded = gravity > 0 ? moved.landed : moved.bumped;
+  grounded = gravity > 0 ? moved.landed : moved.bumped;
   if ((moved.landed && vy > 0) || (moved.bumped && vy < 0)) vy = 0;
+  // A pad fires on touch.
+  const pad = padAt(world, x, moved.y, kind.half, spentPad);
+  if (pad) {
+    ({ gravity, vy } = boostOf('pad', pad.kind, gravity, body.mini));
+    grounded = false;
+    spentPad = pad.id;
+    burst = BURST_TIME;
+    burstAt = { x: pad.x, y: pad.y, type: 'pad', kind: pad.kind };
+  }
   const outside = moved.y - kind.half < 0 || moved.y + kind.half > PLAY_H;
   /** @type {Body} */
-  const vehicle = { ...body, x, y: moved.y, vy, dir: vy < 0 ? -1 : 1, gravity, held: holding, queued, grounded, streak, streakFrom, sinceAct };
+  const vehicle = { ...body, x, y: moved.y, vy, dir: vy < 0 ? -1 : 1, gravity, held: holding, queued, grounded, streak, streakFrom, sinceAct, spentRing, spentPad, burst, burstAt };
   return { vehicle, crashed: moved.crash || outside || world.hazard(x, moved.y, moved.y, kind.radius) };
 }
 

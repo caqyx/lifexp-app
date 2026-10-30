@@ -104,16 +104,19 @@ export const SECTOR1 = [
     ],
   },
   {
-    // Ball: columns from the floor, the ceiling and the floor.
+    // Ball: jump pads over two beds with beds over them too (the first pads).
     id: 'r1-09',
     mode: 'ball',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'pillar', x: 10, on: 'floor', h: 3 },
-      { type: 'pillar', x: 17, on: 'ceil', h: 3 },
-      { type: 'pillar', x: 24, on: 'floor', h: 3 },
+      { type: 'pad', kind: 'jump', x: 7, on: 'floor' },
+      { type: 'spike', x: 8.4, on: 'floor', count: 2 },
+      { type: 'spike', x: 8.4, on: 'ceil', count: 2 },
+      { type: 'pad', kind: 'jump', x: 17, on: 'floor' },
+      { type: 'spike', x: 18.4, on: 'floor', count: 2 },
+      { type: 'spike', x: 18.4, on: 'ceil', count: 2 },
     ],
   },
   {

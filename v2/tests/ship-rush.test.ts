@@ -408,7 +408,7 @@ describe('collision: rest and slide on tops and undersides, die on sides and haz
   });
 
   test('leaving the playfield is a crash (where nothing else stops it)', () => {
-    const empty: World = { solids: new Map(), hazard: () => false };
+    const empty: World = { solids: new Map(), hazard: () => false, boosters: () => [] };
     expect(stepShip(createShip(7, half - 0.01), true, SPEED, STEP, empty).crashed).toBe(true);
     expect(stepShip(createShip(7, 6), true, SPEED, STEP, empty).crashed).toBe(false);
   });

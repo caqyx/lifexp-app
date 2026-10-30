@@ -52,6 +52,26 @@ export const SNAP = 0.33;
 export const STREAK_TIME = 0.14;
 
 /**
+ * Orbs and pads (stage f-2; flip-rush/js/boosters.js has the rules). Each SETS the
+ * vertical speed (as the genre's boost does: the speed before does not count), in cells/s
+ * along the gravity they leave the body with; negative = away from the ground. Mini:
+ * every speed × MINI_BOOST.
+ * - orbs (a fresh press while touching): jump −16, small −11, gravity: flip, then +4
+ *   (a gentle start toward the new ground), gravityJump: flip, then −16 (a jump away from
+ *   the new ground, toward the old one), dash: +24 (a slam toward the ground);
+ * - pads (on touch): jump −18, small −12, gravity: flip, then +8 (sent across).
+ * Reach: an orb counts while the body's centre is within RING_REACH of the orb's centre
+ * (drawn radius RING_R); a pad while the body's box touches the cell-wide pad box
+ * PAD_H deep on its surface.
+ */
+export const RING = { jump: -16, small: -11, gravity: 4, gravityJump: -16, dash: 24 };
+export const PAD = { jump: -18, small: -12, gravity: 8 };
+export const MINI_BOOST = 0.8;
+export const RING_R = 0.42;
+export const RING_REACH = { normal: 0.85, mini: 0.75 };
+export const PAD_H = 0.3;
+
+/**
  * Human limits per difficulty tier for tapping modes (owner: "possible for a human"). The
  * validator (prove.js) proves that every section has a path that keeps them:
  * - minInterval: seconds between two input changes, at least — a press is held at least

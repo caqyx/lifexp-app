@@ -114,6 +114,12 @@ export function beamSpec(world, x0, x1, speed, limits, start) {
       const next = stepBody(v, holding, speed, dt, world);
       return next.crashed ? null : next.vehicle;
     },
+    // The search's orbs reach less far by the way a mistimed press slips (and a step), so
+    // a press it picks fires the real orb however it slips.
+    search(v, holding, dt) {
+      const next = stepBody(v, holding, speed, dt, world, speed * (limits.tolerance + 1 / 240));
+      return next.crashed ? null : next.vehicle;
+    },
     // The search's habit: keep a press down until it has acted, and a moment longer (so a
     // release that comes early still comes after it).
     allow: (v, holding) => holding || !v.held || (!v.queued && (v.sinceAct ?? 1) >= limits.tolerance + 1 / 240),
@@ -127,7 +133,8 @@ export function beamSpec(world, x0, x1, speed, limits, start) {
       if (overlapsSolid(world, v.x + across, v.y, half)) return false;
       return !world.hazard(v.x - across, v.y, v.y, radius) && !world.hazard(v.x + across, v.y, v.y, radius);
     },
-    tag: (v) => `${v.gravity}${v.grounded ? 'g' : ''}${v.queued ? 'q' : ''}`,
+    // Never merge a state that has used an orb or a pad with one that has not.
+    tag: (v) => `${v.gravity}${v.grounded ? 'g' : ''}${v.queued ? 'q' : ''}|${v.spentRing ?? ''}|${v.spentPad ?? ''}`,
     fewest: true,
     released: true,
   };

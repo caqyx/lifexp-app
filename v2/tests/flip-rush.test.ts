@@ -10,7 +10,8 @@ import { changesOf, peakRate } from '../public/games/_engine/limits.js';
 import { createRng, parseSwitches } from '../public/games/_engine/rng.js';
 import { sectionWorld, type World } from '../public/games/_engine/solids.js';
 import { createAutopilot } from '../public/games/flip-rush/js/autopilot.js';
-import { BODY, JOINT, SECTORS, SNAP, STEP, TIERS, tierSpeed, type SectorDef } from '../public/games/flip-rush/js/config.js';
+import { BODY, JOINT, MINI_BOOST, PAD, RING, RING_REACH, SECTORS, SNAP, STEP, TIERS, tierSpeed, type SectorDef } from '../public/games/flip-rush/js/config.js';
+import { boostOf } from '../public/games/flip-rush/js/boosters.js';
 import { createGame, keepsRecords, stepGame, type Game } from '../public/games/flip-rush/js/game.js';
 import { pickLang, textsOf, translator, TEXT_KEYS } from '../public/games/flip-rush/js/i18n.js';
 import { createBody, snapTarget, stepBody, type Body } from '../public/games/flip-rush/js/physics.js';
@@ -325,6 +326,126 @@ describe('collision: roll and run on tops and undersides, die on sides and hazar
     const w = world([], '2 r4 -3 r26', '10 r30');
     const r = run(w, { ...createBody(5, CEIL, 'ball'), gravity: -1 }, false, 240);
     expect(r.crashed).toBe(true);
+  });
+});
+
+// ── Orbs and pads ────────────────────────────────────────────────────────────
+
+describe('orbs and pads (stage f-2)', () => {
+  test('each sets the vertical speed (never adds), along the gravity it leaves; gravity kinds flip first; mini × 0.8', () => {
+    for (const gravity of [1, -1] as const) {
+      for (const mini of [false, true]) {
+        const k = mini ? MINI_BOOST : 1;
+        expect(boostOf('ring', 'jump', gravity, mini)).toEqual({ gravity, vy: RING.jump * k * gravity });
+        expect(boostOf('ring', 'small', gravity, mini)).toEqual({ gravity, vy: RING.small * k * gravity });
+        expect(boostOf('ring', 'dash', gravity, mini)).toEqual({ gravity, vy: RING.dash * k * gravity });
+        expect(boostOf('ring', 'gravity', gravity, mini)).toEqual({ gravity: -gravity, vy: RING.gravity * k * -gravity });
+        expect(boostOf('ring', 'gravityJump', gravity, mini)).toEqual({ gravity: -gravity, vy: RING.gravityJump * k * -gravity });
+        expect(boostOf('pad', 'jump', gravity, mini)).toEqual({ gravity, vy: PAD.jump * k * gravity });
+        expect(boostOf('pad', 'small', gravity, mini)).toEqual({ gravity, vy: PAD.small * k * gravity });
+        expect(boostOf('pad', 'gravity', gravity, mini)).toEqual({ gravity: -gravity, vy: PAD.gravity * k * -gravity });
+      }
+    }
+    // Jump-type speeds lift away from the ground; the dash and the gravity kinds send toward it.
+    expect(RING.jump).toBeLessThan(RING.small);
+    expect(RING.small).toBeLessThan(0);
+    expect(RING.dash).toBeGreaterThan(0);
+    expect(PAD.jump).toBeLessThan(PAD.small);
+  });
+
+  /** A body at (x, y) in gravity g, mini or not, falling already at vy. */
+  const at = (mode: 'ball' | 'spider', x: number, y: number, gravity: 1 | -1 = 1, mini = false, vy = 0): Body => ({ ...createBody(x, y, mode), gravity, mini, vy });
+
+  for (const gravity of [1, -1] as const) {
+    for (const mini of [false, true]) {
+      const h = (mini ? BODY.mini : BODY.normal).half;
+      const ground = gravity > 0 ? JOINT.floor - h : JOINT.ceil + h;
+      const k = mini ? MINI_BOOST : 1;
+      const label = `gravity ${gravity}${mini ? ', mini' : ''}`;
+
+      test(`an orb fires on a fresh press while touched, before the ground takes it (${label})`, () => {
+        for (const mode of ['ball', 'spider'] as const) {
+          const w = world([{ type: 'ring', kind: 'jump', x: 6, y: ground - 0.3 * gravity }]);
+          const start = run(w, at(mode, 5.9, ground, gravity, mini), false, 2, 0).body;
+          const fired = stepBody(start, true, SPEED, STEP, w).vehicle;
+          expect(fired.gravity, mode).toBe(gravity);
+          expect(fired.spentRing).toBeDefined();
+          // Set, then one step of gravity: about the orb's speed, away from the ground; no teleport.
+          expect(fired.vy * gravity).toBeCloseTo(RING.jump * k + BODY.normal.gravity * STEP, 6);
+          expect(Math.abs(fired.y - ground)).toBeLessThan(0.2);
+        }
+      });
+
+      test(`a press made in the air and still held fires the orb on reaching it (buffer); a used press does not (${label})`, () => {
+        // Falling from (4, 6) at SPEED, the body reaches x = 6 about 2.16 cells lower down.
+        const w = world([{ type: 'ring', kind: 'small', x: 6, y: 6 + 2.16 * gravity }]);
+        const air = at('ball', 4, 6, gravity, mini, 0);
+        const held = run(w, air, true, 120, SPEED);
+        expect(held.path.some((b) => b.spentRing !== undefined)).toBe(true);
+        const fired = held.path.find((b) => b.spentRing !== undefined)!;
+        expect(fired.vy * gravity).toBeLessThan(RING.small * k + 1);
+        // The press acted on the ground first: holding it on into the orb does nothing.
+        const used = at('ball', 3, ground, gravity, mini);
+        const late = run(w, { ...used, grounded: true }, true, 240, SPEED);
+        expect(late.path.filter((b) => b.spentRing !== undefined)).toHaveLength(0);
+      });
+
+      test(`an orb fires once per pass; the gravity orb and the gravity-jump orb flip, the dash slams (${label})`, () => {
+        const w = world([{ type: 'ring', kind: 'gravity', x: 6, y: 6 }]);
+        const twice = run(w, at('spider', 5.6, 6, gravity, mini), (_b, i) => i < 3 || (i > 8 && i < 12), 14, SPEED);
+        expect(flips(at('spider', 5.6, 6, gravity, mini), twice.path)).toBe(1);
+        const jumpFlip = stepBody(at('ball', 6, 6, gravity, mini), true, SPEED, STEP, world([{ type: 'ring', kind: 'gravityJump', x: 6, y: 6 }])).vehicle;
+        expect(jumpFlip.gravity).toBe(-gravity);
+        expect(jumpFlip.vy * -gravity).toBeLessThan(0);
+        const dash = stepBody(at('ball', 6, 6, gravity, mini), true, SPEED, STEP, world([{ type: 'ring', kind: 'dash', x: 6, y: 6 }])).vehicle;
+        expect(dash.vy * gravity).toBeGreaterThan(RING.dash * k - 1);
+      });
+
+      test(`a pad fires on touch with no press, once; the gravity pad sends it across; the spider is moved, not teleported (${label})`, () => {
+        const on = gravity > 0 ? 'floor' : 'ceil';
+        for (const mode of ['ball', 'spider'] as const) {
+          const w = world([{ type: 'pad', kind: 'jump', x: 6, on }]);
+          const r = run(w, at(mode, 3, ground, gravity, mini), false, 240, SPEED);
+          const i = r.path.findIndex((b) => b.spentPad !== undefined);
+          expect(i, mode).toBeGreaterThan(0);
+          expect(r.path[i]!.vy * gravity).toBeLessThan(PAD.jump * k + 1);
+          expect(Math.abs(r.path[i]!.y - ground)).toBeLessThan(0.2);
+          expect(r.crashed).toBe(false);
+        }
+        const g = world([{ type: 'pad', kind: 'gravity', x: 6, on }]);
+        const across = run(g, at('ball', 3, ground, gravity, mini), false, 240, SPEED);
+        expect(across.body.gravity).toBe(-gravity);
+        expect(across.body.y).toBeCloseTo(gravity > 0 ? JOINT.ceil + h : JOINT.floor - h, 6);
+      });
+    }
+  }
+
+  test('reach: an orb counts within RING_REACH of its centre, a pad on its cell and a little above it', () => {
+    expect(RING_REACH.normal).toBeGreaterThan(RING_REACH.mini);
+    const w = world([{ type: 'ring', kind: 'jump', x: 6, y: 6 }]);
+    expect(stepBody(at('ball', 6, 6 + RING_REACH.normal - 0.05), true, 0, STEP, w).vehicle.spentRing).toBeDefined();
+    expect(stepBody(at('ball', 6, 6 + RING_REACH.normal + 0.05), true, 0, STEP, w).vehicle.spentRing).toBeUndefined();
+    const p = world([{ type: 'pad', kind: 'small', x: 6, on: 'floor' }]);
+    expect(stepBody(at('ball', 6.5, FLOOR), false, 0, STEP, p).vehicle.spentPad).toBeDefined();
+    expect(stepBody(at('ball', 8.2, FLOOR), false, 0, STEP, p).vehicle.spentPad).toBeUndefined();
+  });
+
+  test('the validator plays orb chains and pads; an orb out of reach of every path is caught', () => {
+    // r2-15 with a ceiling bed over its floor bed too: only the orb chain gets across.
+    const base = SECTION_LIBRARY[2]!.find((d) => d.id === 'r2-15')!;
+    const chain: SectionData = { ...base, id: 'v-chain', hazards: [...base.hazards, { type: 'spike', x: 7, on: 'ceil', count: 13 }] };
+    const r = proveEntry(chain, 'normal', { gravity: 1, mini: false }, { y: FLOOR, vy: 0 });
+    expect(r.problem).toBeNull();
+    const high: SectionData = { ...chain, id: 'v-high', hazards: chain.hazards.map((h) => (h.type === 'ring' ? { ...h, y: 4 } : h)) };
+    expect(proveEntry(high, 'normal', { gravity: 1, mini: false }, { y: FLOOR, vy: 0 }).problem).not.toBeNull();
+  });
+
+  test('pads come in sector 1, orbs from sector 2, both in sector 3', () => {
+    const kinds = (s: number) => new Set(SECTION_LIBRARY[s]!.flatMap((d) => d.hazards.map((h) => h.type)));
+    expect(kinds(1).has('pad')).toBe(true);
+    expect(kinds(1).has('ring')).toBe(false);
+    expect(kinds(2).has('ring')).toBe(true);
+    expect(kinds(3).has('ring') && kinds(3).has('pad')).toBe(true);
   });
 });
 

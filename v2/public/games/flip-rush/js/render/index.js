@@ -1,12 +1,14 @@
 // @ts-check
 // Flip Rush's frame (docs/v2/PLAN.md 9.1, stage f-1): the Rush engine's renderer
 // (../../../_engine/render/frame.js) with this game's look — its factory themes and
-// backgrounds, and the ball or the spider in the player's skin. Neither leaves a trail;
-// the spider's snap leaves a short streak instead.
+// backgrounds, the ball or the spider in the player's skin, and the orbs and pads (stage
+// f-2) with their flash. Neither vehicle leaves a trail; the spider's snap leaves a short
+// streak instead.
 import { createRenderer, renderFrame as renderWith } from '../../../_engine/render/frame.js';
-import { screenY } from '../../../_engine/render/view.js';
+import { screenX, screenY } from '../../../_engine/render/view.js';
 import { STREAK_TIME, bodyOf } from '../config.js';
 import { drawBackground } from './background.js';
+import { drawBurst, drawPieceBoosters } from './boosters.js';
 import { drawBall, drawSpider, drawStreak, rollAngle } from './vehicles.js';
 import { themeOf } from './themes.js';
 
@@ -22,8 +24,11 @@ export const LOOK = {
   themeOf,
   drawBackground: (ctx, v, th, camX, clock) => drawBackground(ctx, v, /** @type {import('./themes.js').Theme} */ (th), camX, clock),
   trailWidth: () => 0,
+  drawPieceItems: drawPieceBoosters,
   drawVehicle(ctx, s, x, y) {
     const w = s.wave;
+    const camX = w.x - s.view.lead;
+    if (!s.reduced && w.burstAt && (w.burst ?? 0) > 0) drawBurst(ctx, w.burstAt.kind, screenX(s.view, camX, w.burstAt.x), screenY(s.view, w.burstAt.y), s.view.cell, w.burst ?? 0);
     const kind = bodyOf(w.mini);
     const size = kind.size * s.view.cell;
     if (w.mode === 'spider') {

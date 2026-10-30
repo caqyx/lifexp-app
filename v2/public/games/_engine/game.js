@@ -18,12 +18,14 @@ import { checkpointX, jumpX, locate, pieceAt, progressAt, respawnX, speedAt, sta
  * @typedef {{ x: number, y: number }} Point
  * @typedef {import('./level.js').Run} Run
  * @typedef {{ x: number, y: number, dir: number, gravity: 1 | -1, mini: boolean, ship: boolean, vy: number,
- *   mode?: import('./geometry.js').VehicleMode, held?: boolean, queued?: boolean, grounded?: boolean, streak?: number, streakFrom?: number, sinceAct?: number }} Vehicle
+ *   mode?: import('./geometry.js').VehicleMode, held?: boolean, queued?: boolean, grounded?: boolean, streak?: number, streakFrom?: number, sinceAct?: number,
+ *   spentRing?: string, spentPad?: string, burst?: number, burstAt?: { x: number, y: number, type: 'ring' | 'pad', kind: string } }} Vehicle
  *   dir: +1 moving down, −1 moving up (screen y grows downwards); ship: flying the ship,
  *   with vertical speed vy (cells/s; the wave keeps 0 and never uses it); mode: which
  *   vehicle (Flip Rush has more than two); held / queued / grounded: a tapping vehicle's
  *   input and contact (Flip Rush), sinceAct: seconds since its last press acted; streak /
- *   streakFrom: the spider's snap, for drawing.
+ *   streakFrom: the spider's snap, for drawing; spentRing / spentPad: the last orb and pad
+ *   used (each fires once per pass); burst / burstAt: an orb's or pad's flash, for drawing.
  * @typedef {{
  *   mode: Mode, level: 'run' | 'finale', checkpointBy: 'sector' | 'section', rng: () => number,
  *   run: Run, jumped: boolean, rules: GameRules,

@@ -736,7 +736,7 @@ const waveState = (game) =>
 async function recordStates(frame) {
   await frame.evaluate(() => {
     const stage = document.getElementById('stage');
-    const seen = { flipped: false, mini: false, ship: false, ball: false, spider: false };
+    const seen = { flipped: false, mini: false, ship: false, ball: false, spider: false, ring: false, pad: false };
     document.documentElement.dataset.seen = '';
     setInterval(() => {
       if (stage.dataset.debugGravity === '-1') seen.flipped = true;
@@ -744,6 +744,8 @@ async function recordStates(frame) {
       if (stage.dataset.debugShip === '1') seen.ship = true;
       if (stage.dataset.debugMode === 'ball') seen.ball = true;
       if (stage.dataset.debugMode === 'spider') seen.spider = true;
+      if (stage.dataset.debugRing) seen.ring = true;
+      if (stage.dataset.debugPad) seen.pad = true;
       document.documentElement.dataset.seen = Object.keys(seen).filter((k) => seen[k]).join(',');
     }, 5);
   });
@@ -1336,6 +1338,33 @@ test.describe('Flip Rush, a plain run', () => {
       const toast = game.locator('.toast');
       await expect(toast).toContainText(lang === 'pl' ? 'Pająk' : 'Spider');
       await expect(toast).not.toContainText(lang === 'pl' ? 'Fala' : 'Wave');
+// ── Flip Rush f-2: orbs and pads, by the pilot ──
+
+test.describe('Flip Rush f-2', () => {
+  test('sideways 800×360: the pilot fires a pad in sector 1 and an orb chain in sector 2', async ({ page, account }) => {
+    test.setTimeout(120000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Flip Rush');
+    await host.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const stage = game.locator('#stage');
+
+    // Where the seed puts r1-09 (pads) and r2-15 (a pad onto a chain of jump orbs).
+    await openWaveWith(page, host, 'seed=3');
+    await flyFrom(game, 'Graj');
+    const order = (await stage.evaluate((el) => el.dataset.debugOrder)).split('|').map((s) => s.split('.').map(Number));
+    const padPlace = order[0].indexOf(9) + 1;
+    const orbPlace = order[1].indexOf(15) + 1;
+
+    for (const [sector, place, kind] of [[1, padPlace, 'pad'], [2, orbPlace, 'ring']]) {
+      const frame = await openWaveWith(page, host, `seed=3&sector=${sector}&section=${place}&autopilot=1`);
+      await recordStates(frame);
+      await flyFrom(game, 'Graj');
+      await expect.poll(() => game.locator('html').getAttribute('data-seen'), { timeout: 20000 }).toContain(kind);
+      expect(await waveState(game)).toMatchObject({ sector, section: place, state: 'playing' });
+      // And on into the next section (or sector), still playing.
+      await expect.poll(async () => { const w = await waveState(game); return (w.sector - sector) * 100 + w.section; }, { timeout: 20000 }).toBeGreaterThan(place);
+      expect((await waveState(game)).state).toBe('playing');
     }
     expect(problems).toEqual([]);
   });
