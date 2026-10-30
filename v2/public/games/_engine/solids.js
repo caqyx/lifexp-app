@@ -19,10 +19,33 @@ import { pieceIndexAt } from './level.js';
  * @typedef {{ x0: number, x1: number, y0: number, y1: number }} Solid
  *   A box: x0..x1 across, y0 (top) .. y1 (bottom); the floor reaches down to +∞ and the
  *   ceiling up to −∞.
- * @typedef {{ solids: Map<number, Solid[]>, hazard: (x: number, ya: number, yb: number, r: number) => boolean }} World
+ * @typedef {import('./geometry.js').Booster & { id: string }} PlacedBooster
+ * @typedef {{ solids: Map<number, Solid[]>, hazard: (x: number, ya: number, yb: number, r: number) => boolean,
+ *   boosters: (x: number) => PlacedBooster[] }} World
  *   solids: by integer x (each box listed one cell beyond its ends); hazard: does the
- *   circle swept over ya..yb touch a hazard at x?
+ *   circle swept over ya..yb touch a hazard at x? boosters: the orbs and pads within about
+ *   two cells of x, at world x, each with an id of its own in the world.
  */
+
+/**
+ * Orbs and pads bucketed by integer x (each listed two cells beyond itself).
+ * @param {PlacedBooster[]} list
+ */
+function bucketBoosters(list) {
+  /** @type {Map<number, PlacedBooster[]>} */
+  const map = new Map();
+  for (const b of list) {
+    for (let c = Math.floor(b.x) - 2; c <= Math.floor(b.x) + 2; c++) {
+      const into = map.get(c);
+      if (into) into.push(b);
+      else map.set(c, [b]);
+    }
+  }
+  return map;
+}
+
+/** @type {PlacedBooster[]} */
+const NONE = [];
 
 /** Blocks and pillars are solid in Ship Rush. @param {Hazard} h */
 export const isSolid = (h) => h.type === 'block' || h.type === 'pillar';
@@ -95,6 +118,7 @@ export function sectionWorld(g) {
     const terrain = s.y0 === -Infinity || s.y1 === Infinity;
     return terrain ? { ...s, x0: s.x0 <= 1e-9 ? -reach : s.x0, x1: s.x1 >= g.length - 1e-9 ? g.length + reach : s.x1 } : s;
   });
+  const boosters = bucketBoosters(g.boosters.map((b, i) => ({ ...b, id: `${g.id}:${i}` })));
   return {
     solids: bucketSolids(solids),
     hazard(x, ya, yb, r) {
@@ -102,6 +126,7 @@ export function sectionWorld(g) {
       if (list) for (const h of list) if (!isSolid(h) && capsuleHitsHazard(h, x, ya, yb, r)) return true;
       return false;
     },
+    boosters: (x) => boosters.get(Math.floor(x)) ?? NONE,
   };
 }
 
@@ -131,9 +156,13 @@ export function runWorld(run) {
       else into.push(placed);
     }
   }
+  const placedBoosters = bucketBoosters(
+    run.pieces.flatMap((p, k) => p.g.boosters.map((b, i) => ({ ...b, x: b.x + p.x0, id: `${k}:${i}` }))),
+  );
   /** @type {World} */
   const world = {
     solids: bucketSolids([...floors, ...ceilings, ...boxes]),
+    boosters: (x) => placedBoosters.get(Math.floor(x)) ?? NONE,
     hazard(x, ya, yb, r) {
       const i = pieceIndexAt(run, x);
       for (let k = Math.max(0, i - 1); k <= Math.min(run.pieces.length - 1, i + 1); k++) {

@@ -736,7 +736,7 @@ const waveState = (game) =>
 async function recordStates(frame) {
   await frame.evaluate(() => {
     const stage = document.getElementById('stage');
-    const seen = { flipped: false, mini: false, ship: false, ball: false, spider: false };
+    const seen = { flipped: false, mini: false, ship: false, ball: false, spider: false, ring: false, pad: false };
     document.documentElement.dataset.seen = '';
     setInterval(() => {
       if (stage.dataset.debugGravity === '-1') seen.flipped = true;
@@ -744,6 +744,8 @@ async function recordStates(frame) {
       if (stage.dataset.debugShip === '1') seen.ship = true;
       if (stage.dataset.debugMode === 'ball') seen.ball = true;
       if (stage.dataset.debugMode === 'spider') seen.spider = true;
+      if (stage.dataset.debugRing) seen.ring = true;
+      if (stage.dataset.debugPad) seen.pad = true;
       document.documentElement.dataset.seen = Object.keys(seen).filter((k) => seen[k]).join(',');
     }, 5);
   });
@@ -1199,8 +1201,8 @@ test.describe('Flip Rush', () => {
       await expect(stage).toHaveAttribute('data-state', 'menu');
       await expect(game.getByRole('heading', { name: 'Flip Rush' })).toBeVisible();
       await expect(game.getByText('Stuknij — grawitacja się odwraca.')).toBeVisible();
-      // No finale yet (stage f-2).
-      await expect(game.getByRole('button', { name: 'Zagraj finał' })).toBeHidden();
+      // The finale is there, locked until the Demon is finished (stage f-2).
+      await expect(game.getByRole('button', { name: 'Zagraj finał' })).toBeDisabled();
 
       await game.getByRole('button', { name: 'Skórki' }).tap();
       const skins = game.locator('#skin-list');
@@ -1273,7 +1275,8 @@ test.describe('Flip Rush', () => {
     const portals = await stage.evaluate((el) => el.dataset.debugPortals.split(','));
     const back = portals.map((p) => p.split(':')).filter(([kind, , on]) => kind === 'gravity' && on === 'off').map(([, x]) => Number(x));
     expect(back.length).toBeGreaterThan(0);
-    await expect.poll(async () => (await waveState(game)).x, { timeout: 90000 }).toBeGreaterThan(Math.max(...back) + 5);
+    // Sector 3's way back is the run's first one (later sectors have their own).
+    await expect.poll(async () => (await waveState(game)).x, { timeout: 90000 }).toBeGreaterThan(Math.min(...back) + 5);
     const seen = await game.locator('html').getAttribute('data-seen');
     expect(seen).toContain('ball');
     expect(seen).toContain('spider');
@@ -1337,6 +1340,147 @@ test.describe('Flip Rush, a plain run', () => {
       await expect(toast).toContainText(lang === 'pl' ? 'Pająk' : 'Spider');
       await expect(toast).not.toContainText(lang === 'pl' ? 'Fala' : 'Wave');
     }
+    expect(problems).toEqual([]);
+  });
+});
+
+// ── Flip Rush f-2: orbs and pads, by the pilot ──
+
+test.describe('Flip Rush f-2', () => {
+  test('sideways 800×360: the pilot fires a pad in sector 1 and an orb chain in sector 2', async ({ page, account }) => {
+    test.setTimeout(120000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Flip Rush');
+    await host.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const stage = game.locator('#stage');
+
+    // Where the seed puts r1-09 (pads) and r2-15 (a pad onto a chain of jump orbs).
+    await openWaveWith(page, host, 'seed=3');
+    await flyFrom(game, 'Graj');
+    const order = (await stage.evaluate((el) => el.dataset.debugOrder)).split('|').map((s) => s.split('.').map(Number));
+    const padPlace = order[0].indexOf(9) + 1;
+    const orbPlace = order[1].indexOf(15) + 1;
+
+    for (const [sector, place, kind] of [[1, padPlace, 'pad'], [2, orbPlace, 'ring']]) {
+      const frame = await openWaveWith(page, host, `seed=3&sector=${sector}&section=${place}&autopilot=1`);
+      await recordStates(frame);
+      await flyFrom(game, 'Graj');
+      await expect.poll(() => game.locator('html').getAttribute('data-seen'), { timeout: 20000 }).toContain(kind);
+      expect(await waveState(game)).toMatchObject({ sector, section: place, state: 'playing' });
+      // And on into the next section (or sector), still playing.
+      await expect.poll(async () => { const w = await waveState(game); return (w.sector - sector) * 100 + w.section; }, { timeout: 20000 }).toBeGreaterThan(place);
+      expect((await waveState(game)).state).toBe('playing');
+    }
+    expect(problems).toEqual([]);
+  });
+});
+
+// ── Flip Rush f-2: sectors 4–6, the Demon, the achievement and the finale ──
+
+test.describe('Flip Rush f-2, sectors 4–6 and the finale', () => {
+  test('sideways 800×360: sectors 4 and 5 by the pilot — a gravity flip and a mini stretch at their speeds and looks', async ({ page, account }) => {
+    test.setTimeout(240000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Flip Rush');
+    for (const [sector, tier, name] of [[4, 'harder', 'Trudniejszy'], [5, 'insane', 'Insane']]) {
+      const frame = await openWaveWith(page, host, `seed=12&sector=${sector}&section=1&autopilot=10`);
+      await recordStates(frame);
+      await flyFrom(game, 'Graj');
+      await expect.poll(async () => (await waveState(game)).sector).toBe(sector);
+      expect(await waveState(game)).toMatchObject({ tier });
+      await expect(game.locator('#hud-sector')).toContainText(`Sektor ${sector}: ${name}`);
+      // The mini portal pair is the sector's only one; the pilot plays on through it.
+      await expect.poll(() => game.locator('html').getAttribute('data-seen'), { timeout: 120000 }).toMatch(/^(?=.*mini)(?=.*ball)(?=.*spider)/);
+      expect((await waveState(game)).state).toBe('playing');
+    }
+    expect(problems).toEqual([]);
+  });
+
+  test('sideways 800×360: the Demon tiers by test jump, each at its own speed and look, named in the HUD', async ({ page, account }) => {
+    test.setTimeout(120000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Flip Rush');
+    for (const [section, tier, name] of [[1, 'easyDemon', 'Easy Demon'], [11, 'hardDemon', 'Hard Demon'], [16, 'insaneDemon', 'Insane Demon'], [26, 'extremeDemon', 'Extreme Demon']]) {
+      await openWaveWith(page, host, `seed=8&sector=6&section=${section}&autopilot=1`);
+      await flyFrom(game, 'Graj');
+      await expect.poll(async () => (await waveState(game)).section).toBe(section);
+      expect(await waveState(game)).toMatchObject({ sector: 6, tier });
+      await expect(game.locator('#hud-sector')).toContainText(`Sektor 6: ${name}`);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  test.describe('on a touch phone held upright', () => {
+    test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+
+    test('finishing the Demon: the achievement, the last skin and the finale unlock', async ({ page, account }) => {
+      test.setTimeout(90000);
+      const problems = await watchProblems(page);
+      const { host, game } = await playFromList(page, account, 'Flip Rush');
+      await expect(game.getByRole('button', { name: 'Zagraj finał' })).toBeDisabled();
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      await expect(game.locator('#skin-list').getByRole('button', { name: /Korona Maszyn/ })).toBeDisabled();
+      await game.getByRole('button', { name: 'Gotowe' }).tap();
+
+      await openWaveWith(page, host, 'seed=8&sector=6&section=30&autopilot=3');
+      await game.getByRole('button', { name: 'Graj', exact: true }).tap();
+      await game.locator('#stage').tap();
+      const achievement = game.getByRole('region', { name: 'Pogromca Demona' });
+      await expect(achievement).toBeVisible({ timeout: 40000 });
+      await expect(achievement).toContainText('Nowa skórka: Korona Maszyn');
+      await expect(achievement).toContainText('Odblokowany poziom finałowy: Serce Fabryki');
+      expect(JSON.parse(await page.evaluate(() => localStorage.getItem('lifexp-fliprush-progress')))).toMatchObject({ demonComplete: true });
+      await achievement.getByRole('button', { name: 'Dalej' }).tap();
+      await game.getByRole('region', { name: 'Trasa ukończona!' }).getByRole('button', { name: 'Menu' }).tap();
+      await expect(game.getByRole('button', { name: 'Zagraj finał' })).toBeEnabled();
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      const crown = game.locator('#skin-list').getByRole('button', { name: /Korona Maszyn/ });
+      await expect(crown).toBeEnabled();
+      await crown.tap();
+      await expect(crown).toHaveAttribute('aria-pressed', 'true');
+      expect(problems).toEqual([]);
+    });
+  });
+
+  test('sideways 800×360: the finale by the pilot — ball and spider, orbs and pads, its own name and record; practice back to the stretch', async ({ page, account }) => {
+    test.setTimeout(150000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Flip Rush');
+    const stage = game.locator('#stage');
+    await page.evaluate(() => localStorage.setItem('lifexp-fliprush-progress', JSON.stringify({ demonComplete: true })));
+    // The whole finale by the validator's path: its achievement and its own record.
+    const frame = await openWaveWith(page, host, 'seed=1&autopilot=10');
+    await recordStates(frame);
+    await flyFrom(game, 'Zagraj finał');
+    expect(await waveState(game)).toMatchObject({ level: 'finale' });
+    await expect(game.locator('#hud-sector')).toContainText('Serce Fabryki');
+    const achievement = game.getByRole('region', { name: 'Władca Fabryki' });
+    await expect(achievement).toBeVisible({ timeout: 90000 });
+    await expect(game.locator('html')).toHaveAttribute('data-seen', /^(?=.*ball)(?=.*spider)(?=.*ring)(?=.*pad)/);
+    expect(JSON.parse(await page.evaluate(() => localStorage.getItem('lifexp-fliprush-finale-best')))).toMatchObject({ percent: 100 });
+    await achievement.getByRole('button', { name: 'Dalej' }).click();
+    await expect(game.getByRole('region', { name: 'Serce Fabryki za tobą!' })).toBeVisible();
+
+    // Practice from stretch 3: the pilot plays it and lets go; a tap goes back to the start
+    // of the stretch it crashed in (a checkpoint every stretch), not the finale's start.
+    await openWaveWith(page, host, 'seed=1&finale=3&autopilot=1');
+    await flyFrom(game, 'Praktyka finału');
+    await expect(game.locator('.hud__practice')).toBeVisible();
+    await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 30000 });
+    const crash = await waveState(game);
+    expect(crash.section).toBeGreaterThanOrEqual(3);
+    await page.waitForTimeout(600);
+    await stage.click();
+    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    const after = await waveState(game);
+    // (The vehicle restarts a little before the checkpoint, so it may show the stretch before.)
+    expect(after.level).toBe('finale');
+    expect(after.checkpoint).toBe(crash.checkpoint);
+    expect(after.x).toBeLessThan(crash.x);
     expect(problems).toEqual([]);
   });
 });

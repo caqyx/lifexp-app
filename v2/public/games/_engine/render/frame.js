@@ -18,8 +18,10 @@ import { screenX, screenY } from './view.js';
  * @typedef {import('../level.js').Piece} Piece
  * @typedef {import('./section.js').Painted} Painted
  * @typedef {{ x: number, y: number, dir: number, mini: boolean, alive: boolean, flipped: boolean, ship: boolean, angle: number, thrust: boolean,
- *   mode?: import('../geometry.js').VehicleMode, grounded?: boolean, streak?: number, streakFrom?: number }} Pose
- *   mode, grounded, streak, streakFrom: Flip Rush's ball and spider (the spider's snap is drawn as a streak).
+ *   mode?: import('../geometry.js').VehicleMode, grounded?: boolean, streak?: number, streakFrom?: number,
+ *   spentRing?: string, spentPad?: string, burst?: number, burstAt?: { x: number, y: number, type: 'ring' | 'pad', kind: string } }} Pose
+ *   mode, grounded, streak, streakFrom: Flip Rush's ball and spider (the spider's snap is drawn as a streak);
+ *   spentRing, spentPad, burst, burstAt: its orbs and pads (a used one dims, a fired one flashes).
  * @typedef {{ trail: string }} SkinBase
  * @typedef {{
  *   view: View, run: Run, wave: Pose,
@@ -34,8 +36,10 @@ import { screenX, screenY } from './view.js';
  *   drawBackground(ctx: CanvasRenderingContext2D, v: View, th: Theme, camX: number, clock: Clock): void,
  *   drawVehicle(ctx: CanvasRenderingContext2D, s: Scene, x: number, y: number): void,
  *   trailWidth(pose: Pose): number,
+ *   drawPieceItems?(ctx: CanvasRenderingContext2D, s: Scene, piece: Piece, camX: number): void,
  * }} Look
- *   drawVehicle: at (x, y) device px; trailWidth: in cells.
+ *   drawVehicle: at (x, y) device px; trailWidth: in cells; drawPieceItems: what a game
+ *   draws per frame in each visible piece over its painting (Flip Rush: orbs and pads).
  * @typedef {{ painted: Map<Piece, Painted>, key: string, run: Run | null, patterns: Map<string, CanvasPattern | null> }} Renderer
  */
 
@@ -273,6 +277,7 @@ export function renderFrame(ctx, r, s, look) {
   drawPieces(ctx, r, s, pieces, camX, look);
   drawBeyondBand(ctx, r, s, camX, look);
   drawSpinners(ctx, s, pieces, camX, look);
+  if (look.drawPieceItems) for (const piece of pieces) look.drawPieceItems(ctx, s, piece, camX);
   drawPortals(ctx, s, camX);
   drawPlayer(ctx, s, camX, look);
   drawEffects(ctx, s, camX);

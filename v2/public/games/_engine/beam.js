@@ -23,14 +23,16 @@ import { STEP } from './world.js';
  *   x0: number, x1: number, speed: number, limits: Limits, start: Vehicle,
  *   step: (v: Vehicle, holding: boolean, dt: number) => Vehicle | null,
  *   safe: (v: Vehicle, band: number) => boolean, band?: number, tag?: (v: Vehicle) => string, fewest?: boolean, released?: boolean,
- *   allow?: (v: Vehicle, holding: boolean) => boolean,
+ *   allow?: (v: Vehicle, holding: boolean) => boolean, search?: (v: Vehicle, holding: boolean, dt: number) => Vehicle | null,
  * }} BeamSpec
  *   tag: what else tells two states apart besides height, speed and input (Flip Rush:
  *   gravity, contact and a waiting press), so the beam never merges them; fewest: of two
  *   alike states keep the one with fewer input changes so far (tapping vehicles: a path of
  *   few, deliberate taps), else the freer one; released: the input starts released (a
  *   tapping vehicle's changes then pair up as press and release); allow: which inputs the
- *   search may try from a state (a human's habits; the replays fly any input).
+ *   search may try from a state (a human's habits; the replays fly any input); search: a
+ *   stricter step for the search only (Flip Rush: orbs reach less far, so a press it picks
+ *   lies inside the real orb's window by the tolerance), the replays fly `step`.
  * @typedef {{ v: Vehicle, hold: number, cool: number, parent: number, changes: number }} Node
  *   hold: 1 held, -1 released, for the decision that led here; changes: input changes so far.
  */
@@ -56,7 +58,7 @@ function fly(spec, x, node, hold, band) {
   let v = { ...node.v, x };
   if (spec.allow && !spec.allow(v, hold > 0)) return null;
   for (let k = 0; k < N; k++) {
-    v = spec.step(v, hold > 0, STEP);
+    v = (spec.search ?? spec.step)(v, hold > 0, STEP);
     if (!v || !spec.safe(v, band)) return null;
   }
   return v;

@@ -26,7 +26,13 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  * @typedef {{ type: 'pillar', x: number, on: 'floor' | 'ceil', h: number, w?: number }} PillarData
  * @typedef {{ type: 'saw' | 'orb' | 'mine', x: number, y: number, r: number, chain?: boolean }} RoundData
  *   chain: hangs on a chain from the ceiling (drawn only; the chain never hurts).
- * @typedef {SpikeData | BlockData | PillarData | RoundData} HazardData
+ * @typedef {'jump' | 'small' | 'gravity' | 'gravityJump' | 'dash'} RingKind
+ * @typedef {'jump' | 'small' | 'gravity'} PadKind
+ * @typedef {{ type: 'ring', kind: RingKind, x: number, y: number } | { type: 'pad', kind: PadKind, x: number, on: 'floor' | 'ceil', y?: number }} BoosterData
+ *   Flip Rush's orbs (`ring`, at its centre) and pads (`pad`, one cell from x, on the floor
+ *   or the ceiling under/over x + 0.5, or on a block's top or underside at `y`): they help,
+ *   never hurt (flip-rush/js/boosters.js has their effects).
+ * @typedef {SpikeData | BlockData | PillarData | RoundData | BoosterData} HazardData
  * @typedef {{ type: 'chain', x: number, len: number, ornament?: 'diamond' | 'star' | 'triangle' | 'eye' | 'debris' | 'none' }
  *   | { type: 'star' | 'diamond' | 'gear' | 'eye', x: number, y: number, size: number }
  *   | { type: 'frame', x: number, y: number, w: number, h: number }
@@ -44,9 +50,11 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  * @typedef {{ type: 'spike' | 'halfSpike' | 'block' | 'pillar', shape: 'poly', pts: Pt[], vis: Pt[], dir: 'up' | 'down' | 'none', bbox: number[] }} PolyHazard
  * @typedef {{ type: 'saw' | 'orb' | 'mine', shape: 'circle', x: number, y: number, r: number, hit: number, bbox: number[], chain: boolean }} CircleHazard
  * @typedef {PolyHazard | CircleHazard} Hazard
+ * @typedef {{ type: 'ring', kind: RingKind, x: number, y: number, dir: 'none' } | { type: 'pad', kind: PadKind, x: number, y: number, dir: 'up' | 'down' }} Booster
+ *   A pad's x is its centre and y the surface it sits on; dir: the way it faces.
  * @typedef {{ id: string, length: number, ceil: Pt[], floor: Pt[], ceilSegs: Seg[], floorSegs: Seg[],
  *   mini: boolean, tier: string | null, mode: VehicleMode,
- *   hazards: Hazard[], deco: DecoData[], buckets: Map<number, Hazard[]>, segBuckets: Map<number, Seg[]> }} Geometry
+ *   hazards: Hazard[], boosters: Booster[], deco: DecoData[], buckets: Map<number, Hazard[]>, segBuckets: Map<number, Seg[]> }} Geometry
  */
 
 const EPS = 1e-9;
@@ -211,6 +219,7 @@ function resolveSpikes(data, ceil, floor) {
  * @returns {Hazard[]}
  */
 function resolveHazard(data, ceil, floor) {
+  if (data.type === 'ring' || data.type === 'pad') return [];
   if (data.type === 'spike' || data.type === 'halfSpike') return resolveSpikes(data, ceil, floor);
   if (data.type === 'block') {
     const pts = rect(data.x, data.y, data.x + data.w, data.y + data.h);
@@ -225,6 +234,19 @@ function resolveHazard(data, ceil, floor) {
   if (data.type !== 'saw' && data.type !== 'orb' && data.type !== 'mine') throw new Error('unknown hazard');
   const hit = data.r * ROUND_HIT[data.type];
   return [{ type: data.type, shape: 'circle', x: data.x, y: data.y, r: data.r, hit, bbox: [data.x - data.r, data.y - data.r, data.x + data.r, data.y + data.r], chain: data.chain === true }];
+}
+
+/**
+ * An orb or a pad placed (a pad on its surface), or nothing for any other item.
+ * @param {HazardData} data @param {Pt[]} ceil @param {Pt[]} floor
+ * @returns {Booster[]}
+ */
+function resolveBooster(data, ceil, floor) {
+  if (data.type === 'ring') return [{ type: 'ring', kind: data.kind, x: data.x, y: data.y, dir: 'none' }];
+  if (data.type !== 'pad') return [];
+  const x = data.x + 0.5;
+  const y = data.y ?? (data.on === 'floor' ? profileY(floor, x, 'floor') : profileY(ceil, x, 'ceil'));
+  return [{ type: 'pad', kind: data.kind, x, y, dir: data.on === 'floor' ? 'up' : 'down' }];
 }
 
 /**
@@ -257,6 +279,7 @@ export function buildGeometry(data) {
   const ceilSegs = profileSegments(ceil, 'ceil');
   const floorSegs = profileSegments(floor, 'floor');
   const hazards = data.hazards.flatMap((h) => resolveHazard(h, ceil, floor));
+  const boosters = data.hazards.flatMap((h) => resolveBooster(h, ceil, floor));
   return {
     id: data.id,
     length: data.length,
@@ -268,6 +291,7 @@ export function buildGeometry(data) {
     ceilSegs,
     floorSegs,
     hazards,
+    boosters,
     deco: data.deco ?? [],
     buckets: bucketize(hazards, (h) => [/** @type {number} */ (h.bbox[0]), /** @type {number} */ (h.bbox[2])]),
     segBuckets: bucketize([...ceilSegs, ...floorSegs], (s) => [Math.min(s.x0, s.x1), Math.max(s.x0, s.x1)]),
@@ -487,6 +511,9 @@ export function checkSection(data, minGap) {
       const points = item.on === 'floor' ? g.floor : g.ceil;
       if (!isFlatBetween(points, item.x, item.x + (item.w ?? 1))) problems.push(`${data.id}: pillar at ${item.x} not on flat ${item.on}`);
     }
+  }
+  for (const b of g.boosters) {
+    if (b.x - 0.5 < JOINT_CLEAR || b.x + 0.5 > data.length - JOINT_CLEAR) problems.push(`${data.id}: ${b.type} too close to an end`);
   }
   for (const h of g.hazards) {
     if (/** @type {number} */ (h.bbox[0]) < JOINT_CLEAR || /** @type {number} */ (h.bbox[2]) > data.length - JOINT_CLEAR) {

@@ -10,7 +10,8 @@ import { changesOf, peakRate } from '../public/games/_engine/limits.js';
 import { createRng, parseSwitches } from '../public/games/_engine/rng.js';
 import { sectionWorld, type World } from '../public/games/_engine/solids.js';
 import { createAutopilot } from '../public/games/flip-rush/js/autopilot.js';
-import { BODY, JOINT, SECTORS, SNAP, STEP, TIERS, tierSpeed, type SectorDef } from '../public/games/flip-rush/js/config.js';
+import { BODY, FINALE_ID, JOINT, MINI_BOOST, PAD, RING, RING_REACH, SECTORS, SNAP, STEP, TIERS, tierSpeed, type SectorDef } from '../public/games/flip-rush/js/config.js';
+import { boostOf } from '../public/games/flip-rush/js/boosters.js';
 import { createGame, keepsRecords, stepGame, type Game } from '../public/games/flip-rush/js/game.js';
 import { pickLang, textsOf, translator, TEXT_KEYS } from '../public/games/flip-rush/js/i18n.js';
 import { createBody, snapTarget, stepBody, type Body } from '../public/games/flip-rush/js/physics.js';
@@ -66,10 +67,26 @@ function memoryStorage() {
 // ── The run ──────────────────────────────────────────────────────────────────
 
 describe('the run', () => {
-  test('Wave Rush’s structure for sectors 1–3: 10, 15 and 15 sections in its shuffle groups, at its speeds', () => {
-    expect(SECTORS.map((s) => SECTION_LIBRARY[s.id]!.length)).toEqual([10, 15, 15]);
-    expect(SECTORS.map((s) => s.groups)).toEqual([[range(1, 10)], [range(1, 5), range(6, 15)], [range(1, 5), range(6, 15)]]);
-    expect(SECTORS.map((s) => TIERS[s.tier]!.speed)).toEqual([0.8, 0.85, 1.0]);
+  test('Wave Rush’s structure: 10, 15, 15, 10, 10 and 30 sections in its shuffle groups, at its speeds; the Demon in four tiers', () => {
+    expect(SECTORS.map((s) => SECTION_LIBRARY[s.id]!.length)).toEqual([10, 15, 15, 10, 10, 30]);
+    expect(SECTORS.map((s) => s.groups)).toEqual([
+      [range(1, 10)],
+      [range(1, 5), range(6, 15)],
+      [range(1, 5), range(6, 15)],
+      [range(1, 10)],
+      [range(1, 5), range(6, 10)],
+      [range(1, 10), range(11, 15), range(16, 25), range(26, 30)],
+    ]);
+    expect(SECTORS.map((s) => TIERS[s.tier]!.speed)).toEqual([0.8, 0.85, 1.0, 1.1, 1.25, 1.25]);
+    expect(sector(6).bands!.map((b) => [b.from, b.to, b.tier, TIERS[b.tier]!.speed])).toEqual([
+      [1, 10, 'easyDemon', 1.25],
+      [11, 15, 'hardDemon', 1.4],
+      [16, 25, 'insaneDemon', 1.55],
+      [26, 30, 'extremeDemon', 1.7],
+    ]);
+    // Mini sections where the mini portals go: one in sectors 4 and 5, one in each of the Demon's last three tiers.
+    const minis = (s: number) => SECTION_LIBRARY[s]!.flatMap((d, i) => (d.mini ? [i + 1] : []));
+    expect([minis(4), minis(5), minis(6)]).toEqual([[10], [10], [15, 25, 30]]);
     expect(sector(3).portals).toEqual([{ kind: 'gravity', count: 1, span: 2 }]);
   });
 
@@ -120,6 +137,19 @@ describe('the run', () => {
     }
   });
 
+  test('the Demon’s ornament: denser tier by tier, never near a hazard, an orb or a pad', () => {
+    const tiers = [[1, 10], [11, 15], [16, 25], [26, 30]].map(([a, b]) => SECTION_LIBRARY[6]!.slice(a! - 1, b));
+    const per = tiers.map((list) => list.reduce((n, d) => n + (d.deco?.length ?? 0), 0) / list.length);
+    for (let i = 1; i < per.length; i++) expect(per[i]).toBeGreaterThan(per[i - 1]!);
+    for (const d of SECTION_LIBRARY[6]!) {
+      const g = buildGeometry(d);
+      for (const item of d.deco ?? []) {
+        if (item.type !== 'chain' && item.type !== 'gear' && item.type !== 'eye') continue;
+        for (const b of g.boosters) expect(Math.abs(item.x - b.x), d.id).toBeGreaterThan(0.5);
+      }
+    }
+  });
+
   test('from sector 3 the vehicle changes more often: dealt out in turns, a change at every joint the group allows', () => {
     const rate = (s: number) => {
       let changes = 0;
@@ -135,19 +165,40 @@ describe('the run', () => {
     for (let i = 1; i < modes.length; i++) expect(modes[i]).not.toBe(modes[i - 1]);
   });
 
-  test('sector 3: one gravity flip and its way back two sections later; sectors 1–2 none; the same seed builds the same run', () => {
+  test('gravity flips: one for two sections in sector 3, three and two (each back one section later) in sectors 4 and 5, four in the Demon; sectors 1–2 none; the same seed builds the same run', () => {
     for (const seed of [1, 2, 3, 4]) {
       const r = buildRun(createRng(seed));
       expect(r.portals.filter((p) => p.kind === 'gravity' && p.sector < 2)).toEqual([]);
-      const g = r.portals.filter((p) => p.kind === 'gravity');
+      const g = r.portals.filter((p) => p.kind === 'gravity' && p.sector === 2);
       expect(g.map((p) => p.on)).toEqual([true, false]);
       expect(pieceAt(r, g[1]!.x).place - pieceAt(r, g[0]!.x).place).toBe(2);
+      const on = (s: number) => r.portals.filter((p) => p.kind === 'gravity' && p.sector === s && p.on).length;
+      expect([on(3), on(4), on(5)]).toEqual([3, 2, 4]);
+      const mini = (s: number) => r.portals.filter((p) => p.kind === 'mini' && p.sector === s && p.on).length;
+      expect([mini(3), mini(4), mini(5)]).toEqual([1, 1, 3]);
     }
     expect(buildRun(createRng(5)).sectors.map((s) => s.order)).toEqual(buildRun(createRng(5)).sectors.map((s) => s.order));
   });
 
-  test('no finale yet (stage f-2)', () => {
-    expect(() => buildFinale()).toThrow();
+  test('the finale: ten fixed stretches, ball and spider in turn, a vehicle portal at every change, never shuffled; every kind of orb and pad', () => {
+    const a = buildFinale();
+    const b = buildFinale();
+    const sections = a.pieces.filter((p) => p.kind === 'section');
+    expect(sections.map((p) => p.g.id)).toEqual(range(1, 10).map((n) => `f-${String(n).padStart(2, '0')}`));
+    expect(b.pieces.filter((p) => p.kind === 'section').map((p) => p.g.id)).toEqual(sections.map((p) => p.g.id));
+    expect(sections.map((p) => p.mode)).toEqual(range(1, 10).map((n) => (n % 2 ? 'ball' : 'spider')));
+    expect(sections.every((p) => p.tier === 'finale')).toBe(true);
+    expect(a.portals.filter((p) => p.kind === 'ship')).toHaveLength(9);
+    const kinds = new Set(SECTION_LIBRARY[FINALE_ID]!.flatMap((d) => d.hazards.filter((h) => h.type === 'ring' || h.type === 'pad').map((h) => `${h.type}:${'kind' in h ? h.kind : ''}`)));
+    for (const k of ['ring:jump', 'ring:gravity', 'ring:gravityJump', 'ring:dash', 'pad:jump', 'pad:small']) expect(kinds.has(k), k).toBe(true);
+  });
+
+  test('the pilot plays the whole finale', { timeout: 120_000 }, () => {
+    const game = createGame({ rng: createRng(1), mode: 'normal', level: 'finale' });
+    stepGame(game, { holding: false, tap: true }, STEP);
+    const pilot = createAutopilot();
+    for (let i = 0; i < 240 * 120 && game.phase === 'playing'; i++) stepGame(game, { holding: pilot.advise(game.run, game.wave), tap: false }, STEP);
+    expect(game.phase, JSON.stringify(game.where)).toBe('finished');
   });
 });
 
@@ -328,17 +379,139 @@ describe('collision: roll and run on tops and undersides, die on sides and hazar
   });
 });
 
+// ── Orbs and pads ────────────────────────────────────────────────────────────
+
+describe('orbs and pads (stage f-2)', () => {
+  test('each sets the vertical speed (never adds), along the gravity it leaves; gravity kinds flip first; mini × 0.8', () => {
+    for (const gravity of [1, -1] as const) {
+      for (const mini of [false, true]) {
+        const k = mini ? MINI_BOOST : 1;
+        expect(boostOf('ring', 'jump', gravity, mini)).toEqual({ gravity, vy: RING.jump * k * gravity });
+        expect(boostOf('ring', 'small', gravity, mini)).toEqual({ gravity, vy: RING.small * k * gravity });
+        expect(boostOf('ring', 'dash', gravity, mini)).toEqual({ gravity, vy: RING.dash * k * gravity });
+        expect(boostOf('ring', 'gravity', gravity, mini)).toEqual({ gravity: -gravity, vy: RING.gravity * k * -gravity });
+        expect(boostOf('ring', 'gravityJump', gravity, mini)).toEqual({ gravity: -gravity, vy: RING.gravityJump * k * -gravity });
+        expect(boostOf('pad', 'jump', gravity, mini)).toEqual({ gravity, vy: PAD.jump * k * gravity });
+        expect(boostOf('pad', 'small', gravity, mini)).toEqual({ gravity, vy: PAD.small * k * gravity });
+        expect(boostOf('pad', 'gravity', gravity, mini)).toEqual({ gravity: -gravity, vy: PAD.gravity * k * -gravity });
+      }
+    }
+    // Jump-type speeds lift away from the ground; the dash and the gravity kinds send toward it.
+    expect(RING.jump).toBeLessThan(RING.small);
+    expect(RING.small).toBeLessThan(0);
+    expect(RING.dash).toBeGreaterThan(0);
+    expect(PAD.jump).toBeLessThan(PAD.small);
+  });
+
+  /** A body at (x, y) in gravity g, mini or not, falling already at vy. */
+  const at = (mode: 'ball' | 'spider', x: number, y: number, gravity: 1 | -1 = 1, mini = false, vy = 0): Body => ({ ...createBody(x, y, mode), gravity, mini, vy });
+
+  for (const gravity of [1, -1] as const) {
+    for (const mini of [false, true]) {
+      const h = (mini ? BODY.mini : BODY.normal).half;
+      const ground = gravity > 0 ? JOINT.floor - h : JOINT.ceil + h;
+      const k = mini ? MINI_BOOST : 1;
+      const label = `gravity ${gravity}${mini ? ', mini' : ''}`;
+
+      test(`an orb fires on a fresh press while touched, before the ground takes it (${label})`, () => {
+        for (const mode of ['ball', 'spider'] as const) {
+          const w = world([{ type: 'ring', kind: 'jump', x: 6, y: ground - 0.3 * gravity }]);
+          const start = run(w, at(mode, 5.9, ground, gravity, mini), false, 2, 0).body;
+          const fired = stepBody(start, true, SPEED, STEP, w).vehicle;
+          expect(fired.gravity, mode).toBe(gravity);
+          expect(fired.spentRing).toBeDefined();
+          // Set, then one step of gravity: about the orb's speed, away from the ground; no teleport.
+          expect(fired.vy * gravity).toBeCloseTo(RING.jump * k + BODY.normal.gravity * STEP, 6);
+          expect(Math.abs(fired.y - ground)).toBeLessThan(0.2);
+        }
+      });
+
+      test(`a press made in the air and still held fires the orb on reaching it (buffer); a used press does not (${label})`, () => {
+        // Falling from (4, 6) at SPEED, the body reaches x = 6 about 2.16 cells lower down.
+        const w = world([{ type: 'ring', kind: 'small', x: 6, y: 6 + 2.16 * gravity }]);
+        const air = at('ball', 4, 6, gravity, mini, 0);
+        const held = run(w, air, true, 120, SPEED);
+        expect(held.path.some((b) => b.spentRing !== undefined)).toBe(true);
+        const fired = held.path.find((b) => b.spentRing !== undefined)!;
+        expect(fired.vy * gravity).toBeLessThan(RING.small * k + 1);
+        // The press acted on the ground first: holding it on into the orb does nothing.
+        const used = at('ball', 3, ground, gravity, mini);
+        const late = run(w, { ...used, grounded: true }, true, 240, SPEED);
+        expect(late.path.filter((b) => b.spentRing !== undefined)).toHaveLength(0);
+      });
+
+      test(`an orb fires once per pass; the gravity orb and the gravity-jump orb flip, the dash slams (${label})`, () => {
+        const w = world([{ type: 'ring', kind: 'gravity', x: 6, y: 6 }]);
+        const twice = run(w, at('spider', 5.6, 6, gravity, mini), (_b, i) => i < 3 || (i > 8 && i < 12), 14, SPEED);
+        expect(flips(at('spider', 5.6, 6, gravity, mini), twice.path)).toBe(1);
+        const jumpFlip = stepBody(at('ball', 6, 6, gravity, mini), true, SPEED, STEP, world([{ type: 'ring', kind: 'gravityJump', x: 6, y: 6 }])).vehicle;
+        expect(jumpFlip.gravity).toBe(-gravity);
+        expect(jumpFlip.vy * -gravity).toBeLessThan(0);
+        const dash = stepBody(at('ball', 6, 6, gravity, mini), true, SPEED, STEP, world([{ type: 'ring', kind: 'dash', x: 6, y: 6 }])).vehicle;
+        expect(dash.vy * gravity).toBeGreaterThan(RING.dash * k - 1);
+      });
+
+      test(`a pad fires on touch with no press, once; the gravity pad sends it across; the spider is moved, not teleported (${label})`, () => {
+        const on = gravity > 0 ? 'floor' : 'ceil';
+        for (const mode of ['ball', 'spider'] as const) {
+          const w = world([{ type: 'pad', kind: 'jump', x: 6, on }]);
+          const r = run(w, at(mode, 3, ground, gravity, mini), false, 240, SPEED);
+          const i = r.path.findIndex((b) => b.spentPad !== undefined);
+          expect(i, mode).toBeGreaterThan(0);
+          expect(r.path[i]!.vy * gravity).toBeLessThan(PAD.jump * k + 1);
+          expect(Math.abs(r.path[i]!.y - ground)).toBeLessThan(0.2);
+          expect(r.crashed).toBe(false);
+        }
+        const g = world([{ type: 'pad', kind: 'gravity', x: 6, on }]);
+        const across = run(g, at('ball', 3, ground, gravity, mini), false, 240, SPEED);
+        expect(across.body.gravity).toBe(-gravity);
+        expect(across.body.y).toBeCloseTo(gravity > 0 ? JOINT.ceil + h : JOINT.floor - h, 6);
+      });
+    }
+  }
+
+  test('reach: an orb counts within RING_REACH of its centre, a pad on its cell and a little above it', () => {
+    expect(RING_REACH.normal).toBeGreaterThan(RING_REACH.mini);
+    const w = world([{ type: 'ring', kind: 'jump', x: 6, y: 6 }]);
+    expect(stepBody(at('ball', 6, 6 + RING_REACH.normal - 0.05), true, 0, STEP, w).vehicle.spentRing).toBeDefined();
+    expect(stepBody(at('ball', 6, 6 + RING_REACH.normal + 0.05), true, 0, STEP, w).vehicle.spentRing).toBeUndefined();
+    const p = world([{ type: 'pad', kind: 'small', x: 6, on: 'floor' }]);
+    expect(stepBody(at('ball', 6.5, FLOOR), false, 0, STEP, p).vehicle.spentPad).toBeDefined();
+    expect(stepBody(at('ball', 8.2, FLOOR), false, 0, STEP, p).vehicle.spentPad).toBeUndefined();
+  });
+
+  test('the validator plays orb chains and pads; an orb out of reach of every path is caught', () => {
+    // r2-15 with a ceiling bed over its floor bed too: only the orb chain gets across.
+    const base = SECTION_LIBRARY[2]!.find((d) => d.id === 'r2-15')!;
+    const chain: SectionData = { ...base, id: 'v-chain', hazards: [...base.hazards, { type: 'spike', x: 7, on: 'ceil', count: 13 }] };
+    const r = proveEntry(chain, 'normal', { gravity: 1, mini: false }, { y: FLOOR, vy: 0 });
+    expect(r.problem).toBeNull();
+    const high: SectionData = { ...chain, id: 'v-high', hazards: chain.hazards.map((h) => (h.type === 'ring' ? { ...h, y: 4 } : h)) };
+    expect(proveEntry(high, 'normal', { gravity: 1, mini: false }, { y: FLOOR, vy: 0 }).problem).not.toBeNull();
+  });
+
+  test('pads come in sector 1, orbs from sector 2, both in sector 3', () => {
+    const kinds = (s: number) => new Set(SECTION_LIBRARY[s]!.flatMap((d) => d.hazards.map((h) => h.type)));
+    expect(kinds(1).has('pad')).toBe(true);
+    expect(kinds(1).has('ring')).toBe(false);
+    expect(kinds(2).has('ring')).toBe(true);
+    expect(kinds(3).has('ring') && kinds(3).has('pad')).toBe(true);
+  });
+});
+
 // ── The validator ────────────────────────────────────────────────────────────
 
 describe('the human-feasibility validator', () => {
   const open: SectionData = { id: 'v-open', mode: 'ball', length: 30, ceil: '2 r30', floor: '10 r30', hazards: [] };
 
-  test('every section is proven in both gravities, mini where marked; entries rest on the ground or come through the air', () => {
+  test('every section is proven in both gravities, mini where marked; entries rest on either side or come through the air', () => {
     expect(statesOf(sector(1), open)).toEqual([{ gravity: 1, mini: false }, { gravity: -1, mini: false }]);
     expect(statesOf(sector(1), { ...open, mini: true })).toEqual([{ gravity: 1, mini: true }, { gravity: -1, mini: true }]);
     expect(entriesOf(false, 1)[0]).toEqual({ y: FLOOR, vy: 0 });
     expect(entriesOf(false, -1)[0]).toEqual({ y: CEIL, vy: 0 });
-    expect(entriesOf(false, 1)).toHaveLength(7);
+    // ...and resting on the other side, as a gravity portal leaves it (it falls across).
+    expect(entriesOf(false, 1)[1]).toEqual({ y: CEIL, vy: 0 });
+    expect(entriesOf(false, 1)).toHaveLength(8);
   });
 
   test('an open room is fair from every entry, with no tap at all', () => {
@@ -429,7 +602,7 @@ describe('game', () => {
       const pilot = createAutopilot();
       for (let i = 0; i < 240 * 400 && game.phase === 'playing'; i++) stepGame(game, { holding: pilot.advise(game.run, game.wave), tap: false }, STEP);
       expect(game.phase, `seed ${seed} at ${JSON.stringify(game.where)}`).toBe('finished');
-      expect(game.result).toEqual({ sector: 3, section: 15, percent: 100 });
+      expect(game.result).toEqual({ sector: 6, section: 30, percent: 100 });
     }
   });
 });
@@ -477,9 +650,9 @@ describe('records, skins, texts, looks', () => {
     expect(parseSwitches('?sector=2')).toEqual({ seed: null, jump: null, autopilot: null, finale: null });
   });
 
-  test('every sector has its own factory look; detail grows from sector to sector', () => {
-    const looks = SECTORS.map((s) => THEMES[s.theme]!);
-    expect(looks.map((t) => t.backdrop)).toEqual(['hall', 'mine', 'foundry']);
+  test('every sector and Demon tier has its own factory look; detail grows from one to the next', () => {
+    const looks = [...SECTORS.map((s) => THEMES[s.theme]!), ...sector(6).bands!.slice(1).map((b) => THEMES[b.theme]!)];
+    expect(looks.map((t) => t.backdrop)).toEqual(['hall', 'mine', 'foundry', 'reactor', 'core', 'circuits', 'gears', 'saws', 'overdrive']);
     const detail = (t: (typeof looks)[number]) =>
       (t.fx?.glow ?? 0) + (t.fx?.chevrons ? 1 : 0) + (t.fx?.ground ? 1 : 0) + (t.fx?.hazardGlow ? 1 : 0) + (t.motes ? t.motes.count / 20 : 0);
     for (let i = 1; i < looks.length; i++) expect(detail(looks[i]!)).toBeGreaterThan(detail(looks[i - 1]!));

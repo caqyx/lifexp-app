@@ -53,7 +53,12 @@ export function minGapOf(tier, mini = false) {
 export function entriesOf(mini, g) {
   const half = bodyOf(mini).half;
   /** @type {Entry[]} */
-  const out = [{ y: g > 0 ? JOINT.floor - half : JOINT.ceil + half, vy: 0 }];
+  // Resting on its gravity's ground; resting on the other side (a gravity portal just flipped
+  // it: it falls across); in the air at several heights.
+  const out = [
+    { y: g > 0 ? JOINT.floor - half : JOINT.ceil + half, vy: 0 },
+    { y: g > 0 ? JOINT.ceil + half : JOINT.floor - half, vy: 0 },
+  ];
   for (const y of [4, 6, 8]) for (const vy of [0, 6 * g]) out.push({ y, vy });
   return out;
 }
@@ -114,6 +119,12 @@ export function beamSpec(world, x0, x1, speed, limits, start) {
       const next = stepBody(v, holding, speed, dt, world);
       return next.crashed ? null : next.vehicle;
     },
+    // The search's orbs reach less far by the way a mistimed press slips (and a step), so
+    // a press it picks fires the real orb however it slips.
+    search(v, holding, dt) {
+      const next = stepBody(v, holding, speed, dt, world, speed * (limits.tolerance + 1 / 240));
+      return next.crashed ? null : next.vehicle;
+    },
     // The search's habit: keep a press down until it has acted, and a moment longer (so a
     // release that comes early still comes after it).
     allow: (v, holding) => holding || !v.held || (!v.queued && (v.sinceAct ?? 1) >= limits.tolerance + 1 / 240),
@@ -127,7 +138,8 @@ export function beamSpec(world, x0, x1, speed, limits, start) {
       if (overlapsSolid(world, v.x + across, v.y, half)) return false;
       return !world.hazard(v.x - across, v.y, v.y, radius) && !world.hazard(v.x + across, v.y, v.y, radius);
     },
-    tag: (v) => `${v.gravity}${v.grounded ? 'g' : ''}${v.queued ? 'q' : ''}`,
+    // Never merge a state that has used an orb or a pad with one that has not.
+    tag: (v) => `${v.gravity}${v.grounded ? 'g' : ''}${v.queued ? 'q' : ''}|${v.spentRing ?? ''}|${v.spentPad ?? ''}`,
     fewest: true,
     released: true,
   };

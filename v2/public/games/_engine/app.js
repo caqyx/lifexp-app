@@ -504,6 +504,8 @@ export function runApp(def) {
     d.debugShip = w.ship ? '1' : '0';
     d.debugMode = w.mode ?? '';
     d.debugPieceMode = pieceAt(game.run, w.x).mode;
+    d.debugRing = w.spentRing ?? '';
+    d.debugPad = w.spentPad ?? '';
     d.debugLevel = game.level;
     d.debugPilot = piloting() ? '1' : '0';
   }
@@ -586,6 +588,10 @@ export function runApp(def) {
         grounded: w.grounded,
         streak: w.streak,
         streakFrom: w.streakFrom,
+        spentRing: w.spentRing,
+        spentPad: w.spentPad,
+        burst: w.burst,
+        burstAt: w.burstAt,
       },
       trail: game.trail,
       skin: state.skin,

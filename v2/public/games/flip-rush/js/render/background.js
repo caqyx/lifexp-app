@@ -8,6 +8,11 @@
 //   rails with ore carts.
 // - foundry: furnaces and chimneys far behind, ladles on chains pouring molten streams,
 //   the glow of molten metal from below.
+// - reactor (stage f-2): turbines turning far behind, pipes with valves and blinking lights;
+// - core: fuel rods in blue light, containment rings, the core pulsing with the beat;
+// - the Demon: circuits with running pulses (Easy), gears turning in pairs (Hard), saws on
+//   swinging arms with chains (Insane), all of it with white sparks (Extreme);
+// - heart (the finale): a great flywheel, pistons pumping to the beat, gold light pulsing.
 // Everything is placed by a repeatable hash (no state); with reduced motion nothing moves
 // on its own (only the scroll moves it).
 import { drawMotes, hash } from '../../../_engine/render/backdrop.js';
@@ -521,6 +526,328 @@ function drawFoundry(ctx, v, th, camX, clock) {
   drawChains(ctx, v, th, camX, clock);
 }
 
+// ── The reactor's turbine hall (sector 4) ───────────────────────────────────
+
+/**
+ * A gear (or a turbine's rotor when `blades`) at (x, y) device px.
+ * @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} r @param {number} teeth @param {number} angle @param {string} color @param {boolean} [blades]
+ */
+function drawGear(ctx, x, y, r, teeth, angle, color, blades = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  if (blades) {
+    for (let i = 0; i < teeth; i++) {
+      const a = (i / teeth) * Math.PI * 2;
+      ctx.moveTo(0, 0);
+      ctx.arc(0, 0, r, a, a + (Math.PI / teeth) * 0.9);
+      ctx.closePath();
+    }
+  } else {
+    for (let i = 0; i < teeth * 2; i++) {
+      const a = (i / (teeth * 2)) * Math.PI * 2;
+      const rr = i % 2 === 0 ? r : r * 0.84;
+      ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+      ctx.lineTo(Math.cos(a + Math.PI / (teeth * 2)) * rr, Math.sin(a + Math.PI / (teeth * 2)) * rr);
+    }
+    ctx.closePath();
+    ctx.moveTo(r * 0.35, 0);
+    ctx.arc(0, 0, r * 0.35, 0, Math.PI * 2, true);
+  }
+  ctx.fill('evenodd');
+  ctx.restore();
+}
+
+/**
+ * A circular saw (a toothed disc with a hub) at (x, y), turning.
+ * @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} r @param {number} angle @param {string} color @param {string} edge
+ */
+function drawBackSaw(ctx, x, y, r, angle, color, edge) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  const teeth = 14;
+  for (let i = 0; i < teeth; i++) {
+    const a = (i / teeth) * Math.PI * 2;
+    ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    ctx.lineTo(Math.cos(a + 0.18) * r * 0.82, Math.sin(a + 0.18) * r * 0.82);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = edge;
+  ctx.lineWidth = Math.max(1, r * 0.05);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Turbines far behind (rotors turning in their housings), pipes along the wall with valves
+ * and warning lights that blink.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock
+ */
+function drawReactor(ctx, v, th, camX, clock) {
+  const c = v.cell;
+  const t = clock.reduced ? 0 : clock.time;
+  const turb = repeats(v, camX, 0.06, 9);
+  for (let i = turb.first; i < turb.first + turb.count; i++) {
+    const x = turb.at(i) + 3 * c;
+    const y = screenY(v, 6);
+    const r = 2.6 * c;
+    ctx.strokeStyle = th.far;
+    ctx.lineWidth = c * 0.35;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 1.08, 0, Math.PI * 2);
+    ctx.stroke();
+    drawGear(ctx, x, y, r, 7, t * 0.8 + i, th.far, true);
+  }
+  const pipes = [3.2, 8.8];
+  for (const [k, py] of pipes.entries()) {
+    const y = screenY(v, py);
+    ctx.fillStyle = th.mid;
+    ctx.fillRect(0, y - c * 0.22, v.width, c * 0.44);
+    const valves = repeats(v, camX, 0.18, 6);
+    for (let i = valves.first; i < valves.first + valves.count; i++) {
+      const x = valves.at(i) + (k * 3 + 1) * c;
+      ctx.fillStyle = th.mid;
+      ctx.fillRect(x - c * 0.3, y - c * 0.4, c * 0.6, c * 0.8);
+      const on = clock.reduced ? 0.6 : Math.sin(t * 3 + i * 1.7 + k) > 0.2 ? 1 : 0.25;
+      ctx.globalAlpha = on;
+      ctx.fillStyle = th.light;
+      ctx.beginPath();
+      ctx.arc(x, y - c * 0.55, c * 0.12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+// ── The reactor's core (sector 5) ───────────────────────────────────────────
+
+/**
+ * Fuel rods glowing in blue light, containment rings around the core, the core pulsing.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock
+ */
+function drawCore(ctx, v, th, camX, clock) {
+  const c = v.cell;
+  const beat = clock.reduced ? 0.5 : clock.pulse;
+  const cx = v.width / 2;
+  const cy = screenY(v, 13);
+  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(v.width, v.height) * 0.8);
+  glow.addColorStop(0, `rgba(120, 200, 255, ${0.35 + 0.2 * beat})`);
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, v.width, v.height);
+  ctx.strokeStyle = th.far;
+  ctx.lineWidth = c * 0.18;
+  for (let k = 1; k <= 3; k++) {
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, k * 5 * c, k * 1.6 * c, 0, Math.PI, Math.PI * 2);
+    ctx.stroke();
+  }
+  const rods = repeats(v, camX, 0.14, 2.5);
+  for (let i = rods.first; i < rods.first + rods.count; i++) {
+    const x = rods.at(i);
+    const top = screenY(v, 2 + hash(i + 31) * 2);
+    const g = ctx.createLinearGradient(0, top, 0, v.height);
+    g.addColorStop(0, th.mid);
+    g.addColorStop(1, `rgba(120, 200, 255, ${0.35 + 0.25 * beat})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(x, top, c * 0.5, v.height - top);
+  }
+}
+
+// ── The Demon: circuits, gears, saws (sector 6) ─────────────────────────────
+
+/**
+ * Circuit traces: right-angled lines with pads at their ends and pulses running along.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock @param {number} depth
+ */
+function drawCircuits(ctx, v, th, camX, clock, depth) {
+  const c = v.cell;
+  const r = repeats(v, camX, depth, 3);
+  ctx.lineWidth = Math.max(1, c * 0.08);
+  for (let i = r.first; i < r.first + r.count; i++) {
+    const x = r.at(i);
+    for (let k = 0; k < 3; k++) {
+      const seed = i * 7 + k;
+      const y0 = screenY(v, 1 + hash(seed) * 11);
+      const y1 = screenY(v, 1 + hash(seed + 3) * 11);
+      const run = (1 + hash(seed + 5) * 2) * c;
+      ctx.strokeStyle = th.far;
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x + run, y0);
+      ctx.lineTo(x + run + Math.abs(y1 - y0) * 0.3, y1);
+      ctx.lineTo(x + r.step, y1);
+      ctx.stroke();
+      ctx.fillStyle = th.far;
+      ctx.fillRect(x - c * 0.1, y0 - c * 0.1, c * 0.2, c * 0.2);
+      if (!clock.reduced) {
+        // A pulse running along the first leg.
+        const p = (clock.time * 0.6 + hash(seed + 9)) % 1;
+        ctx.fillStyle = th.light;
+        ctx.globalAlpha = 0.8;
+        ctx.beginPath();
+        ctx.arc(x + run * p, y0, c * 0.09, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+}
+
+/**
+ * Big gears turning behind, in meshing pairs (each turns the other way).
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {number} camX @param {Clock} clock @param {number} depth @param {string} color
+ */
+function drawGears(ctx, v, camX, clock, depth, color) {
+  const c = v.cell;
+  const t = clock.reduced ? 0 : clock.time;
+  const r = repeats(v, camX, depth, 8);
+  for (let i = r.first; i < r.first + r.count; i++) {
+    const x = r.at(i) + 2 * c;
+    const y = screenY(v, 3 + hash(i + 50) * 6);
+    const big = 1.8 * c;
+    drawGear(ctx, x, y, big, 12, t * 0.5 + i, color);
+    drawGear(ctx, x + big * 1.55, y + big * 0.9, big * 0.6, 8, -t * 0.5 * (12 / 8) + i, color);
+  }
+}
+
+/**
+ * Saws on swinging arms and chains hanging between them.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock @param {number} depth
+ */
+function drawSawArms(ctx, v, th, camX, clock, depth) {
+  const c = v.cell;
+  const t = clock.reduced ? 0 : clock.time;
+  const r = repeats(v, camX, depth, 7);
+  for (let i = r.first; i < r.first + r.count; i++) {
+    const x = r.at(i) + 1.5 * c;
+    const top = screenY(v, 0.5);
+    const swing = Math.sin(t * 1.1 + i) * 0.35;
+    const len = (3.5 + hash(i + 70) * 3) * c;
+    const sx = x + Math.sin(swing) * len;
+    const sy = top + Math.cos(swing) * len;
+    ctx.strokeStyle = th.mid;
+    ctx.lineWidth = c * 0.18;
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(sx, sy);
+    ctx.stroke();
+    // Dim and edged in the wall's colour, never a hazard's white: they are far behind.
+    ctx.globalAlpha = 0.5;
+    drawBackSaw(ctx, sx, sy, c * 1.1, t * 4 + i, th.mid, th.mid);
+    ctx.globalAlpha = 1;
+    // A chain to the next arm.
+    ctx.lineWidth = Math.max(1, c * 0.06);
+    ctx.strokeStyle = th.far;
+    for (let k = 0; k < 7; k++) {
+      const u = k / 7;
+      const cx = x + u * r.step;
+      const cy = top + c * 0.4 + Math.sin(u * Math.PI) * c * 1.4;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, c * 0.16, c * 0.1, 0.3, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+}
+
+/**
+ * White sparks flashing here and there (the Extreme's), not with reduced motion.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Clock} clock
+ */
+function drawSparks(ctx, v, clock) {
+  if (clock.reduced) return;
+  const c = v.cell;
+  const beat = Math.floor(clock.time * 4);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.lineWidth = Math.max(1, c * 0.05);
+  for (let k = 0; k < 4; k++) {
+    const x = hash(beat * 13 + k) * v.width;
+    const y = hash(beat * 17 + k) * v.height;
+    for (let j = 0; j < 4; j++) {
+      const a = hash(beat + k * 5 + j) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a) * c * 0.6, y + Math.sin(a) * c * 0.6);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/** @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock */
+function drawDemon(ctx, v, th, camX, clock) {
+  const b = th.backdrop;
+  drawCircuits(ctx, v, th, camX, clock, 0.05);
+  if (b === 'gears' || b === 'saws' || b === 'overdrive') drawGears(ctx, v, camX, clock, 0.1, th.far);
+  if (b === 'circuits' || b === 'overdrive') drawCircuits(ctx, v, th, camX, clock, 0.16);
+  if (b === 'saws' || b === 'overdrive') drawSawArms(ctx, v, th, camX, clock, 0.24);
+  if (b === 'overdrive') {
+    drawGears(ctx, v, camX, clock, 0.3, th.mid);
+    drawSparks(ctx, v, clock);
+  }
+}
+
+// ── The finale: the machine's heart ─────────────────────────────────────────
+
+/**
+ * A great flywheel turning far behind, pistons pumping to the beat in front of it, and the
+ * heart's gold light pulsing.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock
+ */
+function drawHeart(ctx, v, th, camX, clock) {
+  const c = v.cell;
+  const t = clock.reduced ? 0 : clock.time;
+  const beat = clock.reduced ? 0.4 : clock.pulse;
+  const cx = v.width * 0.5;
+  const cy = screenY(v, 6);
+  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(v.width, v.height) * 0.6);
+  glow.addColorStop(0, `rgba(255, 190, 80, ${0.25 + 0.25 * beat})`);
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, v.width, v.height);
+  const wheels = repeats(v, camX, 0.04, 16);
+  for (let i = wheels.first; i < wheels.first + wheels.count; i++) {
+    const x = wheels.at(i) + 8 * c;
+    ctx.strokeStyle = th.far;
+    ctx.lineWidth = c * 0.5;
+    ctx.beginPath();
+    ctx.arc(x, cy, 5 * c, 0, Math.PI * 2);
+    ctx.stroke();
+    drawGear(ctx, x, cy, 5.4 * c, 24, t * 0.25 + i, th.far);
+    ctx.lineWidth = c * 0.25;
+    for (let k = 0; k < 6; k++) {
+      const a = t * 0.25 + i + (k * Math.PI) / 3;
+      ctx.beginPath();
+      ctx.moveTo(x, cy);
+      ctx.lineTo(x + Math.cos(a) * 4.6 * c, cy + Math.sin(a) * 4.6 * c);
+      ctx.stroke();
+    }
+  }
+  drawCircuits(ctx, v, th, camX, clock, 0.1);
+  const pistons = repeats(v, camX, 0.2, 4);
+  for (let i = pistons.first; i < pistons.first + pistons.count; i++) {
+    const x = pistons.at(i);
+    const stroke = clock.reduced ? 0.5 : 0.5 + 0.5 * Math.sin(t * Math.PI * 2 * (128 / 60) / 2 + i * 1.3);
+    const top = screenY(v, 2 + stroke * 2.5);
+    ctx.fillStyle = th.mid;
+    ctx.fillRect(x - c * 0.5, top, c, screenY(v, 10) - top);
+    ctx.fillStyle = th.far;
+    ctx.fillRect(x - c * 0.7, top, c * 1.4, c * 0.4);
+  }
+  drawSawArms(ctx, v, th, camX, clock, 0.3);
+}
+
 /**
  * The whole background of a theme.
  * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock
@@ -529,6 +856,10 @@ export function drawBackground(ctx, v, th, camX, clock) {
   drawWall(ctx, v, th);
   if (th.backdrop === 'hall') drawHall(ctx, v, th, camX, clock);
   else if (th.backdrop === 'mine') drawMine(ctx, v, th, camX, clock);
-  else drawFoundry(ctx, v, th, camX, clock);
+  else if (th.backdrop === 'foundry') drawFoundry(ctx, v, th, camX, clock);
+  else if (th.backdrop === 'reactor') drawReactor(ctx, v, th, camX, clock);
+  else if (th.backdrop === 'core') drawCore(ctx, v, th, camX, clock);
+  else if (th.backdrop === 'heart') drawHeart(ctx, v, th, camX, clock);
+  else drawDemon(ctx, v, th, camX, clock);
   if (th.motes && !clock.reduced) drawMotes(ctx, v, th.motes, camX, clock.time);
 }

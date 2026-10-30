@@ -43,7 +43,8 @@ function planFlight(run, body) {
   const x1 = horizon(run, body.x);
   if (x1 - body.x < 0.5) return null;
   const world = runWorld(run);
-  const spec = beamSpec(world, body.x, x1, piece.speed, { ...tierOf(piece.tier), minInterval: 0.05 }, body);
+  // The pilot's presses land exactly when planned: it plans with the real orbs' reach.
+  const spec = { ...beamSpec(world, body.x, x1, piece.speed, { ...tierOf(piece.tier), minInterval: 0.05 }, body), search: undefined };
   spec.released = !body.held;
   for (const grain of FLIP_GRAINS) {
     const { holds } = solveBeam(spec, { verify: false, grain, bands: [[0.5, 'min'], [0.25, 'min'], [0.05, 'min']] });

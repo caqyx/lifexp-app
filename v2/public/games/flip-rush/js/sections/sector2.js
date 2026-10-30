@@ -114,18 +114,18 @@ export const SECTOR2 = [
     ],
   },
   {
-    // Ball: columns with spikes on their ends.
+    // Ball: a small pad over a short bed, then a gravity pad that throws it to the ceiling over a long one.
     id: 'r2-09',
     mode: 'ball',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'pillar', x: 9, on: 'floor', h: 2.5 },
-      { type: 'spike', x: 9, y: 7.5, dir: 'up' },
-      { type: 'pillar', x: 16, on: 'ceil', h: 2.5 },
-      { type: 'spike', x: 16, y: 4.5, dir: 'down' },
-      { type: 'pillar', x: 23, on: 'floor', h: 2.5 },
+      { type: 'pad', kind: 'small', x: 7, on: 'floor' },
+      { type: 'spike', x: 9, on: 'floor', count: 2 },
+      { type: 'pad', kind: 'gravity', x: 14, on: 'floor' },
+      { type: 'spike', x: 16, on: 'floor', count: 4 },
+      { type: 'spike', x: 22, on: 'ceil', count: 3 },
     ],
   },
   {
@@ -155,17 +155,18 @@ export const SECTOR2 = [
     ],
   },
   {
-    // Spider: mines by the ceiling and the floor.
+    // Spider: a jump orb over beds on both sides (the first orb), then a gravity pad across.
     id: 'r2-12',
     mode: 'spider',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'mine', x: 9, y: 9.2, r: 0.7 },
-      { type: 'mine', x: 14, y: 2.8, r: 0.7 },
-      { type: 'mine', x: 19, y: 9.2, r: 0.7 },
-      { type: 'mine', x: 24, y: 2.8, r: 0.7 },
+      { type: 'spike', x: 10, on: 'floor', count: 3 },
+      { type: 'spike', x: 10, on: 'ceil', count: 3 },
+      { type: 'ring', kind: 'jump', x: 9.5, y: 9.35 },
+      { type: 'pad', kind: 'gravity', x: 17, on: 'floor' },
+      { type: 'spike', x: 19, on: 'floor', count: 3 },
     ],
   },
   {
@@ -195,17 +196,19 @@ export const SECTOR2 = [
     ],
   },
   {
-    // Ball: beds and a column to time around.
+    // Ball: a jump pad onto a chain of jump orbs between long beds on both sides.
     id: 'r2-15',
     mode: 'ball',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'spike', x: 7, on: 'floor', count: 3 },
-      { type: 'pillar', x: 14, on: 'ceil', h: 3 },
-      { type: 'spike', x: 19, on: 'floor', count: 3 },
-      { type: 'spike', x: 24, on: 'ceil', count: 2 },
+      { type: 'pad', kind: 'jump', x: 6.5, on: 'floor' },
+      { type: 'spike', x: 8.5, on: 'floor', count: 13 },
+      { type: 'ring', kind: 'jump', x: 10.6, y: 8.3 },
+      { type: 'ring', kind: 'jump', x: 14.4, y: 8.3 },
+      { type: 'ring', kind: 'jump', x: 18.2, y: 8.3 },
+      { type: 'spike', x: 8.5, on: 'ceil', count: 13 },
     ],
   },
 ];

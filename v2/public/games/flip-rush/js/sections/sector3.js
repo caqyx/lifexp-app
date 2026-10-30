@@ -92,18 +92,18 @@ export const SECTOR3 = [
     ],
   },
   {
-    // Spider: mines by the surfaces, closer.
+    // Spider: jump orbs by the floor and the ceiling over beds on both sides, then a column.
     id: 'r3-07',
     mode: 'spider',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'mine', x: 8, y: 9.2, r: 0.7 },
-      { type: 'mine', x: 12, y: 2.8, r: 0.7 },
-      { type: 'mine', x: 16, y: 9.2, r: 0.7 },
-      { type: 'mine', x: 20, y: 2.8, r: 0.7 },
-      { type: 'mine', x: 24, y: 9.2, r: 0.7 },
+      { type: 'spike', x: 10, on: 'floor', count: 2 },
+      { type: 'spike', x: 10, on: 'ceil', count: 2 },
+      { type: 'ring', kind: 'jump', x: 9.2, y: 9.35 },
+      { type: 'ring', kind: 'jump', x: 9.2, y: 2.65 },
+      { type: 'pillar', x: 19, on: 'floor', h: 3 },
     ],
   },
   {
@@ -160,17 +160,19 @@ export const SECTOR3 = [
     ],
   },
   {
-    // Ball: beds and a saw between.
+    // Ball: a jump pad onto a chain of jump orbs between long beds.
     id: 'r3-12',
     mode: 'ball',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'spike', x: 7, on: 'floor', count: 3 },
-      { type: 'saw', x: 13, y: 6, r: 0.8 },
-      { type: 'spike', x: 17, on: 'ceil', count: 3 },
-      { type: 'spike', x: 23, on: 'floor', count: 2 },
+      { type: 'pad', kind: 'jump', x: 5, on: 'floor' },
+      { type: 'spike', x: 7, on: 'floor', count: 14 },
+      { type: 'spike', x: 7, on: 'ceil', count: 14 },
+      { type: 'ring', kind: 'jump', x: 9.2, y: 8.3 },
+      { type: 'ring', kind: 'jump', x: 14, y: 8.3 },
+      { type: 'ring', kind: 'jump', x: 18.8, y: 8.3 },
     ],
   },
   {
@@ -187,7 +189,7 @@ export const SECTOR3 = [
     ],
   },
   {
-    // Ball: mines in the middle.
+    // Ball: a dash orb pushes it back to the floor under a column.
     id: 'r3-14',
     mode: 'ball',
     length: 30,
@@ -195,9 +197,9 @@ export const SECTOR3 = [
     floor: '10 r30',
     hazards: [
       { type: 'spike', x: 7, on: 'floor', count: 2 },
-      { type: 'mine', x: 12.5, y: 6, r: 0.6 },
-      { type: 'spike', x: 16, on: 'ceil', count: 2 },
-      { type: 'mine', x: 21, y: 6, r: 0.6 },
+      { type: 'ring', kind: 'dash', x: 12, y: 4.5 },
+      { type: 'pillar', x: 14, on: 'ceil', h: 3.5 },
+      { type: 'spike', x: 19, on: 'floor', count: 3 },
     ],
   },
   {
