@@ -9,10 +9,13 @@
 //   anyone: an open page keeps running, and app/pwa.ts reloads it only if it asks
 //   for a chunk the deploy removed.
 // - Games (public/games/<id>/, stage g-1) are not precached (Wartime alone is ~4.5 MB):
-//   each file is cached the first time it is played and served from there, while the
-//   network refreshes it in the background (a re-vendored game arrives on the next
-//   play). The game's own page is a frame navigation, so the app shell's navigation
-//   route leaves it alone.
+//   each file is cached the first time it is played. Their code (pages, scripts, styles,
+//   data) is network first (3 s, revalidated past the HTTP cache), the cache only
+//   offline: the Rush games share their engine (games/_engine/), so a stale engine file
+//   next to a newer game would mix two deploys — Flip Rush's portals ran on Ship Rush's
+//   cached engine and said "wave" (hotfix after f-1). Media (images, sound, fonts) stay
+//   stale-while-revalidate. The game's own page is a frame navigation, so the app shell's
+//   navigation route leaves it alone.
 // - Only same-origin GETs are touched; Firebase traffic goes straight to the network.
 // - Push (stage 6-8): shows the reminders and opens their link on a tap (swPush.ts).
 //   v2 does not subscribe before the cutover (R7), so until then nothing arrives here.
@@ -20,7 +23,7 @@
 import { clientsClaim, setCacheNameDetails } from 'workbox-core';
 import { addRoute, cleanupOutdatedCaches, matchPrecache, precache, type PrecacheEntry } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
-import { StaleWhileRevalidate } from 'workbox-strategies';
+import { NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { clickUrl, parsePushData, readPush } from './swPush';
 
 declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: (string | PrecacheEntry)[] };
@@ -47,7 +50,15 @@ async function networkFirstShell(request: Request): Promise<Response> {
 /** Everything under games/ next to the worker (its scope), the frame's page included. */
 const GAMES_PREFIX = () => new URL('games/', self.registration.scope).href;
 
+/** A game's code: its pages and what they run, never served older than the rest of the deploy online. */
+const GAME_CODE = /\.(html?|m?js|css|json|wasm)$/i;
+const isGameCode = (url: URL, request: Request) => request.mode === 'navigate' || url.pathname.endsWith('/') || GAME_CODE.test(url.pathname);
+
 // First, so a game's page (a navigation inside the frame) is never answered with the app shell.
+registerRoute(
+  ({ url, request }) => request.method === 'GET' && url.href.startsWith(GAMES_PREFIX()) && isGameCode(url, request),
+  new NetworkFirst({ cacheName: 'lifexp-v2-games', networkTimeoutSeconds: NETWORK_TIMEOUT_MS / 1000, fetchOptions: { cache: 'no-cache' } }),
+);
 registerRoute(
   ({ url, request }) => request.method === 'GET' && url.href.startsWith(GAMES_PREFIX()),
   new StaleWhileRevalidate({ cacheName: 'lifexp-v2-games' }),
