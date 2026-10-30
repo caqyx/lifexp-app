@@ -1,0 +1,127 @@
+// @ts-check
+// Sector 4 "Trudniejszy" (docs/v2/PLAN.md 9.1, stage w-2): 10 sections, all shuffled,
+// speed 1.1. Tighter (corridors ≥ 4 hitboxes) and denser than sector 3; three gravity
+// flips per run and one mini stretch (section 10, flown small between its own portals).
+import { room, tunnel } from './kit.js';
+
+/** @type {import('../geometry.js').SectionData[]} */
+export const SECTOR4 = [
+  { id: 's4-01', ...tunnel({ gap: 3.2, legs: [3, -3, 3, -3, 2, -2] }), hazards: [], deco: [{ type: 'sawtooth', from: 7, to: 23, on: 'ceil' }] },
+  {
+    id: 's4-02',
+    ...tunnel({ gap: 3.4, legs: [-2, 4, 'r2', -4, 2] }),
+    hazards: [],
+    deco: [{ type: 'chain', x: 4, len: 1, ornament: 'triangle' }],
+  },
+  {
+    id: 's4-03',
+    length: 40,
+    ceil: '2 r40',
+    floor: '10 r40',
+    hazards: [
+      { type: 'pillar', x: 7, on: 'floor', h: 3.2 },
+      { type: 'spike', x: 7, y: 6.8, dir: 'up' },
+      { type: 'pillar', x: 12.5, on: 'ceil', h: 3.2 },
+      { type: 'spike', x: 12.5, y: 5.2, dir: 'down' },
+      { type: 'pillar', x: 18, on: 'floor', h: 3.2 },
+      { type: 'spike', x: 18, y: 6.8, dir: 'up' },
+      { type: 'pillar', x: 23.5, on: 'ceil', h: 3.2 },
+      { type: 'spike', x: 23.5, y: 5.2, dir: 'down' },
+      { type: 'pillar', x: 29, on: 'floor', h: 3.2 },
+      { type: 'spike', x: 29, y: 6.8, dir: 'up' },
+      { type: 'spike', x: 34, on: 'ceil', count: 2 },
+    ],
+  },
+  {
+    id: 's4-04',
+    length: 40,
+    ceil: '2 r40',
+    floor: '10 r40',
+    hazards: [
+      { type: 'saw', x: 7, y: 8.2, r: 1.4 },
+      { type: 'saw', x: 11.5, y: 3.8, r: 1.4 },
+      { type: 'saw', x: 16, y: 8.2, r: 1.4 },
+      { type: 'orb', x: 20.5, y: 3.6, r: 1, chain: true },
+      { type: 'saw', x: 25, y: 8.2, r: 1.4 },
+      { type: 'orb', x: 29.5, y: 3.6, r: 1, chain: true },
+      { type: 'spike', x: 34, on: 'floor', count: 2 },
+    ],
+  },
+  {
+    id: 's4-05',
+    length: 40,
+    ceil: '2 r4 +0.75 r3 +0.75 r3 +0.75 r3 +0.75 r6 -0.75 r3 -0.75 r3 -0.75 r3 -0.75 r12',
+    floor: '10 r40',
+    hazards: [
+      { type: 'halfSpike', x: 10, on: 'floor', count: 2 },
+      { type: 'halfSpike', x: 16, on: 'floor', count: 2 },
+      { type: 'spike', x: 20, on: 'ceil', count: 2 },
+      { type: 'halfSpike', x: 25, on: 'floor', count: 2 },
+      { type: 'saw', x: 34, y: 8.6, r: 0.9 },
+    ],
+    deco: [{ type: 'gear', x: 21, y: 8, size: 1.2 }],
+  },
+  {
+    id: 's4-06',
+    ...room({ top: 1, bottom: 11, inner: 26 }),
+    hazards: [
+      { type: 'orb', x: 8, y: 7.6, r: 1.1 },
+      { type: 'orb', x: 13, y: 3.8, r: 1.1, chain: true },
+      { type: 'orb', x: 18, y: 8.2, r: 1.1 },
+      { type: 'orb', x: 23, y: 4.2, r: 1.1, chain: true },
+      { type: 'orb', x: 28, y: 7.8, r: 1.1 },
+    ],
+    deco: [{ type: 'star', x: 18, y: 3, size: 0.8 }],
+  },
+  {
+    id: 's4-07',
+    ...tunnel({ gap: 3, legs: [2, -4, 4, -4, 4, -2] }),
+    hazards: [],
+    deco: [{ type: 'sawtooth', from: 6, to: 26, on: 'floor' }],
+  },
+  {
+    id: 's4-08',
+    length: 40,
+    ceil: '2 r40',
+    floor: '10 r40',
+    hazards: [
+      { type: 'block', x: 7, y: 2, w: 2, h: 2.4 },
+      { type: 'spike', x: 7, y: 4.4, dir: 'down', count: 2 },
+      { type: 'block', x: 11.5, y: 7.6, w: 2, h: 2.4 },
+      { type: 'spike', x: 11.5, y: 7.6, dir: 'up', count: 2 },
+      { type: 'block', x: 16, y: 2, w: 2, h: 2.4 },
+      { type: 'spike', x: 16, y: 4.4, dir: 'down', count: 2 },
+      { type: 'block', x: 20.5, y: 7.6, w: 2, h: 2.4 },
+      { type: 'spike', x: 20.5, y: 7.6, dir: 'up', count: 2 },
+      { type: 'block', x: 25, y: 2, w: 2, h: 2.4 },
+      { type: 'spike', x: 25, y: 4.4, dir: 'down', count: 2 },
+      { type: 'block', x: 29.5, y: 7.6, w: 2, h: 2.4 },
+      { type: 'spike', x: 29.5, y: 7.6, dir: 'up', count: 2 },
+    ],
+  },
+  {
+    id: 's4-09',
+    length: 40,
+    ceil: '2 r4 d2 r4 u2 r4 d2 r4 u2 r4 d2 r4 u2 r4',
+    floor: '10 r10 u2 r4 d2 r6 u2 r4 d2 r8',
+    hazards: [
+      { type: 'spike', x: 6, on: 'ceil', count: 4 },
+      { type: 'spike', x: 18, on: 'ceil', count: 4 },
+      { type: 'spike', x: 30, on: 'ceil', count: 4 },
+      { type: 'halfSpike', x: 12, on: 'floor', count: 4 },
+      { type: 'halfSpike', x: 26, on: 'floor', count: 2 },
+    ],
+  },
+  {
+    id: 's4-10',
+    mini: true,
+    ...room({ lead: 2, top: 0.5, bottom: 11.5, inner: 30, tail: 2 }),
+    hazards: [
+      { type: 'pillar', x: 9, on: 'floor', h: 4 },
+      { type: 'pillar', x: 16, on: 'ceil', h: 4 },
+      { type: 'pillar', x: 23, on: 'floor', h: 4 },
+      { type: 'pillar', x: 30, on: 'ceil', h: 4 },
+    ],
+    deco: [{ type: 'diamond', x: 19.5, y: 6, size: 0.6 }],
+  },
+];

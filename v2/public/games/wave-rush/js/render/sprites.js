@@ -93,15 +93,27 @@ export const PORTAL_COLORS = {
   gravityOff: '#62b6e6',
   miniOn: '#e07ac8',
   miniOff: '#7fcf7a',
+  shipOn: '#ff8a5c',
+  shipOff: '#7fe0ff',
 };
+
+/**
+ * A portal's colour.
+ * @param {{ kind: 'gravity' | 'mini' | 'ship', on: boolean }} p
+ */
+export function portalColor(p) {
+  if (p.kind === 'gravity') return p.on ? PORTAL_COLORS.gravityOn : PORTAL_COLORS.gravityOff;
+  if (p.kind === 'mini') return p.on ? PORTAL_COLORS.miniOn : PORTAL_COLORS.miniOff;
+  return p.on ? PORTAL_COLORS.shipOn : PORTAL_COLORS.shipOff;
+}
 
 /**
  * A portal: a tall ring across the joint's corridor with arrows for the new gravity.
  * @param {CanvasRenderingContext2D} ctx @param {number} x px @param {number} top px @param {number} bottom px
- * @param {number} cell px @param {{ kind: 'gravity' | 'mini', on: boolean }} p @param {number} time @param {boolean} reduced
+ * @param {number} cell px @param {{ kind: 'gravity' | 'mini' | 'ship', on: boolean }} p @param {number} time @param {boolean} reduced
  */
 export function drawPortal(ctx, x, top, bottom, cell, p, time, reduced) {
-  const color = p.kind === 'gravity' ? (p.on ? PORTAL_COLORS.gravityOn : PORTAL_COLORS.gravityOff) : p.on ? PORTAL_COLORS.miniOn : PORTAL_COLORS.miniOff;
+  const color = portalColor(p);
   const cy = (top + bottom) / 2;
   const ry = (bottom - top) / 2;
   const rx = cell * 0.55;
@@ -308,5 +320,48 @@ export function drawTrail(ctx, points, width, color) {
   ctx.strokeStyle = fade(1);
   ctx.lineWidth = width;
   ctx.stroke(path);
+  ctx.restore();
+}
+
+/**
+ * The ship (the finale): a sleek hull in the skin's colours with a canopy, tilted with
+ * its climb, and a short flame while thrusting.
+ * @param {CanvasRenderingContext2D} ctx @param {Skin} skin @param {number} x @param {number} y @param {number} size
+ * @param {number} tilt radians @param {boolean} thrust @param {boolean} [flipped]
+ */
+export function drawShip(ctx, skin, x, y, size, tilt, thrust, flipped = false) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(tilt);
+  ctx.scale(size, flipped ? -size : size);
+  ctx.lineJoin = 'round';
+  if (thrust) {
+    ctx.fillStyle = 'rgba(255, 170, 80, 0.85)';
+    ctx.beginPath();
+    ctx.moveTo(-0.55, -0.12);
+    ctx.lineTo(-0.92, 0.04);
+    ctx.lineTo(-0.55, 0.18);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.moveTo(0.62, 0.06);
+  ctx.quadraticCurveTo(0.3, -0.16, -0.2, -0.2);
+  ctx.lineTo(-0.58, -0.3);
+  ctx.lineTo(-0.5, 0.0);
+  ctx.lineTo(-0.58, 0.24);
+  ctx.lineTo(0.3, 0.24);
+  ctx.closePath();
+  ctx.fillStyle = skin.body;
+  ctx.fill();
+  ctx.strokeStyle = skin.edge;
+  ctx.lineWidth = 0.08;
+  ctx.stroke();
+  ctx.fillStyle = skin.accent;
+  ctx.beginPath();
+  ctx.ellipse(0.05, -0.12, 0.2, 0.12, 0, Math.PI, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
   ctx.restore();
 }

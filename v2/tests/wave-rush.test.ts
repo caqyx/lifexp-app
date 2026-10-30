@@ -10,6 +10,7 @@ import {
   SECTORS,
   STEP,
   TIERS,
+  SHIP,
   WAVE,
   flatCorridorMinHeight,
   sectorSpeed,
@@ -28,8 +29,10 @@ import {
   type SectionData,
 } from '../public/games/wave-rush/js/geometry.js';
 import { pickLang, textsOf, translator, TEXT_KEYS } from '../public/games/wave-rush/js/i18n.js';
-import { advanceClock, createWave, directionFor, holdFor, isBuffered, stepWave } from '../public/games/wave-rush/js/physics.js';
-import { minGapOf, proveSection, sectionProblems, statesOf } from '../public/games/wave-rush/js/prove.js';
+import { advanceClock, createWave, directionFor, holdFor, isBuffered, stepShip, stepWave } from '../public/games/wave-rush/js/physics.js';
+import { solveShip, verifyShip } from '../public/games/wave-rush/js/ship.js';
+import { FINALE_SECTIONS } from '../public/games/wave-rush/js/sections/finale.js';
+import { minGapOf, proveSection, sectionProblems, statesOf, tierKeyOf } from '../public/games/wave-rush/js/prove.js';
 import {
   KEYS,
   countAttempt,
@@ -37,6 +40,7 @@ import {
   readBest,
   readCheckpointBy,
   readProgress,
+  unlock,
   readSkin,
   saveBest,
   saveCheckpointBy,
@@ -45,6 +49,7 @@ import {
 import { createRng, parseSwitches, shuffle } from '../public/games/wave-rush/js/rng.js';
 import {
   PORTAL_OFFSET,
+  buildFinale,
   buildRun,
   checkpointX,
   jumpX,
@@ -53,11 +58,10 @@ import {
   pieceAt,
   placePortals,
   progressAt,
-  runHits,
   stateAt,
-  type Run,
 } from '../public/games/wave-rush/js/run.js';
-import { SECTION_LIBRARY } from '../public/games/wave-rush/js/sections/index.js';
+import { FINALE, SECTION_LIBRARY } from '../public/games/wave-rush/js/sections/index.js';
+import { createAutopilot } from '../public/games/wave-rush/js/autopilot.js';
 import { DEFAULT_SKIN, SKINS, isUnlocked, resolveSkin } from '../public/games/wave-rush/js/skins.js';
 import { buildTable, changesOf, peakRate, planSteps, readPlan, replay, rowOf, shiftTap, toleranceBand } from '../public/games/wave-rush/js/solver.js';
 
@@ -91,15 +95,18 @@ const blockedStorage = {
 // ── Sections and sectors ─────────────────────────────────────────────────────
 
 describe('authored sectors', () => {
-  test('w-1 builds sectors 1–3 with 10, 15 and 15 sections', () => {
-    expect(SECTORS.map((s) => s.id)).toEqual([1, 2, 3]);
-    expect([1, 2, 3].map((id) => SECTION_LIBRARY[id]?.length)).toEqual([10, 15, 15]);
+  test('the run: sectors with 10, 15, 15, 10, 10 (and 30 Demon) sections', () => {
+    const counts: Record<number, number> = { 1: 10, 2: 15, 3: 15, 4: 10, 5: 10, 6: 30 };
+    expect(SECTORS.map((s) => s.id)).toEqual(range(1, SECTORS.length));
+    for (const s of SECTORS) expect(SECTION_LIBRARY[s.id]?.length, `sector ${s.id}`).toBe(counts[s.id]);
+    for (const s of SECTORS) expect(sorted(s.groups.flat())).toEqual(range(1, counts[s.id]!));
     const ids = Object.values(SECTION_LIBRARY).flat().map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
   test('speeds: 0.5, 0.5 and 1.0 of the base speed; tiers ramp up and stay humanly possible', () => {
-    expect(SECTORS.map((s) => sectorTier(s).speed)).toEqual([0.5, 0.5, 1.0]);
+    expect(SECTORS.map((s) => sectorTier(s).speed)).toEqual([0.5, 0.5, 1.0, 1.1, 1.3, 1.3]);
+    expect(sector(6).bands!.map((b) => TIERS[b.tier]!.speed)).toEqual([1.3, 1.5, 1.7, 1.9]);
     expect(sectorSpeed(sector(3))).toBeCloseTo(BASE_SPEED);
     const order = ['easy', 'normal', 'hard', 'harder', 'insane', 'easyDemon', 'hardDemon', 'insaneDemon', 'extremeDemon'];
     const tiers = order.map((k) => TIERS[k]!);
@@ -120,7 +127,7 @@ describe('authored sectors', () => {
 
   test('every section is well formed: joint ends, 45° slopes only, spikes on flat ground, wide enough', () => {
     for (const s of SECTORS) {
-      for (const data of SECTION_LIBRARY[s.id]!) expect(checkSection(data, minGapOf(s)), data.id).toEqual([]);
+      SECTION_LIBRARY[s.id]!.forEach((data, i) => expect(checkSection(data, minGapOf(tierKeyOf(data, s, i + 1))), data.id).toEqual([]));
     }
   });
 
@@ -135,15 +142,16 @@ describe('authored sectors', () => {
     });
     expect(stats[1]!.density).toBeGreaterThan(stats[0]!.density);
     expect(stats[2]!.gap).toBeLessThan(stats[0]!.gap);
+    expect(stats[4]!.gap).toBeLessThan(stats[2]!.gap);
   });
 
   test('flat stretches are tall enough to zig-zag through at the tier’s tap rate', () => {
     for (const s of SECTORS) {
-      const tier = sectorTier(s);
-      // A stretch is "flat" when both walls stay level for a whole zig-zag (two legs).
-      const leg = sectorSpeed(s) * tier.minInterval;
-      const need = flatCorridorMinHeight(tier);
-      for (const data of SECTION_LIBRARY[s.id]!) {
+      SECTION_LIBRARY[s.id]!.forEach((data, i) => {
+        const tier = TIERS[tierKeyOf(data, s, i + 1)]!;
+        // A stretch is "flat" when both walls stay level for a whole zig-zag (two legs).
+        const leg = tier.speed * BASE_SPEED * tier.minInterval;
+        const need = flatCorridorMinHeight(tier, data.mini === true);
         const g = buildGeometry(data);
         for (let x = 0; x + 2 * leg <= g.length; x += 0.25) {
           const flat = [g.ceil, g.floor].every((pts) =>
@@ -153,7 +161,7 @@ describe('authored sectors', () => {
           const height = profileY(g.floor, x, 'floor') - profileY(g.ceil, x, 'ceil');
           expect(height, `${data.id} at x=${x}`).toBeGreaterThanOrEqual(need - 1e-9);
         }
-      }
+      });
     }
   });
 });
@@ -164,7 +172,6 @@ describe('the human-feasibility validator', () => {
       const band = toleranceBand(tier.speed * BASE_SPEED, false, tier.tolerance);
       const height = Math.min(7.9, flatCorridorMinHeight(tier) + 2 * band + 0.3);
       const half = height / 2;
-      const def: SectorDef = { id: 9, key: name, tier: name, theme: 'lagoon', groups: [[1]], portals: [] };
       const funnel = 4 - half;
       const ok: SectionData = {
         id: `flat-${name}`,
@@ -173,13 +180,13 @@ describe('the human-feasibility validator', () => {
         floor: `10 r3 u${funnel} r${40 - 6 - 2 * funnel} d${funnel} r3`,
         hazards: [],
       };
-      const fails = proveSection(ok, def, { gravity: 1, mini: false }, 2).filter((r) => r.problem);
+      const fails = proveSection(ok, name, { gravity: 1, mini: false }, 2).filter((r) => r.problem);
       expect(fails, `${name}: ${height.toFixed(2)} cells`).toEqual([]);
       if (flatCorridorMinHeight(tier) - 0.7 > 2 * WAVE.radius) {
         const low = flatCorridorMinHeight(tier) - 0.7;
         const f2 = 4 - low / 2;
         const tooLow: SectionData = { ...ok, id: `low-${name}`, ceil: `2 r3 d${f2} r${34 - 2 * f2} u${f2} r3`, floor: `10 r3 u${f2} r${34 - 2 * f2} d${f2} r3` };
-        expect(proveSection(tooLow, def, { gravity: 1, mini: false }, 2).some((r) => r.problem), name).toBe(true);
+        expect(proveSection(tooLow, name, { gravity: 1, mini: false }, 2).some((r) => r.problem), name).toBe(true);
       }
     }
   });
@@ -216,14 +223,14 @@ describe('the human-feasibility validator', () => {
 
   test('a section with no way through is caught', () => {
     const wall: SectionData = { id: 'wall', length: 20, ceil: '2 r20', floor: '10 r20', hazards: [{ type: 'block', x: 9, y: 2, w: 1, h: 8 }] };
-    expect(proveSection(wall, sector(1), { gravity: 1, mini: false }).every((r) => r.problem)).toBe(true);
+    expect(proveSection(wall, 'easy', { gravity: 1, mini: false }).every((r) => r.problem)).toBe(true);
   });
 
   // The proof itself: every authored section, every entry height across the joint, in
   // every state its sector can put it in (both gravities in sector 3).
   for (const s of SECTORS) {
-    test(`sector ${s.id}: every section is passable for a human (${statesOf(s).length} state(s))`, { timeout: 120_000 }, () => {
-      const problems = SECTION_LIBRARY[s.id]!.flatMap((data) => sectionProblems(data, s));
+    test(`sector ${s.id}: every section is passable for a human (in ${statesOf(s).length} gravity state(s); mini sections as mini)`, { timeout: 300_000 }, () => {
+      const problems = SECTION_LIBRARY[s.id]!.flatMap((data, i) => sectionProblems(data, s, i + 1));
       expect(problems).toEqual([]);
     });
   }
@@ -259,7 +266,7 @@ describe('a run', () => {
   test('sector 3 has exactly one gravity portal and the way back two sections later; sectors 1–2 have none', () => {
     for (let seed = 1; seed <= 200; seed++) {
       const run = buildRun(createRng(seed));
-      const bySector = [0, 1, 2].map((i) => run.portals.filter((p) => p.sector === i));
+      const bySector = SECTORS.map((_, i) => run.portals.filter((p) => p.sector === i));
       expect(bySector[0]).toEqual([]);
       expect(bySector[1]).toEqual([]);
       const [on, off] = bySector[2]!;
@@ -279,28 +286,98 @@ describe('a run', () => {
     }
   });
 
-  test('a portal stands in the open joint at a section start: never in a hazard', () => {
-    for (let seed = 1; seed <= 100; seed++) {
+  test('sectors 4 and 5: exact gravity flips (each with its way back) and one mini stretch around the mini section', () => {
+    for (let seed = 1; seed <= 150; seed++) {
       const run = buildRun(createRng(seed));
-      for (const p of run.portals) {
-        const piece = pieceAt(run, p.x);
-        expect(p.x - piece.x0).toBe(PORTAL_OFFSET);
-        expect(piece.g.hazards.every((h) => h.bbox[0]! > PORTAL_OFFSET + 1)).toBe(true);
-        expect(profileY(piece.g.ceil, PORTAL_OFFSET, 'ceil')).toBe(JOINT.ceil);
-        expect(profileY(piece.g.floor, PORTAL_OFFSET, 'floor')).toBe(JOINT.floor);
+      for (const [index, flips] of [[3, 3], [4, 2]] as const) {
+        const portals = run.portals.filter((p) => p.sector === index);
+        const gravity = portals.filter((p) => p.kind === 'gravity');
+        expect(gravity.filter((p) => p.on)).toHaveLength(flips);
+        expect(gravity.filter((p) => !p.on)).toHaveLength(flips);
+        // On, off, on, off…: a flip always comes back before the next, and the sector ends upright.
+        gravity.forEach((p, i) => expect(p.on).toBe(i % 2 === 0));
+        const sector = run.sectors[index]!;
+        const pieces = run.pieces.slice(sector.first, sector.first + sector.count);
+        expect(pieces.filter((p) => stateAt(run, (p.x0 + p.x1) / 2).gravity === -1)).toHaveLength(flips);
+        expect(stateAt(run, sector.x1 - 0.1).gravity).toBe(1);
+        // Mini: exactly the section marked mini, wherever the shuffle put it.
+        const mini = portals.filter((p) => p.kind === 'mini');
+        expect(mini.map((p) => p.on)).toEqual([true, false]);
+        const small = pieces.filter((p) => stateAt(run, (p.x0 + p.x1) / 2).mini);
+        expect(small.map((p) => p.g.mini)).toEqual([true]);
+        expect(pieces.filter((p) => p.g.mini)).toHaveLength(1);
       }
     }
   });
 
-  test('portal rules for stage w-2 place exact counts (3 gravity pairs and 1 mini pair in 10 sections)', () => {
-    const def: SectorDef = { id: 4, key: 'harder', tier: 'harder', theme: 'lagoon', groups: [range(1, 10)], portals: [{ kind: 'gravity', count: 3, span: 1 }, { kind: 'mini', count: 1, span: 1 }] };
+  test('a portal stands in an open joint (a section’s lead-in, a mini’s lead-out): never in a hazard', () => {
     for (let seed = 1; seed <= 100; seed++) {
-      const slots = placePortals(def, 10, createRng(seed));
-      expect(slots.filter((s) => s.kind === 'gravity' && s.on)).toHaveLength(3);
-      expect(slots.filter((s) => s.kind === 'mini' && s.on)).toHaveLength(1);
-      expect(new Set(slots.map((s) => s.boundary)).size).toBe(slots.length);
-      for (const s of slots) expect(s.boundary).toBeGreaterThanOrEqual(1);
-      for (const s of slots) expect(s.boundary).toBeLessThanOrEqual(9);
+      const run = buildRun(createRng(seed));
+      for (const p of run.portals) {
+        const piece = pieceAt(run, p.x);
+        const local = p.x - piece.x0;
+        if (p.kind === 'mini' && !p.on) expect(piece.x1 - p.x).toBeCloseTo(PORTAL_OFFSET.miniBack);
+        else expect(local).toBeCloseTo(p.kind === 'mini' ? PORTAL_OFFSET.mini : PORTAL_OFFSET.gravity);
+        for (const h of piece.g.hazards) expect(Math.abs((h.bbox[0]! + h.bbox[2]!) / 2 - local)).toBeGreaterThan(1);
+        expect(profileY(piece.g.ceil, local, 'ceil')).toBe(JOINT.ceil);
+        expect(profileY(piece.g.floor, local, 'floor')).toBe(JOINT.floor);
+      }
+    }
+  });
+
+  test('the Demon: tiers in order, each shuffled within itself, at its own speed and look, with its own portals', () => {
+    const demon = sector(6);
+    const bands = demon.bands!;
+    for (let seed = 1; seed <= 100; seed++) {
+      const run = buildRun(createRng(seed));
+      const placed = run.sectors[5]!;
+      const pieces = run.pieces.slice(placed.first, placed.first + placed.count);
+      bands.forEach((band, b) => {
+        const mine = pieces.filter((p) => p.band === b);
+        expect(sorted(mine.map((p) => p.number))).toEqual(range(band.from, band.to));
+        for (const p of mine) expect(p).toMatchObject({ tier: band.tier, theme: band.theme });
+        for (const p of mine) expect(p.speed).toBeCloseTo(TIERS[band.tier]!.speed * BASE_SPEED);
+      });
+      // Tiers in order.
+      expect(pieces.map((p) => p.band)).toEqual([...pieces.map((p) => p.band)].sort((a, b) => a - b));
+      // Gravity: 1 + 2 + 1 flips, each back inside its own tier; mini around each tier's mini section.
+      const portals = run.portals.filter((p) => p.sector === 5);
+      expect(portals.filter((p) => p.kind === 'gravity' && p.on)).toHaveLength(4);
+      expect(portals.filter((p) => p.kind === 'mini' && p.on)).toHaveLength(3);
+      for (const b of [1, 2, 3]) {
+        const small = pieces.filter((p) => p.band === b && stateAt(run, (p.x0 + p.x1) / 2).mini);
+        expect(small.map((p) => p.g.mini)).toEqual([true]);
+      }
+      expect(stateAt(run, placed.x1 - 0.1)).toMatchObject({ gravity: 1, mini: false });
+    }
+  });
+
+  test('practice checkpoints in the Demon are per tier', () => {
+    const run = buildRun(createRng(3));
+    const placed = run.sectors[5]!;
+    const pieces = run.pieces.slice(placed.first, placed.first + placed.count);
+    for (const b of [0, 1, 2, 3]) {
+      const mine = pieces.filter((p) => p.band === b);
+      const last = mine[mine.length - 1]!;
+      expect(checkpointX(run, (last.x0 + last.x1) / 2, 'sector')).toBe(mine[0]!.x0);
+      expect(checkpointX(run, (last.x0 + last.x1) / 2, 'section')).toBe(last.x0);
+    }
+  });
+
+  test('portal placement: exact counts, never overlapping, inside its range', () => {
+    const def: SectorDef = { id: 4, key: 'harder', tier: 'harder', theme: 'lagoon', groups: [range(1, 10)], portals: [{ kind: 'gravity', count: 3, span: 1 }, { kind: 'mini', count: 1 }] };
+    const data: SectionData[] = range(1, 10).map((n) => ({ id: `t${n}`, length: 10, ceil: '2 r10', floor: '10 r10', hazards: [], mini: n === 4 }));
+    for (let seed = 1; seed <= 100; seed++) {
+      const order = shuffle(range(1, 10), createRng(seed));
+      const slots = placePortals(def, order, data, createRng(seed));
+      const gravity = slots.filter((s) => s.kind === 'gravity');
+      expect(gravity.filter((s) => s.on)).toHaveLength(3);
+      expect(new Set(gravity.map((s) => s.boundary)).size).toBe(6);
+      for (const s of gravity) expect(s.boundary).toBeGreaterThanOrEqual(1);
+      for (const s of gravity) expect(s.boundary).toBeLessThanOrEqual(9);
+      const mini = slots.filter((s) => s.kind === 'mini');
+      expect(mini).toHaveLength(2);
+      for (const s of mini) expect(order[s.place - 1]).toBe(4);
     }
   });
 
@@ -336,8 +413,10 @@ describe('physics', () => {
     expect(directionFor(true, 1)).toBe(-1);
     expect(holdFor(1, -1)).toBe(true);
     expect(holdFor(-1, -1)).toBe(false);
-    // No horizontal state: only x, y, direction, gravity and size.
-    expect(Object.keys(w).sort()).toEqual(['dir', 'gravity', 'mini', 'x', 'y']);
+    // No horizontal state: x, y, direction, gravity, size — and the ship's vertical speed,
+    // which the wave never uses.
+    expect(Object.keys(w).sort()).toEqual(['dir', 'gravity', 'mini', 'ship', 'vy', 'x', 'y']);
+    expect(stepWave(w, true, 10, 0.1).vy).toBe(0);
   });
 
   test('a fixed step: 60, 120 and 144 Hz run the same number of steps and end in the same place', () => {
@@ -370,6 +449,105 @@ describe('physics', () => {
     expect(isBuffered(1000, 1100)).toBe(true);
     expect(isBuffered(1000, 1200)).toBe(false);
     expect(isBuffered(null, 1000)).toBe(false);
+  });
+});
+
+describe('the ship (finale)', () => {
+  test('holding thrusts up, letting go falls, smoothly and capped; flipped gravity mirrors it', () => {
+    let ship = { ...createWave(0, 6), ship: true };
+    ship = stepShip(ship, true, 10, 0.1);
+    expect(ship.vy).toBeCloseTo(-SHIP.up * 0.1);
+    expect(ship.y).toBeLessThan(6);
+    expect(ship.x).toBeCloseTo(1);
+    for (let i = 0; i < 100; i++) ship = stepShip(ship, true, 10, STEP);
+    expect(ship.vy).toBe(-SHIP.maxV);
+    for (let i = 0; i < 400; i++) ship = stepShip(ship, false, 10, STEP);
+    expect(ship.vy).toBe(SHIP.maxV);
+    const flipped = stepShip({ ...createWave(0, 6), ship: true, gravity: -1 }, true, 10, 0.1);
+    expect(flipped.vy).toBeCloseTo(SHIP.up * 0.1);
+    // stepWave flies the ship when it is one.
+    expect(stepWave({ ...createWave(0, 6), ship: true }, true, 10, 0.1).vy).toBeCloseTo(-SHIP.up * 0.1);
+  });
+
+  test('a fixed step: the ship ends in the same place at 60, 120 and 144 Hz', () => {
+    const results = [60, 120, 144].map((hz) => {
+      let acc = 0;
+      let steps = 0;
+      let ship = { ...createWave(0, 6), ship: true };
+      for (let f = 0; f < hz * 2; f++) {
+        const tick = advanceClock(acc, 1 / hz);
+        acc = tick.accumulator;
+        for (let i = 0; i < tick.steps; i++) {
+          ship = stepShip(ship, Math.floor(steps / 90) % 2 === 0, 12, STEP);
+          steps += 1;
+        }
+      }
+      return { steps, x: ship.x, y: ship.y, vy: ship.vy };
+    });
+    for (const r of results) expect(Math.abs(r.steps - 480)).toBeLessThanOrEqual(1);
+    expect(results[0]!.y).toBeCloseTo(results[1]!.y, 1);
+    expect(results[1]!.y).toBeCloseTo(results[2]!.y, 1);
+    expect(results[0]!.x).toBeCloseTo(results[2]!.x, 1);
+  });
+
+  test('the ship never grazes: a 45° slope it flies along is still a crash', () => {
+    const g = room([], '2 r20', '10 r6 u4 r10');
+    const y = profileY(g.floor, 8, 'floor') - 0.1;
+    expect(capsuleHits(g, 8, y, y, SHIP.radius, 0, 0)).toBe(true);
+  });
+
+  test('the ship validator finds a fair path through an open room and none through a wall', () => {
+    const limits = TIERS.finale!;
+    const open: SectionData = { id: 'open', length: 30, ceil: '2 r30', floor: '10 r30', hazards: [] };
+    const g = buildGeometry(open);
+    const spec = { hits: (x: number, ya: number, yb: number, r: number, d: number, sl: number) => capsuleHits(g, x, ya, yb, r, d, sl), x0: 1, x1: 30, speed: limits.speed * BASE_SPEED, limits, gravity: 1 as const, y: 6, vy: 0 };
+    const ok = solveShip(spec);
+    expect(ok.problem).toBeNull();
+    expect(verifyShip(spec, ok.holds!)).toBeNull();
+    const wall = buildGeometry({ ...open, id: 'wall', hazards: [{ type: 'block', x: 12, y: 2, w: 1, h: 8 }] });
+    expect(solveShip({ ...spec, hits: (x, ya, yb, r, d, sl) => capsuleHits(wall, x, ya, yb, r, d, sl) }).holds).toBeNull();
+  });
+});
+
+describe('the finale', () => {
+  test('a fixed sequence that alternates wave and ship, with a portal at every change, never shuffled', () => {
+    const a = buildFinale();
+    const b = buildFinale();
+    expect(a.sectors[0]!.order).toEqual(range(1, FINALE_SECTIONS.length));
+    expect(b.sectors[0]!.order).toEqual(a.sectors[0]!.order);
+    const pieces = a.pieces.filter((p) => p.kind === 'section');
+    const modes = pieces.map((p) => p.mode);
+    expect(modes).toEqual(modes.map((_, i) => (i % 2 === 0 ? 'wave' : 'ship')));
+    expect(a.portals.filter((p) => p.kind === 'ship').map((p) => p.on)).toEqual(modes.slice(1).map((m) => m === 'ship'));
+    for (const p of pieces) expect(p.tier).toBe(p.mode === 'ship' ? 'finale' : 'extremeDemon');
+    for (const p of pieces) expect(stateAt(a, p.x0 + 2).ship).toBe(p.mode === 'ship');
+  });
+
+  test('every stretch of the finale is passable for a human: wave stretches at Extreme limits, ship stretches by the ship validator', { timeout: 300_000 }, () => {
+    const problems = FINALE_SECTIONS.flatMap((data, i) => sectionProblems(data, FINALE, i + 1));
+    expect(problems).toEqual([]);
+  });
+
+  test('practice in the finale goes back to the section; a crash in normal play to its start', () => {
+    const practice = createGame({ rng: createRng(1), mode: 'practice', level: 'finale', checkpointBy: 'sector', jump: { sector: 1, section: 4 } });
+    expect(practice.checkpointBy).toBe('section');
+    expect(practice.checkpoint).toBe(jumpX(practice.run, 1, 4));
+    const normal = createGame({ rng: createRng(1), mode: 'normal', level: 'finale' });
+    expect(normal.run.kind).toBe('finale');
+    expect(keepsRecords(normal)).toBe(true);
+  });
+
+  test('the pilot flies the whole finale, ship and wave', { timeout: 120_000 }, () => {
+    const game = createGame({ rng: createRng(1), mode: 'normal', level: 'finale' });
+    stepGame(game, { holding: true, tap: true }, STEP);
+    const pilot = createAutopilot();
+    let shipSteps = 0;
+    for (let i = 0; i < 240 * 60 && game.phase === 'playing'; i++) {
+      if (game.wave.ship) shipSteps += 1;
+      stepGame(game, { holding: pilot.advise(game.run, game.wave), tap: false }, STEP);
+    }
+    expect(game.phase).toBe('finished');
+    expect(shipSteps).toBeGreaterThan(240);
   });
 });
 
@@ -495,29 +673,15 @@ describe('game', () => {
     expect(game.checkpoint).toBe(jumpX(game.run, 1, 2));
   });
 
-  test('a run flown by the solver reaches the end of sector 3 and says how far it got', () => {
-    const game = createGame({ rng: createRng(12), mode: 'normal', jump: { sector: 3, section: 15 } });
+  test('the solver’s pilot flies the last section of the run to the end, and the result says how far', { timeout: 60_000 }, () => {
+    const lastSector = SECTORS.length;
+    const count = SECTION_LIBRARY[lastSector]!.length;
+    const game = createGame({ rng: createRng(12), mode: 'normal', jump: { sector: lastSector, section: count } });
     stepGame(game, { holding: false, tap: true }, STEP);
-    const run: Run = game.run;
-    const last = run.pieces[run.pieces.length - 2]!;
-    // Fly the last section with a plan from where the wave is.
-    const spec = {
-      hits: (x: number, ya: number, yb: number, rr: number, dir: number, slope: number) => runHits(run, x, ya, yb, rr, dir, slope),
-      x0: game.wave.x,
-      x1: run.finishX + 1,
-      speed: sectorSpeed(sector(3)),
-      mini: false,
-      limits: sectorTier(sector(3)),
-      yAnchor: game.wave.y,
-    };
-    const table = buildTable(spec);
-    const plan = readPlan(table, rowOf(table, game.wave.y))!;
-    expect(plan).not.toBeNull();
-    const dirs = planSteps(plan, table.n);
-    for (let i = 0; i < dirs.length && game.phase === 'playing'; i++) stepGame(game, { holding: holdFor(dirs[i]!, game.wave.gravity), tap: false }, STEP);
+    const pilot = createAutopilot();
+    for (let i = 0; i < 240 * 30 && game.phase === 'playing'; i++) stepGame(game, { holding: pilot.advise(game.run, game.wave), tap: false }, STEP);
     expect(game.phase).toBe('finished');
-    expect(game.result).toEqual({ sector: 3, section: 15, percent: 100 });
-    expect(last.place).toBe(15);
+    expect(game.result).toEqual({ sector: lastSector, section: count, percent: 100 });
     expect(resultOf(game).percent).toBe(100);
   });
 });
@@ -551,8 +715,25 @@ describe('records', () => {
     expect(readAttempts(storage)).toBe(0);
     expect(readBest(blockedStorage)).toBeNull();
     expect(saveBest(blockedStorage, { sector: 1, section: 1, percent: 1 }).isNew).toBe(true);
-    expect(readProgress(blockedStorage)).toEqual({ demonComplete: false });
+    expect(readProgress(blockedStorage)).toEqual({ demonComplete: false, finaleComplete: false });
     expect(readSkin(null)).toBeNull();
+  });
+});
+
+describe('achievements', () => {
+  test('finishing the Demon unlocks once: the achievement, the last skin; the finale has its own', () => {
+    const storage = memoryStorage();
+    expect(readProgress(storage)).toEqual({ demonComplete: false, finaleComplete: false });
+    const crown = SKINS[SKINS.length - 1]!;
+    expect(isUnlocked(crown, readProgress(storage))).toBe(false);
+    expect(unlock(storage, 'demonComplete')).toBe(true);
+    expect(unlock(storage, 'demonComplete')).toBe(false);
+    expect(readProgress(storage)).toEqual({ demonComplete: true, finaleComplete: false });
+    expect(isUnlocked(crown, readProgress(storage))).toBe(true);
+    expect(unlock(storage, 'finaleComplete')).toBe(true);
+    expect(readProgress(storage)).toEqual({ demonComplete: true, finaleComplete: true });
+    for (const key of storage.data.keys()) expect(key.startsWith('lifexp-waverush-')).toBe(true);
+    expect(unlock(blockedStorage, 'demonComplete')).toBe(true);
   });
 });
 
@@ -588,14 +769,16 @@ describe('texts and switches', () => {
     }
     expect(translator('pl')('result', { sector: 2, section: 3, percent: 41 })).toBe('Sektor 2, sekcja 3 · 41% trasy');
     expect(translator('en')('attempt', { n: 7 })).toBe('Attempt 7');
-    expect(translator('pl')('finishedTitle')).toBe('Ciąg dalszy wkrótce');
+    expect(translator('pl')('achDemon')).toBe('Pogromca Demona');
+    expect(translator('en')('achDemon')).toBe('Demon Slayer');
   });
 
   test('?sector, ?section and ?autopilot only work together with ?seed', () => {
-    expect(parseSwitches('?seed=5&sector=3&section=4')).toEqual({ seed: 5, jump: { sector: 3, section: 4 }, autopilot: null });
-    expect(parseSwitches('?seed=5&sector=2&autopilot=2')).toEqual({ seed: 5, jump: { sector: 2, section: 1 }, autopilot: 2 });
-    expect(parseSwitches('?sector=3&section=4&autopilot=3')).toEqual({ seed: null, jump: null, autopilot: null });
-    expect(parseSwitches('?seed=x')).toEqual({ seed: null, jump: null, autopilot: null });
+    expect(parseSwitches('?seed=5&sector=3&section=4')).toEqual({ seed: 5, jump: { sector: 3, section: 4 }, autopilot: null, finale: null });
+    expect(parseSwitches('?seed=5&sector=2&autopilot=2')).toEqual({ seed: 5, jump: { sector: 2, section: 1 }, autopilot: 2, finale: null });
+    expect(parseSwitches('?seed=5&finale=4&autopilot=1')).toEqual({ seed: 5, jump: null, autopilot: 1, finale: 4 });
+    expect(parseSwitches('?sector=3&section=4&autopilot=3&finale=2')).toEqual({ seed: null, jump: null, autopilot: null, finale: null });
+    expect(parseSwitches('?seed=x')).toEqual({ seed: null, jump: null, autopilot: null, finale: null });
   });
 
   test('a shuffle keeps every item', () => {

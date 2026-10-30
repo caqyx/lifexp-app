@@ -1,12 +1,13 @@
 // @ts-check
-// Wave Rush's states (docs/v2/PLAN.md 9.1, stage w-1): ready → playing → dead or
-// finished, in two modes. Normal: a crash starts a new run (sector 1, section 1, a new
+// Wave Rush's states (docs/v2/PLAN.md 9.1, stages w-1 and w-2): ready → playing → dead
+// or finished, in two modes, on two levels (the run of sectors 1–6, or the finale). Normal: a crash starts a new run (sector 1, section 1, a new
 // shuffle); its result is how far it got. Praktyka: a crash restarts at the last
 // checkpoint (the start of the sector, or of the section) of the same run; no records.
 // No DOM and no clock: main.js feeds the input and the fixed steps.
 import { JOINT, RESTART_LOCK } from './config.js';
-import { createWave, stepWave, waveRadius, waveSlope } from './physics.js';
+import { createWave, hitRadius, stepWave, waveSlope } from './physics.js';
 import {
+  buildFinale,
   buildRun,
   checkpointX,
   jumpX,
@@ -15,23 +16,24 @@ import {
   progressAt,
   respawnX,
   runHits,
-  sectorAt,
+  speedAt,
   stateAt,
 } from './run.js';
 
 /**
  * @typedef {'ready' | 'playing' | 'dead' | 'finished'} Phase
  * @typedef {'normal' | 'practice'} Mode
- * @typedef {'start' | 'sector' | 'section' | 'portal' | 'death' | 'finish' | 'restart'} GameEvent
+ * @typedef {'start' | 'sector' | 'tier' | 'section' | 'portal' | 'death' | 'finish' | 'restart'} GameEvent
+ *   tier: a new Demon tier began (inside the same sector).
  * @typedef {{ sector: number, section: number, percent: number }} Result
  * @typedef {{ x: number, y: number }} Point
  * @typedef {{
- *   mode: Mode, checkpointBy: 'sector' | 'section', rng: () => number,
+ *   mode: Mode, level: 'run' | 'finale', checkpointBy: 'sector' | 'section', rng: () => number,
  *   run: import('./run.js').Run, jumped: boolean,
  *   phase: Phase, phaseTime: number, time: number,
  *   wave: import('./physics.js').Wave, previous: { x: number, y: number },
  *   trail: Point[], attempt: number, checkpoint: number,
- *   where: { sector: number, section: number }, result: Result | null, lastPortal: import('./run.js').Portal | null,
+ *   where: { sector: number, section: number }, band: number, result: Result | null, lastPortal: import('./run.js').Portal | null,
  * }} Game
  * @typedef {{ holding: boolean, tap: boolean }} Input
  */
@@ -47,26 +49,30 @@ const TRAIL_KEEP = 48;
  */
 function placeWave(game, x) {
   const state = stateAt(game.run, x);
-  game.wave = { ...createWave(x, START_Y), gravity: state.gravity, mini: state.mini };
+  game.wave = { ...createWave(x, START_Y), gravity: state.gravity, mini: state.mini, ship: state.ship };
   game.previous = { x, y: START_Y };
   game.trail = [{ x, y: START_Y }];
   game.where = locate(game.run, x);
+  game.band = pieceAt(game.run, x).band;
   game.lastPortal = null;
 }
 
 /**
  * A new game on its ready screen.
- * @param {{ rng: () => number, mode: Mode, checkpointBy?: 'sector' | 'section', jump?: { sector: number, section: number } | null }} options
+ * @param {{ rng: () => number, mode: Mode, level?: 'run' | 'finale', checkpointBy?: 'sector' | 'section', jump?: { sector: number, section: number } | null }} options
+ *   The finale's practice always uses section checkpoints.
  * @returns {Game}
  */
 export function createGame(options) {
-  const run = buildRun(options.rng);
+  const level = options.level ?? 'run';
+  const run = level === 'finale' ? buildFinale() : buildRun(options.rng);
   const target = options.jump ? jumpX(run, options.jump.sector, options.jump.section) : null;
   const start = target === null ? run.startX : respawnX(run, target);
   /** @type {Game} */
   const game = {
     mode: options.mode,
-    checkpointBy: options.checkpointBy ?? 'sector',
+    level,
+    checkpointBy: level === 'finale' ? 'section' : (options.checkpointBy ?? 'sector'),
     rng: options.rng,
     run,
     jumped: target !== null,
@@ -77,8 +83,9 @@ export function createGame(options) {
     previous: { x: start, y: START_Y },
     trail: [],
     attempt: 1,
-    checkpoint: target === null ? run.startX : checkpointX(run, target, options.checkpointBy ?? 'sector'),
+    checkpoint: target === null ? run.startX : checkpointX(run, target, level === 'finale' ? 'section' : (options.checkpointBy ?? 'sector')),
     where: { sector: 1, section: 1 },
+    band: -1,
     result: null,
     lastPortal: null,
   };
@@ -103,7 +110,8 @@ function passPortals(game, from, to, events) {
   for (const p of game.run.portals) {
     if (p.x <= from || p.x > to) continue;
     if (p.kind === 'gravity') game.wave = { ...game.wave, gravity: p.on ? -1 : 1 };
-    else game.wave = { ...game.wave, mini: p.on };
+    else if (p.kind === 'mini') game.wave = { ...game.wave, mini: p.on };
+    else game.wave = { ...game.wave, ship: p.on, vy: 0 };
     game.lastPortal = p;
     events.push('portal');
   }
@@ -120,8 +128,13 @@ function trackPlace(game, events) {
     game.wave = { ...game.wave, gravity: 1, mini: false };
     events.push('sector');
   }
+  const piece = pieceAt(game.run, game.wave.x);
+  if (piece.kind === 'section' && piece.band !== game.band) {
+    if (where.sector === game.where.sector && piece.band >= 0) events.push('tier');
+    game.band = piece.band;
+  }
   if (where.sector !== game.where.sector || where.section !== game.where.section) {
-    if (pieceAt(game.run, game.wave.x).kind === 'section') events.push('section');
+    if (piece.kind === 'section') events.push('section');
     game.checkpoint = Math.max(game.checkpoint, checkpointX(game.run, game.wave.x, game.checkpointBy));
   }
   game.where = where;
@@ -132,7 +145,11 @@ function trackPlace(game, events) {
  * @param {Game} game @param {number} previousDir
  */
 function trackTrail(game, previousDir) {
-  if (game.wave.dir !== previousDir) game.trail.push({ x: game.previous.x, y: game.previous.y });
+  const last = game.trail[game.trail.length - 1];
+  if (game.wave.ship) {
+    // The ship flies curves: a point every few tenths of a cell.
+    if (!last || game.wave.x - last.x > 0.25) game.trail.push({ x: game.wave.x, y: game.wave.y });
+  } else if (game.wave.dir !== previousDir) game.trail.push({ x: game.previous.x, y: game.previous.y });
   const behind = game.wave.x - TRAIL_KEEP;
   let drop = 0;
   while (drop < game.trail.length - 2 && /** @type {Point} */ (game.trail[drop + 1]).x < behind) drop += 1;
@@ -142,7 +159,9 @@ function trackTrail(game, previousDir) {
 /** @param {Game} game */
 function crashed(game) {
   const w = game.wave;
-  return runHits(game.run, w.x, w.y, w.y, waveRadius(w.mini), w.dir, waveSlope(w.mini));
+  // The ship never grazes: only the wave flies exactly along 45° slopes.
+  if (w.ship) return runHits(game.run, w.x, w.y, w.y, hitRadius(w), 0, 0);
+  return runHits(game.run, w.x, w.y, w.y, hitRadius(w), w.dir, waveSlope(w.mini));
 }
 
 /**
@@ -152,7 +171,7 @@ function crashed(game) {
 function fly(game, holding, dt, events) {
   const before = game.wave;
   game.previous = { x: before.x, y: before.y };
-  game.wave = stepWave(before, holding, sectorAt(game.run, before.x).speed, dt);
+  game.wave = stepWave(before, holding, speedAt(game.run, before.x), dt);
   passPortals(game, before.x, game.wave.x, events);
   trackPlace(game, events);
   trackTrail(game, before.dir);
@@ -179,7 +198,7 @@ function fly(game, holding, dt, events) {
  */
 function restart(game) {
   if (game.mode === 'normal') {
-    game.run = buildRun(game.rng);
+    game.run = game.level === 'finale' ? buildFinale() : buildRun(game.rng);
     game.jumped = false;
     game.checkpoint = game.run.startX;
     placeWave(game, game.run.startX);

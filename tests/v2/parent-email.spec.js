@@ -122,6 +122,8 @@ test.describe('v1 on a desktop', () => {
     await openSignedIn(page, account, '#/settings/account');
     await page.getByLabel('Adres rodzica').fill('mama@poczta.pl');
     await page.getByRole('button', { name: 'Wyślij kod' }).click();
+    // The request is made asynchronously after the click: wait for it before reading it.
+    await expect.poll(() => sent.length).toBeGreaterThan(0);
     await page.getByLabel('Kod z e-maila').fill(sent[0].template_params.code);
     await page.getByRole('button', { name: 'Potwierdź' }).click();
     await expect(page.getByText('Potwierdzony adres: mama@poczta.pl')).toBeVisible();

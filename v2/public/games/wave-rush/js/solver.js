@@ -311,11 +311,15 @@ export function verifyPlan(spec, plan, n, gravity) {
 export function proveFrom(spec, y, gravity, tables) {
   let problem = 'no path';
   let n = 1;
-  for (const [band, strict] of /** @type {[number, boolean][]} */ ([[1, false], [1, true], [1.4, true]])) {
-    const key = `${band}${strict ? 's' : ''}`;
+  // Changes at least this far apart can never exceed the rate cap in any one second.
+  const rateSafe = Math.max(spec.limits.minInterval, 1 / Math.floor(spec.limits.maxRate) + 0.005);
+  /** @type {[number, boolean, number][]} */
+  const tries = [[1, false, spec.limits.minInterval], [1, true, spec.limits.minInterval], [1.4, true, spec.limits.minInterval], [1, false, rateSafe], [1, true, rateSafe]];
+  for (const [band, strict, interval] of tries) {
+    const key = `${band}${strict ? 's' : ''}@${interval}`;
     let table = tables.get(key);
     if (!table) {
-      table = buildTable({ ...spec, band, strict });
+      table = buildTable({ ...spec, band, strict, limits: { ...spec.limits, minInterval: interval } });
       tables.set(key, table);
     }
     n = table.n;

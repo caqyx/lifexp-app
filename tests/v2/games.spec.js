@@ -720,7 +720,51 @@ const waveState = (game) =>
     attempt: Number(el.dataset.debugAttempt),
     checkpoint: Number(el.dataset.debugCheckpoint),
     pilot: el.dataset.debugPilot === '1',
+    tier: el.dataset.debugTier,
+    gravity: Number(el.dataset.debugGravity),
+    mini: el.dataset.debugMini === '1',
+    ship: el.dataset.debugShip === '1',
+    level: el.dataset.debugLevel,
   }));
+
+/**
+ * Remembers, inside the frame, every gravity, size and vehicle the wave has had (the
+ * test polls the record; a moment between two polls is not missed).
+ */
+async function recordStates(frame) {
+  await frame.evaluate(() => {
+    const stage = document.getElementById('stage');
+    const seen = { flipped: false, mini: false, ship: false };
+    document.documentElement.dataset.seen = '';
+    setInterval(() => {
+      if (stage.dataset.debugGravity === '-1') seen.flipped = true;
+      if (stage.dataset.debugMini === '1') seen.mini = true;
+      if (stage.dataset.debugShip === '1') seen.ship = true;
+      document.documentElement.dataset.seen = Object.keys(seen).filter((k) => seen[k]).join(',');
+    }, 5);
+  });
+}
+
+/**
+ * Reopens the game's frame with exactly these test switches (not added to earlier ones:
+ * a query names each switch once).
+ */
+async function openWaveWith(page, host, query) {
+  await host.locator('iframe').evaluate((frame, q) => {
+    frame.src = `${frame.src.split('?')[0]}?lang=pl&${q}`;
+  }, query);
+  await expect.poll(() => page.frames().some((f) => f.url().endsWith(`?lang=pl&${query}`))).toBe(true);
+  return page.frames().find((f) => f.url().endsWith(`?lang=pl&${query}`));
+}
+
+/** Starts a level from the menu and taps to fly. */
+async function flyFrom(game, button) {
+  await game.getByRole('button', { name: button, exact: true }).click();
+  const stage = game.locator('#stage');
+  await expect(stage).toHaveAttribute('data-state', 'ready');
+  await stage.click();
+  await expect(stage).toHaveAttribute('data-state', 'playing');
+}
 
 test.describe('Wave Rush', () => {
   test.describe('on a touch phone held upright', () => {
@@ -759,7 +803,7 @@ test.describe('Wave Rush', () => {
       // A run from the start: the solver's path for the seed (?autopilot=2, test only) flies
       // sections 1 and 2 and lets go at the start of section 3.
       await reopenFrameWith(page, host, 'seed=7&autopilot=2');
-      await game.getByRole('button', { name: 'Graj' }).tap();
+      await game.getByRole('button', { name: 'Graj', exact: true }).tap();
       await expect(stage).toHaveAttribute('data-state', 'ready');
       await stage.tap();
       await expect(stage).toHaveAttribute('data-state', 'playing');
@@ -799,7 +843,7 @@ test.describe('Wave Rush', () => {
 
     // Normal mode, jumped (test only) into sector 2: a crash still starts again at sector 1.
     await reopenFrameWith(page, host, 'seed=11&sector=2&section=3');
-    await game.getByRole('button', { name: 'Graj' }).click();
+    await game.getByRole('button', { name: 'Graj', exact: true }).click();
     await host.locator('iframe').focus();
     await page.keyboard.down('Space');
     await page.keyboard.up('Space');
@@ -817,7 +861,7 @@ test.describe('Wave Rush', () => {
     // Praktyka from sector 2, section 3: the pilot flies that section, lets go in section 4,
     // the wave crashes, and a tap brings it back at sector 2's start.
     await reopenFrameWith(page, host, 'seed=12&sector=2&section=3&autopilot=1');
-    await game.getByRole('button', { name: 'Praktyka' }).click();
+    await game.getByRole('button', { name: 'Praktyka', exact: true }).click();
     await stage.click();
     await expect(stage).toHaveAttribute('data-state', 'playing');
     await expect(game.locator('.hud__practice')).toBeVisible();
@@ -838,5 +882,91 @@ test.describe('Wave Rush', () => {
     // Practice keeps no record.
     expect(await page.evaluate(() => localStorage.getItem('lifexp-waverush-best'))).toBe(kept);
     expect(problems).toEqual([]);
+  });
+});
+
+// ── Wave Rush w-2: sectors 4–6, the Demon, the achievement and the finale ──
+
+test.describe('Wave Rush w-2', () => {
+  test('sideways 800×360: the Demon tiers by test jump, a gravity flip and a mini stretch, and the finale’s ship flown by the pilot', async ({ page, account }) => {
+    test.setTimeout(150000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Wave Rush');
+    const stage = game.locator('#stage');
+
+    // Each Demon tier starts at its own speed and look, named in the HUD.
+    for (const [section, tier, name] of [[1, 'easyDemon', 'Easy Demon'], [11, 'hardDemon', 'Hard Demon'], [16, 'insaneDemon', 'Insane Demon'], [26, 'extremeDemon', 'Extreme Demon']]) {
+      await openWaveWith(page, host, `seed=8&sector=6&section=${section}&autopilot=1`);
+      await flyFrom(game, 'Graj');
+      await expect.poll(async () => (await waveState(game)).section).toBe(section);
+      expect(await waveState(game)).toMatchObject({ sector: 6, tier });
+      await expect(game.locator('#hud-sector')).toContainText(`Sektor 6: ${name}`);
+    }
+
+    // Sector 4 flown by the solver's path: a gravity flip and the mini stretch on the way.
+    const frame = await openWaveWith(page, host, 'seed=12&sector=4&section=1&autopilot=10');
+    await recordStates(frame);
+    await flyFrom(game, 'Graj');
+    await expect.poll(() => game.locator('html').getAttribute('data-seen'), { timeout: 60000 }).toMatch(/^(?=.*flipped)(?=.*mini)/);
+    expect((await waveState(game)).sector).toBe(4);
+
+    // The finale (unlocked here directly): its first ship stretch, flown by the pilot.
+    await page.evaluate(() => localStorage.setItem('lifexp-waverush-progress', JSON.stringify({ demonComplete: true })));
+    const finale = await openWaveWith(page, host, 'seed=1&finale=2&autopilot=2');
+    await recordStates(finale);
+    await expect(game.getByRole('button', { name: 'Zagraj finał' })).toBeEnabled();
+    await flyFrom(game, 'Zagraj finał');
+    expect(await waveState(game)).toMatchObject({ level: 'finale' });
+    await expect.poll(async () => (await waveState(game)).section, { timeout: 30000 }).toBeGreaterThanOrEqual(3);
+    expect(await game.locator('html').getAttribute('data-seen')).toContain('ship');
+    await expect(game.locator('#hud-sector')).toContainText('Ostatnia Fala');
+    // Hands off: the crash starts the finale again from its first stretch.
+    await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 15000 });
+    await page.waitForTimeout(600);
+    await stage.click();
+    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    expect(await waveState(game)).toMatchObject({ level: 'finale', section: 1 });
+    expect(problems).toEqual([]);
+  });
+
+  test.describe('on a touch phone held upright', () => {
+    test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+
+    test('finishing the Demon: the achievement, the last skin and the finale unlock', async ({ page, account }) => {
+      test.setTimeout(90000);
+      const problems = await watchProblems(page);
+      const { host, game } = await playFromList(page, account, 'Wave Rush');
+      // Locked before: the last skin and the finale.
+      await expect(game.getByRole('button', { name: 'Zagraj finał' })).toBeDisabled();
+      await expect(game.getByText('Finał odblokujesz, kończąc cały sektor Demon.')).toBeVisible();
+
+      // The last Demon section, flown by the solver's path (test jump: counts only with ?seed).
+      await openWaveWith(page, host, 'seed=8&sector=6&section=30&autopilot=3');
+      await game.getByRole('button', { name: 'Graj', exact: true }).tap();
+      await game.locator('#stage').tap();
+      const achievement = game.getByRole('region', { name: 'Pogromca Demona' });
+      await expect(achievement).toBeVisible({ timeout: 30000 });
+      await expect(achievement).toContainText('Osiągnięcie odblokowane');
+      await expect(achievement).toContainText('Nowa skórka: Korona Demona');
+      await expect(achievement).toContainText('Odblokowany poziom finałowy: Ostatnia Fala');
+      expect(JSON.parse(await page.evaluate(() => localStorage.getItem('lifexp-waverush-progress')))).toMatchObject({ demonComplete: true });
+      await achievement.getByRole('button', { name: 'Dalej' }).tap();
+      const finished = game.getByRole('region', { name: 'Trasa ukończona!' });
+      await expect(finished).toBeVisible();
+      await finished.getByRole('button', { name: 'Menu' }).tap();
+
+      // Unlocked now: the finale, and the last skin can be worn.
+      await expect(game.getByRole('button', { name: 'Zagraj finał' })).toBeEnabled();
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      const crown = game.locator('#skin-list').getByRole('button', { name: /Korona Demona/ });
+      await expect(crown).toBeEnabled();
+      await crown.tap();
+      await expect(crown).toHaveAttribute('aria-pressed', 'true');
+      await page.reload();
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      await expect(game.locator('#skin-list').getByRole('button', { name: /Korona Demona/ })).toHaveAttribute('aria-pressed', 'true');
+      expect(problems).toEqual([]);
+    });
   });
 });

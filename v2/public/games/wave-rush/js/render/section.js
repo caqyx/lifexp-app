@@ -162,6 +162,7 @@ function paintEmblems(ctx, g, th, m) {
         ctx.arc(cx, cy, r * 0.62, 0, Math.PI * 2);
         ctx.fill();
       } else if (th.emblem === 'diamond') paintDiamond(ctx, cx, cy, r, th.block.detail);
+      else if (th.emblem === 'eye') paintEye(ctx, cx, cy, r * 1.4, th.block.detail, th.block.glow);
       else paintStar(ctx, cx, cy, r * 1.1, th.block.detail);
     }
   }
@@ -224,17 +225,90 @@ function paintTerrain(ctx, g, th, m) {
   paintSurfaceDetail(ctx, g, th, m);
   paintEmblems(ctx, g, th, m);
   for (const d of g.deco) if (d.type === 'sawtooth') paintSawtooth(ctx, g, th, m, d);
+  if (th.fx?.chevrons) paintChevrons(ctx, g, th, m);
+  if (th.fx?.teeth) {
+    paintSawtooth(ctx, g, th, m, { from: 0, to: g.length, on: 'ceil' });
+    paintSawtooth(ctx, g, th, m, { from: 0, to: g.length, on: 'floor' });
+  }
+  if (th.fx?.ground) paintGroundGlow(ctx, g, th.fx.ground, m);
   ctx.restore();
-  paintOutline(ctx, [g.ceil, g.floor], th.block, m);
+  paintOutline(ctx, [g.ceil, g.floor], th.block, m, th.fx?.glow ?? 0);
 }
 
 /**
- * A bright outline over a soft, restrained glow.
- * @param {CanvasRenderingContext2D} ctx @param {Pt[][]} lines @param {{ edge: string, glow: string }} colors @param {Map} m
+ * Arrow (chevron) patterns inside the walls, pointing the way the level flows, in bands
+ * that follow each wall's surface.
+ * @param {CanvasRenderingContext2D} ctx @param {Geometry} g @param {Theme} th @param {Map} m
  */
-function paintOutline(ctx, lines, colors, m) {
+function paintChevrons(ctx, g, th, m) {
+  ctx.strokeStyle = th.block.detail;
+  ctx.lineWidth = Math.max(1, m.c * 0.09);
+  ctx.lineJoin = 'miter';
+  ctx.beginPath();
+  for (const [pts, side, into] of /** @type {[Pt[], 'ceil' | 'floor', number][]} */ ([[g.ceil, 'ceil', -1], [g.floor, 'floor', 1]])) {
+    for (let x = 0.5; x < g.length; x += 1) {
+      for (const depth of [1.1, 2.1]) {
+        const y = profileY(pts, x, side) + into * depth;
+        const h = 0.22;
+        ctx.moveTo(m.X(x - 0.12), m.Y(y - h));
+        ctx.lineTo(m.X(x + 0.12), m.Y(y));
+        ctx.lineTo(m.X(x - 0.12), m.Y(y + h));
+      }
+    }
+  }
+  ctx.globalAlpha = 0.55;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+}
+
+/**
+ * A glowing ground: light pooled along the floor's surface, with faint ripples below it
+ * (water or ice).
+ * @param {CanvasRenderingContext2D} ctx @param {Geometry} g @param {string} color @param {Map} m
+ */
+function paintGroundGlow(ctx, g, color, m) {
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = color;
+  ctx.lineJoin = 'round';
+  for (const [w, a] of [[1.6, 0.25], [0.7, 0.45]]) {
+    ctx.globalAlpha = /** @type {number} */ (a);
+    ctx.lineWidth = m.c * /** @type {number} */ (w);
+    linePath(ctx, g.floor, m);
+    ctx.stroke();
+  }
+  ctx.lineWidth = Math.max(1, m.c * 0.06);
+  for (const [dy, a] of [[0.75, 0.5], [1.25, 0.3], [1.9, 0.18]]) {
+    ctx.globalAlpha = /** @type {number} */ (a);
+    linePath(ctx, g.floor, m, /** @type {number} */ (dy));
+    ctx.setLineDash([m.c * 0.9, m.c * 0.5]);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * A bright outline over a soft glow: restrained in sectors 1–3, stronger (`glow`) later.
+ * @param {CanvasRenderingContext2D} ctx @param {Pt[][]} lines @param {{ edge: string, glow: string }} colors @param {Map} m
+ * @param {number} [glow]
+ */
+function paintOutline(ctx, lines, colors, m, glow = 0) {
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
+  if (glow > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = colors.glow;
+    for (const [w, a] of [[1.1, 0.35], [0.6, 0.6]]) {
+      ctx.globalAlpha = Math.min(1, /** @type {number} */ (a) * glow);
+      ctx.lineWidth = m.c * /** @type {number} */ (w);
+      for (const pts of lines) {
+        linePath(ctx, pts, m);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
   ctx.strokeStyle = colors.glow;
   ctx.lineWidth = m.c * 0.34;
   for (const pts of lines) {
@@ -242,7 +316,7 @@ function paintOutline(ctx, lines, colors, m) {
     ctx.stroke();
   }
   ctx.strokeStyle = colors.edge;
-  ctx.lineWidth = Math.max(1.5, m.c * 0.085);
+  ctx.lineWidth = Math.max(1.5, m.c * (glow > 0 ? 0.1 : 0.085));
   for (const pts of lines) {
     linePath(ctx, pts, m);
     ctx.stroke();
@@ -279,7 +353,7 @@ function paintBlock(ctx, h, th, m) {
   }
   ctx.restore();
   const rect = /** @type {Pt[]} */ ([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]);
-  paintOutline(ctx, [rect], th.block, m);
+  paintOutline(ctx, [rect], th.block, m, th.fx?.glow ?? 0);
   if (h.type === 'pillar') {
     // Capital and base: slabs a little wider than the shaft.
     ctx.fillStyle = th.block.rim;
@@ -301,6 +375,13 @@ function paintSpike(ctx, h, th, m) {
   tri.lineTo(m.X(tip[0]), m.Y(tip[1]));
   tri.lineTo(m.X(b[0]), m.Y(b[1]));
   tri.closePath();
+  if (th.fx?.hazardGlow) {
+    // A pale halo: hazards read first among glowing walls and deco.
+    ctx.strokeStyle = th.fx.hazardGlow;
+    ctx.lineWidth = m.c * 0.4;
+    ctx.lineJoin = 'round';
+    ctx.stroke(tri);
+  }
   ctx.fillStyle = th.hazard.fill;
   ctx.fill(tri);
   // Inner facet: a smaller triangle toward the base.
@@ -339,6 +420,24 @@ export function paintStar(ctx, x, y, r, color) {
   ctx.beginPath();
   ctx.arc(x, y, r * 0.18, 0, Math.PI * 2);
   ctx.fill();
+}
+
+/**
+ * The "eye": a four-point star with a glowing core and a ring.
+ * @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} r px @param {string} color @param {string} glow
+ */
+export function paintEye(ctx, x, y, r, color, glow) {
+  const halo = ctx.createRadialGradient(x, y, 0, x, y, r * 1.3);
+  halo.addColorStop(0, glow);
+  halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(x - r * 1.3, y - r * 1.3, r * 2.6, r * 2.6);
+  paintStar(ctx, x, y, r, color);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, r * 0.08);
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.42, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 /** @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} r px @param {string} color */
@@ -417,6 +516,12 @@ function paintGear(ctx, th, m, d) {
 
 /** @param {CanvasRenderingContext2D} ctx @param {Geometry} g @param {Theme} th @param {Map} m */
 function paintDeco(ctx, g, th, m) {
+  // Spike orbs that hang on chains: the chain is deco, the orb (drawn per frame) the hazard.
+  for (const h of g.hazards) {
+    if (h.shape !== 'circle' || !h.chain) continue;
+    const top = profileY(g.ceil, h.x, 'ceil');
+    paintChain(ctx, g, th, m, { x: h.x, len: Math.max(0, h.y - h.r - top - 0.1), ornament: 'none' });
+  }
   for (const d of g.deco) {
     if (d.type === 'chain') paintChain(ctx, g, th, m, d);
     else if (d.type === 'gear') paintGear(ctx, th, m, d);
