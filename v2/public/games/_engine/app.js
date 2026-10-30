@@ -431,7 +431,7 @@ export function runApp(def) {
     dom.achievementTitle.textContent = t(finale ? 'achFinale' : 'achDemon');
     dom.achievementBody.textContent = t(finale ? 'achFinaleBody' : 'achDemonBody');
     dom.achievementUnlocks.replaceChildren(
-      ...(finale ? [] : /** @type {const} */ (['unlockSkin', 'unlockFinale'])).map((key) => {
+      ...(finale ? [] : def.finale ? ['unlockSkin', 'unlockFinale'] : ['unlockSkin']).map((key) => {
         const item = document.createElement('li');
         item.className = 'unlocks__item';
         item.textContent = t(key);

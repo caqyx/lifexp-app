@@ -112,6 +112,29 @@ export const SECTORS = [
     groups: [range(1, 5), range(6, 10)],
     portals: [{ kind: 'gravity', count: 2, span: 1 }, { kind: 'mini', count: 1 }],
   },
+  {
+    id: 6,
+    key: 'demon',
+    tier: 'easyDemon',
+    theme: 'nebulaBlue',
+    groups: [range(1, 10), range(11, 15), range(16, 25), range(26, 30)],
+    bands: [
+      { from: 1, to: 10, tier: 'easyDemon', theme: 'nebulaBlue', key: 'easyDemon' },
+      { from: 11, to: 15, tier: 'hardDemon', theme: 'nebulaViolet', key: 'hardDemon' },
+      { from: 16, to: 25, tier: 'insaneDemon', theme: 'nebulaCrimson', key: 'insaneDemon' },
+      { from: 26, to: 30, tier: 'extremeDemon', theme: 'nebulaExtreme', key: 'extremeDemon' },
+    ],
+    // Easy: one flip for two sections; Hard: the mini stretch; Insane: two flips and the
+    // mini stretch; Extreme: one flip and the mini stretch (as Wave Rush's Demon).
+    portals: [
+      { kind: 'gravity', count: 1, span: 2, band: 0 },
+      { kind: 'mini', count: 1, band: 1 },
+      { kind: 'gravity', count: 2, span: 1, band: 2 },
+      { kind: 'mini', count: 1, band: 2 },
+      { kind: 'gravity', count: 1, span: 1, band: 3 },
+      { kind: 'mini', count: 1, band: 3 },
+    ],
+  },
 ];
 
 /** @param {string} key @returns {Tier} */

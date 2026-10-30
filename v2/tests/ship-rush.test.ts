@@ -63,9 +63,9 @@ const half = SHIP.normal.half;
 // ── The run ──────────────────────────────────────────────────────────────────
 
 describe('the run', () => {
-  test('Wave Rush’s structure: sectors of 10, 15, 15, 10 and 10 sections in its shuffle groups', () => {
-    const counts: Record<number, number> = { 1: 10, 2: 15, 3: 15, 4: 10, 5: 10 };
-    expect(SECTORS.map((s) => s.id)).toEqual([1, 2, 3, 4, 5]);
+  test('Wave Rush’s structure: sectors of 10, 15, 15, 10, 10 and 30 sections in its shuffle groups', () => {
+    const counts: Record<number, number> = { 1: 10, 2: 15, 3: 15, 4: 10, 5: 10, 6: 30 };
+    expect(SECTORS.map((s) => s.id)).toEqual([1, 2, 3, 4, 5, 6]);
     for (const s of SECTORS) expect(SECTION_LIBRARY[s.id]?.length, `sector ${s.id}`).toBe(counts[s.id]);
     expect(sector(1).groups).toEqual([range(1, 10)]);
     expect(sector(2).groups).toEqual([range(1, 5), range(6, 15)]);
@@ -76,15 +76,19 @@ describe('the run', () => {
     expect(sector(5).groups).toEqual([range(1, 5), range(6, 10)]);
     expect(sector(5).portals).toEqual([{ kind: 'gravity', count: 2, span: 1 }, { kind: 'mini', count: 1 }]);
     // One mini section in each of sectors 4 and 5, none before.
-    expect(SECTORS.map((s) => SECTION_LIBRARY[s.id]!.filter((d) => d.mini).length)).toEqual([0, 0, 0, 1, 1]);
+    expect(sector(6).groups).toEqual([range(1, 10), range(11, 15), range(16, 25), range(26, 30)]);
+    // One mini section in each of sectors 4 and 5 and in the Demon's Hard, Insane and Extreme tiers.
+    expect(SECTORS.map((s) => SECTION_LIBRARY[s.id]!.filter((d) => d.mini).length)).toEqual([0, 0, 0, 1, 1, 3]);
+    expect(SECTION_LIBRARY[6]!.flatMap((d, i) => (d.mini ? [i + 1] : []))).toEqual([15, 25, 30]);
     const ids = Object.values(SECTION_LIBRARY).flat().map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
     // Every section is flown as the ship.
     for (const data of Object.values(SECTION_LIBRARY).flat()) expect(data.mode ?? 'ship').toBe('ship');
   });
 
-  test('speeds: 0.8, 0.85, 1.0, 1.1 and 1.25 for sectors 1–5 (not slow, owner); tiers ramp up and stay humanly possible', () => {
-    expect(SECTORS.map((s) => tierOf(s.tier).speed)).toEqual([0.8, 0.85, 1.0, 1.1, 1.25]);
+  test('speeds: 0.8, 0.85, 1.0, 1.1, 1.25 for sectors 1–5 and 1.25–1.7 in the Demon (sectors 1–2 not slow, owner); tiers ramp up and stay humanly possible', () => {
+    expect(SECTORS.map((s) => tierOf(s.tier).speed)).toEqual([0.8, 0.85, 1.0, 1.1, 1.25, 1.25]);
+    expect(sector(6).bands!.map((b) => tierOf(b.tier).speed)).toEqual([1.25, 1.4, 1.55, 1.7]);
     expect(tierSpeed('hard')).toBeCloseTo(BASE_SPEED);
     const order = ['easy', 'normal', 'hard', 'harder', 'insane', 'easyDemon', 'hardDemon', 'insaneDemon', 'extremeDemon'];
     const tiers = order.map((k) => TIERS[k]!);
@@ -105,8 +109,8 @@ describe('the run', () => {
     expect(checkShipSection(slope, 1).join()).toContain('slope');
   });
 
-  test('further sectors are harder: narrower openings and more obstacles per cell', () => {
-    const stats = SECTORS.map((s) => {
+  test('further sectors are harder: narrower openings and more obstacles per cell; the Demon’s Extreme has the tightest spots', () => {
+    const stats = SECTORS.filter((s) => s.id <= 5).map((s) => {
       const list = SECTION_LIBRARY[s.id]!;
       const cells = list.reduce((n, d) => n + d.length, 0);
       // Obstacles: hazards and solids, and every step of the floor or the ceiling (a wall).
@@ -120,6 +124,15 @@ describe('the run', () => {
     expect(stats[1]!.mean).toBeLessThan(stats[0]!.mean);
     expect(stats[2]!.mean).toBeLessThan(stats[1]!.mean);
     expect(stats[2]!.least).toBeLessThan(stats[0]!.least);
+    for (let i = 3; i < stats.length; i++) {
+      expect(stats[i]!.density).toBeGreaterThan(stats[i - 1]!.density);
+      expect(stats[i]!.mean).toBeLessThan(stats[i - 1]!.mean);
+    }
+    // The Demon's difficulty is mostly speed and tighter limits (its tiers); its Extreme
+    // still holds the tightest spots of the run.
+    const least = (list: SectionData[]) => Math.min(...list.map(narrowestGap));
+    const demon = SECTION_LIBRARY[6]!;
+    expect(least(demon.slice(25))).toBeLessThanOrEqual(Math.min(...SECTORS.filter((s) => s.id <= 5).map((s) => least(SECTION_LIBRARY[s.id]!))));
   });
 
   test('each group is shuffled within itself; the same seed builds the same run', () => {
@@ -176,6 +189,31 @@ describe('the run', () => {
         expect(stateAt(run, (piece.x0 + piece.x1) / 2).mini).toBe(true);
         expect(stateAt(run, piece.x1 + 0.1).mini).toBe(false);
       }
+    }
+  });
+
+  test('the Demon: tiers in order, each shuffled within itself, at its own speed and look, with its own portals and checkpoints', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const run = buildRun(createRng(seed));
+      const placed = run.sectors[5]!;
+      const bands = sector(6).bands!;
+      const pieces = run.pieces.slice(placed.first, placed.first + placed.count);
+      bands.forEach((band, b) => {
+        const mine = pieces.filter((p) => p.band === b);
+        expect(sorted(mine.map((p) => p.number))).toEqual(range(band.from, band.to));
+        for (const p of mine) expect(p).toMatchObject({ tier: band.tier, theme: band.theme, speed: tierSpeed(band.tier) });
+        // Practice in the Demon goes back to the tier's start.
+        expect(checkpointX(run, mine[mine.length - 1]!.x0 + 1, 'sector')).toBe(mine[0]!.x0);
+      });
+      expect(pieces.map((p) => p.band)).toEqual([...pieces.map((p) => p.band)].sort((a, b) => a - b));
+      const portals = run.portals.filter((p) => p.sector === 5);
+      const inBand = (b: number, kind: string) => portals.filter((p) => p.kind === kind && pieceAt(run, p.x).band === b);
+      expect([0, 1, 2, 3].map((b) => inBand(b, 'gravity').length)).toEqual([2, 0, 4, 2]);
+      expect([0, 1, 2, 3].map((b) => inBand(b, 'mini').length)).toEqual([0, 2, 2, 2]);
+      const easy = inBand(0, 'gravity');
+      expect(pieceAt(run, easy[1]!.x).place - pieceAt(run, easy[0]!.x).place).toBe(2);
+      for (const p of portals.filter((q) => q.kind === 'mini')) expect(pieceAt(run, p.x).g.mini).toBe(true);
+      expect(stateAt(run, placed.x1 - 0.1)).toMatchObject({ gravity: 1, mini: false });
     }
   });
 
@@ -521,8 +559,8 @@ describe('records and skins', () => {
   });
 
   test('every sector has its own look; detail grows from sector to sector', () => {
-    const looks = SECTORS.map((s) => THEMES[s.theme]!);
-    expect(new Set(looks.map((t) => t.id)).size).toBe(SECTORS.length);
+    const looks = [...SECTORS.map((s) => THEMES[s.theme]!), ...sector(6).bands!.slice(1).map((b) => THEMES[b.theme]!)];
+    expect(new Set(looks.map((t) => t.id)).size).toBe(looks.length);
     const detail = (t: (typeof looks)[number]) => {
       const sp = t.space;
       const space = sp ? sp.stars / 100 + sp.galaxies + sp.satellites + (sp.planet ? 1 : 0) + (sp.earth ? 1 : 0) + sp.structures + sp.asteroids + (sp.rays ? 1 : 0) : 0;

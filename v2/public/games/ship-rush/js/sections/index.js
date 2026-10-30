@@ -7,6 +7,7 @@ import { SECTOR2 } from './sector2.js';
 import { SECTOR3 } from './sector3.js';
 import { SECTOR4 } from './sector4.js';
 import { SECTOR5 } from './sector5.js';
+import { SECTOR6 } from './sector6.js';
 
 /** @type {Record<number, import('../../../_engine/geometry.js').SectionData[]>} */
-export const SECTION_LIBRARY = { 1: SECTOR1, 2: SECTOR2, 3: SECTOR3, 4: SECTOR4, 5: SECTOR5 };
+export const SECTION_LIBRARY = { 1: SECTOR1, 2: SECTOR2, 3: SECTOR3, 4: SECTOR4, 5: SECTOR5, 6: SECTOR6 };

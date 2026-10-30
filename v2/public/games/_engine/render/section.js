@@ -577,6 +577,8 @@ function paintChain(ctx, g, th, m, d) {
   const end = top + d.len + 0.32;
   if (d.ornament === 'diamond') paintDiamond(ctx, m.X(d.x), m.Y(end), c * 0.32, th.deco);
   else if (d.ornament === 'star') paintStar(ctx, m.X(d.x), m.Y(end), c * 0.36, th.deco);
+  else if (d.ornament === 'eye') paintEye(ctx, m.X(d.x), m.Y(end), c * 0.36, th.deco, th.block.glow);
+  else if (d.ornament === 'debris') paintDebris(ctx, m.X(d.x), m.Y(end + 0.1), c * 0.4, th, d.x);
   else if (d.ornament === 'triangle') {
     ctx.fillStyle = th.deco;
     ctx.beginPath();
@@ -586,6 +588,86 @@ function paintChain(ctx, g, th, m, d) {
     ctx.closePath();
     ctx.fill();
   }
+}
+
+/**
+ * A piece of chained debris: a torn plate with a rivet, hanging from its chain.
+ * @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} r px @param {Theme} th @param {number} seed
+ */
+function paintDebris(ctx, x, y, r, th, seed) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(Math.sin(seed * 12.9898) * 0.5);
+  ctx.beginPath();
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const rr = r * (0.7 + 0.3 * Math.abs(Math.sin(seed * 7.1 + i * 2.3)));
+    ctx.lineTo(Math.cos(a) * rr * 1.2, Math.sin(a) * rr * 0.8);
+  }
+  ctx.closePath();
+  ctx.fillStyle = th.block.bottom;
+  ctx.fill();
+  ctx.strokeStyle = th.deco;
+  ctx.lineWidth = Math.max(1, r * 0.12);
+  ctx.stroke();
+  ctx.fillStyle = th.deco;
+  ctx.beginPath();
+  ctx.arc(0, -r * 0.35, r * 0.12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * A glowing outlined truss far behind the corridor (dim).
+ * @param {CanvasRenderingContext2D} ctx @param {Theme} th @param {Map} m @param {{ x: number, y: number, w: number, h: number }} d
+ */
+function paintFrame(ctx, th, m, d) {
+  ctx.save();
+  ctx.globalAlpha = 0.32;
+  ctx.strokeStyle = th.block.glow;
+  ctx.lineWidth = Math.max(1, m.c * 0.08);
+  ctx.beginPath();
+  ctx.rect(m.X(d.x), m.Y(d.y), d.w * m.c, d.h * m.c);
+  const step = Math.min(d.w, d.h);
+  for (let u = 0; u + step <= Math.max(d.w, d.h) + 1e-9; u += step) {
+    if (d.w >= d.h) {
+      ctx.moveTo(m.X(d.x + u), m.Y(d.y));
+      ctx.lineTo(m.X(d.x + u + step), m.Y(d.y + d.h));
+    } else {
+      ctx.moveTo(m.X(d.x), m.Y(d.y + u));
+      ctx.lineTo(m.X(d.x + d.w), m.Y(d.y + u + step));
+    }
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * A wreck's outline far behind: a broken hull with ribs and a torn end (dim).
+ * @param {CanvasRenderingContext2D} ctx @param {Theme} th @param {Map} m @param {{ x: number, y: number, size: number }} d
+ */
+function paintWreck(ctx, th, m, d) {
+  const s = d.size * m.c;
+  const x = m.X(d.x);
+  const y = m.Y(d.y);
+  ctx.save();
+  ctx.globalAlpha = 0.3;
+  ctx.strokeStyle = th.block.glow;
+  ctx.lineWidth = Math.max(1, m.c * 0.08);
+  ctx.beginPath();
+  ctx.moveTo(x - s, y);
+  ctx.quadraticCurveTo(x - s * 0.4, y - s * 0.55, x + s * 0.5, y - s * 0.4);
+  ctx.lineTo(x + s * 0.65, y - s * 0.15);
+  ctx.lineTo(x + s * 0.45, y + s * 0.05);
+  ctx.lineTo(x + s * 0.7, y + s * 0.3);
+  ctx.quadraticCurveTo(x - s * 0.2, y + s * 0.45, x - s, y);
+  for (let k = -2; k <= 1; k++) {
+    ctx.moveTo(x + k * s * 0.28, y - s * 0.42);
+    ctx.lineTo(x + k * s * 0.28 + s * 0.05, y + s * 0.38);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 /** A faint gear in the background of the corridor. @param {CanvasRenderingContext2D} ctx @param {Theme} th @param {Map} m @param {{ x: number, y: number, size: number }} d */
@@ -622,6 +704,15 @@ function paintDeco(ctx, g, th, m) {
     else if (d.type === 'gear') paintGear(ctx, th, m, d);
     else if (d.type === 'star') paintStar(ctx, m.X(d.x), m.Y(d.y), d.size * m.c * 0.6, th.deco);
     else if (d.type === 'diamond') paintDiamond(ctx, m.X(d.x), m.Y(d.y), d.size * m.c * 0.6, th.deco);
+    else if (d.type === 'eye') {
+      // Far behind: faint.
+      ctx.save();
+      ctx.globalAlpha = 0.45;
+      paintEye(ctx, m.X(d.x), m.Y(d.y), d.size * m.c * 0.6, th.deco, th.block.glow);
+      ctx.restore();
+    }
+    else if (d.type === 'frame') paintFrame(ctx, th, m, d);
+    else if (d.type === 'wreck') paintWreck(ctx, th, m, d);
   }
 }
 

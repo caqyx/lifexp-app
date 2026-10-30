@@ -1097,4 +1097,56 @@ test.describe('Ship Rush s-2', () => {
     }
     expect(problems).toEqual([]);
   });
+
+  test('sideways 800×360: the Demon tiers by test jump, each at its own speed and look, named in the HUD', async ({ page, account }) => {
+    test.setTimeout(120000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Ship Rush');
+    for (const [section, tier, name] of [[1, 'easyDemon', 'Easy Demon'], [11, 'hardDemon', 'Hard Demon'], [16, 'insaneDemon', 'Insane Demon'], [26, 'extremeDemon', 'Extreme Demon']]) {
+      await openWaveWith(page, host, `seed=8&sector=6&section=${section}&autopilot=1`);
+      await flyFrom(game, 'Graj');
+      await expect.poll(async () => (await waveState(game)).section).toBe(section);
+      expect(await waveState(game)).toMatchObject({ sector: 6, tier, ship: true });
+      await expect(game.locator('#hud-sector')).toContainText(`Sektor 6: ${name}`);
+    }
+    expect(problems).toEqual([]);
+  });
+
+  test.describe('on a touch phone held upright', () => {
+    test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+
+    test('finishing the Demon: the achievement and the last hull unlock', async ({ page, account }) => {
+      test.setTimeout(90000);
+      const problems = await watchProblems(page);
+      const { host, game } = await playFromList(page, account, 'Ship Rush');
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      await expect(game.locator('#skin-list').getByRole('button', { name: /Korona Pustki/ })).toBeDisabled();
+      await game.getByRole('button', { name: 'Gotowe' }).tap();
+
+      // The last Demon section, flown by the validator's path (test jump: counts only with ?seed).
+      await openWaveWith(page, host, 'seed=8&sector=6&section=30&autopilot=3');
+      await game.getByRole('button', { name: 'Graj', exact: true }).tap();
+      await game.locator('#stage').tap();
+      const achievement = game.getByRole('region', { name: 'Pogromca Demona' });
+      await expect(achievement).toBeVisible({ timeout: 40000 });
+      await expect(achievement).toContainText('Osiągnięcie odblokowane');
+      await expect(achievement).toContainText('Nowa skórka: Korona Pustki');
+      expect(JSON.parse(await page.evaluate(() => localStorage.getItem('lifexp-shiprush-progress')))).toMatchObject({ demonComplete: true });
+      await achievement.getByRole('button', { name: 'Dalej' }).tap();
+      const finished = game.getByRole('region', { name: 'Trasa ukończona!' });
+      await expect(finished).toBeVisible();
+      await finished.getByRole('button', { name: 'Menu' }).tap();
+
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      const crown = game.locator('#skin-list').getByRole('button', { name: /Korona Pustki/ });
+      await expect(crown).toBeEnabled();
+      await crown.tap();
+      await expect(crown).toHaveAttribute('aria-pressed', 'true');
+      await page.reload();
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      await expect(game.locator('#skin-list').getByRole('button', { name: /Korona Pustki/ })).toHaveAttribute('aria-pressed', 'true');
+      expect(problems).toEqual([]);
+    });
+  });
 });
