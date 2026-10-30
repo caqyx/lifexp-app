@@ -22,7 +22,7 @@
     "types": ["vite/client", "node"],
     "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src", "tests", "tools", "public/games/flappy/js", "public/games/quick-math/js", "public/games/wave-rush/js", "public/games/_engine", "public/games/ship-rush/js", "vite.config.ts"],
+  "include": ["src", "tests", "tools", "public/games/flappy/js", "public/games/quick-math/js", "public/games/wave-rush/js", "public/games/_engine", "public/games/ship-rush/js", "public/games/flip-rush/js", "vite.config.ts"],
   // The Service Worker has its own globals (WebWorker lib): tsconfig.sw.json.
   "exclude": ["src/sw.ts"]
 }

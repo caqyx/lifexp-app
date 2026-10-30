@@ -22,10 +22,17 @@ import { STEP } from './world.js';
  * @typedef {{
  *   x0: number, x1: number, speed: number, limits: Limits, start: Vehicle,
  *   step: (v: Vehicle, holding: boolean, dt: number) => Vehicle | null,
- *   safe: (v: Vehicle, band: number) => boolean, band?: number,
+ *   safe: (v: Vehicle, band: number) => boolean, band?: number, tag?: (v: Vehicle) => string, fewest?: boolean, released?: boolean,
+ *   allow?: (v: Vehicle, holding: boolean) => boolean,
  * }} BeamSpec
- * @typedef {{ v: Vehicle, hold: number, cool: number, parent: number }} Node
- *   hold: 1 held, -1 released, for the decision that led here.
+ *   tag: what else tells two states apart besides height, speed and input (Flip Rush:
+ *   gravity, contact and a waiting press), so the beam never merges them; fewest: of two
+ *   alike states keep the one with fewer input changes so far (tapping vehicles: a path of
+ *   few, deliberate taps), else the freer one; released: the input starts released (a
+ *   tapping vehicle's changes then pair up as press and release); allow: which inputs the
+ *   search may try from a state (a human's habits; the replays fly any input).
+ * @typedef {{ v: Vehicle, hold: number, cool: number, parent: number, changes: number }} Node
+ *   hold: 1 held, -1 released, for the decision that led here; changes: input changes so far.
  */
 
 /** Physics steps per decision (1/60 s). */
@@ -47,6 +54,7 @@ export const GRAIN = { bucket: 0.25, per: 3, spread: 0.8 };
 function fly(spec, x, node, hold, band) {
   /** @type {Vehicle | null} */
   let v = { ...node.v, x };
+  if (spec.allow && !spec.allow(v, hold > 0)) return null;
   for (let k = 0; k < N; k++) {
     v = spec.step(v, hold > 0, STEP);
     if (!v || !spec.safe(v, band)) return null;
@@ -58,10 +66,10 @@ function fly(spec, x, node, hold, band) {
  * Keeps a spread of states: per height band and hold, a few with different speeds. Of
  * two nearly alike, the freer one stays (longer since its last change, so it may change
  * sooner): otherwise fresh changes would crowd out the states that keep their course.
- * @param {Map<string, Node[]>} buckets @param {Node} node @param {Grain} grain
+ * @param {Map<string, Node[]>} buckets @param {Node} node @param {Grain} grain @param {string} tag @param {boolean} fewest
  */
-function keep(buckets, node, grain) {
-  const key = `${Math.round(node.v.y / grain.bucket)}:${node.hold}`;
+function keep(buckets, node, grain, tag, fewest) {
+  const key = `${Math.round(node.v.y / grain.bucket)}:${node.hold}:${tag}`;
   const list = buckets.get(key);
   if (!list) {
     buckets.set(key, [node]);
@@ -69,7 +77,9 @@ function keep(buckets, node, grain) {
   }
   const alike = list.findIndex((n) => Math.abs(n.v.vy - node.v.vy) < grain.spread);
   if (alike >= 0) {
-    if (node.cool > /** @type {Node} */ (list[alike]).cool) list[alike] = node;
+    const old = /** @type {Node} */ (list[alike]);
+    const better = fewest ? node.changes < old.changes || (node.changes === old.changes && node.cool > old.cool) : node.cool > old.cool;
+    if (better) list[alike] = node;
     return;
   }
   if (list.length < grain.per) list.push(node);
@@ -84,18 +94,19 @@ function searchLayers(spec, interval, band, grain) {
   const dx = spec.speed * N * STEP;
   const steps = Math.ceil((spec.x1 - spec.x0) / dx - 1e-9);
   /** @type {Node[][]} */
-  const layers = [[{ v: spec.start, hold: 0, cool: interval, parent: -1 }]];
+  const layers = [[{ v: spec.start, hold: 0, cool: interval, parent: -1, changes: 0 }]];
   for (let i = 0; i < steps; i++) {
     const x = spec.x0 + i * dx;
     /** @type {Map<string, Node[]>} */
     const buckets = new Map();
     (/** @type {Node[]} */ (layers[i])).forEach((node, index) => {
       for (const hold of [1, -1]) {
+        if (i === 0 && hold > 0 && spec.released) continue;
         const change = i > 0 && hold !== node.hold;
         if (change && node.cool < interval) continue;
         const next = fly(spec, x, node, hold, band);
         if (!next) continue;
-        keep(buckets, { v: next, hold, cool: change || i === 0 ? 1 : node.cool + 1, parent: index }, grain);
+        keep(buckets, { v: next, hold, cool: change || i === 0 ? 1 : node.cool + 1, parent: index, changes: node.changes + (change ? 1 : 0) }, grain, spec.tag ? spec.tag(next) : '', spec.fewest === true);
       }
     });
     const layer = [...buckets.values()].flat();
@@ -188,7 +199,10 @@ export function solveBeam(spec, options = {}) {
     const steps = Math.ceil((spec.x1 - spec.x0) / (spec.speed * decision) - 1e-9);
     if (layers.length - 1 < steps) continue;
     // Try ends nearest the middle of their band first (most room around them).
-    const order = last.map((n, i) => ({ i, d: Math.abs(n.v.vy) })).sort((a, b) => a.d - b.d).slice(0, options.tries ?? 60);
+    const order = last
+      .map((n, i) => ({ i, d: Math.abs(n.v.vy), c: spec.fewest ? n.changes : 0 }))
+      .sort((a, b) => a.c - b.c || a.d - b.d)
+      .slice(0, options.tries ?? 60);
     for (const { i } of order) {
       const holds = holdsOf(layers, i);
       if (!verify) return { holds, problem: null };

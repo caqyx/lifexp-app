@@ -17,9 +17,13 @@ import { checkpointX, jumpX, locate, pieceAt, progressAt, respawnX, speedAt, sta
  * @typedef {{ sector: number, section: number, percent: number }} Result
  * @typedef {{ x: number, y: number }} Point
  * @typedef {import('./level.js').Run} Run
- * @typedef {{ x: number, y: number, dir: number, gravity: 1 | -1, mini: boolean, ship: boolean, vy: number }} Vehicle
+ * @typedef {{ x: number, y: number, dir: number, gravity: 1 | -1, mini: boolean, ship: boolean, vy: number,
+ *   mode?: import('./geometry.js').VehicleMode, held?: boolean, queued?: boolean, grounded?: boolean, streak?: number, streakFrom?: number, sinceAct?: number }} Vehicle
  *   dir: +1 moving down, −1 moving up (screen y grows downwards); ship: flying the ship,
- *   with vertical speed vy (cells/s; the wave keeps 0 and never uses it).
+ *   with vertical speed vy (cells/s; the wave keeps 0 and never uses it); mode: which
+ *   vehicle (Flip Rush has more than two); held / queued / grounded: a tapping vehicle's
+ *   input and contact (Flip Rush), sinceAct: seconds since its last press acted; streak /
+ *   streakFrom: the spider's snap, for drawing.
  * @typedef {{
  *   mode: Mode, level: 'run' | 'finale', checkpointBy: 'sector' | 'section', rng: () => number,
  *   run: Run, jumped: boolean, rules: GameRules,
@@ -54,7 +58,7 @@ const TRAIL_KEEP = 48;
  */
 function placeWave(game, x) {
   const state = stateAt(game.run, x);
-  game.wave = { ...createVehicle(x, START_Y), gravity: state.gravity, mini: state.mini, ship: state.ship };
+  game.wave = { ...createVehicle(x, START_Y), gravity: state.gravity, mini: state.mini, ship: state.ship, mode: state.mode };
   game.previous = { x, y: START_Y };
   game.trail = [{ x, y: START_Y }];
   game.where = locate(game.run, x);
@@ -118,7 +122,7 @@ function passPortals(game, from, to, events) {
     if (p.x <= from || p.x > to) continue;
     if (p.kind === 'gravity') game.wave = { ...game.wave, gravity: p.on ? -1 : 1 };
     else if (p.kind === 'mini') game.wave = { ...game.wave, mini: p.on };
-    else game.wave = { ...game.wave, ship: p.on, vy: 0 };
+    else game.wave = { ...game.wave, ship: p.on, vy: 0, mode: p.mode ?? (p.on ? 'ship' : 'wave') };
     game.lastPortal = p;
     events.push('portal');
   }

@@ -17,7 +17,9 @@ import { screenX, screenY } from './view.js';
  * @typedef {import('../level.js').Run} Run
  * @typedef {import('../level.js').Piece} Piece
  * @typedef {import('./section.js').Painted} Painted
- * @typedef {{ x: number, y: number, dir: number, mini: boolean, alive: boolean, flipped: boolean, ship: boolean, angle: number, thrust: boolean }} Pose
+ * @typedef {{ x: number, y: number, dir: number, mini: boolean, alive: boolean, flipped: boolean, ship: boolean, angle: number, thrust: boolean,
+ *   mode?: import('../geometry.js').VehicleMode, grounded?: boolean, streak?: number, streakFrom?: number }} Pose
+ *   mode, grounded, streak, streakFrom: Flip Rush's ball and spider (the spider's snap is drawn as a streak).
  * @typedef {{ trail: string }} SkinBase
  * @typedef {{
  *   view: View, run: Run, wave: Pose,
@@ -223,7 +225,8 @@ function drawPlayer(ctx, s, camX, look) {
   const before = s.trail.filter((p) => p.x <= camX - 2).pop();
   if (before) points.unshift({ x: screenX(v, camX, before.x), y: screenY(v, before.y) });
   points.push({ x: screenX(v, camX, w.x), y: screenY(v, w.y) });
-  drawTrail(ctx, points, v.cell * look.trailWidth(w), s.skin.trail);
+  const width = look.trailWidth(w);
+  if (width > 0) drawTrail(ctx, points, v.cell * width, s.skin.trail);
   if (!w.alive) return;
   look.drawVehicle(ctx, s, screenX(v, camX, w.x), screenY(v, w.y));
 }
