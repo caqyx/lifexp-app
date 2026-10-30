@@ -35,15 +35,17 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  *   frame: a glowing outlined truss far behind the corridor; wreck: a broken hull's
  *   outline; both dim, like all deco, so hazards read first (stage s-2).
  * @typedef {{ id: string, length: number, ceil: string, floor: string, hazards: HazardData[], deco?: DecoData[],
- *   mini?: boolean, tier?: string, mode?: 'wave' | 'ship' }} SectionData
+ *   mini?: boolean, tier?: string, mode?: VehicleMode }} SectionData
  *   mini: designed (and proven) for the mini wave, flown between its own mini portals;
- *   tier: its own speed and limits (the finale); mode: flown as the wave (default) or the ship.
+ *   tier: its own speed and limits (the finale); mode: the vehicle it is flown with (Wave
+ *   Rush: the wave unless `ship`; Ship Rush: the ship unless `wave`; Flip Rush: ball or spider).
+ * @typedef {'wave' | 'ship' | 'ball' | 'spider'} VehicleMode
  *
  * @typedef {{ type: 'spike' | 'halfSpike' | 'block' | 'pillar', shape: 'poly', pts: Pt[], vis: Pt[], dir: 'up' | 'down' | 'none', bbox: number[] }} PolyHazard
  * @typedef {{ type: 'saw' | 'orb' | 'mine', shape: 'circle', x: number, y: number, r: number, hit: number, bbox: number[], chain: boolean }} CircleHazard
  * @typedef {PolyHazard | CircleHazard} Hazard
  * @typedef {{ id: string, length: number, ceil: Pt[], floor: Pt[], ceilSegs: Seg[], floorSegs: Seg[],
- *   mini: boolean, tier: string | null, mode: 'wave' | 'ship',
+ *   mini: boolean, tier: string | null, mode: VehicleMode,
  *   hazards: Hazard[], deco: DecoData[], buckets: Map<number, Hazard[]>, segBuckets: Map<number, Seg[]> }} Geometry
  */
 

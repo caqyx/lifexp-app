@@ -1,0 +1,7 @@
+{
+  "game": "flip-rush",
+  "source": "lifexp",
+  "code": "v2/public/games/flip-rush",
+  "note": "LifeXP's own game, written in this repo (docs/v2/PLAN.md 9.1, f-1): an original gravity-flip sibling of Wave Rush and Ship Rush for the ball and the spider, not a vendored copy, so no VENDORED.json. Its engine (levels, game states, records, validator, renderer, page) is shared with the other Rush games in v2/public/games/_engine/. Its CSP is in index.html; tests/vendor-game.spec.js checks it like a vendored game's.",
+  "tests": ["v2/tests/flip-rush.test.ts", "v2/tests/flip-rush-sections.test.ts", "tests/v2/games.spec.js"]
+}

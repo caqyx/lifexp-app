@@ -116,19 +116,19 @@ export const SECTOR2 = [
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'saw', x: 9, y: 3.3, r: 1 },
-      { type: 'saw', x: 9, y: 8.7, r: 1 },
-      { type: 'saw', x: 16, y: 5.6, r: 1 },
-      { type: 'saw', x: 23.5, y: 3.3, r: 1 },
-      { type: 'saw', x: 23.5, y: 8.7, r: 1 },
+      { type: 'saw', x: 10, y: 3.1, r: 1 },
+      { type: 'saw', x: 10, y: 8.9, r: 1 },
+      { type: 'saw', x: 16.5, y: 5.6, r: 1 },
+      { type: 'saw', x: 24, y: 3.1, r: 1 },
+      { type: 'saw', x: 24, y: 8.9, r: 1 },
     ],
   },
   {
     // A narrow tunnel with a stub from below and one from above.
     id: 's2-10',
     length: 30,
-    ceil: '2 r5 +2 r20 -2 r5',
-    floor: '10 r5 -1.5 r20 +1.5 r5',
+    ceil: '2 r6 +2 r19 -2 r5',
+    floor: '10 r6 -1.5 r19 +1.5 r5',
     hazards: [
       { type: 'pillar', x: 12, on: 'floor', h: 1 },
       { type: 'pillar', x: 19, on: 'ceil', h: 1 },

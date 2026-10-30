@@ -16,19 +16,21 @@ import { sectionStyle } from './sectors.js';
  * @typedef {import('./geometry.js').Geometry} Geometry
  * @typedef {import('./geometry.js').SectionData} SectionData
  * @typedef {{ g: Geometry, x0: number, x1: number, sector: number, number: number, place: number, kind: 'section' | 'pad',
- *   tier: string, theme: string, speed: number, band: number, mode: 'wave' | 'ship' }} Piece
+ *   tier: string, theme: string, speed: number, band: number, mode: VehicleMode }} Piece
  *   sector: index into run.sectors; number: the section's number in its data (1-based);
  *   place: its position in the sector's shuffle (1-based); pads have 0; band: index of
  *   its Demon tier in the sector's bands, or -1.
  * @typedef {{ kind: 'gravity', boundary: number, on: boolean } | { kind: 'mini', place: number, on: boolean }} PortalSlot
  *   gravity: at a boundary (b = between places b and b+1); mini: inside its section's own joints.
  * @typedef {'gravity' | 'mini' | 'ship'} PortalKind
- * @typedef {{ x: number, kind: PortalKind, on: boolean, sector: number }} Portal
+ * @typedef {{ x: number, kind: PortalKind, on: boolean, sector: number, mode?: VehicleMode }} Portal
+ *   A vehicle portal ('ship') says the vehicle after it in `mode` (and `on`: is it the ship).
  * @typedef {{ def: SectorDef, x0: number, x1: number, order: number[], first: number, count: number }} PlacedSector
  *   first: index of its first piece.
- * @typedef {{ kind: 'run' | 'finale', sectors: PlacedSector[], pieces: Piece[], portals: Portal[], startX: number, finishX: number, length: number, baseMode: 'wave' | 'ship' }} Run
- *   baseMode: the vehicle at a sector's start (ship portals switch it).
- * @typedef {{ tierSpeed: (tier: string) => number, baseMode: 'wave' | 'ship' }} LevelRules
+ * @typedef {{ kind: 'run' | 'finale', sectors: PlacedSector[], pieces: Piece[], portals: Portal[], startX: number, finishX: number, length: number, baseMode: VehicleMode }} Run
+ *   baseMode: the vehicle at a sector's start (vehicle portals switch it).
+ * @typedef {{ tierSpeed: (tier: string) => number, baseMode: VehicleMode }} LevelRules
+ * @typedef {import('./geometry.js').VehicleMode} VehicleMode
  */
 
 /** Where portals stand inside a section's open lead-in (and a mini's way back in its lead-out). */
@@ -57,11 +59,33 @@ export function padGeometry(id, length) {
 
 /**
  * The order a sector's sections are played in this run: each group shuffled, groups in
- * order (a fixed sector, the finale, is never shuffled).
- * @param {SectorDef} sector @param {() => number} rng
+ * order (a fixed sector, the finale, is never shuffled). An `alternate` sector (Flip Rush
+ * from sector 3) then deals each shuffled group out by vehicle in turns, so the vehicle
+ * changes at as many joints as the group allows (each vehicle's sections keep their
+ * shuffled order; a group starts with the other vehicle than the last one when it can).
+ * @param {SectorDef} sector @param {() => number} rng @param {SectionData[]} [data] the sector's sections (for `alternate`)
  */
-export function orderSections(sector, rng) {
-  return sector.groups.flatMap((group) => (sector.fixed ? group.slice() : shuffle(group, rng)));
+export function orderSections(sector, rng, data) {
+  /** @type {VehicleMode | null} */
+  let last = null;
+  return sector.groups.flatMap((group) => {
+    const order = sector.fixed ? group.slice() : shuffle(group, rng);
+    if (!sector.alternate || !data) return order;
+    const modeOf = (/** @type {number} */ n) => data[n - 1]?.mode ?? null;
+    const first = modeOf(/** @type {number} */ (order[0]));
+    const a = order.filter((n) => modeOf(n) === first);
+    const b = order.filter((n) => modeOf(n) !== first);
+    // The bigger pile must lead; with equal piles, lead with the other vehicle than the last.
+    const lead = a.length > b.length || (a.length === b.length && first !== last) ? a : b;
+    const other = lead === a ? b : a;
+    const dealt = [];
+    for (let i = 0; i < Math.max(lead.length, other.length); i++) {
+      if (i < lead.length) dealt.push(/** @type {number} */ (lead[i]));
+      if (i < other.length) dealt.push(/** @type {number} */ (other[i]));
+    }
+    last = modeOf(/** @type {number} */ (dealt[dealt.length - 1]));
+    return dealt;
+  });
 }
 
 /**
@@ -149,7 +173,7 @@ function sectionsOf(sector, library) {
  */
 function placeSector(def, s, x, into) {
   const data = sectionsOf(def, into.library);
-  const order = orderSections(def, into.rng);
+  const order = orderSections(def, into.rng, data);
   const first = into.pieces.length;
   const x0 = x;
   order.forEach((number, i) => {
@@ -174,8 +198,12 @@ function placeSector(def, s, x, into) {
   // Ship and wave portals where the vehicle changes (the finales).
   for (let i = first; i < into.pieces.length; i++) {
     const piece = /** @type {Piece} */ (into.pieces[i]);
-    const before = i === first ? into.rules.baseMode : /** @type {Piece} */ (into.pieces[i - 1]).mode;
-    if (piece.mode !== before) into.portals.push({ x: piece.x0 + PORTAL_OFFSET.ship, kind: 'ship', on: piece.mode === 'ship', sector: s });
+    // Against the piece before; a sector's start also against baseMode, since each sector
+    // begins in it (stateAt, a practice checkpoint) — so a sector that starts in another
+    // vehicle has its portal even when the sector before ended in that vehicle too.
+    const prev = i === 0 ? into.rules.baseMode : /** @type {Piece} */ (into.pieces[i - 1]).mode;
+    const changes = piece.mode !== prev || (i === first && piece.mode !== into.rules.baseMode);
+    if (changes) into.portals.push({ x: piece.x0 + PORTAL_OFFSET.ship, kind: 'ship', on: piece.mode === 'ship', mode: piece.mode, sector: s });
   }
   into.portals.sort((a, b) => a.x - b.x);
   return { def, x0, x1: x, order, first, count: order.length };
@@ -259,21 +287,22 @@ export function runHits(run, x, ya, yb, r, dir, slope) {
 /**
  * Gravity, size and vehicle at x: the portals of x's sector already passed (a sector starts normal).
  * @param {Run} run @param {number} x
- * @returns {{ gravity: 1 | -1, mini: boolean, ship: boolean }}
+ * @returns {{ gravity: 1 | -1, mini: boolean, ship: boolean, mode: VehicleMode }}
  */
 export function stateAt(run, x) {
   const sector = pieceAt(run, x).sector;
   /** @type {1 | -1} */
   let gravity = 1;
   let mini = false;
-  let ship = run.baseMode === 'ship';
+  /** @type {VehicleMode} */
+  let mode = run.baseMode;
   for (const p of run.portals) {
     if (p.sector !== sector || p.x > x) continue;
     if (p.kind === 'gravity') gravity = p.on ? -1 : 1;
     else if (p.kind === 'mini') mini = p.on;
-    else ship = p.on;
+    else mode = p.mode ?? (p.on ? 'ship' : 'wave');
   }
-  return { gravity, mini, ship };
+  return { gravity, mini, ship: mode === 'ship', mode };
 }
 
 /** How far x is through the whole run, 0..100. @param {Run} run @param {number} x */

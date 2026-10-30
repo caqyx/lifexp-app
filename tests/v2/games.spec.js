@@ -73,18 +73,18 @@ async function openGame(page, account) {
 test.describe('on a phone', () => {
   test.use({ viewport: PHONE });
 
-  test('the list: six games, each with a line, its time today and "Graj"', async ({ page, account }) => {
+  test('the list: seven games, each with a line, its time today and "Graj"', async ({ page, account }) => {
     await openSignedIn(page, account, '#/today');
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.getByLabel('Nawigacja').getByRole('link', { name: 'Gry' }).click();
     await expect(page).toHaveURL(/#\/games$/);
 
     const cards = page.getByRole('list', { name: 'Gry' }).getByRole('listitem');
-    await expect(cards).toHaveCount(6);
-    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush', 'Ship Rush']);
+    await expect(cards).toHaveCount(7);
+    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush', 'Ship Rush', 'Flip Rush']);
     for (const card of await cards.all()) await expect(card.getByText('Dziś jeszcze nie grano')).toBeVisible();
-    // All are in (g-2, g-3, g-4, w-1, s-1): nothing is "Wkrótce" any more.
-    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush', 'Ship Rush']) {
+    // All are in (g-2, g-3, g-4, w-1, s-1, f-1): nothing is "Wkrótce" any more.
+    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush', 'Ship Rush', 'Flip Rush']) {
       await expect(page.getByRole('link', { name: `Graj: ${name}` })).toBeVisible();
     }
     await expect(page.getByText('Wkrótce')).toHaveCount(0);
@@ -724,6 +724,7 @@ const waveState = (game) =>
     gravity: Number(el.dataset.debugGravity),
     mini: el.dataset.debugMini === '1',
     ship: el.dataset.debugShip === '1',
+    mode: el.dataset.debugMode,
     level: el.dataset.debugLevel,
   }));
 
@@ -734,12 +735,14 @@ const waveState = (game) =>
 async function recordStates(frame) {
   await frame.evaluate(() => {
     const stage = document.getElementById('stage');
-    const seen = { flipped: false, mini: false, ship: false };
+    const seen = { flipped: false, mini: false, ship: false, ball: false, spider: false };
     document.documentElement.dataset.seen = '';
     setInterval(() => {
       if (stage.dataset.debugGravity === '-1') seen.flipped = true;
       if (stage.dataset.debugMini === '1') seen.mini = true;
       if (stage.dataset.debugShip === '1') seen.ship = true;
+      if (stage.dataset.debugMode === 'ball') seen.ball = true;
+      if (stage.dataset.debugMode === 'spider') seen.spider = true;
       document.documentElement.dataset.seen = Object.keys(seen).filter((k) => seen[k]).join(',');
     }, 5);
   });
@@ -1175,6 +1178,123 @@ test.describe('Ship Rush s-2', () => {
     await stage.click();
     await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
     expect(await waveState(game)).toMatchObject({ level: 'finale', section: 1, ship: true });
+    expect(problems).toEqual([]);
+  });
+});
+
+// ── Flip Rush (stage f-1): the ball and the spider in turns, on the same engine ──
+
+test.describe('Flip Rush', () => {
+  test.describe('on a touch phone held upright', () => {
+    test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
+
+    test('skins (the last one locked) survive a reload; the pilot plays the ball and the spider through a portal, a crash starts again at sector 1, Zakończ records the time', async ({ page, account }) => {
+      test.setTimeout(90000);
+      const problems = await watchProblems(page);
+      await page.clock.install();
+      const { host, game } = await playFromList(page, account, 'Flip Rush');
+      await expect(host.getByRole('note')).toBeVisible();
+      const stage = game.locator('#stage');
+      await expect(stage).toHaveAttribute('data-state', 'menu');
+      await expect(game.getByRole('heading', { name: 'Flip Rush' })).toBeVisible();
+      await expect(game.getByText('Stuknij — grawitacja się odwraca.')).toBeVisible();
+      // No finale yet (stage f-2).
+      await expect(game.getByRole('button', { name: 'Zagraj finał' })).toBeHidden();
+
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      const skins = game.locator('#skin-list');
+      await expect(skins.getByRole('button')).toHaveCount(10);
+      await expect(skins.getByRole('button', { name: /Zębatka/ })).toHaveAttribute('aria-pressed', 'true');
+      const locked = skins.getByRole('button', { name: /Korona Maszyn/ });
+      await expect(locked).toBeDisabled();
+      await expect(locked).toContainText('Zablokowana');
+      await skins.getByRole('button', { name: /Iskra/ }).tap();
+      await expect(skins.getByRole('button', { name: /Iskra/ })).toHaveAttribute('aria-pressed', 'true');
+      expect(await page.evaluate(() => localStorage.getItem('lifexp-fliprush-skin'))).toBe('"spark"');
+      await page.reload();
+      await game.getByRole('button', { name: 'Skórki' }).tap();
+      await expect(skins.getByRole('button', { name: /Iskra/ })).toHaveAttribute('aria-pressed', 'true');
+      await game.getByRole('button', { name: 'Gotowe' }).tap();
+
+      // The validator's path for the seed (?autopilot=3, test only) plays sections 1–3,
+      // through at least one vehicle portal, and lets go at the start of section 4.
+      const frame = await openWaveWith(page, host, 'seed=3&autopilot=3');
+      await recordStates(frame);
+      await game.getByRole('button', { name: 'Graj', exact: true }).tap();
+      await expect(stage).toHaveAttribute('data-state', 'ready');
+      await stage.tap();
+      await expect(stage).toHaveAttribute('data-state', 'playing');
+      await expect.poll(async () => (await waveState(game)).section, { timeout: 40000 }).toBeGreaterThanOrEqual(4);
+      expect(await waveState(game)).toMatchObject({ sector: 1, attempt: 1, tier: 'easy' });
+      const seen = await game.locator('html').getAttribute('data-seen');
+      expect(seen).toContain('ball');
+      expect(seen).toContain('spider');
+
+      // Hands off: the vehicle runs into the next hazard; a tap starts again.
+      await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 15000 });
+      const dead = game.getByRole('region', { name: 'Rozbity!' });
+      await expect(dead).toContainText('Sektor 1, sekcja');
+      await expect(dead.getByText('Nowy rekord!')).toBeVisible();
+      const best = JSON.parse(await page.evaluate(() => localStorage.getItem('lifexp-fliprush-best')));
+      expect(best).toMatchObject({ sector: 1 });
+      expect(best.section).toBeGreaterThanOrEqual(4);
+      await page.waitForTimeout(600);
+      await stage.tap();
+      await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+      expect(await waveState(game)).toMatchObject({ sector: 1, section: 1 });
+
+      await endAndExpectSession(page, account, 'Flip Rush');
+      expect(problems).toEqual([]);
+    });
+  });
+
+  test('sideways 800×360: the full height; sector 3 by the pilot through its gravity flip and vehicle changes; Praktyka goes back to the sector’s checkpoint', async ({ page, account }) => {
+    test.setTimeout(150000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Flip Rush');
+    await expect(host.getByRole('note')).toBeHidden();
+    await host.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished)));
+    const frameBox = await host.locator('iframe').boundingBox();
+    expect(frameBox.height).toBe(360);
+    const stage = game.locator('#stage');
+
+    // Sector 3 played by the validator's path: a vehicle change at nearly every joint, the
+    // gravity portal and the way back.
+    const frame = await openWaveWith(page, host, 'seed=5&sector=3&section=1&autopilot=15');
+    await recordStates(frame);
+    await flyFrom(game, 'Graj');
+    await expect.poll(async () => (await waveState(game)).sector).toBe(3);
+    expect(await waveState(game)).toMatchObject({ tier: 'hard' });
+    await expect(game.locator('#hud-sector')).toContainText('Sektor 3: Trudny');
+    // Every tap flips the vehicle's gravity here, so the portals are followed by place: the
+    // pilot passes the gravity portal back (the last one in sector 3) still playing.
+    const portals = await stage.evaluate((el) => el.dataset.debugPortals.split(','));
+    const back = portals.map((p) => p.split(':')).filter(([kind, , on]) => kind === 'gravity' && on === 'off').map(([, x]) => Number(x));
+    expect(back.length).toBeGreaterThan(0);
+    await expect.poll(async () => (await waveState(game)).x, { timeout: 90000 }).toBeGreaterThan(Math.max(...back) + 5);
+    const seen = await game.locator('html').getAttribute('data-seen');
+    expect(seen).toContain('ball');
+    expect(seen).toContain('spider');
+    expect((await waveState(game)).state).toBe('playing');
+
+    // Praktyka from sector 2, section 3: the pilot plays it and lets go; after the crash a
+    // tap brings the vehicle back to sector 2's start, and practice keeps no record.
+    const kept = await page.evaluate(() => localStorage.getItem('lifexp-fliprush-best'));
+    await openWaveWith(page, host, 'seed=12&sector=2&section=3&autopilot=1');
+    await flyFrom(game, 'Praktyka');
+    await expect(game.locator('.hud__practice')).toBeVisible();
+    const start = await waveState(game);
+    await expect.poll(async () => (await waveState(game)).section, { timeout: 30000 }).toBeGreaterThanOrEqual(4);
+    await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 20000 });
+    await expect(game.getByText('Stuknij, żeby wrócić do punktu kontrolnego')).toBeVisible();
+    await page.waitForTimeout(600);
+    await stage.click();
+    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    const after = await waveState(game);
+    expect(after.checkpoint).toBe(start.checkpoint);
+    expect(after.x).toBeLessThan(start.x);
+    expect(await page.evaluate(() => localStorage.getItem('lifexp-fliprush-best'))).toBe(kept);
     expect(problems).toEqual([]);
   });
 });

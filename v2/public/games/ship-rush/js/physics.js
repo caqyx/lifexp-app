@@ -1,8 +1,9 @@
 // @ts-check
-// The ship's flight (docs/v2/PLAN.md 9.1, stage s-1). Hold: thrust up; release: gravity
-// pulls down (the other way round upside down); the vertical speed changes smoothly and is
-// capped; the level scrolls at the piece's speed. The mini ship is smaller and lighter: it
-// answers the input faster.
+// The ship's flight (docs/v2/PLAN.md 9.1, stages s-1 and f-0). Hold: thrust up; release:
+// gravity pulls down (the other way round upside down); the vertical speed changes
+// smoothly and is capped — braking is stronger than speeding up, and the climb is faster
+// than the fall (config.js SHIP); the level scrolls at the piece's speed. The mini ship is
+// smaller and lighter: it answers the input faster.
 //
 // The collision rule (owner, stage s-1: "as in the genre"), checked once per fixed step:
 // 1. The ship's body is a square (half side `half`). It moves, then every solid box it now
@@ -19,17 +20,15 @@
 //    any of them is a crash, wherever it comes from.
 // There are no slopes in ship terrain (solids.js), so no surface is "almost level".
 import { createVehicle } from '../../_engine/game.js';
+import { roomyAt, settle as settleBody } from '../../_engine/solids.js';
 import { PLAY_H, SNAP, shipKind } from './config.js';
 
 export { advanceClock, isBuffered } from '../../_engine/clock.js';
 
 /**
  * @typedef {import('../../_engine/game.js').Vehicle} Ship
- * @typedef {import('./solids.js').World} World
- * @typedef {import('./solids.js').Solid} Solid
+ * @typedef {import('../../_engine/solids.js').World} World
  */
-
-const EPS = 1e-9;
 
 /** A ship at (x, y), flying level. @param {number} x @param {number} y @returns {Ship} */
 export function createShip(x, y) {
@@ -37,33 +36,11 @@ export function createShip(x, y) {
 }
 
 /**
- * Does a body at (x, y) overlap the box (touching does not count)?
- * @param {Solid} s @param {number} x @param {number} y @param {number} half
- */
-function overlaps(s, x, y, half) {
-  return x + half > s.x0 + EPS && x - half < s.x1 - EPS && y + half > s.y0 + EPS && y - half < s.y1 - EPS;
-}
-
-/**
- * Where the body ends up after moving to (x, y) from height `prevY`: put back on the tops
- * it landed on and under the undersides it bumped, or a crash.
+ * Where the ship's body ends up after moving (the engine's rule, with the ship's snap).
  * @param {World} world @param {number} prevY @param {number} x @param {number} y @param {number} half
- * @returns {{ y: number, crash: boolean, landed: boolean, bumped: boolean }}
  */
 export function settle(world, prevY, x, y, half) {
-  const list = world.solids.get(Math.floor(x)) ?? [];
-  let top = Infinity;
-  let under = -Infinity;
-  for (const s of list) {
-    if (!overlaps(s, x, y, half)) continue;
-    if (prevY + half <= s.y0 + SNAP) top = Math.min(top, s.y0 - half);
-    else if (prevY - half >= s.y1 - SNAP) under = Math.max(under, s.y1 + half);
-    else return { y, crash: true, landed: false, bumped: false };
-  }
-  if (top < under - EPS) return { y, crash: true, landed: true, bumped: true };
-  const settled = Math.max(under, Math.min(y, top));
-  for (const s of list) if (overlaps(s, x, settled, half)) return { y: settled, crash: true, landed: false, bumped: false };
-  return { y: settled, crash: false, landed: settled < y - EPS, bumped: settled > y + EPS };
+  return settleBody(world, prevY, x, y, half, SNAP);
 }
 
 /**
@@ -73,8 +50,11 @@ export function settle(world, prevY, x, y, half) {
  */
 export function stepShip(ship, holding, speed, dt, world) {
   const kind = shipKind(ship.mini);
-  const accel = (holding ? -kind.up : kind.down) * ship.gravity;
-  let vy = Math.min(kind.maxV, Math.max(-kind.maxV, ship.vy + accel * dt));
+  // In gravity's frame: positive is falling.
+  const fall = ship.vy * ship.gravity;
+  const rising = fall <= 0;
+  const accel = holding ? -(rising ? kind.upRise : kind.upFall) : rising ? kind.downRise : kind.downFall;
+  let vy = Math.min(kind.capDown, Math.max(-kind.capUp, fall + accel * dt)) * ship.gravity;
   const x = ship.x + speed * dt;
   const moved = settle(world, ship.y, x, ship.y + vy * dt, kind.half);
   if (moved.landed && vy > 0) vy = 0;
@@ -86,20 +66,10 @@ export function stepShip(ship, holding, speed, dt, world) {
 }
 
 /**
- * The search's "room to spare" (prove.js): no hazard within `band` above or below, and
- * no box's left side (a wall ahead) within the body's width and `band` of its height.
- * Resting on a box whose left side is behind is no danger.
+ * The search's "room to spare" (prove.js): the engine's rule for the ship's body.
  * @param {World} world @param {Ship} ship @param {number} band
  */
 export function roomy(world, ship, band) {
   const kind = shipKind(ship.mini);
-  if (world.hazard(ship.x, ship.y - band, ship.y + band, kind.radius)) return false;
-  if (band <= 0) return true;
-  const list = world.solids.get(Math.floor(ship.x)) ?? [];
-  const h = kind.half;
-  for (const s of list) {
-    if (s.x0 <= ship.x - h + EPS || s.x0 >= ship.x + h - EPS) continue;
-    if (ship.y + h + band > s.y0 + EPS && ship.y - h - band < s.y1 - EPS) return false;
-  }
-  return true;
+  return roomyAt(world, ship.x, ship.y, kind.half, kind.radius, band);
 }

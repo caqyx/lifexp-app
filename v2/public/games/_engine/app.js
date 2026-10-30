@@ -40,13 +40,14 @@ import { isUnlocked, resolveSkin } from './skins.js';
  *   paintSkin: (ctx: CanvasRenderingContext2D, skin: any) => void,
  *   slopeOf: (vehicle: Vehicle) => number,
  *   loadAutopilot: () => Promise<{ advise: (run: Run, vehicle: Vehicle) => boolean }>,
- *   demon: boolean, finale: boolean,
+ *   demon: boolean, finale: boolean, holdTaps?: boolean,
  * }} AppDef
  *   t: the game's translator (every key of APP_TEXT_KEYS, plus sector1..n and the Demon
  *   bands' keys); paintSkin: a skin's preview in a 96 × 64 box (CSS px); slopeOf: the
  *   wave's |dy/dx| now (the icon turns toward it); demon: the run ends with the Demon
  *   sector (finishing it is the achievement that unlocks the last skin and the finale);
- *   finale: the game has its finale level (its box on the menu).
+ *   finale: the game has its finale level (its box on the menu); holdTaps: a short tap is
+ *   held down until the ball or the spider has acted on it (or INPUT_BUFFER_MS passes).
  */
 
 /** The texts the page itself uses (each game's i18n has them all; its tests check). */
@@ -384,7 +385,7 @@ export function runApp(def) {
         const p = game.lastPortal;
         fx.ring = { x: p.x, color: portalColor(p), at: clock.time };
         if (p.kind === 'gravity') showToast(t(p.on ? 'gravityFlip' : 'gravityBack'));
-        if (p.kind === 'ship') showToast(t(p.on ? 'shipOn' : 'waveOn'));
+        if (p.kind === 'ship') showToast(t(p.mode ? `${p.mode}On` : p.on ? 'shipOn' : 'waveOn'));
       }
       if (event === 'death') handleDeath();
       if (event === 'finish') handleFinish();
@@ -501,6 +502,7 @@ export function runApp(def) {
     d.debugTier = pieceAt(game.run, w.x).tier;
     d.debugMini = w.mini ? '1' : '0';
     d.debugShip = w.ship ? '1' : '0';
+    d.debugMode = w.mode ?? '';
     d.debugLevel = game.level;
     d.debugPilot = piloting() ? '1' : '0';
   }
@@ -530,8 +532,12 @@ export function runApp(def) {
     const events = stepGame(state.game, { holding, tap }, STEP);
     if (tap && (events.includes('start') || events.includes('restart'))) input.pressedAt = null;
     if (input.pressedAt !== null && !isBuffered(input.pressedAt, now)) input.pressedAt = null;
-    // A press shorter than a step still counts once.
-    if (!input.down && tap && state.game.phase === 'playing') input.pressedAt = null;
+    // A press shorter than a step still counts once. For tap vehicles (Flip Rush's ball and
+    // spider, which act only on the ground) a short tap is kept until it has acted or the
+    // buffer runs out, so a tap just before landing counts.
+    const w = state.game.wave;
+    const waits = def.holdTaps === true && (w.mode === 'ball' || w.mode === 'spider') && w.sinceAct !== 0;
+    if (!input.down && tap && state.game.phase === 'playing' && !waits) input.pressedAt = null;
     clock.time += STEP;
     reactToEvents(events);
     updateParticles(particles, STEP);
@@ -575,6 +581,10 @@ export function runApp(def) {
         ship: w.ship,
         angle,
         thrust: input.down && game.phase === 'playing',
+        mode: w.mode,
+        grounded: w.grounded,
+        streak: w.streak,
+        streakFrom: w.streakFrom,
       },
       trail: game.trail,
       skin: state.skin,

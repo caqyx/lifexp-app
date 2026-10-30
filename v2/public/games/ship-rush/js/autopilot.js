@@ -6,7 +6,7 @@
 // are flown by the wave solver's course (../../_engine/wavepilot.js).
 import { solveBeam } from '../../_engine/beam.js';
 import { courseHold, expected, planCourse } from '../../_engine/wavepilot.js';
-import { STEP, tierOf } from './config.js';
+import { JOINT, STEP, tierOf } from './config.js';
 import { roomy, stepShip } from './physics.js';
 import { SHIP_GRAINS } from './prove.js';
 import { pieceAt, sectorAt, speedAt } from './run.js';
@@ -63,6 +63,7 @@ function planFlight(run, ship) {
   if (x1 - ship.x < 0.5) return null;
   const world = runWorld(run);
   const speed = piece.speed;
+  const vehicleAhead = run.portals.some((p) => p.kind === 'ship' && p.x > ship.x && p.x <= x1 + 0.6);
   /** @type {import('../../_engine/beam.js').BeamSpec} */
   const spec = {
     x0: ship.x,
@@ -74,7 +75,9 @@ function planFlight(run, ship) {
       const next = stepShip(v, holding, speed, dt, world);
       return next.crashed ? null : throughPortals(run, v.x, next.vehicle);
     },
-    safe: (v, band) => roomy(world, v, band),
+    // Before a change of vehicle, arrive in the middle of the joint (the wave cannot start
+    // against a wall the ship was resting on).
+    safe: (v, band) => roomy(world, v, band) && (!vehicleAhead || v.x < x1 - 2 || (v.y > JOINT.ceil + 1.2 && v.y < JOINT.floor - 1.2)),
   };
   for (const grain of SHIP_GRAINS) {
     const { holds } = solveBeam(spec, { verify: false, grain, bands: [[0.35, 'min'], [0.2, 'min'], [0.05, 'min']] });

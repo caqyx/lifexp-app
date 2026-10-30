@@ -110,10 +110,11 @@ const OWN_GAMES = [
   { id: 'flappy', prefix: 'lifexp-flappy-', storageArgs: ['BEST_KEY'] },
   // (the argument is read up to its first parenthesis: recordKey(level) → "recordKey(level")
   { id: 'quick-math', prefix: 'lifexp-quickmath-', storageArgs: ['MODE_KEY', 'recordKey(level'] },
-  // Wave Rush and Ship Rush reach storage only through the shared engine's records
+  // Wave Rush, Ship Rush and Flip Rush reach storage only through the shared engine's records
   // (v2/public/games/_engine/records.js, checked below), under their own prefix.
   { id: 'wave-rush', prefix: 'lifexp-waverush-', storageArgs: [], records: 'lifexp-waverush-' },
   { id: 'ship-rush', prefix: 'lifexp-shiprush-', storageArgs: [], records: 'lifexp-shiprush-' },
+  { id: 'flip-rush', prefix: 'lifexp-fliprush-', storageArgs: [], records: 'lifexp-fliprush-' },
 ];
 
 /** Every file of a directory, recursively. @param {string} dir */

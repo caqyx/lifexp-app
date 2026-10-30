@@ -1676,6 +1676,7 @@
       "quick-math": "Szybkie liczenie",
       "wave-rush": "Wave Rush",
       "ship-rush": "Ship Rush",
+      "flip-rush": "Flip Rush",
       "test": "Gra testowa"
     },
     "descriptions": {
@@ -1685,6 +1686,7 @@
       "quick-math": "Liczenie w pamięci na czas: poziomy trudności i rekordy.",
       "wave-rush": "Przytrzymaj, by lecieć w górę, puść, by w dół: sektory coraz trudniejszych korytarzy.",
       "ship-rush": "Przytrzymaj, by statek się wznosił, puść, by opadał: od chmur przez burzę po zorzę.",
+      "flip-rush": "Stuknij, by odwrócić grawitację: kula i pająk na zmianę, przez halę, kopalnię i odlewnię.",
       "test": "Gra do testów automatycznych."
     },
     "play": "Graj",

@@ -28,26 +28,35 @@ export {
 export { bandOf, sectionStyle } from '../../_engine/sectors.js';
 
 /**
- * @typedef {{ up: number, down: number, maxV: number, half: number, radius: number, size: number }} ShipKind
- *   up / down: the vertical acceleration while held / released (cells/s²); maxV: the cap
- *   on the vertical speed (cells/s); half: half the side of the square body that rests
- *   on surfaces and hits their sides; radius: the circle that hazards are tested
- *   against (inside the body); size: the drawn length (cells).
+ * @typedef {{ upRise: number, upFall: number, downRise: number, downFall: number, capUp: number, capDown: number,
+ *   half: number, radius: number, size: number }} ShipKind
+ *   Accelerations in cells/s², measured against gravity's pull: held — `upRise` while
+ *   climbing, `upFall` while still falling (it brakes harder than it climbs); released —
+ *   `downRise` while still climbing, `downFall` while falling (it sinks softer than it
+ *   brakes). Speed caps: `capUp` climbing, `capDown` falling. half: half the side of the
+ *   square body that rests on surfaces and hits their sides; radius: the circle hazards
+ *   are tested against (inside the body); size: the drawn length (cells).
  */
 
-/** The ship, and the mini ship: smaller, lighter, quicker to answer the input. */
+/**
+ * The ship and the mini ship (stage f-0: matched to the genre's feel, docs/v2/PLAN.md
+ * 9.1). In the genre's units a cube falls at g ≈ 115 cells/s²; the ship climbs at 0.4 g,
+ * brakes a fall at 0.5 g, sinks at 0.32 g and brakes a climb at 0.48 g, climbing at most
+ * 16 cells/s and falling at most 12.8. The mini ship is the same ship ÷ 0.85: quicker in
+ * everything and faster at its caps.
+ */
 export const SHIP = {
   /** @type {ShipKind} */
-  normal: { up: 34, down: 30, maxV: 8.5, half: 0.3, radius: 0.28, size: 1.1 },
+  normal: { upRise: 46, upFall: 57.5, downRise: 55.2, downFall: 36.8, capUp: 16, capDown: 12.8, half: 0.3, radius: 0.28, size: 1.1 },
   /** @type {ShipKind} */
-  mini: { up: 50, down: 44, maxV: 8.5, half: 0.18, radius: 0.17, size: 0.66 },
+  mini: { upRise: 54.1, upFall: 67.6, downRise: 64.9, downFall: 43.3, capUp: 18.8, capDown: 15.1, half: 0.18, radius: 0.17, size: 0.66 },
 };
 
 /**
  * A landing forgives this much: a body that was at most SNAP below a surface's level
  * the step before is put back on it (a sharper edge would read as a wall to the player).
  */
-export const SNAP = 0.15;
+export const SNAP = 0.2;
 
 /**
  * Human limits per difficulty tier, as in Wave Rush (owner, 2026-10-29: "possible for a

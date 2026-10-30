@@ -14,10 +14,11 @@
  *   Demon: the sections from..to (numbers) fly at their own tier, look and checkpoint.
  * @typedef {{
  *   id: number, key: string, tier: string, theme: string,
- *   groups: number[][], portals: PortalRule[], bands?: Band[], fixed?: boolean,
+ *   groups: number[][], portals: PortalRule[], bands?: Band[], fixed?: boolean, alternate?: boolean,
  * }} SectorDef
  *   `groups`: section numbers (1-based) shuffled among themselves and played in this
- *   order (`fixed`: not shuffled at all, the finale).
+ *   order (`fixed`: not shuffled at all, the finale; `alternate`: each group dealt out by
+ *   vehicle in turns, level.js `orderSections`).
  */
 
 /** @param {number} from @param {number} to */

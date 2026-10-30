@@ -157,13 +157,17 @@ export const PORTAL_COLORS = {
   miniOff: '#7fcf7a',
   shipOn: '#ff8a5c',
   shipOff: '#7fe0ff',
+  ball: '#ffb347',
+  spider: '#c77dff',
 };
 
 /**
  * A portal's colour.
- * @param {{ kind: 'gravity' | 'mini' | 'ship', on: boolean }} p
+ * @param {{ kind: 'gravity' | 'mini' | 'ship', on: boolean, mode?: string }} p
  */
 export function portalColor(p) {
+  if (p.kind === 'ship' && p.mode === 'ball') return PORTAL_COLORS.ball;
+  if (p.kind === 'ship' && p.mode === 'spider') return PORTAL_COLORS.spider;
   if (p.kind === 'gravity') return p.on ? PORTAL_COLORS.gravityOn : PORTAL_COLORS.gravityOff;
   if (p.kind === 'mini') return p.on ? PORTAL_COLORS.miniOn : PORTAL_COLORS.miniOff;
   return p.on ? PORTAL_COLORS.shipOn : PORTAL_COLORS.shipOff;

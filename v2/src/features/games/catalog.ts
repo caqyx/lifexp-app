@@ -1,15 +1,15 @@
-// The games of v2 (owner's decision 2026-10-26: these four, plus Wave Rush from w-1 and
-// Ship Rush from s-1;
+// The games of v2 (owner's decision 2026-10-26: these four, plus Wave Rush from w-1,
+// Ship Rush from s-1 and Flip Rush from f-1;
 // v1's Coins, Snake, 2048, Redstone and FPS stay in v1 until the cutover). Every game
 // runs in GameHost.
 // Vendored games live in v2/public/games/<id>/ (scripts/vendor-game.mjs, VENDORED.json);
-// Flappy Bird, Szybkie liczenie, Wave Rush and Ship Rush are LifeXP's own, written in this
-// repo in v2/public/games/flappy/, quick-math/, wave-rush/ and ship-rush/ (GAME.json; the
-// two Rush games share their engine in v2/public/games/_engine/).
-import { Activity, Bird, Calculator, FlaskConical, Grid3x3, type LucideIcon, Rocket, Swords } from 'lucide-preact';
+// Flappy Bird, Szybkie liczenie, Wave Rush, Ship Rush and Flip Rush are LifeXP's own,
+// written in this repo in v2/public/games/flappy/, quick-math/, wave-rush/, ship-rush/ and
+// flip-rush/ (GAME.json; the Rush games share their engine in v2/public/games/_engine/).
+import { Activity, Bird, Calculator, Cog, FlaskConical, Grid3x3, type LucideIcon, Rocket, Swords } from 'lucide-preact';
 import { emulatorTarget } from '@/lib/emulator';
 
-export type GameId = 'flappy-bird' | 'wartime' | 'gridlock' | 'quick-math' | 'wave-rush' | 'ship-rush' | 'test';
+export type GameId = 'flappy-bird' | 'wartime' | 'gridlock' | 'quick-math' | 'wave-rush' | 'ship-rush' | 'flip-rush' | 'test';
 
 export interface GameDef {
   id: GameId;
@@ -34,6 +34,7 @@ export const GAMES: readonly GameDef[] = [
   { id: 'quick-math', sessionName: 'Szybkie liczenie', icon: Calculator, src: 'games/quick-math/index.html' },
   { id: 'wave-rush', sessionName: 'Wave Rush', icon: Activity, src: 'games/wave-rush/index.html', landscape: true },
   { id: 'ship-rush', sessionName: 'Ship Rush', icon: Rocket, src: 'games/ship-rush/index.html', landscape: true },
+  { id: 'flip-rush', sessionName: 'Flip Rush', icon: Cog, src: 'games/flip-rush/index.html', landscape: true },
 ];
 
 /**

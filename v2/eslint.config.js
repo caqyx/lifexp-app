@@ -66,7 +66,7 @@ export default tseslint.config(
   {
     // LifeXP's own games run in GameHost's frame as plain ES modules (no build step),
     // with their own CSP: no eval, no HTML strings, nothing global.
-    files: ['public/games/flappy/**/*.js', 'public/games/quick-math/**/*.js', 'public/games/wave-rush/**/*.js', 'public/games/ship-rush/**/*.js', 'public/games/_engine/**/*.js'],
+    files: ['public/games/flappy/**/*.js', 'public/games/quick-math/**/*.js', 'public/games/wave-rush/**/*.js', 'public/games/ship-rush/**/*.js', 'public/games/flip-rush/**/*.js', 'public/games/_engine/**/*.js'],
     languageOptions: { globals: globals.browser, sourceType: 'module' },
     rules: {
       'no-eval': 'error',
@@ -76,7 +76,7 @@ export default tseslint.config(
         { selector: 'AssignmentExpression > MemberExpression.left[property.name=/^(inner|outer)HTML$/]', message: 'Tekst przez textContent.' },
         { selector: "CallExpression[callee.property.name='insertAdjacentHTML']", message: 'Tekst przez textContent.' },
         { selector: "AssignmentExpression > MemberExpression.left[object.name='window']", message: 'Bez globali na window.' },
-        { selector: "CallExpression[callee.property.name='clear'][callee.object.name=/^(localStorage|sessionStorage)$/]", message: 'Gra kasuje tylko swoje klucze (lifexp-flappy-*, lifexp-quickmath-*, lifexp-waverush-*, lifexp-shiprush-*).' },
+        { selector: "CallExpression[callee.property.name='clear'][callee.object.name=/^(localStorage|sessionStorage)$/]", message: 'Gra kasuje tylko swoje klucze (lifexp-flappy-*, lifexp-quickmath-*, lifexp-waverush-*, lifexp-shiprush-*, lifexp-fliprush-*).' },
       ],
     },
   },
