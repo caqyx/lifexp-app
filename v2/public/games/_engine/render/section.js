@@ -1,14 +1,27 @@
 // @ts-check
-// One section painted once into its own canvas (docs/v2/PLAN.md 9.1, stage w-1): the
+// One section painted once into its own canvas (docs/v2/PLAN.md 9.1, stages w-1 and s-1),
+// for both Rush games: the
 // terrain (fill, the sector's block pattern, a lit rim, an inset trim, the outline with a
 // restrained glow), its fixed hazards (blocks, pillars, spikes) and its deco (chains with
 // ornaments, stars, diamonds, gears, sawtooth edges). Per frame the game only copies the
 // visible part; saws, orbs and portals move, so they are drawn per frame (sprites.js).
-import { VIEW_H, VIEW_TOP } from '../config.js';
+import { VIEW_H, VIEW_TOP } from '../world.js';
 import { profileY } from '../geometry.js';
 
 /**
- * @typedef {import('./themes.js').Theme} Theme
+ * @typedef {{ glow: number, chevrons: boolean, teeth: boolean, ground: string | null, hazardGlow: string | null }} SurfaceFx
+ *   glow: outline glow strength (0 = restrained); chevrons: arrow patterns inside the
+ *   walls; teeth: toothed edges along every wall; ground: a glowing floor; hazardGlow: a
+ *   halo around hazards so they stay readable among glowing deco.
+ * @typedef {{
+ *   id: string,
+ *   pattern: 'tiles' | 'bricks' | 'panels', emblem: 'porthole' | 'diamond' | 'star' | 'eye',
+ *   block: { top: string, bottom: string, tile: string, shade: string, rim: string, edge: string, glow: string, detail: string },
+ *   hazard: { fill: string, inner: string, edge: string, metal: string },
+ *   deco: string, fx?: SurfaceFx,
+ * }} SurfaceTheme
+ *   What a section's painting needs of a look: each game's themes add their backgrounds.
+ * @typedef {SurfaceTheme} Theme
  * @typedef {import('./view.js').View} View
  * @typedef {import('../geometry.js').Geometry} Geometry
  * @typedef {import('../geometry.js').Pt} Pt

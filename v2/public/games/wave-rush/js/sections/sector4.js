@@ -4,7 +4,7 @@
 // flips per run and one mini stretch (section 10, flown small between its own portals).
 import { room, tunnel } from './kit.js';
 
-/** @type {import('../geometry.js').SectionData[]} */
+/** @type {import('../../../_engine/geometry.js').SectionData[]} */
 export const SECTOR4 = [
   { id: 's4-01', ...tunnel({ gap: 3.2, legs: [3, -3, 3, -3, 2, -2] }), hazards: [], deco: [{ type: 'sawtooth', from: 7, to: 23, on: 'ceil' }] },
   {

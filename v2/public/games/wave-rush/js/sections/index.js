@@ -9,7 +9,7 @@ import { SECTOR5 } from './sector5.js';
 import { SECTOR6 } from './sector6.js';
 import { FINALE, FINALE_SECTIONS } from './finale.js';
 
-/** @type {Record<number, import('../geometry.js').SectionData[]>} */
+/** @type {Record<number, import('../../../_engine/geometry.js').SectionData[]>} */
 export const SECTION_LIBRARY = { 1: SECTOR1, 2: SECTOR2, 3: SECTOR3, 4: SECTOR4, 5: SECTOR5, 6: SECTOR6, [FINALE.id]: FINALE_SECTIONS };
 
 export { FINALE };

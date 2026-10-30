@@ -3,7 +3,7 @@
 // portals. Sections 1–5 are shuffled and played first, then 6–15. A little more of
 // everything than sector 1: more spikes, saws and narrower (≥ 6 hitboxes) corridors.
 
-/** @type {import('../geometry.js').SectionData[]} */
+/** @type {import('../../../_engine/geometry.js').SectionData[]} */
 export const SECTOR2 = [
   // ── 1–5: warm-up ──
   {

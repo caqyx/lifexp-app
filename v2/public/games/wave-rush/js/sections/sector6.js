@@ -8,7 +8,7 @@
 // in each of Hard, Insane and Extreme.
 import { join, open, room, tunnel } from './kit.js';
 
-/** @typedef {import('../geometry.js').HazardData} HazardData */
+/** @typedef {import('../../../_engine/geometry.js').HazardData} HazardData */
 
 /**
  * Spike orbs in a chamber, alternating high (on a chain) and low.
@@ -33,7 +33,7 @@ const d23 = join(room({ top: 1, bottom: 11, inner: 12, tail: 2 }), tunnel({ lead
 const d27 = join(tunnel({ gap: 3, legs: [3, -3, 4, -4, 3, -3], tail: 2 }), room({ lead: 2, top: 1, bottom: 11, inner: 14 }), tunnel({ lead: 2, gap: 3, legs: [-4, 4, -3, 3] }));
 const d30 = join(tunnel({ gap: 3, legs: [4, -4, 4, -4], tail: 2 }), open(4), tunnel({ lead: 2, gap: 3, legs: [-3, 3, -4, 4, -3, 3] }));
 
-/** @type {import('../geometry.js').SectionData[]} */
+/** @type {import('../../../_engine/geometry.js').SectionData[]} */
 export const SECTOR6 = [
   // ── Easy Demon ──
   { id: 'd01', ...tunnel({ gap: 3.2, legs: [3, -3, 3, -3, 3, -3] }), hazards: [], deco: [{ type: 'chain', x: 4, len: 1.2, ornament: 'triangle' }] },

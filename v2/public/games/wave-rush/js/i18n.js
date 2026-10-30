@@ -1,6 +1,9 @@
 // @ts-check
 // The game's own texts: the frame cannot use the app's i18n, so GameHost passes the
-// app's language as ?lang=pl|en (Polish when missing or unknown).
+// app's language as ?lang=pl|en (Polish when missing or unknown; ../../_engine/i18n.js).
+import { makeTranslator, pickLang } from '../../_engine/i18n.js';
+
+export { pickLang };
 
 const TEXTS = {
   pl: {
@@ -146,18 +149,12 @@ const TEXTS = {
 /** @typedef {'pl' | 'en'} Lang */
 /** @typedef {keyof typeof TEXTS.pl} TextKey */
 
-/** @param {string} search @returns {Lang} */
-export function pickLang(search) {
-  return new URLSearchParams(search).get('lang') === 'en' ? 'en' : 'pl';
-}
-
 /**
  * @param {Lang} lang
  * @returns {(key: TextKey, values?: Record<string, string | number>) => string}
  */
 export function translator(lang) {
-  const texts = TEXTS[lang];
-  return (key, values) => texts[key].replace(/\{(\w+)\}/g, (_, name) => String(values?.[name] ?? `{${name}}`));
+  return makeTranslator(TEXTS[lang]);
 }
 
 /** Every key of both languages (for the tests). */

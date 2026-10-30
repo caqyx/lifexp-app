@@ -5,7 +5,7 @@
 // here is proven in both gravities. Corridors ≥ 4.5 hitboxes, and the narrow ones are
 // diagonal (45° walls the wave can graze while flying along them).
 
-/** @type {import('../geometry.js').SectionData[]} */
+/** @type {import('../../../_engine/geometry.js').SectionData[]} */
 export const SECTOR3 = [
   // ── 1–5 ──
   {

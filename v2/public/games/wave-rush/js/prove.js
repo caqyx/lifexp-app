@@ -2,14 +2,14 @@
 // The validator's entry point: is an authored section fair at its sector's settings?
 // (docs/v2/PLAN.md 9.1, stage w-1). Used by v2/tests/wave-rush.test.ts on every section.
 import { JOINT, WAVE, sectionStyle, tierOf, tierSpeed } from './config.js';
-import { buildGeometry, capsuleHits, checkSection } from './geometry.js';
+import { buildGeometry, capsuleHits, checkSection } from '../../_engine/geometry.js';
 import { PORTAL_OFFSET } from './run.js';
 import { solveShip } from './ship.js';
 import { changesOf, entryHeights, proveFrom, toleranceBand } from './solver.js';
 
 /**
  * @typedef {import('./config.js').SectorDef} SectorDef
- * @typedef {import('./geometry.js').SectionData} SectionData
+ * @typedef {import('../../_engine/geometry.js').SectionData} SectionData
  * @typedef {{ y: number, problem: string | null, changes: number }} EntryResult
  */
 

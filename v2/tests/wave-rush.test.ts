@@ -27,7 +27,7 @@ import {
   profileY,
   widestGapAt,
   type SectionData,
-} from '../public/games/wave-rush/js/geometry.js';
+} from '../public/games/_engine/geometry.js';
 import { pickLang, textsOf, translator, TEXT_KEYS } from '../public/games/wave-rush/js/i18n.js';
 import { advanceClock, createWave, directionFor, holdFor, isBuffered, stepShip, stepWave } from '../public/games/wave-rush/js/physics.js';
 import { solveShip, verifyShip } from '../public/games/wave-rush/js/ship.js';
@@ -46,7 +46,7 @@ import {
   saveCheckpointBy,
   saveSkin,
 } from '../public/games/wave-rush/js/records.js';
-import { createRng, parseSwitches, shuffle } from '../public/games/wave-rush/js/rng.js';
+import { createRng, parseSwitches, shuffle } from '../public/games/_engine/rng.js';
 import {
   PORTAL_OFFSET,
   buildFinale,
@@ -60,7 +60,7 @@ import {
   progressAt,
   stateAt,
 } from '../public/games/wave-rush/js/run.js';
-import { TURN_TAU, easeAngle, shortestArc, targetAngle } from '../public/games/wave-rush/js/render/turn.js';
+import { TURN_TAU, easeAngle, shortestArc, targetAngle } from '../public/games/_engine/render/turn.js';
 import { FINALE, SECTION_LIBRARY } from '../public/games/wave-rush/js/sections/index.js';
 import { createAutopilot } from '../public/games/wave-rush/js/autopilot.js';
 import { DEFAULT_SKIN, SKINS, isUnlocked, resolveSkin } from '../public/games/wave-rush/js/skins.js';

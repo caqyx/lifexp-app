@@ -110,9 +110,15 @@ const OWN_GAMES = [
   { id: 'flappy', prefix: 'lifexp-flappy-', storageArgs: ['BEST_KEY'] },
   // (the argument is read up to its first parenthesis: recordKey(level) → "recordKey(level")
   { id: 'quick-math', prefix: 'lifexp-quickmath-', storageArgs: ['MODE_KEY', 'recordKey(level'] },
-  // Every key goes through records.js's readJson/writeJson (KEYS: lifexp-waverush-*).
-  { id: 'wave-rush', prefix: 'lifexp-waverush-', storageArgs: ['key'] },
+  // Wave Rush and Ship Rush reach storage only through the shared engine's records
+  // (v2/public/games/_engine/records.js, checked below), under their own prefix.
+  { id: 'wave-rush', prefix: 'lifexp-waverush-', storageArgs: [], records: 'lifexp-waverush-' },
 ];
+
+/** Every file of a directory, recursively. @param {string} dir */
+function filesOf(dir) {
+  return fs.readdirSync(dir, { recursive: true }).map((f) => path.join(dir, f)).filter((f) => fs.statSync(f).isFile());
+}
 
 for (const game of OWN_GAMES) {
   test(`LifeXP's own game ${game.id}: a CSP no looser than the vendored games', no external host, nothing beyond itself`, async () => {
@@ -129,7 +135,7 @@ for (const game of OWN_GAMES) {
     expect(html).not.toMatch(/\sstyle=/); // no inline styles (the CSP would block them)
     expect(html).toContain('<link rel="icon" href="data:,">');
 
-    const files = fs.readdirSync(dir, { recursive: true }).map((f) => path.join(dir, f)).filter((f) => fs.statSync(f).isFile());
+    const files = filesOf(dir);
     const problems = [];
     for (const file of files) {
       const text = fs.readFileSync(file, 'utf8');
@@ -147,5 +153,31 @@ for (const game of OWN_GAMES) {
       [...fs.readFileSync(f, 'utf8').matchAll(/(?:localStorage|storage\??)\.(?:getItem|setItem|removeItem)\(([^,)]+)/g)].map((m) => m[1].trim()),
     );
     expect([...new Set(args)].sort()).toEqual([...game.storageArgs].sort());
+    if (game.records) {
+      expect(fs.readFileSync(path.join(dir, 'js', 'records.js'), 'utf8')).toContain(`createRecords('${game.records}')`);
+    }
   });
 }
+
+// The engine Wave Rush and Ship Rush share (stage s-1): code only, no page of its own; the
+// same rules as a game, it names no storage key (each game gives its prefix) and reaches
+// storage only through records.js's readJson/writeJson.
+test('the Rush games’ shared engine: no page, no external host, no storage key of its own', async () => {
+  const { FORBIDDEN, externalUrls } = await import(SCRIPT);
+  const dir = path.join(__dirname, '..', 'v2', 'public', 'games', '_engine');
+  expect(fs.existsSync(path.join(dir, 'index.html'))).toBe(false);
+  const files = filesOf(dir);
+  const problems = [];
+  for (const file of files) {
+    const text = fs.readFileSync(file, 'utf8');
+    for (const url of externalUrls(text)) problems.push(`${path.basename(file)}: ${url}`);
+    for (const { pattern, why } of FORBIDDEN) if (pattern.test(text)) problems.push(`${path.basename(file)}: ${why}`);
+    if (/\beval\s*\(|new Function\s*\(/.test(text)) problems.push(`${path.basename(file)}: eval`);
+    for (const [, key] of text.matchAll(/['"`](lifexp-[a-z-]*)/g)) problems.push(`${path.basename(file)}: key ${key}`);
+  }
+  expect(problems).toEqual([]);
+  const args = files.flatMap((f) =>
+    [...fs.readFileSync(f, 'utf8').matchAll(/(?:localStorage|storage\??)\.(?:getItem|setItem|removeItem)\(([^,)]+)/g)].map((m) => m[1].trim()),
+  );
+  expect([...new Set(args)]).toEqual(['key']);
+});

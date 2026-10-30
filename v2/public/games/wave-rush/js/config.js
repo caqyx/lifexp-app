@@ -7,28 +7,26 @@
 // corridor is closed by solid terrain, and touching anything solid is a crash, except
 // grazing a 45° slope that runs exactly along the wave's current direction.
 
-/** One physics step: 240 per second whatever the screen's refresh rate. */
-export const STEP = 1 / 240;
-/** A longer frame (a stalled tab) is cut to this, so the game never jumps far ahead. */
-export const MAX_FRAME = 0.25;
+export {
+  BASE_SPEED,
+  CAMERA_LEAD,
+  INPUT_BUFFER_MS,
+  JOINT,
+  JOINT_CLEAR,
+  MAX_FRAME,
+  MIN_VIEW_W,
+  PLAY_H,
+  RESPAWN_BACK,
+  RESTART_LOCK,
+  START_PAD,
+  STEP,
+  VIEW_H,
+  VIEW_TOP,
+} from '../../_engine/world.js';
+import { BASE_SPEED } from '../../_engine/world.js';
+import { bandOf, range, sectionStyle } from '../../_engine/sectors.js';
 
-/** The playfield: the wave lives in y 0..PLAY_H; leaving it is a crash. */
-export const PLAY_H = 12;
-/** The band always on screen (terrain fills whatever is above and below it). */
-export const VIEW_TOP = -1.5;
-export const VIEW_H = 15;
-/** A portrait phone still shows at least this many cells ahead and behind (letterboxed band). */
-export const MIN_VIEW_W = 18;
-/** Where the wave sits on screen: a share of the visible width, at most this many cells in. */
-export const CAMERA_LEAD = { share: 0.3, max: 9 };
-
-/** Every section starts and ends with this open corridor, so any order joins up. */
-export const JOINT = { ceil: 2, floor: 10, lead: 2 };
-/** Nothing that can hurt stands closer than this to a section's ends. */
-export const JOINT_CLEAR = 2.5;
-
-/** Speed 1.0 in cells per second (the feel of a classic "normal speed" level). */
-export const BASE_SPEED = 10.4;
+export { bandOf, sectionStyle };
 
 export const WAVE = {
   /** Hit circle radius; the drawing is larger, so a near miss looks like one. */
@@ -41,15 +39,6 @@ export const WAVE = {
   size: 1.05,
   miniSize: 0.68,
 };
-
-/** After a crash taps are ignored this long, so a frantic tap does not skip the result. */
-export const RESTART_LOCK = 0.45;
-/** A tap this close before the lock ends still counts. */
-export const INPUT_BUFFER_MS = 130;
-/** Where a run starts: this many open cells before sector 1. */
-export const START_PAD = 8;
-/** A respawn starts this far before its checkpoint (inside the open joint). */
-export const RESPAWN_BACK = 2;
 
 /**
  * Human limits per difficulty tier (owner, 2026-10-29: "possible for a human, not just
@@ -85,24 +74,10 @@ export const TIERS = {
 export const SHIP = { up: 34, down: 30, maxV: 8.5, radius: 0.3, size: 1.45 };
 
 /**
- * @typedef {{ kind: 'gravity' | 'mini', count: number, span?: number, band?: number }} PortalRule
- *   gravity: `count` flips upside down, each with its own portal back `span` sections
- *   later, at section boundaries (within `band` when given), so a sector always ends
- *   upright. mini: one pair around each of the band's sections marked `mini` (in its own
- *   open lead-in and lead-out), so mini is only ever flown where it was designed and
- *   proven; `count` must equal the number of those sections.
- * @typedef {{ from: number, to: number, tier: string, theme: string, key: string }} Band
- *   Demon: the sections from..to (numbers) fly at their own tier, look and checkpoint.
- * @typedef {{
- *   id: number, key: string, tier: string, theme: string,
- *   groups: number[][], portals: PortalRule[], bands?: Band[], fixed?: boolean,
- * }} SectorDef
- *   `groups`: section numbers (1-based) shuffled among themselves and played in this
- *   order (`fixed`: not shuffled at all, the finale).
+ * @typedef {import('../../_engine/sectors.js').PortalRule} PortalRule
+ * @typedef {import('../../_engine/sectors.js').Band} Band
+ * @typedef {import('../../_engine/sectors.js').SectorDef} SectorDef
  */
-
-/** @param {number} from @param {number} to */
-const range = (from, to) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
 
 /** The run: sectors 1–6. Finishing it (the whole Demon) unlocks the last skin and the finale. @type {SectorDef[]} */
 export const SECTORS = [
@@ -168,23 +143,6 @@ export function tierOf(key) {
 /** Cells per second of a tier. @param {string} key */
 export function tierSpeed(key) {
   return tierOf(key).speed * BASE_SPEED;
-}
-
-/**
- * The band a section number belongs to, or null.
- * @param {SectorDef} sector @param {number} number
- */
-export function bandOf(sector, number) {
-  return sector.bands?.find((b) => number >= b.from && number <= b.to) ?? null;
-}
-
-/**
- * The tier and look of a section of a sector (its band's, or the sector's).
- * @param {SectorDef} sector @param {number} number
- */
-export function sectionStyle(sector, number) {
-  const band = bandOf(sector, number);
-  return { tier: band ? band.tier : sector.tier, theme: band ? band.theme : sector.theme };
 }
 
 /** @param {SectorDef} sector */

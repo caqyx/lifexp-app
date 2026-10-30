@@ -90,12 +90,18 @@ function missingReferences() {
   // 4. Gry v2 (v2/public/games → /v2/games/<id>/): każda ze stroną z CSP i z metryczką:
   //    kopia (scripts/vendor-game.mjs) ma VENDORED.json, który mówi, skąd i z którego
   //    commitu jest; gra LifeXP pisana w tym repo (Flappy Bird) ma GAME.json z
-  //    "source": "lifexp", zamiast udawać kopię.
+  //    "source": "lifexp", zamiast udawać kopię. Katalog zaczynający się od "_" (np. _engine,
+  //    wspólny silnik Wave Rush i Ship Rush) to kod współdzielony przez gry, nie gra: nie ma
+  //    własnej strony.
   const gamesDir = path.join(OUT, 'v2', 'games');
   if (fs.existsSync(gamesDir)) {
     for (const id of fs.readdirSync(gamesDir)) {
       const dir = path.join(gamesDir, id);
       if (!fs.statSync(dir).isDirectory()) continue;
+      if (id.startsWith('_')) {
+        if (fs.existsSync(path.join(dir, 'index.html'))) missing.add(`${path.relative(OUT, dir)}: kod współdzielony nie może mieć strony (index.html)`);
+        continue;
+      }
       const page = path.join(dir, 'index.html');
       expect(page, dir);
       if (fs.existsSync(page) && !/http-equiv=["']Content-Security-Policy["']/i.test(fs.readFileSync(page, 'utf8'))) {

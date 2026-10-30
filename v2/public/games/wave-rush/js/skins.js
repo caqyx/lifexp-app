@@ -2,6 +2,7 @@
 // The wave's looks (docs/v2/PLAN.md 9.1, stage w-1): ten original icons, drawn from
 // shapes on the canvas (render/wave.js). All are free from the start except the last,
 // which unlocks when the whole Demon sector is finished (stage w-2).
+import { isUnlocked, resolveSkin as resolveFrom } from '../../_engine/skins.js';
 
 /**
  * @typedef {'dart' | 'arrow' | 'kite' | 'chevron' | 'diamond' | 'fin' | 'blade' | 'comet' | 'twin' | 'crown'} Shape
@@ -34,19 +35,12 @@ export const SKINS = [
 
 export const DEFAULT_SKIN = /** @type {Skin} */ (SKINS[0]);
 
-/**
- * Can this skin be worn?
- * @param {Skin} skin @param {{ demonComplete: boolean }} progress
- */
-export function isUnlocked(skin, progress) {
-  return skin.unlock !== 'demon' || progress.demonComplete;
-}
+export { isUnlocked };
 
 /**
  * The skin to wear for a stored id: the default when it is unknown or still locked.
  * @param {string | null} id @param {{ demonComplete: boolean }} progress
  */
 export function resolveSkin(id, progress) {
-  const skin = SKINS.find((s) => s.id === id);
-  return skin && isUnlocked(skin, progress) ? skin : DEFAULT_SKIN;
+  return resolveFrom(SKINS, id, progress);
 }
