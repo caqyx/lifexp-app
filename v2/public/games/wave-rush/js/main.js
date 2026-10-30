@@ -23,6 +23,8 @@ runApp({
   renderFrame,
   slopeOf: (w) => (w.mini ? WAVE.miniSlope : WAVE.slope),
   loadAutopilot: () => import('./autopilot.js').then((m) => m.createAutopilot()),
+  demon: true,
+  finale: true,
   /** The wave's zig-zag trail and the icon. @param {CanvasRenderingContext2D} ctx @param {import('./skins.js').Skin} skin */
   paintSkin(ctx, skin) {
     ctx.strokeStyle = skin.trail;

@@ -15,7 +15,7 @@ import { profileY } from '../geometry.js';
  *   halo around hazards so they stay readable among glowing deco.
  * @typedef {{
  *   id: string,
- *   pattern: 'tiles' | 'bricks' | 'panels', emblem: 'porthole' | 'diamond' | 'star' | 'eye',
+ *   pattern: 'tiles' | 'bricks' | 'panels' | 'plates', emblem: 'porthole' | 'diamond' | 'star' | 'eye' | 'bolt' | 'vent',
  *   block: { top: string, bottom: string, tile: string, shade: string, rim: string, edge: string, glow: string, detail: string },
  *   hazard: { fill: string, inner: string, edge: string, metal: string },
  *   deco: string, fx?: SurfaceFx,
@@ -80,7 +80,20 @@ export function paintPattern(ctx, th, m, x0, y0, x1, y1) {
   const light = new Path2D();
   const dark = new Path2D();
   const inset = 0.09;
-  if (th.pattern === 'bricks') {
+  if (th.pattern === 'plates') {
+    // Riveted hull plates: wide plates, staggered rows, a rivet at each corner.
+    for (let y = Math.floor(y0); y < y1; y += 1) {
+      const shift = (Math.abs(Math.round(y)) % 2) * 1;
+      for (let x = Math.floor(x0 / 2) * 2 - shift; x < x1; x += 2) {
+        light.moveTo(m.X(x + inset), m.Y(y + 1 - inset));
+        light.lineTo(m.X(x + inset), m.Y(y + inset));
+        light.lineTo(m.X(x + 2 - inset), m.Y(y + inset));
+        dark.moveTo(m.X(x + 2 - inset), m.Y(y + inset));
+        dark.lineTo(m.X(x + 2 - inset), m.Y(y + 1 - inset));
+        dark.lineTo(m.X(x + inset), m.Y(y + 1 - inset));
+      }
+    }
+  } else if (th.pattern === 'bricks') {
     for (let y = Math.floor(y0 * 2) / 2; y < y1; y += 0.5) {
       const shift = (Math.round(y * 2) % 2) * 0.5;
       for (let x = Math.floor(x0) - shift; x < x1; x += 1) {
@@ -109,8 +122,22 @@ export function paintPattern(ctx, th, m, x0, y0, x1, y1) {
   ctx.stroke(light);
   ctx.strokeStyle = th.block.shade;
   ctx.stroke(dark);
-  if (th.pattern === 'panels') {
+  if (th.pattern === 'panels' || th.pattern === 'plates') {
+    const size = th.pattern === 'panels' ? 2 : 1;
     ctx.fillStyle = th.block.detail;
+    if (size === 1) {
+      for (let y = Math.floor(y0); y < y1; y += 1) {
+        const shift = (Math.abs(Math.round(y)) % 2) * 1;
+        for (let x = Math.floor(x0 / 2) * 2 - shift; x < x1; x += 2) {
+          for (const [dx, dy] of [[0.22, 0.22], [1.78, 0.22], [0.22, 0.78], [1.78, 0.78]]) {
+            ctx.beginPath();
+            ctx.arc(m.X(x + /** @type {number} */ (dx)), m.Y(y + /** @type {number} */ (dy)), c * 0.055, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+      return;
+    }
     for (let y = Math.floor(y0 / 2) * 2; y < y1; y += 2) {
       for (let x = Math.floor(x0 / 2) * 2; x < x1; x += 2) {
         for (const [dx, dy] of [[0.3, 0.3], [1.7, 0.3], [0.3, 1.7], [1.7, 1.7]]) {
@@ -175,6 +202,8 @@ function paintEmblems(ctx, g, th, m) {
         ctx.arc(cx, cy, r * 0.62, 0, Math.PI * 2);
         ctx.fill();
       } else if (th.emblem === 'diamond') paintDiamond(ctx, cx, cy, r, th.block.detail);
+      else if (th.emblem === 'bolt') paintBolt(ctx, cx, cy, r, th.block.detail, th.block.glow);
+      else if (th.emblem === 'vent') paintVent(ctx, cx, cy, r, th.block.detail, th.block.shade);
       else if (th.emblem === 'eye') paintEye(ctx, cx, cy, r * 1.4, th.block.detail, th.block.glow);
       else paintStar(ctx, cx, cy, r * 1.1, th.block.detail);
     }
@@ -451,6 +480,59 @@ export function paintEye(ctx, x, y, r, color, glow) {
   ctx.beginPath();
   ctx.arc(x, y, r * 0.42, 0, Math.PI * 2);
   ctx.stroke();
+}
+
+/**
+ * A lightning bolt in a ring: the storm's emblem.
+ * @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} r px @param {string} color @param {string} glow
+ */
+function paintBolt(ctx, x, y, r, color, glow) {
+  const halo = ctx.createRadialGradient(x, y, 0, x, y, r * 1.4);
+  halo.addColorStop(0, glow);
+  halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(x - r * 1.4, y - r * 1.4, r * 2.8, r * 2.8);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, r * 0.14);
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x + r * 0.18, y - r * 0.78);
+  ctx.lineTo(x - r * 0.38, y + r * 0.1);
+  ctx.lineTo(x - r * 0.02, y + r * 0.1);
+  ctx.lineTo(x - r * 0.2, y + r * 0.78);
+  ctx.lineTo(x + r * 0.4, y - r * 0.14);
+  ctx.lineTo(x + r * 0.04, y - r * 0.14);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/**
+ * A round vent with slats: the sky platforms' emblem.
+ * @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} r px @param {string} color @param {string} shade
+ */
+function paintVent(ctx, x, y, r, color, shade) {
+  ctx.fillStyle = shade;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, r * 0.13);
+  ctx.stroke();
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.8, 0, Math.PI * 2);
+  ctx.clip();
+  ctx.lineWidth = Math.max(1, r * 0.11);
+  ctx.beginPath();
+  for (let k = -2; k <= 2; k++) {
+    ctx.moveTo(x - r, y + k * r * 0.32);
+    ctx.lineTo(x + r, y + k * r * 0.32);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 /** @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} r px @param {string} color */

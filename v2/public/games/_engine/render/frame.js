@@ -127,7 +127,7 @@ function drawPieces(ctx, r, s, pieces, camX, look) {
  */
 function patternOf(r, th, cell) {
   if (r.patterns.has(th.id)) return r.patterns.get(th.id) ?? null;
-  const size = th.pattern === 'panels' ? 2 : 1;
+  const size = th.pattern === 'panels' || th.pattern === 'plates' ? 2 : 1;
   const tile = document.createElement('canvas');
   tile.width = Math.max(1, Math.round(size * cell));
   tile.height = tile.width;

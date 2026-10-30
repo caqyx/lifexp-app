@@ -40,10 +40,13 @@ import { isUnlocked, resolveSkin } from './skins.js';
  *   paintSkin: (ctx: CanvasRenderingContext2D, skin: any) => void,
  *   slopeOf: (vehicle: Vehicle) => number,
  *   loadAutopilot: () => Promise<{ advise: (run: Run, vehicle: Vehicle) => boolean }>,
+ *   demon: boolean, finale: boolean,
  * }} AppDef
  *   t: the game's translator (every key of APP_TEXT_KEYS, plus sector1..n and the Demon
  *   bands' keys); paintSkin: a skin's preview in a 96 × 64 box (CSS px); slopeOf: the
- *   wave's |dy/dx| now (the icon turns toward it).
+ *   wave's |dy/dx| now (the icon turns toward it); demon: the run ends with the Demon
+ *   sector (finishing it is the achievement that unlocks the last skin and the finale);
+ *   finale: the game has its finale level (its box on the menu).
  */
 
 /** The texts the page itself uses (each game's i18n has them all; its tests check). */
@@ -198,7 +201,8 @@ export function runApp(def) {
   function updateMenu() {
     const best = records.readBest(storage);
     dom.menuBest.textContent = best ? t('bestValue', best) : t('bestNone');
-    const unlocked = records.readProgress(storage).demonComplete;
+    dom.finaleBox.hidden = !def.finale;
+    const unlocked = def.finale && records.readProgress(storage).demonComplete;
     dom.finalePlay.disabled = !unlocked;
     dom.finalePractice.disabled = !unlocked;
     dom.finaleBox.classList.toggle('is-locked', !unlocked);
@@ -211,7 +215,7 @@ export function runApp(def) {
 
   /** @param {'normal' | 'practice'} mode @param {'run' | 'finale'} [level] */
   function startGame(mode, level = 'run') {
-    if (level === 'finale' && !records.readProgress(storage).demonComplete) return;
+    if (level === 'finale' && !(def.finale && records.readProgress(storage).demonComplete)) return;
     const jump = level === 'finale' ? (switches.finale ? { sector: 1, section: switches.finale } : null) : switches.jump;
     state.game = createGame(def.rules, { rng: gameRng, mode, level, checkpointBy: state.checkpointBy, jump });
     state.newBest = false;
@@ -411,7 +415,7 @@ export function runApp(def) {
     dom.stage.classList.toggle('is-new-best', state.newBest);
     // The whole run (Demon included) and the finale each give an achievement. A level
     // jumped into with the test switches counts only in a test (?seed=); practice never.
-    const earned = game.mode === 'normal' && (keepsRecords(game) || debug);
+    const earned = game.mode === 'normal' && (keepsRecords(game) || debug) && (finale || def.demon);
     if (earned && records.unlock(storage, finale ? 'finaleComplete' : 'demonComplete')) {
       showAchievement(finale);
       return;

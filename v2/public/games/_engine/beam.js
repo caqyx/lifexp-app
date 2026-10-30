@@ -30,9 +30,15 @@ import { STEP } from './world.js';
 
 /** Physics steps per decision (1/60 s). */
 export const N = 4;
-/** States kept per height band (and per hold) in a layer, spread over vertical speed. */
-const PER_BUCKET = 3;
-const BUCKET = 0.25;
+/**
+ * How finely the beam keeps states: per height band (`bucket` cells) and hold, up to
+ * `per` states whose vertical speeds differ by at least `spread`. The default is Wave
+ * Rush's finale ship's; a finer beam keeps more alternatives (more paths to try for one
+ * that survives every mistimed tap) at a higher cost.
+ * @typedef {{ bucket: number, per: number, spread: number }} Grain
+ * @type {Grain}
+ */
+export const GRAIN = { bucket: 0.25, per: 3, spread: 0.8 };
 
 /**
  * One decision's flight with room to spare; the state after it, or null.
@@ -49,27 +55,32 @@ function fly(spec, x, node, hold, band) {
 }
 
 /**
- * Keeps a spread of states: per height band and hold, a few with different speeds.
- * @param {Map<string, Node[]>} buckets @param {Node} node
+ * Keeps a spread of states: per height band and hold, a few with different speeds. Of
+ * two nearly alike, the freer one stays (longer since its last change, so it may change
+ * sooner): otherwise fresh changes would crowd out the states that keep their course.
+ * @param {Map<string, Node[]>} buckets @param {Node} node @param {Grain} grain
  */
-function keep(buckets, node) {
-  const key = `${Math.round(node.v.y / BUCKET)}:${node.hold}`;
+function keep(buckets, node, grain) {
+  const key = `${Math.round(node.v.y / grain.bucket)}:${node.hold}`;
   const list = buckets.get(key);
   if (!list) {
     buckets.set(key, [node]);
     return;
   }
-  if (list.length >= PER_BUCKET) return;
-  if (list.some((n) => Math.abs(n.v.vy - node.v.vy) < 0.8)) return;
-  list.push(node);
+  const alike = list.findIndex((n) => Math.abs(n.v.vy - node.v.vy) < grain.spread);
+  if (alike >= 0) {
+    if (node.cool > /** @type {Node} */ (list[alike]).cool) list[alike] = node;
+    return;
+  }
+  if (list.length < grain.per) list.push(node);
 }
 
 /**
  * The beam search: every layer's surviving states, from the start to the end.
- * @param {BeamSpec} spec @param {number} interval minimum decisions between changes @param {number} band
+ * @param {BeamSpec} spec @param {number} interval minimum decisions between changes @param {number} band @param {Grain} grain
  * @returns {Node[][]}
  */
-function searchLayers(spec, interval, band) {
+function searchLayers(spec, interval, band, grain) {
   const dx = spec.speed * N * STEP;
   const steps = Math.ceil((spec.x1 - spec.x0) / dx - 1e-9);
   /** @type {Node[][]} */
@@ -84,7 +95,7 @@ function searchLayers(spec, interval, band) {
         if (change && node.cool < interval) continue;
         const next = fly(spec, x, node, hold, band);
         if (!next) continue;
-        keep(buckets, { v: next, hold, cool: change || i === 0 ? 1 : node.cool + 1, parent: index });
+        keep(buckets, { v: next, hold, cool: change || i === 0 ? 1 : node.cool + 1, parent: index }, grain);
       }
     });
     const layer = [...buckets.values()].flat();
@@ -159,8 +170,9 @@ export function verifyBeam(spec, holds) {
 /**
  * Searches a path that keeps every limit, widening the room to spare and then spacing
  * the taps out if the first tries are not robust.
- * @param {BeamSpec} spec @param {{ verify?: boolean, tries?: number, bands?: [number, 'min' | 'rateSafe'][] }} [options]
- *   verify: false for the pilot; bands: the tries (room to spare, and the interval used).
+ * @param {BeamSpec} spec @param {{ verify?: boolean, tries?: number, bands?: [number, 'min' | 'rateSafe'][], grain?: Grain }} [options]
+ *   verify: false for the pilot; bands: the tries (room to spare, and the interval used);
+ *   grain: how finely the beam keeps states.
  * @returns {{ holds: Int8Array | null, problem: string | null }}
  */
 export function solveBeam(spec, options = {}) {
@@ -171,7 +183,7 @@ export function solveBeam(spec, options = {}) {
   let problem = 'no path';
   for (const [band, which] of tries) {
     const interval = which === 'min' ? spec.limits.minInterval : rateSafe;
-    const layers = searchLayers(spec, Math.ceil(interval / decision - 1e-9), band);
+    const layers = searchLayers(spec, Math.ceil(interval / decision - 1e-9), band, options.grain ?? GRAIN);
     const last = /** @type {Node[]} */ (layers[layers.length - 1]);
     const steps = Math.ceil((spec.x1 - spec.x0) / (spec.speed * decision) - 1e-9);
     if (layers.length - 1 < steps) continue;

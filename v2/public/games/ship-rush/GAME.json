@@ -1,0 +1,7 @@
+{
+  "game": "ship-rush",
+  "source": "lifexp",
+  "code": "v2/public/games/ship-rush",
+  "note": "LifeXP's own game, written in this repo (docs/v2/PLAN.md 9.1, s-1): an original ship-flying sibling of Wave Rush, not a vendored copy, so no VENDORED.json. Its engine (levels, game states, records, validator, renderer, page) is shared with Wave Rush in v2/public/games/_engine/. Its CSP is in index.html; tests/vendor-game.spec.js checks it like a vendored game's.",
+  "tests": ["v2/tests/ship-rush.test.ts", "tests/v2/games.spec.js"]
+}

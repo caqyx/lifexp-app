@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Ship Rush</title>
+<link rel="stylesheet" href="../_engine/shell.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<main id="stage" class="stage" data-state="menu">
+  <canvas id="board" class="board" role="img"></canvas>
+
+  <div class="hud" aria-hidden="true">
+    <div class="hud__bar"><span id="progress-fill" class="hud__fill"></span></div>
+    <div class="hud__row">
+      <p id="hud-sector" class="hud__label"></p>
+      <p class="hud__practice" data-t="practiceBadge"></p>
+      <p id="progress-text" class="hud__label hud__label--num">0%</p>
+      <p id="hud-attempt" class="hud__label hud__label--num"></p>
+    </div>
+  </div>
+
+  <p id="toast" class="toast" role="status" aria-live="polite"></p>
+
+  <section id="menu" class="panel panel--menu" aria-labelledby="menu-title">
+    <div class="card card--menu">
+      <h1 id="menu-title" class="card__title" data-t="title"></h1>
+      <p class="card__body" data-t="tagline"></p>
+      <div class="actions">
+        <button id="play" class="button button--primary" type="button" data-t="play"></button>
+        <button id="practice" class="button" type="button" data-t="practice"></button>
+        <button id="skins-open" class="button" type="button" data-t="skins"></button>
+      </div>
+      <dl class="stats">
+        <div class="stats__item"><dt data-t="best"></dt><dd id="menu-best"></dd></div>
+        <div class="stats__item"><dt data-t="attempts"></dt><dd id="menu-attempts">0</dd></div>
+      </dl>
+      <div id="finale-box" class="finale" role="group" aria-labelledby="finale-title">
+        <p id="finale-title" class="finale__title" data-t="finaleName"></p>
+        <div class="actions actions--row">
+          <button id="finale-play" class="button button--finale" type="button" data-t="finalePlay"></button>
+          <button id="finale-practice" class="button" type="button" data-t="finalePractice"></button>
+        </div>
+        <p id="finale-note" class="card__hint"></p>
+      </div>
+      <div class="choice" role="group" aria-labelledby="cp-title">
+        <p id="cp-title" class="choice__title" data-t="checkpoints"></p>
+        <div class="choice__options">
+          <button id="cp-sector" class="chip" type="button" aria-pressed="true" data-t="cpSector"></button>
+          <button id="cp-section" class="chip" type="button" aria-pressed="false" data-t="cpSection"></button>
+        </div>
+      </div>
+      <p class="card__hint" data-t="hint"></p>
+      <p class="card__hint card__hint--portrait" data-t="portrait"></p>
+    </div>
+  </section>
+
+  <section id="skins" class="panel panel--skins" aria-labelledby="skins-title">
+    <div class="card card--skins">
+      <h2 id="skins-title" class="card__title" data-t="skinsTitle"></h2>
+      <p class="card__body" data-t="skinsHint"></p>
+      <ul id="skin-list" class="skins"></ul>
+      <button id="skins-done" class="button button--primary" type="button" data-t="done"></button>
+    </div>
+  </section>
+
+  <section id="ready" class="panel panel--ready" aria-labelledby="ready-title">
+    <p id="ready-title" class="pill" data-t="ready"></p>
+  </section>
+
+  <section id="dead" class="panel panel--dead" aria-labelledby="dead-title" aria-live="polite">
+    <div class="card card--small">
+      <h2 id="dead-title" class="card__title" data-t="crashed"></h2>
+      <p class="badge" data-t="newBest"></p>
+      <p id="dead-result" class="card__body"></p>
+      <p id="dead-hint" class="card__hint"></p>
+      <button id="dead-menu" class="button button--quiet" type="button" data-t="menu"></button>
+    </div>
+  </section>
+
+  <section id="finished" class="panel panel--finished" aria-labelledby="finished-title" aria-live="polite">
+    <div class="card card--small">
+      <h2 id="finished-title" class="card__title" data-t="finishedTitle"></h2>
+      <p class="badge" data-t="newBest"></p>
+      <p id="finished-result" class="card__body"></p>
+      <p id="finished-body" class="card__hint" data-t="finishedBody"></p>
+      <div class="actions actions--row">
+        <button id="finished-again" class="button button--primary" type="button" data-t="again"></button>
+        <button id="finished-menu" class="button" type="button" data-t="menu"></button>
+      </div>
+    </div>
+  </section>
+
+  <section id="achievement" class="panel panel--achievement" aria-labelledby="achievement-title" aria-live="polite">
+    <div class="card card--achievement">
+      <p class="card__eyebrow" data-t="achievement"></p>
+      <h2 id="achievement-title" class="card__title card__title--big"></h2>
+      <p id="achievement-body" class="card__body"></p>
+      <ul id="achievement-unlocks" class="unlocks"></ul>
+      <button id="achievement-next" class="button button--primary" type="button" data-t="continue"></button>
+    </div>
+  </section>
+
+  <section id="paused" class="panel panel--paused" aria-labelledby="paused-title">
+    <div class="card card--small">
+      <h2 id="paused-title" class="card__title" data-t="paused"></h2>
+      <p class="card__body" data-t="resume"></p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

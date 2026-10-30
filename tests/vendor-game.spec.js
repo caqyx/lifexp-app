@@ -113,6 +113,7 @@ const OWN_GAMES = [
   // Wave Rush and Ship Rush reach storage only through the shared engine's records
   // (v2/public/games/_engine/records.js, checked below), under their own prefix.
   { id: 'wave-rush', prefix: 'lifexp-waverush-', storageArgs: [], records: 'lifexp-waverush-' },
+  { id: 'ship-rush', prefix: 'lifexp-shiprush-', storageArgs: [], records: 'lifexp-shiprush-' },
 ];
 
 /** Every file of a directory, recursively. @param {string} dir */
