@@ -5,7 +5,10 @@
 // upside down). The ship (the finale) has a vertical speed instead: holding thrusts it
 // up, letting go lets gravity pull it down, smoothly and capped.
 import { createVehicle } from '../../_engine/game.js';
-import { SHIP, WAVE } from './config.js';
+import { stepWaveOnly, waveRadius } from '../../_engine/wave.js';
+import { SHIP } from './config.js';
+
+export { directionFor, holdFor, waveRadius, waveSlope } from '../../_engine/wave.js';
 
 export { advanceClock, isBuffered } from '../../_engine/clock.js';
 
@@ -16,27 +19,6 @@ export const createWave = createVehicle;
 /** The hit radius of whatever is flying. @param {Wave} w */
 export const hitRadius = (w) => (w.ship ? SHIP.radius : waveRadius(w.mini));
 
-/** @param {boolean} mini */
-export const waveRadius = (mini) => (mini ? WAVE.miniRadius : WAVE.radius);
-/** @param {boolean} mini */
-export const waveSlope = (mini) => (mini ? WAVE.miniSlope : WAVE.slope);
-
-/**
- * Which way the wave goes for this input: holding climbs, unless gravity is flipped.
- * @param {boolean} holding @param {1 | -1} gravity
- */
-export function directionFor(holding, gravity) {
-  return holding ? -gravity : gravity;
-}
-
-/**
- * The input that makes the wave go `dir` (the solver plans in directions).
- * @param {number} dir @param {1 | -1} gravity
- */
-export function holdFor(dir, gravity) {
-  return dir === -gravity;
-}
-
 /**
  * One fixed step: forward at `speed` cells/s, up or down at the slope. No clamping:
  * leaving the playfield is a crash, found by the collision check.
@@ -45,9 +27,7 @@ export function holdFor(dir, gravity) {
  */
 export function stepWave(wave, holding, speed, dt) {
   if (wave.ship) return stepShip(wave, holding, speed, dt);
-  const dir = directionFor(holding, wave.gravity);
-  const dx = speed * dt;
-  return { ...wave, dir, x: wave.x + dx, y: wave.y + dir * waveSlope(wave.mini) * dx };
+  return stepWaveOnly(wave, holding, speed, dt);
 }
 
 /**

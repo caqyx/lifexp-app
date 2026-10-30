@@ -27,9 +27,13 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  * @typedef {{ type: 'saw' | 'orb' | 'mine', x: number, y: number, r: number, chain?: boolean }} RoundData
  *   chain: hangs on a chain from the ceiling (drawn only; the chain never hurts).
  * @typedef {SpikeData | BlockData | PillarData | RoundData} HazardData
- * @typedef {{ type: 'chain', x: number, len: number, ornament?: 'diamond' | 'star' | 'triangle' | 'none' }
- *   | { type: 'star' | 'diamond' | 'gear', x: number, y: number, size: number }
+ * @typedef {{ type: 'chain', x: number, len: number, ornament?: 'diamond' | 'star' | 'triangle' | 'eye' | 'debris' | 'none' }
+ *   | { type: 'star' | 'diamond' | 'gear' | 'eye', x: number, y: number, size: number }
+ *   | { type: 'frame', x: number, y: number, w: number, h: number }
+ *   | { type: 'wreck', x: number, y: number, size: number }
  *   | { type: 'sawtooth', from: number, to: number, on: 'floor' | 'ceil' }} DecoData
+ *   frame: a glowing outlined truss far behind the corridor; wreck: a broken hull's
+ *   outline; both dim, like all deco, so hazards read first (stage s-2).
  * @typedef {{ id: string, length: number, ceil: string, floor: string, hazards: HazardData[], deco?: DecoData[],
  *   mini?: boolean, tier?: string, mode?: 'wave' | 'ship' }} SectionData
  *   mini: designed (and proven) for the mini wave, flown between its own mini portals;

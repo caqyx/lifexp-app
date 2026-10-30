@@ -73,6 +73,10 @@ export const TIERS = {
   hardDemon: { speed: 1.4, minInterval: 0.14, tolerance: 0.023, clearance: 3.1, maxRate: 6.5 },
   insaneDemon: { speed: 1.55, minInterval: 0.125, tolerance: 0.02, clearance: 2.9, maxRate: 7 },
   extremeDemon: { speed: 1.7, minInterval: 0.115, tolerance: 0.018, clearance: 2.8, maxRate: 7.5 },
+  // The finale's ship stretches, and its wave stretches (clearance in wave diameters,
+  // the same 0.6 cells as the ship's body).
+  finaleShip: { speed: 1.5, minInterval: 0.13, tolerance: 0.02, clearance: 3, maxRate: 7 },
+  finaleWave: { speed: 1.3, minInterval: 0.15, tolerance: 0.025, clearance: 3.5, maxRate: 6 },
 };
 
 /**
@@ -96,7 +100,64 @@ export const SECTORS = [
     groups: [range(1, 5), range(6, 15)],
     portals: [{ kind: 'gravity', count: 1, span: 2 }],
   },
+  {
+    id: 4,
+    key: 'harder',
+    tier: 'harder',
+    theme: 'orbit',
+    groups: [range(1, 10)],
+    portals: [{ kind: 'gravity', count: 3, span: 1 }, { kind: 'mini', count: 1 }],
+  },
+  {
+    id: 5,
+    key: 'insane',
+    tier: 'insane',
+    theme: 'deepSpace',
+    groups: [range(1, 5), range(6, 10)],
+    portals: [{ kind: 'gravity', count: 2, span: 1 }, { kind: 'mini', count: 1 }],
+  },
+  {
+    id: 6,
+    key: 'demon',
+    tier: 'easyDemon',
+    theme: 'nebulaBlue',
+    groups: [range(1, 10), range(11, 15), range(16, 25), range(26, 30)],
+    bands: [
+      { from: 1, to: 10, tier: 'easyDemon', theme: 'nebulaBlue', key: 'easyDemon' },
+      { from: 11, to: 15, tier: 'hardDemon', theme: 'nebulaViolet', key: 'hardDemon' },
+      { from: 16, to: 25, tier: 'insaneDemon', theme: 'nebulaCrimson', key: 'insaneDemon' },
+      { from: 26, to: 30, tier: 'extremeDemon', theme: 'nebulaExtreme', key: 'extremeDemon' },
+    ],
+    // Easy: one flip for two sections; Hard: the mini stretch; Insane: two flips and the
+    // mini stretch; Extreme: one flip and the mini stretch (as Wave Rush's Demon).
+    portals: [
+      { kind: 'gravity', count: 1, span: 2, band: 0 },
+      { kind: 'mini', count: 1, band: 1 },
+      { kind: 'gravity', count: 2, span: 1, band: 2 },
+      { kind: 'mini', count: 1, band: 2 },
+      { kind: 'gravity', count: 1, span: 1, band: 3 },
+      { kind: 'mini', count: 1, band: 3 },
+    ],
+  },
 ];
+
+/** The finale's number among the sector-like levels (its sections live under this id). */
+export const FINALE_ID = 7;
+
+/**
+ * The finale "Horyzont Zdarzeń": one fixed sequence (never shuffled), mostly the ship with
+ * wave stretches between, a vehicle portal at every change. Unlocked by the Demon.
+ * @type {SectorDef}
+ */
+export const FINALE = {
+  id: FINALE_ID,
+  key: 'finale',
+  tier: 'finaleShip',
+  theme: 'eventHorizon',
+  groups: [range(1, 10)],
+  portals: [],
+  fixed: true,
+};
 
 /** @param {string} key @returns {Tier} */
 export function tierOf(key) {

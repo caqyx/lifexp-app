@@ -1,9 +1,10 @@
 // @ts-check
-// Ship Rush, LifeXP's own game (docs/v2/PLAN.md 9.1, stage s-1): Wave Rush's sibling for
-// the ship. The Rush engine's page (../../_engine/app.js) with this game's rules,
-// sectors, records, skins, texts and look. Stage s-1 has sectors 1–3; the Demon and the
-// finale (stage s-2) are not there yet, so their achievement and the finale's box are off.
+// Ship Rush, LifeXP's own game (docs/v2/PLAN.md 9.1, stages s-1 and s-2): Wave Rush's
+// sibling for the ship. The Rush engine's page (../../_engine/app.js) with this game's
+// rules, sectors, records, skins, texts and look. Finishing the whole run (the Demon
+// included) is the achievement that unlocks the last hull and the finale.
 import { runApp } from '../../_engine/app.js';
+import { WAVE } from '../../_engine/wave.js';
 import { SECTORS } from './config.js';
 import { RULES } from './game.js';
 import { pickLang, translator } from './i18n.js';
@@ -23,10 +24,10 @@ runApp({
   skins: SKINS,
   createRenderer,
   renderFrame,
-  slopeOf: () => 1,
+  slopeOf: (w) => (w.mini ? WAVE.miniSlope : WAVE.slope),
   loadAutopilot: () => import('./autopilot.js').then((m) => m.createAutopilot()),
-  demon: false,
-  finale: false,
+  demon: true,
+  finale: true,
   /** The ship's curving trail and the hull. @param {CanvasRenderingContext2D} ctx @param {import('./skins.js').Skin} skin */
   paintSkin(ctx, skin) {
     ctx.strokeStyle = skin.trail;

@@ -55,7 +55,7 @@ function drawLight(ctx, v, th, clock) {
   glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = glow;
   ctx.fillRect(cx - r * 6, cy - r * 6, r * 12, r * 12);
-  if (th.backdrop === 'day') {
+  if (th.backdrop === 'day' || th.backdrop === 'space') {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.fillStyle = 'rgba(255, 245, 210, 0.07)';
@@ -190,7 +190,8 @@ function cloudSprite(th, layer, shape, cell) {
     path.arc(x, y, r, 0, Math.PI * 2);
   }
   path.rect(w * 0.12, base - h * 0.12, w * 0.76, h * 0.12);
-  const color = th.clouds[layer.key];
+  const clouds = /** @type {NonNullable<Theme['clouds']>} */ (th.clouds);
+  const color = clouds[layer.key];
   ctx.fillStyle = color;
   ctx.fill(path);
   // Shade gathering beneath.
@@ -198,7 +199,7 @@ function cloudSprite(th, layer, shape, cell) {
   ctx.clip(path);
   const shade = ctx.createLinearGradient(0, h * 0.25, 0, base);
   shade.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  shade.addColorStop(1, th.clouds.shade);
+  shade.addColorStop(1, clouds.shade);
   ctx.fillStyle = shade;
   ctx.fillRect(0, 0, w, h);
   ctx.restore();
@@ -212,6 +213,7 @@ function cloudSprite(th, layer, shape, cell) {
  * @param {typeof LAYERS[number]} layer
  */
 function drawCloudLayer(ctx, v, th, camX, layer) {
+  if (!th.clouds) return;
   const left = camX * layer.depth;
   const first = Math.floor(left / layer.span) - 1;
   for (let k = first; (k * layer.span - left) * v.cell < v.width + layer.size * 3 * v.cell; k++) {
@@ -333,12 +335,445 @@ function drawMotes(ctx, v, p, camX, time) {
   ctx.restore();
 }
 
+// ── Space (stage s-2) ────────────────────────────────────────────────────────
+
+/** The far layer of space, painted once per look and size (it only scrolls). @type {Map<string, HTMLCanvasElement>} */
+const farCache = new Map();
+
+/**
+ * A spiral galaxy: a bright core, a tilted disc and two curling arms of dots.
+ * @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} r @param {number} seed
+ */
+function paintGalaxy(ctx, x, y, r, seed) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(hash(seed) * Math.PI);
+  ctx.scale(1, 0.45 + hash(seed + 1) * 0.3);
+  const disc = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+  disc.addColorStop(0, 'rgba(255, 240, 220, 0.8)');
+  disc.addColorStop(0.2, 'rgba(220, 200, 255, 0.35)');
+  disc.addColorStop(1, 'rgba(120, 100, 220, 0)');
+  ctx.fillStyle = disc;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(235, 225, 255, 0.55)';
+  for (let arm = 0; arm < 2; arm++) {
+    for (let k = 0; k < 40; k++) {
+      const t = k / 40;
+      const a = arm * Math.PI + t * Math.PI * 1.6;
+      const d = r * (0.15 + t * 0.85);
+      const s = Math.max(1, r * 0.035 * (1 - t * 0.6));
+      ctx.fillRect(Math.cos(a) * d + (hash(seed * 7 + k) - 0.5) * r * 0.12, Math.sin(a) * d + (hash(seed * 11 + k) - 0.5) * r * 0.12, s, s);
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * The far layer: nebula haze, galaxies and a dense field of stars (still; a few twinkle on top).
+ * @param {Theme} th @param {View} v
+ */
+function farLayer(th, v) {
+  const key = `${th.id}@${v.width}x${v.height}`;
+  const cached = farCache.get(key);
+  if (cached) return cached;
+  const space = /** @type {import('./themes.js').Space} */ (th.space);
+  const canvas = document.createElement('canvas');
+  canvas.width = v.width * 2;
+  canvas.height = v.height;
+  const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
+  const w = canvas.width;
+  // Haze: soft blobs that wrap around (painted twice across the seam).
+  space.haze.forEach((color, i) => {
+    for (let k = 0; k < 5; k++) {
+      const seed = i * 41 + k * 7;
+      const x = hash(seed) * w;
+      const y = v.height * (0.15 + hash(seed + 1) * 0.7);
+      const r = v.height * (0.35 + hash(seed + 2) * 0.45);
+      for (const dx of [0, -w, w]) {
+        const g = ctx.createRadialGradient(x + dx, y, 0, x + dx, y, r);
+        g.addColorStop(0, color);
+        g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x + dx - r, y - r, r * 2, r * 2);
+      }
+    }
+  });
+  for (let i = 0; i < space.galaxies; i++) paintGalaxy(ctx, w * (0.15 + i * 0.33 + hash(i + 5) * 0.1), v.height * (0.15 + hash(i + 9) * 0.5), v.cell * (1.2 + hash(i + 3) * 1.2), i + 1);
+  for (let i = 0; i < space.stars * 2; i++) {
+    const s = Math.max(1, v.cell * (0.03 + hash(i + 401) ** 3 * 0.12));
+    ctx.globalAlpha = 0.25 + hash(i + 503) * 0.7;
+    ctx.fillStyle = hash(i + 607) > 0.85 ? '#ffd9c8' : hash(i + 607) > 0.7 ? '#cfe0ff' : '#ffffff';
+    ctx.fillRect(hash(i + 211) * w, hash(i + 307) * v.height, s, s);
+  }
+  ctx.globalAlpha = 1;
+  farCache.set(key, canvas);
+  return canvas;
+}
+
+/**
+ * The far layer, scrolling very slowly, with a few stars twinkling on top.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock
+ */
+function drawFarSpace(ctx, v, th, camX, clock) {
+  const far = farLayer(th, v);
+  const shift = (((camX * 0.03 * v.cell) % far.width) + far.width) % far.width;
+  ctx.drawImage(far, -shift, 0);
+  if (shift > far.width - v.width) ctx.drawImage(far, far.width - shift, 0);
+  if (!clock.reduced) drawStars(ctx, v, camX, clock, 40);
+}
+
+/**
+ * Earth's curve below the band: the blue disc, continents and clouds, and the thin
+ * bright line of its atmosphere.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {number} camX
+ */
+function drawEarth(ctx, v, camX) {
+  const r = v.width * 1.4 + v.cell * 20;
+  const cx = v.width * 0.45;
+  const cy = screenY(v, 8.8) + r;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.clip();
+  const sea = ctx.createLinearGradient(0, cy - r, 0, cy - r + v.cell * 6);
+  sea.addColorStop(0, '#2f7ad8');
+  sea.addColorStop(1, '#0a2a60');
+  ctx.fillStyle = sea;
+  ctx.fillRect(cx - r, cy - r, r * 2, v.cell * 8);
+  // Land and cloud bands, drifting slowly as the ship orbits.
+  const drift = camX * 0.04 * v.cell;
+  for (let i = 0; i < 26; i++) {
+    const u = ((((hash(i + 31) * v.width * 2.4 - drift) % (v.width * 2.4)) + v.width * 2.4) % (v.width * 2.4)) - v.width * 0.6;
+    const depth = hash(i + 77) * v.cell * 3.5;
+    const y = cy - Math.sqrt(Math.max(0, r * r - (u - cx) ** 2)) + depth + v.cell * 0.3;
+    const land = hash(i + 13) > 0.45;
+    ctx.fillStyle = land ? 'rgba(90, 140, 70, 0.75)' : 'rgba(255, 255, 255, 0.55)';
+    ctx.beginPath();
+    ctx.ellipse(u, y, v.cell * (land ? 1.6 + hash(i) * 2.4 : 2 + hash(i) * 3), v.cell * (land ? 0.35 : 0.18), 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const [w, a] of [[v.cell * 1.4, 0.12], [v.cell * 0.5, 0.3], [v.cell * 0.12, 0.7]]) {
+    ctx.strokeStyle = `rgba(120, 200, 255, ${a})`;
+    ctx.lineWidth = /** @type {number} */ (w);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Satellites passing far off: a body, two solar panels with their grid, a dish; slowly
+ * turning (still with reduced motion).
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {number} camX @param {Clock} clock @param {number} count
+ */
+function drawSatellites(ctx, v, camX, clock, count) {
+  const span = 34;
+  const left = camX * 0.12;
+  for (let k = Math.floor(left / span) - 1; (k * span - left) * v.cell < v.width + v.cell * 6; k++) {
+    for (let j = 0; j < count; j++) {
+      const seed = k * 13 + j * 101;
+      if (hash(seed) > 0.6) continue;
+      const x = (k * span + hash(seed + 1) * span - left) * v.cell;
+      const y = screenY(v, 0.5 + hash(seed + 2) * 8);
+      const size = v.cell * (0.5 + hash(seed + 3) * 0.5);
+      const turn = (clock.reduced ? 0 : clock.time * 0.15) + hash(seed + 4) * 6;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.sin(turn) * 0.4);
+      ctx.globalAlpha = 0.75;
+      for (const side of [-1, 1]) {
+        ctx.fillStyle = '#1d3d7a';
+        ctx.fillRect(side > 0 ? size * 0.35 : -size * 1.95, -size * 0.32, size * 1.6, size * 0.64);
+        ctx.strokeStyle = 'rgba(160, 200, 255, 0.7)';
+        ctx.lineWidth = Math.max(1, size * 0.04);
+        ctx.strokeRect(side > 0 ? size * 0.35 : -size * 1.95, -size * 0.32, size * 1.6, size * 0.64);
+        ctx.beginPath();
+        for (let g = 1; g < 4; g++) {
+          const gx = (side > 0 ? size * 0.35 : -size * 1.95) + (g * size * 1.6) / 4;
+          ctx.moveTo(gx, -size * 0.32);
+          ctx.lineTo(gx, size * 0.32);
+        }
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#d8dde6';
+      ctx.fillRect(-size * 0.35, -size * 0.4, size * 0.7, size * 0.8);
+      ctx.fillStyle = '#f2b84b';
+      ctx.fillRect(-size * 0.35, -size * 0.4, size * 0.7, size * 0.18);
+      ctx.strokeStyle = '#d8dde6';
+      ctx.beginPath();
+      ctx.moveTo(0, -size * 0.4);
+      ctx.lineTo(0, -size * 0.8);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, -size * 0.85, size * 0.12, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+/**
+ * A ringed planet: a banded globe lit from one side, its ring passing behind and in front.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {NonNullable<import('./themes.js').Space['planet']>} p @param {number} camX
+ */
+function drawPlanet(ctx, v, p, camX) {
+  const r = p.r * v.cell;
+  const cx = v.width * p.x - ((camX * 0.01 * v.cell) % (v.width * 0.2));
+  const cy = screenY(v, p.y);
+  const ring = (/** @type {number} */ from, /** @type {number} */ to) => {
+    ctx.strokeStyle = p.ring;
+    for (const [w, k] of [[r * 0.16, 1.9], [r * 0.06, 2.2]]) {
+      ctx.lineWidth = /** @type {number} */ (w);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, r * /** @type {number} */ (k), r * 0.42, -0.25, from, to);
+      ctx.stroke();
+    }
+  };
+  ring(Math.PI, Math.PI * 2);
+  const g = ctx.createRadialGradient(cx - r * 0.4, cy - r * 0.4, r * 0.1, cx, cy, r);
+  g.addColorStop(0, p.body[0]);
+  g.addColorStop(1, p.body[1]);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
+  for (let k = -3; k <= 3; k++) ctx.fillRect(cx - r, cy + k * r * 0.26, r * 2, r * 0.09);
+  const night = ctx.createLinearGradient(cx - r, 0, cx + r, 0);
+  night.addColorStop(0.55, 'rgba(0, 0, 0, 0)');
+  night.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+  ctx.fillStyle = night;
+  ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  ctx.restore();
+  ring(0, Math.PI);
+}
+
+/**
+ * Burning asteroids streaking across the sky (the Insane Demon): a rock and a tail of fire.
+ * Still with reduced motion.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Clock} clock @param {number} count
+ */
+function drawAsteroids(ctx, v, clock, count) {
+  ctx.save();
+  for (let i = 0; i < count; i++) {
+    const speed = 0.06 + hash(i + 71) * 0.06;
+    const t = clock.reduced ? hash(i + 3) : (clock.time * speed + hash(i + 3)) % 1;
+    const x = v.width * (1.15 - t * 1.4);
+    const y = v.height * (-0.1 + t * 0.6 + hash(i + 9) * 0.5);
+    const r = v.cell * (0.18 + hash(i + 17) * 0.3);
+    const tail = ctx.createLinearGradient(x, y, x + r * 9, y - r * 4);
+    tail.addColorStop(0, 'rgba(255, 210, 120, 0.85)');
+    tail.addColorStop(0.3, 'rgba(255, 90, 40, 0.5)');
+    tail.addColorStop(1, 'rgba(255, 40, 40, 0)');
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = tail;
+    ctx.beginPath();
+    ctx.moveTo(x, y - r);
+    ctx.lineTo(x + r * 9, y - r * 4);
+    ctx.lineTo(x, y + r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#3a1a14';
+    ctx.beginPath();
+    for (let k = 0; k < 7; k++) {
+      const a = (k / 7) * Math.PI * 2;
+      const rr = r * (0.75 + hash(i * 13 + k) * 0.35);
+      ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 150, 80, 0.9)';
+    ctx.lineWidth = Math.max(1, r * 0.15);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Glowing outlined structures far behind (the Demon): towers of trusses, rings and broken
+ * frames, scrolling at their own depth; dim, so hazards in front stay first to read.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {number} count
+ */
+function drawStructures(ctx, v, th, camX, count) {
+  const span = 30 / Math.max(1, count / 3);
+  const left = camX * 0.22;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = th.block.glow;
+  ctx.lineWidth = Math.max(1, v.cell * 0.07);
+  ctx.globalAlpha = 0.55;
+  for (let k = Math.floor(left / span) - 1; (k * span - left) * v.cell < v.width + v.cell * 8; k++) {
+    const seed = k * 23 + 5;
+    const x = (k * span + hash(seed) * span * 0.6 - left) * v.cell;
+    const kind = Math.floor(hash(seed + 1) * 3);
+    const h = v.cell * (4 + hash(seed + 2) * 6);
+    const base = screenY(v, 13.5);
+    ctx.beginPath();
+    if (kind === 0) {
+      // A truss tower.
+      const w = v.cell * 1.2;
+      ctx.rect(x, base - h, w, h);
+      for (let y = base - h; y < base; y += w) {
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + w, y + w);
+        ctx.moveTo(x + w, y);
+        ctx.lineTo(x, y + w);
+      }
+    } else if (kind === 1) {
+      // A ring station.
+      const r = v.cell * (1.6 + hash(seed + 3) * 1.4);
+      const y = screenY(v, 1 + hash(seed + 4) * 8);
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.moveTo(x + r * 0.55, y);
+      ctx.arc(x, y, r * 0.55, 0, Math.PI * 2);
+      for (let s = 0; s < 6; s++) {
+        const a = (s / 6) * Math.PI * 2;
+        ctx.moveTo(x + Math.cos(a) * r * 0.55, y + Math.sin(a) * r * 0.55);
+        ctx.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r);
+      }
+    } else {
+      // A broken frame, hanging from above.
+      const w = v.cell * (2 + hash(seed + 5) * 2);
+      const top = screenY(v, -1.5);
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, top + h * 0.7);
+      ctx.lineTo(x + w * 0.6, top + h * 0.8);
+      ctx.moveTo(x + w, top);
+      ctx.lineTo(x + w, top + h * 0.45);
+      ctx.lineTo(x + w * 0.75, top + h * 0.55);
+      ctx.moveTo(x, top + h * 0.3);
+      ctx.lineTo(x + w, top + h * 0.3);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Light rays from a black sun (the Extreme Demon), slowly turning (still with reduced motion).
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {string} color @param {Clock} clock
+ */
+function drawRays(ctx, v, color, clock) {
+  const cx = v.width * 0.7;
+  const cy = screenY(v, 3.2);
+  const spin = clock.reduced ? 0 : clock.time * 0.04;
+  const reach = Math.hypot(v.width, v.height);
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  for (let i = 0; i < 20; i++) {
+    const a = spin + (i / 20) * Math.PI * 2;
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * reach, cy + Math.sin(a) * reach);
+    ctx.lineTo(cx + Math.cos(a + 0.08) * reach, cy + Math.sin(a + 0.08) * reach);
+    ctx.closePath();
+  }
+  ctx.fill();
+  // The black sun and its white corona.
+  const r = v.cell * 1.8;
+  const corona = ctx.createRadialGradient(cx, cy, r * 0.9, cx, cy, r * 2.6);
+  corona.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+  corona.addColorStop(0.15, 'rgba(255, 40, 60, 0.5)');
+  corona.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = corona;
+  ctx.fillRect(cx - r * 3, cy - r * 3, r * 6, r * 6);
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * A black hole: its burning disc seen nearly edge-on, bent over and under the dark centre,
+ * and a thin bright ring around the shadow; the disc turns slowly (still with reduced motion).
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {number} camX @param {Clock} clock
+ */
+function drawBlackHole(ctx, v, camX, clock) {
+  const r = v.cell * 2.2;
+  const cx = v.width * 0.68 - ((camX * 0.01 * v.cell) % (v.width * 0.1));
+  const cy = screenY(v, 4.2);
+  const spin = clock.reduced ? 0 : clock.time * 0.6;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const halo = ctx.createRadialGradient(cx, cy, r, cx, cy, r * 4.5);
+  halo.addColorStop(0, 'rgba(255, 170, 80, 0.35)');
+  halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = halo;
+  ctx.fillRect(cx - r * 5, cy - r * 5, r * 10, r * 10);
+  // The disc: bands of light around an ellipse, the far side bent up over the shadow.
+  for (let k = 0; k < 4; k++) {
+    const g = ctx.createLinearGradient(cx - r * 3.4, 0, cx + r * 3.4, 0);
+    const phase = (spin + k * 0.7) % (Math.PI * 2);
+    g.addColorStop(0, 'rgba(255, 120, 40, 0)');
+    g.addColorStop(0.5 + 0.25 * Math.sin(phase), 'rgba(255, 235, 190, 0.55)');
+    g.addColorStop(1, 'rgba(255, 120, 40, 0)');
+    ctx.strokeStyle = g;
+    ctx.lineWidth = r * (0.22 - k * 0.04);
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * (2.4 + k * 0.3), r * (0.42 + k * 0.05), -0.12, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, r * (1.25 + k * 0.08), r * (1.15 + k * 0.08), 0, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.fillStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 245, 220, 0.9)';
+  ctx.lineWidth = Math.max(1, v.cell * 0.06);
+  ctx.stroke();
+  // The near side of the disc passes in front of the shadow.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = 'rgba(255, 210, 150, 0.6)';
+  ctx.lineWidth = r * 0.16;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, r * 2.4, r * 0.42, -0.12, 0.05, Math.PI - 0.05);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Space: the far layer, a sun, Earth and satellites in orbit, a ringed planet, light rays,
+ * structures and burning asteroids — whichever the look has.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock
+ */
+function drawSpace(ctx, v, th, camX, clock) {
+  const space = /** @type {import('./themes.js').Space} */ (th.space);
+  drawFarSpace(ctx, v, th, camX, clock);
+  if (space.rays) drawRays(ctx, v, space.rays, clock);
+  if (space.blackHole) drawBlackHole(ctx, v, camX, clock);
+  drawLight(ctx, v, th, clock);
+  if (space.planet) drawPlanet(ctx, v, space.planet, camX);
+  if (space.structures) drawStructures(ctx, v, th, camX, space.structures);
+  if (space.satellites) drawSatellites(ctx, v, camX, clock, space.satellites);
+  if (space.earth) drawEarth(ctx, v, camX);
+  if (space.asteroids) drawAsteroids(ctx, v, clock, space.asteroids);
+}
+
 /**
  * All background layers of one look.
  * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock
  */
 export function drawBackground(ctx, v, th, camX, clock) {
   drawSky(ctx, v, th);
+  if (th.backdrop === 'space') {
+    drawSpace(ctx, v, th, camX, clock);
+    if (th.motes && !clock.reduced) drawMotes(ctx, v, th.motes, camX, clock.time);
+    return;
+  }
   if (th.backdrop === 'night') {
     drawStars(ctx, v, camX, clock, 110);
     drawAurora(ctx, v, camX, clock);
