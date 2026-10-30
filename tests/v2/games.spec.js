@@ -1076,3 +1076,25 @@ test.describe('Ship Rush', () => {
     expect(problems).toEqual([]);
   });
 });
+
+// ── Ship Rush s-2: sectors 4–6, the Demon, the achievement and the finale ──
+
+test.describe('Ship Rush s-2', () => {
+  test('sideways 800×360: sectors 4 and 5 by the pilot — gravity flips and a mini stretch at their speeds and looks', async ({ page, account }) => {
+    test.setTimeout(180000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Ship Rush');
+    for (const [sector, tier, name] of [[4, 'harder', 'Trudniejszy'], [5, 'insane', 'Insane']]) {
+      const frame = await openWaveWith(page, host, `seed=12&sector=${sector}&section=1&autopilot=10`);
+      await recordStates(frame);
+      await flyFrom(game, 'Graj');
+      await expect.poll(async () => (await waveState(game)).sector).toBe(sector);
+      expect(await waveState(game)).toMatchObject({ tier, ship: true });
+      await expect(game.locator('#hud-sector')).toContainText(`Sektor ${sector}: ${name}`);
+      await expect.poll(() => game.locator('html').getAttribute('data-seen'), { timeout: 90000 }).toMatch(/^(?=.*flipped)(?=.*mini)/);
+      expect((await waveState(game)).state).toBe('playing');
+    }
+    expect(problems).toEqual([]);
+  });
+});

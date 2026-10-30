@@ -63,22 +63,28 @@ const half = SHIP.normal.half;
 // ── The run ──────────────────────────────────────────────────────────────────
 
 describe('the run', () => {
-  test('Wave Rush’s structure: sectors of 10, 15 and 15 sections in its shuffle groups (stage s-1)', () => {
-    const counts: Record<number, number> = { 1: 10, 2: 15, 3: 15 };
-    expect(SECTORS.map((s) => s.id)).toEqual([1, 2, 3]);
+  test('Wave Rush’s structure: sectors of 10, 15, 15, 10 and 10 sections in its shuffle groups', () => {
+    const counts: Record<number, number> = { 1: 10, 2: 15, 3: 15, 4: 10, 5: 10 };
+    expect(SECTORS.map((s) => s.id)).toEqual([1, 2, 3, 4, 5]);
     for (const s of SECTORS) expect(SECTION_LIBRARY[s.id]?.length, `sector ${s.id}`).toBe(counts[s.id]);
     expect(sector(1).groups).toEqual([range(1, 10)]);
     expect(sector(2).groups).toEqual([range(1, 5), range(6, 15)]);
     expect(sector(3).groups).toEqual([range(1, 5), range(6, 15)]);
     expect(sector(3).portals).toEqual([{ kind: 'gravity', count: 1, span: 2 }]);
+    expect(sector(4).groups).toEqual([range(1, 10)]);
+    expect(sector(4).portals).toEqual([{ kind: 'gravity', count: 3, span: 1 }, { kind: 'mini', count: 1 }]);
+    expect(sector(5).groups).toEqual([range(1, 5), range(6, 10)]);
+    expect(sector(5).portals).toEqual([{ kind: 'gravity', count: 2, span: 1 }, { kind: 'mini', count: 1 }]);
+    // One mini section in each of sectors 4 and 5, none before.
+    expect(SECTORS.map((s) => SECTION_LIBRARY[s.id]!.filter((d) => d.mini).length)).toEqual([0, 0, 0, 1, 1]);
     const ids = Object.values(SECTION_LIBRARY).flat().map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
     // Every section is flown as the ship.
     for (const data of Object.values(SECTION_LIBRARY).flat()) expect(data.mode ?? 'ship').toBe('ship');
   });
 
-  test('speeds: 0.8, 0.85 and 1.0 for sectors 1–3 (not slow, owner); tiers ramp up and stay humanly possible', () => {
-    expect(SECTORS.map((s) => tierOf(s.tier).speed)).toEqual([0.8, 0.85, 1.0]);
+  test('speeds: 0.8, 0.85, 1.0, 1.1 and 1.25 for sectors 1–5 (not slow, owner); tiers ramp up and stay humanly possible', () => {
+    expect(SECTORS.map((s) => tierOf(s.tier).speed)).toEqual([0.8, 0.85, 1.0, 1.1, 1.25]);
     expect(tierSpeed('hard')).toBeCloseTo(BASE_SPEED);
     const order = ['easy', 'normal', 'hard', 'harder', 'insane', 'easyDemon', 'hardDemon', 'insaneDemon', 'extremeDemon'];
     const tiers = order.map((k) => TIERS[k]!);
@@ -93,7 +99,7 @@ describe('the run', () => {
 
   test('sections: joints at both ends, level runs and steps only (no slope), wide enough for their tier', () => {
     for (const s of SECTORS) {
-      SECTION_LIBRARY[s.id]!.forEach((data, i) => expect(checkShipSection(data, minGapOf(tierKeyOf(data, s, i + 1))), data.id).toEqual([]));
+      SECTION_LIBRARY[s.id]!.forEach((data, i) => expect(checkShipSection(data, minGapOf(tierKeyOf(data, s, i + 1), data.mini === true)), data.id).toEqual([]));
     }
     const slope: SectionData = { id: 'slope', length: 20, ceil: '2 r20', floor: '10 r6 u2 r12', hazards: [] };
     expect(checkShipSection(slope, 1).join()).toContain('slope');
@@ -143,6 +149,33 @@ describe('the run', () => {
       expect(off.x).toBeLessThan(placed.x1);
       expect(stateAt(run, (on.x + off.x) / 2).gravity).toBe(-1);
       expect(stateAt(run, off.x + 0.1).gravity).toBe(1);
+    }
+  });
+
+  test('sectors 4 and 5: exact flips (each back one section later) and one mini stretch around the mini section', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const run = buildRun(createRng(seed));
+      for (const [index, flips] of [[3, 3], [4, 2]] as const) {
+        const placed = run.sectors[index]!;
+        const portals = run.portals.filter((p) => p.sector === index);
+        const gravity = portals.filter((p) => p.kind === 'gravity');
+        expect(gravity).toHaveLength(flips * 2);
+        for (let k = 0; k < gravity.length; k += 2) {
+          const on = gravity[k]!;
+          const off = gravity[k + 1]!;
+          expect([on.on, off.on]).toEqual([true, false]);
+          expect(pieceAt(run, off.x).place - pieceAt(run, on.x).place).toBe(1);
+          expect(stateAt(run, (on.x + off.x) / 2).gravity).toBe(-1);
+        }
+        expect(stateAt(run, placed.x1 - 0.1).gravity).toBe(1);
+        const mini = portals.filter((p) => p.kind === 'mini');
+        expect(mini.map((p) => p.on)).toEqual([true, false]);
+        const piece = pieceAt(run, mini[0]!.x);
+        expect(piece.g.mini).toBe(true);
+        expect(pieceAt(run, mini[1]!.x)).toBe(piece);
+        expect(stateAt(run, (piece.x0 + piece.x1) / 2).mini).toBe(true);
+        expect(stateAt(run, piece.x1 + 0.1).mini).toBe(false);
+      }
     }
   });
 
@@ -421,21 +454,21 @@ describe('game', () => {
   });
 
   test('the pilot flies the last section to the finish, and the result says how far', { timeout: 60_000 }, () => {
-    const game = createGame({ rng: createRng(12), mode: 'normal', jump: { sector: 3, section: 15 } });
+    const game = createGame({ rng: createRng(12), mode: 'normal', jump: { sector: SECTORS.length, section: SECTION_LIBRARY[SECTORS.length]!.length } });
     stepGame(game, { holding: false, tap: true }, STEP);
     const pilot = createAutopilot();
     for (let i = 0; i < 240 * 30 && game.phase === 'playing'; i++) stepGame(game, { holding: pilot.advise(game.run, game.wave), tap: false }, STEP);
     expect(game.phase).toBe('finished');
-    expect(game.result).toEqual({ sector: 3, section: 15, percent: 100 });
+    expect(game.result).toEqual({ sector: SECTORS.length, section: SECTION_LIBRARY[SECTORS.length]!.length, percent: 100 });
     expect(resultOf(game).percent).toBe(100);
   });
 
-  test('the pilot flies the whole run, every sector, for several shuffles', { timeout: 120_000 }, () => {
+  test('the pilot flies the whole run, every sector, for several shuffles', { timeout: 300_000 }, () => {
     for (const seed of [1, 7, 21]) {
       const game = createGame({ rng: createRng(seed), mode: 'normal' });
       stepGame(game, { holding: false, tap: true }, STEP);
       const pilot = createAutopilot();
-      for (let i = 0; i < 240 * 300 && game.phase === 'playing'; i++) stepGame(game, { holding: pilot.advise(game.run, game.wave), tap: false }, STEP);
+      for (let i = 0; i < 240 * 600 && game.phase === 'playing'; i++) stepGame(game, { holding: pilot.advise(game.run, game.wave), tap: false }, STEP);
       expect(game.phase, `seed ${seed} at ${JSON.stringify(game.where)}`).toBe('finished');
     }
   });
@@ -490,7 +523,11 @@ describe('records and skins', () => {
   test('every sector has its own look; detail grows from sector to sector', () => {
     const looks = SECTORS.map((s) => THEMES[s.theme]!);
     expect(new Set(looks.map((t) => t.id)).size).toBe(SECTORS.length);
-    const detail = (t: (typeof looks)[number]) => (t.fx?.glow ?? 0) + (t.fx?.chevrons ? 1 : 0) + (t.fx?.ground ? 1 : 0) + (t.motes ? 1 : 0) + (t.backdrop === 'storm' ? 1 : 0);
+    const detail = (t: (typeof looks)[number]) => {
+      const sp = t.space;
+      const space = sp ? sp.stars / 100 + sp.galaxies + sp.satellites + (sp.planet ? 1 : 0) + (sp.earth ? 1 : 0) + sp.structures + sp.asteroids + (sp.rays ? 1 : 0) : 0;
+      return (t.fx?.glow ?? 0) + (t.fx?.chevrons ? 1 : 0) + (t.fx?.teeth ? 1 : 0) + (t.fx?.ground ? 1 : 0) + (t.motes ? 1 : 0) + (t.backdrop === 'storm' ? 1 : 0) + space;
+    };
     for (let i = 1; i < looks.length; i++) expect(detail(looks[i]!)).toBeGreaterThan(detail(looks[i - 1]!));
   });
 });

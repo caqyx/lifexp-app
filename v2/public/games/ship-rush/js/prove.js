@@ -7,7 +7,7 @@
 import { solveBeam } from '../../_engine/beam.js';
 import { checkSection, widestGapAt } from '../../_engine/geometry.js';
 import { changesOf } from '../../_engine/limits.js';
-import { JOINT, sectionStyle, shipKind, SHIP, tierOf, tierSpeed } from './config.js';
+import { JOINT, sectionStyle, shipKind, tierOf, tierSpeed } from './config.js';
 import { geometryOf } from './run.js';
 import { createShip, roomy, stepShip } from './physics.js';
 import { sectionWorld, solidsOf } from './solids.js';
@@ -40,9 +40,13 @@ export function tierKeyOf(data, sector, number) {
   return data.tier ?? sectionStyle(sector, number).tier;
 }
 
-/** The corridor a tier needs everywhere, in cells (clearance × the body's height). @param {string} tier */
-export function minGapOf(tier) {
-  return tierOf(tier).clearance * 2 * SHIP.normal.half;
+/**
+ * The corridor a tier needs everywhere, in cells (clearance × the body's height; the
+ * mini ship's body is smaller, so a mini section may be tighter).
+ * @param {string} tier @param {boolean} [mini]
+ */
+export function minGapOf(tier, mini = false) {
+  return tierOf(tier).clearance * 2 * shipKind(mini).half;
 }
 
 /**
@@ -100,7 +104,7 @@ export function checkShipSection(data, minGap) {
  * looks for central paths first.
  * @type {[number, 'min' | 'rateSafe'][]}
  */
-const TRIES = [[0.7, 'min'], [0.55, 'min'], [0.55, 'rateSafe'], [0.45, 'min'], [0.35, 'min'], [0.25, 'min']];
+const TRIES = [[0.7, 'min'], [0.55, 'min'], [0.55, 'rateSafe'], [0.45, 'min'], [0.35, 'min'], [0.25, 'min'], [0.15, 'min'], [0.08, 'min']];
 /**
  * How finely the beam keeps states, tried in turn: the coarse one first (quick), then
  * finer ones that keep more alternatives (a path that survives every mistimed tap is
@@ -151,7 +155,7 @@ export function proveEntry(data, tier, state, entry, options = {}) {
  */
 export function sectionProblems(data, sector, number) {
   const tier = tierKeyOf(data, sector, number);
-  const problems = checkShipSection(data, minGapOf(tier));
+  const problems = checkShipSection(data, minGapOf(tier, data.mini === true));
   if (problems.length) return problems;
   for (const state of statesOf(sector, data)) {
     for (const entry of entriesOf(state.mini)) {

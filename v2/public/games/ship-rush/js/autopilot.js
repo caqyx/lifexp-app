@@ -23,15 +23,31 @@ const LOOKAHEAD = 8;
 
 /**
  * The span to plan over: past the section a little way ahead, but never past a change
- * of speed, a portal or the sector's end.
+ * of speed, a change of vehicle or the sector's end.
  * @param {Run} run @param {number} x
  */
 function horizon(run, x) {
   let end = Math.min(pieceAt(run, x + LOOKAHEAD + 2).x1 + 2, sectorAt(run, x).x1 + 0.5);
   const speed = speedAt(run, x);
   for (const p of run.pieces) if (p.x0 > x && p.x0 < end && p.speed !== speed) end = Math.min(end, p.x0 + 0.5);
-  for (const p of run.portals) if (p.x > x + 0.05 && p.x < end) end = p.x - 0.01;
+  // Gravity and size portals are flown through (the plan applies them); a change of vehicle ends the plan.
+  for (const p of run.portals) if (p.kind === 'ship' && p.x > x + 0.05 && p.x < end) end = p.x - 0.01;
   return end;
+}
+
+/**
+ * The ship after the gravity and size portals between `from` and its x (as the game applies them).
+ * @param {Run} run @param {number} from @param {Ship} ship
+ * @returns {Ship}
+ */
+function throughPortals(run, from, ship) {
+  let out = ship;
+  for (const p of run.portals) {
+    if (p.x <= from || p.x > ship.x) continue;
+    if (p.kind === 'gravity') out = { ...out, gravity: p.on ? -1 : 1 };
+    else if (p.kind === 'mini') out = { ...out, mini: p.on };
+  }
+  return out;
 }
 
 /**
@@ -54,7 +70,7 @@ function planFlight(run, ship) {
     start: ship,
     step(v, holding, dt) {
       const next = stepShip(v, holding, speed, dt, world);
-      return next.crashed ? null : next.vehicle;
+      return next.crashed ? null : throughPortals(run, v.x, next.vehicle);
     },
     safe: (v, band) => roomy(world, v, band),
   };

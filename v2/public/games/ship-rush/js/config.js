@@ -96,6 +96,22 @@ export const SECTORS = [
     groups: [range(1, 5), range(6, 15)],
     portals: [{ kind: 'gravity', count: 1, span: 2 }],
   },
+  {
+    id: 4,
+    key: 'harder',
+    tier: 'harder',
+    theme: 'orbit',
+    groups: [range(1, 10)],
+    portals: [{ kind: 'gravity', count: 3, span: 1 }, { kind: 'mini', count: 1 }],
+  },
+  {
+    id: 5,
+    key: 'insane',
+    tier: 'insane',
+    theme: 'deepSpace',
+    groups: [range(1, 5), range(6, 10)],
+    portals: [{ kind: 'gravity', count: 2, span: 1 }, { kind: 'mini', count: 1 }],
+  },
 ];
 
 /** @param {string} key @returns {Tier} */
