@@ -725,6 +725,7 @@ const waveState = (game) =>
     mini: el.dataset.debugMini === '1',
     ship: el.dataset.debugShip === '1',
     mode: el.dataset.debugMode,
+    pieceMode: el.dataset.debugPieceMode,
     level: el.dataset.debugLevel,
   }));
 
@@ -1295,6 +1296,47 @@ test.describe('Flip Rush', () => {
     expect(after.checkpoint).toBe(start.checkpoint);
     expect(after.x).toBeLessThan(start.x);
     expect(await page.evaluate(() => localStorage.getItem('lifexp-fliprush-best'))).toBe(kept);
+    expect(problems).toEqual([]);
+  });
+});
+
+// ── Flip Rush hotfix: a plain run, no pilot and no jump (the seed only fixes the shuffle) ──
+
+test.describe('Flip Rush, a plain run', () => {
+  test('sideways 800×360: the first portal into a spider section makes the spider, says so (pl, en), and the track fits the vehicle', async ({ page, account }) => {
+    test.setTimeout(90000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Flip Rush');
+    const stage = game.locator('#stage');
+
+    for (const lang of ['pl', 'en']) {
+      // A shuffle whose sector 1 opens with a spider section: its portal stands in the very
+      // first joint, reached with no input at all.
+      let seed = 0;
+      for (let k = 1; k <= 40 && !seed; k++) {
+        const query = `lang=${lang}&seed=${k}`;
+        await host.locator('iframe').evaluate((frame, q) => { frame.src = `${frame.src.split('?')[0]}?${q}`; }, query);
+        await expect.poll(() => page.frames().some((f) => f.url().endsWith(`?${query}`))).toBe(true);
+        const frame = page.frames().find((f) => f.url().endsWith(`?${query}`));
+        await expect(frame.locator('#stage')).toHaveAttribute('data-debug-order', /\d/);
+        const first = Number((await frame.locator('#stage').getAttribute('data-debug-order')).split('|')[0].split('.')[0]);
+        if ([2, 4, 6, 8].includes(first)) seed = k;
+      }
+      expect(seed).toBeGreaterThan(0);
+      await game.locator('#play').click();
+      await expect(stage).toHaveAttribute('data-state', 'ready');
+      await stage.click();
+      await expect(stage).toHaveAttribute('data-state', 'playing');
+      await expect.poll(async () => (await waveState(game)).x, { timeout: 10000 }).toBeGreaterThan(1.5);
+      const w = await waveState(game);
+      expect(w.state).toBe('playing');
+      expect(w.pieceMode).toBe('spider');
+      expect(w.mode).toBe('spider');
+      const toast = game.locator('.toast');
+      await expect(toast).toContainText(lang === 'pl' ? 'Pająk' : 'Spider');
+      await expect(toast).not.toContainText(lang === 'pl' ? 'Fala' : 'Wave');
+    }
     expect(problems).toEqual([]);
   });
 });

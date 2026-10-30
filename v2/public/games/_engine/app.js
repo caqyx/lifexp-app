@@ -503,6 +503,7 @@ export function runApp(def) {
     d.debugMini = w.mini ? '1' : '0';
     d.debugShip = w.ship ? '1' : '0';
     d.debugMode = w.mode ?? '';
+    d.debugPieceMode = pieceAt(game.run, w.x).mode;
     d.debugLevel = game.level;
     d.debugPilot = piloting() ? '1' : '0';
   }

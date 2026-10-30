@@ -78,3 +78,29 @@ test("v1's worker updating does not delete v2's caches", async ({ page, context,
   await expect(page.locator('.topbar__title')).toHaveText('Dziś');
   await context.setOffline(false);
 });
+
+test("a game's code comes from the network while online, even with an older copy cached; offline, from the cache", async ({ page, context, account }) => {
+  // The Rush games share games/_engine/: a cached engine file older than the game next to it
+  // made Flip Rush's portals run on Ship Rush's engine (hotfix after f-1).
+  await openSignedIn(page, account, '#/today');
+  await waitForServiceWorker(page);
+  const read = () =>
+    page.evaluate(async () => {
+      const url = new URL('games/_engine/world.js', document.baseURI).href;
+      return (await fetch(url)).text();
+    });
+  const plant = () =>
+    page.evaluate(async () => {
+      const url = new URL('games/_engine/world.js', document.baseURI).href;
+      await (await caches.open('lifexp-v2-games')).put(url, new Response('// an older deploy', { headers: { 'content-type': 'text/javascript' } }));
+    });
+  await plant();
+  expect(await read()).toContain('BASE_SPEED');
+  // The fresh copy replaced the old one in the cache.
+  expect(await page.evaluate(async () => (await (await caches.open('lifexp-v2-games')).match(new URL('games/_engine/world.js', document.baseURI).href)).text())).toContain('BASE_SPEED');
+
+  await plant();
+  await context.setOffline(true);
+  expect(await read()).toBe('// an older deploy');
+  await context.setOffline(false);
+});
