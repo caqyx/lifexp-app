@@ -65,8 +65,8 @@ export const RESPAWN_BACK = 2;
  * @type {Record<string, Tier>}
  */
 export const TIERS = {
-  easy: { speed: 0.5, minInterval: 0.22, tolerance: 0.04, clearance: 7, maxRate: 4 },
-  normal: { speed: 0.5, minInterval: 0.2, tolerance: 0.036, clearance: 6, maxRate: 4.5 },
+  easy: { speed: 0.8, minInterval: 0.24, tolerance: 0.045, clearance: 7, maxRate: 3.5 },
+  normal: { speed: 0.8, minInterval: 0.21, tolerance: 0.04, clearance: 6, maxRate: 4 },
   hard: { speed: 1.0, minInterval: 0.17, tolerance: 0.03, clearance: 4.5, maxRate: 5 },
   harder: { speed: 1.1, minInterval: 0.16, tolerance: 0.028, clearance: 4, maxRate: 5.5 },
   insane: { speed: 1.3, minInterval: 0.15, tolerance: 0.025, clearance: 3.5, maxRate: 6 },
