@@ -94,6 +94,8 @@ export const TIERS = {
   hardDemon: { speed: 1.4, minInterval: 0.08, tolerance: 0.023, clearance: 3.1, maxRate: 11 },
   insaneDemon: { speed: 1.55, minInterval: 0.075, tolerance: 0.02, clearance: 2.9, maxRate: 12 },
   extremeDemon: { speed: 1.7, minInterval: 0.07, tolerance: 0.018, clearance: 2.8, maxRate: 13 },
+  // The finale "Serce Fabryki": between the Demon's Hard and Insane, held for its whole length.
+  finale: { speed: 1.45, minInterval: 0.08, tolerance: 0.022, clearance: 3, maxRate: 11 },
 };
 
 /** @typedef {import('../../_engine/sectors.js').SectorDef} SectorDef */
@@ -177,3 +179,22 @@ export function tierSpeed(key) {
 
 /** @param {boolean} mini */
 export const bodyOf = (mini) => (mini ? BODY.mini : BODY.normal);
+
+/** The finale's number among the sector-like levels (its sections live under this id). */
+export const FINALE_ID = 7;
+
+/**
+ * The finale "Serce Fabryki" (stage f-2): one fixed sequence (never shuffled) of ten
+ * original stretches at the machine's heart, ball and spider in turn, every kind of orb
+ * and pad, at one tier. Unlocked by finishing the Demon; its own record and achievement.
+ * @type {SectorDef}
+ */
+export const FINALE = {
+  id: FINALE_ID,
+  key: 'finale',
+  tier: 'finale',
+  theme: 'heart',
+  groups: [range(1, 10)],
+  portals: [],
+  fixed: true,
+};

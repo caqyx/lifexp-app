@@ -2,7 +2,8 @@
 // Flip Rush, LifeXP's own game (docs/v2/PLAN.md 9.1, stages f-1 and f-2): the third Rush
 // game, for the ball and the spider, which take turns through portals. The Rush engine's
 // page (../../_engine/app.js) with this game's rules, sectors, records, skins, texts and
-// look. Stage f-1 has sectors 1–3; the Demon and the finale come in stage f-2.
+// look. Finishing the whole run (the Demon included) is the achievement that unlocks the
+// last skin and the finale.
 import { runApp } from '../../_engine/app.js';
 import { WAVE } from '../../_engine/wave.js';
 import { SECTORS } from './config.js';
@@ -27,7 +28,7 @@ runApp({
   slopeOf: (w) => (w.mini ? WAVE.miniSlope : WAVE.slope),
   loadAutopilot: () => import('./autopilot.js').then((m) => m.createAutopilot()),
   demon: true,
-  finale: false,
+  finale: true,
   holdTaps: true,
   /** The ball on the floor and the spider on the ceiling. @param {CanvasRenderingContext2D} ctx @param {import('./skins.js').Skin} skin */
   paintSkin(ctx, skin) {

@@ -11,7 +11,7 @@
 // engine's ornament (chains, gears, frames), denser tier by tier.
 
 /**
- * @typedef {'hall' | 'mine' | 'foundry' | 'reactor' | 'core' | 'circuits' | 'gears' | 'saws' | 'overdrive'} Backdrop
+ * @typedef {'hall' | 'mine' | 'foundry' | 'reactor' | 'core' | 'circuits' | 'gears' | 'saws' | 'overdrive' | 'heart'} Backdrop
  * @typedef {import('../../../_engine/render/section.js').SurfaceTheme & {
  *   wall: [string, string, string], haze: string, backdrop: Backdrop,
  *   far: string, mid: string, near: string, light: string,
@@ -190,6 +190,25 @@ export const THEMES = {
     hazard: { fill: '#000000', inner: '#3a0a0e', edge: '#ffffff', metal: '#ffffff' },
     deco: 'rgba(255, 90, 100, 0.55)',
     fx: { glow: 1.7, chevrons: true, teeth: true, ground: 'rgba(255, 40, 50, 0.5)', hazardGlow: 'rgba(255, 255, 255, 0.28)' },
+  },
+  // The finale "Serce Fabryki": the machine's heart — a great flywheel, pistons pumping to
+  // the beat, gold light on black and crimson.
+  heart: {
+    id: 'heart',
+    wall: ['#050203', '#1c0608', '#3a0c0a'],
+    haze: 'rgba(255, 190, 80, 0.24)',
+    backdrop: 'heart',
+    far: 'rgba(255, 190, 90, 0.35)',
+    mid: 'rgba(110, 30, 24, 0.92)',
+    near: 'rgba(14, 4, 4, 0.9)',
+    light: 'rgba(255, 210, 120, 0.95)',
+    motes: { color: '#ffd27a', count: 70 },
+    pattern: 'plates',
+    emblem: 'star',
+    block: { top: '#2a1410', bottom: '#080202', tile: 'rgba(255, 220, 160, 0.14)', shade: 'rgba(0, 0, 0, 0.55)', rim: '#c8902a', edge: '#fff2d0', glow: 'rgba(255, 190, 80, 0.55)', detail: 'rgba(255, 200, 100, 0.85)' },
+    hazard: { fill: '#040101', inner: '#4a1a12', edge: '#ffffff', metal: '#fff6e6' },
+    deco: 'rgba(255, 210, 130, 0.55)',
+    fx: { glow: 1.6, chevrons: true, teeth: true, ground: 'rgba(255, 190, 80, 0.45)', hazardGlow: 'rgba(255, 255, 255, 0.26)' },
   },
 };
 

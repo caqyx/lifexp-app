@@ -6,7 +6,7 @@
 // section nobody could play (the validator: public/games/_engine/beam.js with
 // flip-rush/js/prove.js).
 import { describe, expect, test } from 'vitest';
-import { SECTORS } from '../public/games/flip-rush/js/config.js';
+import { FINALE, FINALE_ID, SECTORS } from '../public/games/flip-rush/js/config.js';
 import { sectionProblems } from '../public/games/flip-rush/js/prove.js';
 import { SECTION_LIBRARY } from '../public/games/flip-rush/js/sections/index.js';
 
@@ -17,4 +17,11 @@ describe('every Flip Rush section is passable for a human', () => {
       expect(problems).toEqual([]);
     });
   }
+});
+
+describe('the finale is passable for a human', () => {
+  test('every stretch, every state, every entry', { timeout: 300_000 }, () => {
+    const problems = SECTION_LIBRARY[FINALE_ID]!.flatMap((data, i) => sectionProblems(data, FINALE, i + 1));
+    expect(problems).toEqual([]);
+  });
 });

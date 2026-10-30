@@ -10,7 +10,7 @@ import { changesOf, peakRate } from '../public/games/_engine/limits.js';
 import { createRng, parseSwitches } from '../public/games/_engine/rng.js';
 import { sectionWorld, type World } from '../public/games/_engine/solids.js';
 import { createAutopilot } from '../public/games/flip-rush/js/autopilot.js';
-import { BODY, JOINT, MINI_BOOST, PAD, RING, RING_REACH, SECTORS, SNAP, STEP, TIERS, tierSpeed, type SectorDef } from '../public/games/flip-rush/js/config.js';
+import { BODY, FINALE_ID, JOINT, MINI_BOOST, PAD, RING, RING_REACH, SECTORS, SNAP, STEP, TIERS, tierSpeed, type SectorDef } from '../public/games/flip-rush/js/config.js';
 import { boostOf } from '../public/games/flip-rush/js/boosters.js';
 import { createGame, keepsRecords, stepGame, type Game } from '../public/games/flip-rush/js/game.js';
 import { pickLang, textsOf, translator, TEXT_KEYS } from '../public/games/flip-rush/js/i18n.js';
@@ -180,8 +180,25 @@ describe('the run', () => {
     expect(buildRun(createRng(5)).sectors.map((s) => s.order)).toEqual(buildRun(createRng(5)).sectors.map((s) => s.order));
   });
 
-  test('no finale yet (stage f-2)', () => {
-    expect(() => buildFinale()).toThrow();
+  test('the finale: ten fixed stretches, ball and spider in turn, a vehicle portal at every change, never shuffled; every kind of orb and pad', () => {
+    const a = buildFinale();
+    const b = buildFinale();
+    const sections = a.pieces.filter((p) => p.kind === 'section');
+    expect(sections.map((p) => p.g.id)).toEqual(range(1, 10).map((n) => `f-${String(n).padStart(2, '0')}`));
+    expect(b.pieces.filter((p) => p.kind === 'section').map((p) => p.g.id)).toEqual(sections.map((p) => p.g.id));
+    expect(sections.map((p) => p.mode)).toEqual(range(1, 10).map((n) => (n % 2 ? 'ball' : 'spider')));
+    expect(sections.every((p) => p.tier === 'finale')).toBe(true);
+    expect(a.portals.filter((p) => p.kind === 'ship')).toHaveLength(9);
+    const kinds = new Set(SECTION_LIBRARY[FINALE_ID]!.flatMap((d) => d.hazards.filter((h) => h.type === 'ring' || h.type === 'pad').map((h) => `${h.type}:${'kind' in h ? h.kind : ''}`)));
+    for (const k of ['ring:jump', 'ring:gravity', 'ring:gravityJump', 'ring:dash', 'pad:jump', 'pad:small']) expect(kinds.has(k), k).toBe(true);
+  });
+
+  test('the pilot plays the whole finale', { timeout: 120_000 }, () => {
+    const game = createGame({ rng: createRng(1), mode: 'normal', level: 'finale' });
+    stepGame(game, { holding: false, tap: true }, STEP);
+    const pilot = createAutopilot();
+    for (let i = 0; i < 240 * 120 && game.phase === 'playing'; i++) stepGame(game, { holding: pilot.advise(game.run, game.wave), tap: false }, STEP);
+    expect(game.phase, JSON.stringify(game.where)).toBe('finished');
   });
 });
 

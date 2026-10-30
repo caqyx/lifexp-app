@@ -4,7 +4,7 @@
 // section says its vehicle (`ball` or `spider`); a vehicle portal stands in the joint
 // wherever the next section is the other one.
 import { buildLevel } from '../../_engine/level.js';
-import { SECTORS, tierSpeed } from './config.js';
+import { FINALE, FINALE_ID, SECTORS, tierSpeed } from './config.js';
 import { SECTION_LIBRARY } from './sections/index.js';
 
 export {
@@ -46,7 +46,7 @@ export function buildRun(rng, options = {}) {
   return buildLevel('run', options.sectors ?? SECTORS, options.library ?? SECTION_LIBRARY, rng, RULES);
 }
 
-/** The finale comes in stage f-2. @returns {Run} */
+/** The finale: one fixed sequence of ball and spider stretches. @returns {Run} */
 export function buildFinale() {
-  throw new Error('Flip Rush has no finale yet (stage f-2)');
+  return buildLevel('finale', [FINALE], { [FINALE_ID]: SECTION_LIBRARY[FINALE_ID] ?? [] }, () => 0, RULES);
 }
