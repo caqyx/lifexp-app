@@ -94,7 +94,7 @@ export const SECTOR1 = [
     id: 's1-09',
     length: 30,
     ceil: '2 r30',
-    floor: '10 r6 -1 r2 -1 r2 -1 r8 +1 r2 +1 r2 +1 r8',
+    floor: '10 r6 -0.75 r2 -0.75 r2 -0.75 r8 +0.75 r2 +0.75 r2 +0.75 r8',
     hazards: [
       { type: 'halfSpike', x: 13, on: 'ceil', count: 2 },
       { type: 'spike', x: 25, on: 'ceil' },

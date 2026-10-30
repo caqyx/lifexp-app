@@ -60,6 +60,7 @@ import {
   progressAt,
   stateAt,
 } from '../public/games/wave-rush/js/run.js';
+import { TURN_TAU, easeAngle, shortestArc, targetAngle } from '../public/games/wave-rush/js/render/turn.js';
 import { FINALE, SECTION_LIBRARY } from '../public/games/wave-rush/js/sections/index.js';
 import { createAutopilot } from '../public/games/wave-rush/js/autopilot.js';
 import { DEFAULT_SKIN, SKINS, isUnlocked, resolveSkin } from '../public/games/wave-rush/js/skins.js';
@@ -104,8 +105,8 @@ describe('authored sectors', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  test('speeds: 0.5, 0.5 and 1.0 of the base speed; tiers ramp up and stay humanly possible', () => {
-    expect(SECTORS.map((s) => sectorTier(s).speed)).toEqual([0.5, 0.5, 1.0, 1.1, 1.3, 1.3]);
+  test('speeds: 0.8, 0.8 and 1.0 of the base speed for sectors 1–3; tiers ramp up and stay humanly possible', () => {
+    expect(SECTORS.map((s) => sectorTier(s).speed)).toEqual([0.8, 0.8, 1.0, 1.1, 1.3, 1.3]);
     expect(sector(6).bands!.map((b) => TIERS[b.tier]!.speed)).toEqual([1.3, 1.5, 1.7, 1.9]);
     expect(sectorSpeed(sector(3))).toBeCloseTo(BASE_SPEED);
     const order = ['easy', 'normal', 'hard', 'harder', 'insane', 'easyDemon', 'hardDemon', 'insaneDemon', 'extremeDemon'];
@@ -548,6 +549,58 @@ describe('the finale', () => {
     }
     expect(game.phase).toBe('finished');
     expect(shipSteps).toBeGreaterThan(240);
+  });
+});
+
+describe('the icon turns, the flight does not', () => {
+  const deg = (d: number) => (d * Math.PI) / 180;
+
+  test('easing by real frame time: 60, 120 and 144 Hz turn alike, a 90° turn done in ~100 ms', () => {
+    const after = (hz: number, seconds: number) => {
+      let a = deg(-45);
+      for (let f = 0; f < Math.round(seconds * hz); f++) a = easeAngle(a, deg(45), 1 / hz);
+      return a;
+    };
+    // Times each rate reaches in whole frames (1/12 s = 5, 10 and 12 frames).
+    for (const t of [1 / 12, 1 / 6, 1 / 4]) {
+      expect(after(120, t)).toBeCloseTo(after(60, t), 6);
+      expect(after(144, t)).toBeCloseTo(after(60, t), 6);
+    }
+    const left = (a: number) => Math.abs(deg(45) - a) / deg(90);
+    // Not a snap: after one 60 Hz frame most of the turn is still to come…
+    expect(left(after(60, 1 / 60))).toBeGreaterThan(0.6);
+    // …and after 100 ms it is visually done.
+    expect(left(after(60, 0.1))).toBeLessThan(0.1);
+    expect(left(after(60, 0.15))).toBeLessThan(0.03);
+    expect(TURN_TAU).toBeGreaterThanOrEqual(0.035);
+    expect(TURN_TAU).toBeLessThanOrEqual(0.045);
+  });
+
+  test('the shortest way round', () => {
+    expect(shortestArc(deg(170), deg(-170))).toBeCloseTo(deg(20));
+    expect(shortestArc(deg(-170), deg(170))).toBeCloseTo(deg(-20));
+    const a = easeAngle(deg(170), deg(-170), 0.02);
+    // Turned past 180° to the other side, never back through 0°.
+    expect(Math.abs(a)).toBeGreaterThan(deg(170));
+  });
+
+  test('the target is the flight: ±45°, mini ±63.4°, upside down by the direction, the ship by its climb', () => {
+    const w = { ...createWave(0, 6) };
+    expect(targetAngle({ ...w, dir: 1 }, 10, 1)).toBeCloseTo(deg(45));
+    expect(targetAngle({ ...w, dir: -1 }, 10, 1)).toBeCloseTo(deg(-45));
+    expect(targetAngle({ ...w, dir: -1, mini: true }, 10, 2)).toBeCloseTo(-Math.atan(2));
+    // Upside down, holding flies down: the target follows the flight, not the input.
+    const flipped = stepWave({ ...w, gravity: -1 }, true, 10, STEP);
+    expect(targetAngle(flipped, 10, 1)).toBeCloseTo(deg(45));
+    expect(targetAngle({ ...w, ship: true, vy: 0 }, 10, 1)).toBe(0);
+    expect(targetAngle({ ...w, ship: true, vy: -5 }, 10, 1)).toBeLessThan(0);
+  });
+
+  test('the turn is drawing only: the flight still changes direction at once', () => {
+    const w = createWave(0, 6);
+    const up = stepWave(stepWave(w, false, 10, STEP), true, 10, STEP);
+    expect(up.dir).toBe(-1);
+    expect(up.y).toBeCloseTo(6);
   });
 });
 

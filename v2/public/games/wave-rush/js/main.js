@@ -9,7 +9,7 @@
 // (tests only) makes runs repeatable and exposes the state as data-debug-*; only with a
 // seed, ?sector=<n>&section=<m> starts there and ?autopilot=<k> lets the solver fly the
 // first k sections of the first attempt (then the wave is the player's again).
-import { MAX_FRAME, SECTORS, STEP } from './config.js';
+import { MAX_FRAME, SECTORS, STEP, WAVE } from './config.js';
 import { createParticles, flashAlpha, ringProgress, shakeOffset, spawnBurst, updateParticles } from './effects.js';
 import { createGame, keepsRecords, resultOf, stepGame } from './game.js';
 import { pickLang, translator } from './i18n.js';
@@ -30,6 +30,7 @@ import {
 import { beatPulse } from './render/background.js';
 import { createRenderer, renderFrame } from './render/index.js';
 import { drawWave, portalColor } from './render/sprites.js';
+import { easeAngle, targetAngle } from './render/turn.js';
 import { computeView } from './render/view.js';
 import { createRng, parseSwitches } from './rng.js';
 import { pieceAt, progressAt } from './run.js';
@@ -145,6 +146,8 @@ const fx = { deathAt: -10, ring: /** @type {{ x: number, color: string, at: numb
 const clock = { accumulator: 0, last: /** @type {number | null} */ (null), time: 0, frame: 0, running: false, alpha: 1 };
 let view = computeView(innerWidth, innerHeight, Math.min(devicePixelRatio || 1, MAX_PIXEL_RATIO));
 let toastTimer = 0;
+/** The icon's drawn angle (render only; null = snap to the flight's angle). */
+const visual = { angle: /** @type {number | null} */ (null) };
 
 // ── Layout ───────────────────────────────────────────────────────────────────
 
@@ -356,6 +359,7 @@ function reactToEvents(events) {
   const game = state.game;
   for (const event of events) {
     if (event === 'start' || event === 'restart') {
+      visual.angle = null;
       countAttempt(storage);
       state.newBest = false;
       show('playing');
@@ -521,9 +525,26 @@ function runStep() {
   updateParticles(particles, STEP);
 }
 
-/** @param {number} alpha how far between the last two steps this frame is */
-function drawFrame(alpha) {
+/**
+ * The icon's drawn angle: it turns toward the flight's angle by real frame time (the
+ * flight itself changes direction instantly). Snaps on a new attempt. Kept with reduced
+ * motion: it is a quick, subtle turn, not decoration.
+ * @param {number} dt seconds since the last frame
+ */
+function turnIcon(dt) {
+  const w = state.game.wave;
+  const target = targetAngle(w, pieceAt(state.game.run, w.x).speed, w.mini ? WAVE.miniSlope : WAVE.slope);
+  visual.angle = visual.angle === null ? target : easeAngle(visual.angle, target, dt);
+  return visual.angle;
+}
+
+/**
+ * @param {number} alpha how far between the last two steps this frame is
+ * @param {number} dt seconds since the last frame
+ */
+function drawFrame(alpha, dt) {
   const game = state.game;
+  const angle = turnIcon(dt);
   const calm = reduced();
   const w = game.wave;
   const since = clock.time - fx.deathAt;
@@ -540,7 +561,7 @@ function drawFrame(alpha) {
       alive: game.phase !== 'dead',
       flipped: w.gravity === -1,
       ship: w.ship,
-      tilt: Math.atan2(w.vy, pieceAt(game.run, w.x).speed) * 0.9,
+      angle,
       thrust: input.down && game.phase === 'playing',
     },
     trail: game.trail,
@@ -569,7 +590,7 @@ function frame(now) {
   } else {
     clock.time += Math.min(seconds, MAX_FRAME);
   }
-  drawFrame(clock.alpha);
+  drawFrame(clock.alpha, Math.min(seconds, MAX_FRAME));
   if (debug) writeDebug();
 }
 
