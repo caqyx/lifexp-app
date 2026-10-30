@@ -1,8 +1,9 @@
 // @ts-check
-// The ship's flight (docs/v2/PLAN.md 9.1, stage s-1). Hold: thrust up; release: gravity
-// pulls down (the other way round upside down); the vertical speed changes smoothly and is
-// capped; the level scrolls at the piece's speed. The mini ship is smaller and lighter: it
-// answers the input faster.
+// The ship's flight (docs/v2/PLAN.md 9.1, stages s-1 and f-0). Hold: thrust up; release:
+// gravity pulls down (the other way round upside down); the vertical speed changes
+// smoothly and is capped — braking is stronger than speeding up, and the climb is faster
+// than the fall (config.js SHIP); the level scrolls at the piece's speed. The mini ship is
+// smaller and lighter: it answers the input faster.
 //
 // The collision rule (owner, stage s-1: "as in the genre"), checked once per fixed step:
 // 1. The ship's body is a square (half side `half`). It moves, then every solid box it now
@@ -73,8 +74,11 @@ export function settle(world, prevY, x, y, half) {
  */
 export function stepShip(ship, holding, speed, dt, world) {
   const kind = shipKind(ship.mini);
-  const accel = (holding ? -kind.up : kind.down) * ship.gravity;
-  let vy = Math.min(kind.maxV, Math.max(-kind.maxV, ship.vy + accel * dt));
+  // In gravity's frame: positive is falling.
+  const fall = ship.vy * ship.gravity;
+  const rising = fall <= 0;
+  const accel = holding ? -(rising ? kind.upRise : kind.upFall) : rising ? kind.downRise : kind.downFall;
+  let vy = Math.min(kind.capDown, Math.max(-kind.capUp, fall + accel * dt)) * ship.gravity;
   const x = ship.x + speed * dt;
   const moved = settle(world, ship.y, x, ship.y + vy * dt, kind.half);
   if (moved.landed && vy > 0) vy = 0;

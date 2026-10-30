@@ -234,22 +234,38 @@ describe('the ship’s flight', () => {
   test('holding thrusts up, letting go falls, smoothly and capped; flipped gravity mirrors it', () => {
     let s = createShip(0, 6);
     s = stepShip(s, true, SPEED, 0.05, open).vehicle;
-    expect(s.vy).toBeCloseTo(-SHIP.normal.up * 0.05);
+    expect(s.vy).toBeCloseTo(-SHIP.normal.upRise * 0.05);
     expect(s.y).toBeLessThan(6);
     expect(s.x).toBeCloseTo(SPEED * 0.05);
-    for (let i = 0; i < 120; i++) s = stepShip(s, true, SPEED, STEP, open).vehicle;
-    expect(s.vy).toBe(-SHIP.normal.maxV);
+    for (let i = 0; i < 120; i++) s = stepShip({ ...s, y: 6 }, true, SPEED, STEP, open).vehicle;
+    expect(s.vy).toBe(-SHIP.normal.capUp);
     for (let i = 0; i < 300; i++) s = stepShip({ ...s, y: 6 }, false, SPEED, STEP, open).vehicle;
-    expect(s.vy).toBe(SHIP.normal.maxV);
+    expect(s.vy).toBe(SHIP.normal.capDown);
     const flipped = stepShip({ ...createShip(0, 6), gravity: -1 }, true, SPEED, 0.05, open).vehicle;
-    expect(flipped.vy).toBeCloseTo(SHIP.normal.up * 0.05);
+    expect(flipped.vy).toBeCloseTo(SHIP.normal.upRise * 0.05);
+  });
+
+  test('the genre’s feel (stage f-0): braking is stronger than speeding up, the climb faster than the fall', () => {
+    const k = SHIP.normal;
+    // Held: braking a fall (0.5 g) beats climbing (0.4 g); released: braking a climb (0.48 g) beats sinking (0.32 g).
+    expect(k.upFall / k.upRise).toBeCloseTo(1.25, 2);
+    expect(k.downRise / k.downFall).toBeCloseTo(1.5, 2);
+    expect(k.capUp / k.capDown).toBeCloseTo(1.25, 2);
+    // A falling ship, held, brakes at upFall.
+    const falling = stepShip({ ...createShip(0, 6), vy: 5 }, true, SPEED, 0.01, open).vehicle;
+    expect(falling.vy).toBeCloseTo(5 - k.upFall * 0.01);
+    // A climbing ship, released, brakes at downRise.
+    const climbing = stepShip({ ...createShip(0, 6), vy: -5 }, false, SPEED, 0.01, open).vehicle;
+    expect(climbing.vy).toBeCloseTo(-5 + k.downRise * 0.01);
+    // The mini ship is the same ship ÷ 0.85.
+    for (const key of ['upRise', 'upFall', 'downRise', 'downFall', 'capUp', 'capDown'] as const) expect(SHIP.mini[key] * 0.85).toBeCloseTo(k[key], 0);
   });
 
   test('the mini ship is smaller, lighter and answers faster', () => {
     expect(SHIP.mini.half).toBeLessThan(SHIP.normal.half);
     expect(SHIP.mini.radius).toBeLessThan(SHIP.normal.radius);
-    expect(SHIP.mini.up).toBeGreaterThan(SHIP.normal.up);
-    expect(SHIP.mini.down).toBeGreaterThan(SHIP.normal.down);
+    expect(SHIP.mini.upRise).toBeGreaterThan(SHIP.normal.upRise);
+    expect(SHIP.mini.downFall).toBeGreaterThan(SHIP.normal.downFall);
     const big = fly(open, createShip(0, 6), true, 24).ship;
     const mini = fly(open, { ...createShip(0, 6), mini: true }, true, 24).ship;
     expect(mini.y).toBeLessThan(big.y);

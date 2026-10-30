@@ -160,8 +160,8 @@ export const SECTOR3 = [
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'pillar', x: 6.5, on: 'floor', h: 2.8 },
-      { type: 'pillar', x: 6.5, on: 'ceil', h: 1.9 },
+      { type: 'pillar', x: 7, on: 'floor', h: 2.8 },
+      { type: 'pillar', x: 7, on: 'ceil', h: 1.9 },
       { type: 'pillar', x: 11.25, on: 'floor', h: 1.3 },
       { type: 'pillar', x: 11.25, on: 'ceil', h: 3.4 },
       { type: 'pillar', x: 16, on: 'floor', h: 3.3 },
