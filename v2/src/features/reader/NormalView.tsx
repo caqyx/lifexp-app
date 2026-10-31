@@ -23,7 +23,8 @@ interface NormalViewProps {
 export function NormalView({ sents, sections, secStart, start, current, jump, size, onPosition }: NormalViewProps) {
   const view = useRef<HTMLDivElement>(null);
   const paras = useRef<{ el: HTMLElement; s: number }[]>([]);
-  const ignore = useRef(false);
+  /** scrollTop the reader itself scrolled to, until its scroll event arrives. */
+  const ignoreTop = useRef<number | null>(null);
   const ticking = useRef(false);
   const currentRef = useRef(current);
   currentRef.current = current;
@@ -59,12 +60,12 @@ export function NormalView({ sents, sections, secStart, start, current, jump, si
     const box = view.current;
     const list = paras.current;
     if (!box || !list.length) return;
-    ignore.current = true;
     const at = list[lastAtOrBefore(list.map((p) => p.s), idx)];
-    box.scrollTop = Math.max(0, (at?.el.offsetTop ?? 0) - 12);
-    setTimeout(() => {
-      ignore.current = false;
-    }, 80);
+    const top = Math.max(0, (at?.el.offsetTop ?? 0) - 12);
+    if (Math.abs(box.scrollTop - top) < 1) return;
+    box.scrollTop = top;
+    // The scroll this causes is not the reader's: it must not move the position.
+    ignoreTop.current = box.scrollTop;
   };
 
   useLayoutEffect(() => {
@@ -86,7 +87,13 @@ export function NormalView({ sents, sections, secStart, start, current, jump, si
   }, [size]);
 
   const onScroll = () => {
-    if (ignore.current || ticking.current) return;
+    const box0 = view.current;
+    if (box0 && ignoreTop.current !== null) {
+      const own = Math.abs(box0.scrollTop - ignoreTop.current) < 1;
+      ignoreTop.current = null;
+      if (own) return;
+    }
+    if (ticking.current) return;
     ticking.current = true;
     requestAnimationFrame(() => {
       ticking.current = false;
