@@ -103,7 +103,7 @@ export function SettingsPanel({ open, onClose, settings, onResize, onView, onPer
         <span class="reader__row-label">{t('reader.settings.size')}</span>
         <span class="reader__step">
           <button type="button" aria-label={t('reader.settings.smaller')} disabled={settings.size === 0} onClick={() => onResize(-1)}>
-            A−
+            {t('reader.settings.smallerShort')}
           </button>
           <output>{settings.size + 1}</output>
           <button
@@ -112,7 +112,7 @@ export function SettingsPanel({ open, onClose, settings, onResize, onView, onPer
             disabled={settings.size === EASY_SIZES.length - 1}
             onClick={() => onResize(1)}
           >
-            A+
+            {t('reader.settings.biggerShort')}
           </button>
         </span>
       </div>

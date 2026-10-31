@@ -1791,8 +1791,12 @@
       "per": "Zdań na ekranie",
       "theme": "Motyw",
       "paper": "Papier",
-      "night": "Noc"
+      "night": "Noc",
+      "smallerShort": "A−",
+      "biggerShort": "A+"
     },
-    "close": "Zamknij"
+    "close": "Zamknij",
+    "slowerShort": "−",
+    "fasterShort": "+"
   }
 }

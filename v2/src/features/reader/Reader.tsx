@@ -243,7 +243,7 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
   // ── Rendering ─────────────────────────────────────────────────────────────
   const pct = percentRead(pos, sents.length);
   const status = (
-    <div class="reader__status" aria-live="polite">
+    <div class="reader__status">
       <b>{pct}%</b>
       <br />
       {t('reader.status', { n: fmt(pos + 1), total: fmt(sents.length) })}
@@ -385,7 +385,7 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
             <div class="reader__auto">
               <div class="reader__speed">
                 <button type="button" aria-label={t('reader.slower')} onClick={() => setWpm(settings.wpm - WPM_STEP)}>
-                  −
+                  {t('reader.slowerShort')}
                 </button>
                 <div class="reader__speed-mid">
                   <input
@@ -403,7 +403,7 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
                   </output>
                 </div>
                 <button type="button" aria-label={t('reader.faster')} onClick={() => setWpm(settings.wpm + WPM_STEP)}>
-                  +
+                  {t('reader.fasterShort')}
                 </button>
               </div>
               <div class="reader__nav">

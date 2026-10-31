@@ -165,6 +165,11 @@ test('imports TXT and MD, reads in Prosta, Auto and Normalny, and keeps the posi
   const text = page.getByTestId('reader-easy-text');
   await expect(text).toHaveText('Ala ma kota.');
   await expect(status(page)).toHaveText('0%zdanie 1 z 5');
+  // Literata is served by the app itself (the test blocks every other host).
+  await expect(text).toHaveCSS('font-family', /^"Literata Variable"/);
+  await expect
+    .poll(() => page.evaluate(async () => (await document.fonts.ready, [...document.fonts].some((f) => f.family.includes('Literata') && f.status === 'loaded'))))
+    .toBe(true);
   await page.getByRole('button', { name: 'Dalej' }).click();
   await expect(text).toHaveText('Kot ma Alę.');
   await page.getByRole('button', { name: 'Dalej' }).click();
@@ -271,6 +276,17 @@ test('Markdown sections: the whole-page view, the table of contents and the Nigh
   await page.reload();
   await expect(page.locator('.reader')).toHaveAttribute('data-theme', 'night');
   await expect(page.locator('.reader__sent.is-on')).toHaveText(['Trzecie zdanie jest ostatnie.']);
+
+  // Auto goes on to the next section by itself.
+  await page.getByRole('button', { name: 'Spis' }).click();
+  await page.getByRole('dialog', { name: 'Spis treści' }).getByRole('button', { name: 'Rozdział pierwszy' }).click();
+  await page.getByRole('button', { name: 'Auto' }).click();
+  await expect(page.locator('.reader__w.is-now')).toHaveText('Rozdział');
+  await page.getByRole('slider', { name: 'Tempo czytania' }).fill('900');
+  await page.getByRole('button', { name: 'Start' }).click();
+  await expect(page.locator('.reader__crumb')).toHaveText('Notatki  ·  Rozdział drugi', { timeout: 10000 });
+  await expect(page.getByText('To koniec książki.')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.reader__w.is-now')).toHaveText('ostatnie.');
 });
 
 test('imports a PDF and an EPUB; a scan, an unknown format and an empty file get their own message; two taps delete', async ({ page }) => {

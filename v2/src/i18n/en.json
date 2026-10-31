@@ -1791,8 +1791,12 @@
       "per": "Sentences per screen",
       "theme": "Theme",
       "paper": "Paper",
-      "night": "Night"
+      "night": "Night",
+      "smallerShort": "A−",
+      "biggerShort": "A+"
     },
-    "close": "Close"
+    "close": "Close",
+    "slowerShort": "−",
+    "fasterShort": "+"
   }
 }

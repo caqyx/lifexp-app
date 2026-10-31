@@ -1547,6 +1547,13 @@ serwera (test regresyjny `features/exus/choreHandlers.test.ts`). Etap zamyka wł
 3. Szybkie liczenie: wyczucie klawiatury ekranowej (szybkie stukanie, duże klawisze, brak przybliżania przy podwójnym stuknięciu).
 4. Czas grania widoczny dla rodzica: po kilku minutach gry na koncie dziecka sesja jest w historii v1 i w widoku rodzica (oraz w raporcie tygodniowym).
 
+**Moduł Czytnik (2026-10-31)** — przeniesiony samodzielny czytnik książek, decyzje właściciela: moduł natywny,
+**domyślnie wyłączony** (opt-in), wszystko lokalnie na urządzeniu, bez punktów i bez wpływu na statystyki.
+
+| PR | Zakres | Stan |
+|---|---|---|
+| r | `#/reader` (biblioteka w powłoce) i `#/reader/:id` (czytanie na pełnym ekranie bez menu i paska: `bare` w rejestrze, własny przycisk „Biblioteka”). **Włączanie:** nowe pole `users.optInModules` (domyślnie `[]` w konwerterze; tylko addytywnie) — `reader` nie trafia do `enabledModules`, więc v1 go nie widzi; `domain/modules` `OPT_IN_MODULES`, ankieta pierwszego uruchomienia go nie proponuje, przełącznik w Ustawieniach → Moduły, `/idz czytnik` i `/modul czytnik` w Ex-us. **Dane:** IndexedDB `lifexp-v2-reader` (meta, treść, ustawienia czytnika; bez IndexedDB — pamięć i komunikat), nic w Firestore ani Storage. **Domena** (`domain/reader`, testy): zdania (skróty PL/EN, inicjały, dzielenie długich), grupy po 1–2 zdania, TXT/MD (UTF-8 → Windows-1250, Markdown), PDF (linie → akapity, dzielenie wyrazów, numery stron, zdanie przez granicę strony), EPUB (OPF, spine, ścieżki), ustawienia i tempo Auto. **Tryby:** Prosta (zdania albo „Cała strona”, strzałki, przesunięcie palcem, klawisze), Auto (słowo po słowie 60–900 słów/min), Normalny (przewijanie); suwak, %, „zdanie X z Y”, spis treści, motywy Papier/Noc, czcionka Literata z `@fontsource-variable/literata` (OFL). pdf.js (`pdfjs-dist` 4.10.38, wersja legacy) i JSZip ładowane dopiero przy imporcie; SW ich nie instaluje (ani plików Literata), tylko zapisuje przy pierwszym użyciu (`lifexp-v2-reader`). Test: `tests/v2/reader.spec.js` (Pixel 7). | Kod gotowy; do sprawdzenia przez właściciela na telefonie: import prawdziwej książki PDF/EPUB (polskie znaki, długość), płynność Auto, przesunięcie palcem |
+
 
 Kolejność od 2026-09-29: 1g → 2a (ekran „Dziś” tylko do odczytu, pierwszy ekran z danymi) → 1f. Właściciel
 nie widział dotąd zmian w aplikacji, a 1f (offline, manifest) też jest niewidoczne, więc ekran z danymi idzie przed nim.
