@@ -18,6 +18,7 @@ const ready: Profile = {
   modulesChosen: true,
   enabledModules: ['chores'],
   disabledModules: null,
+  optInModules: [],
   lang: 'pl',
   points: { total: 0, earnedAllTime: 0, spentAllTime: 0 },
   dailyLimit: null,

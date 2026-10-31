@@ -22,8 +22,9 @@ export default defineConfig({
         rollupFormat: 'iife',
         globPatterns: ['**/*.{js,css,html,woff2,png,webmanifest}'],
         // Vendored games (public/games, stage g-1) are cached when first played, not
-        // installed with the app: Wartime alone is ~4.5 MB (src/sw.ts).
-        globIgnores: ['games/**'],
+        // installed with the app: Wartime alone is ~4.5 MB (src/sw.ts). The same for the opt-in
+        // reader's pdf.js, JSZip and Literata (its pdf.js worker, .mjs, is not matched anyway).
+        globIgnores: ['games/**', 'assets/reader-pdf-*', 'assets/reader-epub-*', 'assets/literata-*'],
       },
       manifest: {
         // Its own name while v1 and v2 live side by side, so two installed icons are told apart.

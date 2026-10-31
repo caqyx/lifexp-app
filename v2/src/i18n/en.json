@@ -18,6 +18,7 @@
     "notes": "Notes",
     "stats": "Statistics",
     "games": "Games",
+    "reader": "Reader",
     "reports": "Reports and updates",
     "settings": "Settings",
     "exus": "Ex-us",
@@ -910,7 +911,8 @@
       "notes": "Notes",
       "stats": "XP stats",
       "games": "Games",
-      "aichat": "Ex-us"
+      "aichat": "Ex-us",
+      "reader": "Reader"
     },
     "moduleDescriptions": {
       "chores": "Household and one-time chores for points, paid out to Money.",
@@ -918,7 +920,8 @@
       "notes": "A notebook.",
       "stats": "Points, level and streak on Today, logging activities, history, stats and badges.",
       "games": "Games in the app; playing time counts itself, no points.",
-      "aichat": "An AI assistant that helps you log and plan."
+      "aichat": "An AI assistant that helps you log and plan.",
+      "reader": "PDF, EPUB, TXT and Markdown books, sentence by sentence. They stay on this device; no points."
     },
     "theme": "Theme",
     "family": "Style",
@@ -1704,5 +1707,92 @@
     "loadFailed": "Could not load today's playing time.",
     "notFound": "There is no such game.",
     "back": "All games"
+  },
+  "reader": {
+    "library": {
+      "intro": "PDF, EPUB, TXT and Markdown. Read sentence by sentence or the whole page.",
+      "local": "Books stay on this device only. Reading earns no points.",
+      "add": "Add a book",
+      "dropHint": "or drop files here",
+      "shelf": "Your library",
+      "empty": "The library is empty. Add your first book.",
+      "sentences_one": "{{n}} sentence",
+      "sentences_few": "{{n}} sentences",
+      "sentences_many": "{{n}} sentences",
+      "sentences_other": "{{n}} sentences",
+      "meta": "{{format}} · {{sentences}} · {{pct}}%",
+      "progress": "{{pct}}% read",
+      "delete": "Delete",
+      "deleteSure": "Sure?",
+      "deleteLabel": "Delete the book {{title}}",
+      "deleteSureLabel": "Really delete the book {{title}}? Press again.",
+      "importing": "Loading: {{name}}",
+      "opening": "Opening the book…",
+      "added_one": "Book added.",
+      "added_few": "Books added: {{count}}.",
+      "added_many": "Books added: {{count}}.",
+      "added_other": "Books added: {{count}}.",
+      "fileError": "{{name}}: {{message}}",
+      "noStorage": "Browser storage is unavailable. The library lasts only until you reload.",
+      "noStorageAdded": "Browser storage is unavailable. The books will be gone after a reload.",
+      "notFound": "Book not found.",
+      "toLibrary": "Back to the library"
+    },
+    "errors": {
+      "unsupported": "Unsupported format: .{{ext}} (PDF, EPUB, TXT and MD work).",
+      "empty": "No text found in the file.",
+      "scanned": "This PDF has no text layer (it is probably a scan). It needs a PDF with selectable text.",
+      "brokenEpub": "Damaged EPUB: the file {{path}} is missing",
+      "noOpf": "Damaged EPUB: no OPF file found.",
+      "library": "PDF and EPUB support did not load. Check your internet connection and try again.",
+      "unreadable": "The file could not be read.",
+      "saveFailed": "Could not save in the browser."
+    },
+    "sections": {
+      "part": "Part {{n}}",
+      "page": "Page {{n}}",
+      "chapter": "Chapter {{n}}",
+      "start": "Beginning"
+    },
+    "back": "Library",
+    "backLabel": "Back to the library",
+    "textSettings": "Aa",
+    "textSettingsLabel": "Text settings",
+    "toc": "Contents",
+    "tocTitle": "Table of contents",
+    "modeLabel": "Reading mode",
+    "modes": {
+      "easy": "Simple",
+      "auto": "Auto",
+      "normal": "Normal"
+    },
+    "seek": "Position in the book",
+    "prev": "Back",
+    "prevLabel": "Previous sentences",
+    "next": "Next",
+    "nextLabel": "Next sentences",
+    "status": "sentence {{n}} of {{total}}",
+    "end": "That is the end of the book.",
+    "speed": "Reading pace",
+    "slower": "Slower",
+    "faster": "Faster",
+    "wpm": "words/min",
+    "play": "Start",
+    "pause": "Pause",
+    "settings": {
+      "title": "Settings",
+      "size": "Text size",
+      "smaller": "Smaller text",
+      "bigger": "Larger text",
+      "view": "View",
+      "viewLabel": "Simple mode view",
+      "sentences": "Sentences",
+      "page": "Whole page",
+      "per": "Sentences per screen",
+      "theme": "Theme",
+      "paper": "Paper",
+      "night": "Night"
+    },
+    "close": "Close"
   }
 }

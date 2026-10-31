@@ -16,6 +16,10 @@
 //   cached engine and said "wave" (hotfix after f-1). Media (images, sound, fonts) stay
 //   stale-while-revalidate. The game's own page is a frame navigation, so the app shell's
 //   navigation route leaves it alone.
+// - The reader's big parts (pdf.js and its worker, JSZip, the Literata font files) are
+//   not precached either: the reader is opt-in, and pdf.js alone is ~1.8 MB. Each is
+//   cached the first time it is used (cache first: the names carry a content hash),
+//   and a newer build of the same file replaces the older one in that cache.
 // - Only same-origin GETs are touched; Firebase traffic goes straight to the network.
 // - Push (stage 6-8): shows the reminders and opens their link on a tap (swPush.ts).
 //   v2 does not subscribe before the cutover (R7), so until then nothing arrives here.
@@ -23,7 +27,7 @@
 import { clientsClaim, setCacheNameDetails } from 'workbox-core';
 import { addRoute, cleanupOutdatedCaches, matchPrecache, precache, type PrecacheEntry } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
-import { NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
+import { CacheFirst, NetworkFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { clickUrl, parsePushData, readPush } from './swPush';
 
 declare const self: ServiceWorkerGlobalScope & { __WB_MANIFEST: (string | PrecacheEntry)[] };
@@ -62,6 +66,29 @@ registerRoute(
 registerRoute(
   ({ url, request }) => request.method === 'GET' && url.href.startsWith(GAMES_PREFIX()),
   new StaleWhileRevalidate({ cacheName: 'lifexp-v2-games' }),
+);
+
+/** assets/<name>-<hash>.<ext> of the reader's lazily cached parts (vite.config.ts globIgnores). */
+const READER_ASSET = /\/assets\/((?:reader-pdf|reader-epub|pdf\.worker\.min|literata-[a-z-]+)-)[\w-]+\.(?:m?js|woff2)$/;
+
+registerRoute(
+  ({ url, request }) => request.method === 'GET' && url.origin === self.location.origin && READER_ASSET.test(url.pathname),
+  new CacheFirst({
+    cacheName: 'lifexp-v2-reader',
+    plugins: [
+      {
+        // One copy per file: a new deploy's build of it drops the old one.
+        cacheDidUpdate: async ({ cacheName, request }) => {
+          const name = new URL(request.url).pathname.match(READER_ASSET)?.[1];
+          if (!name) return;
+          const cache = await caches.open(cacheName);
+          for (const key of await cache.keys()) {
+            if (key.url !== request.url && new URL(key.url).pathname.match(READER_ASSET)?.[1] === name) await cache.delete(key);
+          }
+        },
+      },
+    ],
+  }),
 );
 
 // Registered before the precache route, so navigations (including ./ and

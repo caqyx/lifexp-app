@@ -18,6 +18,7 @@
     "notes": "Notatki",
     "stats": "Statystyki",
     "games": "Gry",
+    "reader": "Czytnik",
     "reports": "Zgłoszenia i aktualizacje",
     "settings": "Ustawienia",
     "exus": "Ex-us",
@@ -910,7 +911,8 @@
       "notes": "Notatki",
       "stats": "Statystyki XP",
       "games": "Gry",
-      "aichat": "Ex-us"
+      "aichat": "Ex-us",
+      "reader": "Czytnik"
     },
     "moduleDescriptions": {
       "chores": "Obowiązki domowe i jednorazowe za punkty, z wypłatą do Pieniędzy.",
@@ -918,7 +920,8 @@
       "notes": "Notatnik.",
       "stats": "Punkty, poziom i seria na „Dziś”, zapisywanie aktywności, historia, statystyki i odznaki.",
       "games": "Gry w aplikacji; czas grania liczy się sam, bez punktów.",
-      "aichat": "Asystent AI, który pomaga zapisywać i planować."
+      "aichat": "Asystent AI, który pomaga zapisywać i planować.",
+      "reader": "Książki PDF, EPUB, TXT i Markdown, zdanie po zdaniu. Zostają na tym urządzeniu; bez punktów."
     },
     "theme": "Motyw",
     "family": "Styl",
@@ -1704,5 +1707,92 @@
     "loadFailed": "Nie udało się wczytać dzisiejszego czasu grania.",
     "notFound": "Nie ma takiej gry.",
     "back": "Wszystkie gry"
+  },
+  "reader": {
+    "library": {
+      "intro": "PDF, EPUB, TXT i Markdown. Czytaj zdanie po zdaniu albo w pełnym widoku.",
+      "local": "Książki zostają tylko na tym urządzeniu. Czytanie nie daje punktów.",
+      "add": "Dodaj książkę",
+      "dropHint": "albo przeciągnij pliki tutaj",
+      "shelf": "Twoja biblioteka",
+      "empty": "Biblioteka jest pusta. Dodaj pierwszą książkę.",
+      "sentences_one": "{{n}} zdanie",
+      "sentences_few": "{{n}} zdania",
+      "sentences_many": "{{n}} zdań",
+      "sentences_other": "{{n}} zdania",
+      "meta": "{{format}} · {{sentences}} · {{pct}}%",
+      "progress": "Przeczytano {{pct}}%",
+      "delete": "Usuń",
+      "deleteSure": "Na pewno?",
+      "deleteLabel": "Usuń książkę {{title}}",
+      "deleteSureLabel": "Na pewno usunąć książkę {{title}}? Naciśnij jeszcze raz.",
+      "importing": "Wczytuję: {{name}}",
+      "opening": "Otwieram książkę…",
+      "added_one": "Dodano książkę.",
+      "added_few": "Dodano książek: {{count}}.",
+      "added_many": "Dodano książek: {{count}}.",
+      "added_other": "Dodano książek: {{count}}.",
+      "fileError": "{{name}}: {{message}}",
+      "noStorage": "Zapis w przeglądarce niedostępny. Biblioteka działa tylko do odświeżenia.",
+      "noStorageAdded": "Zapis w przeglądarce niedostępny. Książki znikną po odświeżeniu.",
+      "notFound": "Nie znaleziono książki.",
+      "toLibrary": "Wróć do biblioteki"
+    },
+    "errors": {
+      "unsupported": "Nieobsługiwany format: .{{ext}} (obsługuję PDF, EPUB, TXT, MD).",
+      "empty": "Nie znalazłem w pliku żadnego tekstu.",
+      "scanned": "Ten PDF nie ma warstwy tekstowej (to prawdopodobnie skan). Potrzebny jest PDF z zaznaczalnym tekstem.",
+      "brokenEpub": "Uszkodzony EPUB: brak pliku {{path}}",
+      "noOpf": "Uszkodzony EPUB: nie znaleziono pliku OPF.",
+      "library": "Obsługa PDF i EPUB się nie załadowała. Sprawdź połączenie z internetem i spróbuj ponownie.",
+      "unreadable": "Nie udało się odczytać pliku.",
+      "saveFailed": "Nie udało się zapisać w przeglądarce."
+    },
+    "sections": {
+      "part": "Część {{n}}",
+      "page": "Strona {{n}}",
+      "chapter": "Rozdział {{n}}",
+      "start": "Początek"
+    },
+    "back": "Biblioteka",
+    "backLabel": "Wróć do biblioteki",
+    "textSettings": "Aa",
+    "textSettingsLabel": "Ustawienia tekstu",
+    "toc": "Spis",
+    "tocTitle": "Spis treści",
+    "modeLabel": "Tryb czytania",
+    "modes": {
+      "easy": "Prosta",
+      "auto": "Auto",
+      "normal": "Normalny"
+    },
+    "seek": "Pozycja w książce",
+    "prev": "Wstecz",
+    "prevLabel": "Poprzednie zdania",
+    "next": "Dalej",
+    "nextLabel": "Następne zdania",
+    "status": "zdanie {{n}} z {{total}}",
+    "end": "To koniec książki.",
+    "speed": "Tempo czytania",
+    "slower": "Wolniej",
+    "faster": "Szybciej",
+    "wpm": "słów/min",
+    "play": "Start",
+    "pause": "Pauza",
+    "settings": {
+      "title": "Ustawienia",
+      "size": "Rozmiar tekstu",
+      "smaller": "Mniejszy tekst",
+      "bigger": "Większy tekst",
+      "view": "Widok",
+      "viewLabel": "Widok Prostej",
+      "sentences": "Zdania",
+      "page": "Cała strona",
+      "per": "Zdań na ekranie",
+      "theme": "Motyw",
+      "paper": "Papier",
+      "night": "Noc"
+    },
+    "close": "Zamknij"
   }
 }

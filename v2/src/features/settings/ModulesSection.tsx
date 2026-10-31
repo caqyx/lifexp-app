@@ -1,7 +1,8 @@
 // Settings → Moduły (v1 renderModuleSettings / toggleModule): each switch applies at
 // once, nothing is asked and no data is touched; a module turned back on shows
-// everything it had. Tasks, Goals and Today are always there.
-import { Bot, ChartLine, ClipboardCheck, Gamepad2, NotebookPen, Wallet, type LucideIcon } from 'lucide-preact';
+// everything it had. Tasks, Goals and Today are always there. The reader is opt-in:
+// off until switched on here (domain/modules OPT_IN_MODULES).
+import { BookOpen, Bot, ChartLine, ClipboardCheck, Gamepad2, NotebookPen, Wallet, type LucideIcon } from 'lucide-preact';
 import { OPTIONAL_MODULES, isModuleOn, type OptionalModule } from '@/domain/modules';
 import type { Profile } from '@/domain/profile';
 import { t } from '@/i18n';
@@ -18,6 +19,7 @@ const ICONS: Record<OptionalModule, LucideIcon> = {
   stats: ChartLine,
   games: Gamepad2,
   aichat: Bot,
+  reader: BookOpen,
 };
 
 export function ModulesSection({ uid, profile }: { uid: string; profile: Profile }) {

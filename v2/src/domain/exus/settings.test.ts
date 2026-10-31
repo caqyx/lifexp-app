@@ -51,12 +51,13 @@ describe('the words', () => {
     ['gry', 'games'],
     ['Ex-us', 'aichat'],
     ['aichat', 'aichat'],
+    ['Czytnik', 'reader'],
   ])('module %s', (word, id) => {
     expect(MODULE_WORD(word)).toBe(id);
   });
 
   it('every module that can be turned off has a name, and its own id works', () => {
-    const named = new Set(['obowiazki', 'pieniadze', 'notatki', 'statystyki', 'gry', 'ex-us'].map((w) => MODULE_WORD(w)));
+    const named = new Set(['obowiazki', 'pieniadze', 'notatki', 'statystyki', 'gry', 'ex-us', 'czytnik'].map((w) => MODULE_WORD(w)));
     expect([...named].sort()).toEqual([...OPTIONAL_MODULES].sort());
     for (const id of OPTIONAL_MODULES) expect(MODULE_WORD(id), id).toBe(id);
   });
