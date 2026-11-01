@@ -55,7 +55,7 @@ export const APP_TEXT_KEYS = [
   'canvas', 'bestValue', 'bestNone', 'finaleLocked', 'finaleBest', 'finaleReady', 'sectorLabel', 'sectionLabel',
   'attempt', 'result', 'tapRespawn', 'tapRestart', 'finaleResult', 'finaleDoneTitle', 'finishedTitle', 'finaleDoneBody',
   'finishedBody', 'achFinale', 'achDemon', 'achFinaleBody', 'achDemonBody', 'unlockSkin', 'unlockFinale', 'gravityFlip',
-  'gravityBack', 'shipOn', 'waveOn', 'finaleName', 'selected', 'locked',
+  'gravityBack', 'shipOn', 'waveOn', 'finaleName', 'selected', 'locked', 'checkpoint', 'tapSector',
 ];
 
 /**
@@ -170,6 +170,9 @@ export function runApp(def) {
   const clock = { accumulator: 0, last: /** @type {number | null} */ (null), time: 0, frame: 0, running: false, alpha: 1 };
   let view = computeView(innerWidth, innerHeight, Math.min(devicePixelRatio || 1, MAX_PIXEL_RATIO));
   let toastTimer = 0;
+  let toastHold = 0;
+  /** @type {string | null} */
+  let toastNext = null;
   /** The icon's drawn angle (render only; null = snap to the flight's angle). */
   const visual = { angle: /** @type {number | null} */ (null) };
 
@@ -232,11 +235,28 @@ export function runApp(def) {
   }
 
   /** @param {string} text */
-  function showToast(text) {
+  /**
+   * Shows a toast. A sticky one (the checkpoint) is not cut short: what comes while it is up
+   * (a portal's toast just after the sector's start) waits until it has gone.
+   * @param {string} text @param {boolean} [sticky]
+   */
+  function showToast(text, sticky = false) {
+    const now = performance.now();
+    if (!sticky && now < toastHold) {
+      toastNext = text;
+      return;
+    }
     dom.toast.textContent = text;
     dom.toast.classList.add('is-on');
+    toastHold = sticky ? now + TOAST_TIME : 0;
     clearTimeout(toastTimer);
-    toastTimer = window.setTimeout(() => dom.toast.classList.remove('is-on'), TOAST_TIME);
+    toastTimer = window.setTimeout(() => {
+      dom.toast.classList.remove('is-on');
+      toastHold = 0;
+      const next = toastNext;
+      toastNext = null;
+      if (next) showToast(next);
+    }, TOAST_TIME);
   }
 
   // ── Skins ────────────────────────────────────────────────────────────────────
@@ -387,6 +407,7 @@ export function runApp(def) {
         if (p.kind === 'gravity') showToast(t(p.on ? 'gravityFlip' : 'gravityBack'));
         if (p.kind === 'ship') showToast(t(p.mode ? `${p.mode}On` : p.on ? 'shipOn' : 'waveOn'));
       }
+      if (event === 'checkpoint') showToast(t('checkpoint'), true);
       if (event === 'death') handleDeath();
       if (event === 'finish') handleFinish();
     }
@@ -400,7 +421,7 @@ export function runApp(def) {
     const result = game.result ?? resultOf(game);
     if (keepsRecords(game)) state.newBest = records.saveBest(storage, result).isNew;
     dom.deadResult.textContent = t('result', result);
-    dom.deadHint.textContent = t(game.mode === 'practice' ? 'tapRespawn' : 'tapRestart');
+    dom.deadHint.textContent = t(game.mode === 'practice' ? 'tapRespawn' : game.sectorStart !== null ? 'tapSector' : 'tapRestart');
     dom.stage.classList.toggle('is-new-best', state.newBest);
     show('dead');
   }
@@ -497,6 +518,7 @@ export function runApp(def) {
     d.debugSection = String(game.where.section);
     d.debugAttempt = String(game.attempt);
     d.debugCheckpoint = game.checkpoint.toFixed(2);
+    d.debugSectorStart = game.sectorStart === null ? '' : game.sectorStart.toFixed(2);
     d.debugOrder = game.run.sectors.map((s) => s.order.join('.')).join('|');
     d.debugPortals = game.run.portals.map((p) => `${p.kind}:${p.x.toFixed(1)}:${p.on ? 'on' : 'off'}`).join(',');
     d.debugTier = pieceAt(game.run, w.x).tier;

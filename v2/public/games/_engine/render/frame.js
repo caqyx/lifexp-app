@@ -6,6 +6,7 @@
 // kept only while near the screen. Each game brings its `Look`: its themes, its
 // background and how its vehicle is drawn.
 import { JOINT } from '../world.js';
+import { keepsNormalCheckpoint } from '../sectors.js';
 import { pieceIndexAt } from '../level.js';
 import { paintPattern, paintSection, STRIP_BOTTOM, STRIP_TOP } from './section.js';
 import { drawMine, drawOrb, drawPortal, drawSaw, drawTrail } from './sprites.js';
@@ -221,6 +222,57 @@ function drawPortals(ctx, s, camX) {
   }
 }
 
+/**
+ * Normal play's checkpoints: at the start of every sector that keeps one, a post on the
+ * floor with a flag and a faint line across the corridor (sectors.js keepsNormalCheckpoint).
+ * @param {CanvasRenderingContext2D} ctx @param {Scene} s @param {number} camX
+ */
+function drawCheckpoints(ctx, s, camX) {
+  if (s.run.kind !== 'run') return;
+  const v = s.view;
+  const c = v.cell;
+  s.run.sectors.forEach((placed, i) => {
+    if (i === 0 || !keepsNormalCheckpoint(placed.def)) return;
+    // Just before the joint (a vehicle portal may stand just after it).
+    const x = screenX(v, camX, placed.x0 - 1.4);
+    if (x < -c * 2 || x > v.width + c * 2) return;
+    const floor = screenY(v, JOINT.floor);
+    const top = screenY(v, JOINT.floor - 2.4);
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(1, c * 0.06);
+    ctx.setLineDash([c * 0.3, c * 0.3]);
+    ctx.beginPath();
+    ctx.moveTo(x, screenY(v, JOINT.ceil));
+    ctx.lineTo(x, floor);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    // The post and its flag: green with a white outline, a check mark on it.
+    ctx.fillStyle = '#e8edf5';
+    ctx.fillRect(x - c * 0.06, top, c * 0.12, floor - top);
+    ctx.fillStyle = '#3ddc84';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(1, c * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(x + c * 0.06, top);
+    ctx.lineTo(x + c * 1.1, top + c * 0.35);
+    ctx.lineTo(x + c * 0.06, top + c * 0.7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = '#0b3d22';
+    ctx.lineWidth = Math.max(1, c * 0.07);
+    ctx.beginPath();
+    ctx.moveTo(x + c * 0.25, top + c * 0.36);
+    ctx.lineTo(x + c * 0.4, top + c * 0.5);
+    ctx.lineTo(x + c * 0.68, top + c * 0.2);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
 /** @param {CanvasRenderingContext2D} ctx @param {Scene} s @param {number} camX @param {Look} look */
 function drawPlayer(ctx, s, camX, look) {
   const v = s.view;
@@ -279,6 +331,7 @@ export function renderFrame(ctx, r, s, look) {
   drawSpinners(ctx, s, pieces, camX, look);
   if (look.drawPieceItems) for (const piece of pieces) look.drawPieceItems(ctx, s, piece, camX);
   drawPortals(ctx, s, camX);
+  drawCheckpoints(ctx, s, camX);
   drawPlayer(ctx, s, camX, look);
   drawEffects(ctx, s, camX);
   ctx.restore();

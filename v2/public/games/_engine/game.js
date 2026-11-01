@@ -8,11 +8,12 @@
 // (`GameRules`); everything else here is shared by Wave Rush and Ship Rush.
 import { JOINT, RESTART_LOCK } from './world.js';
 import { checkpointX, jumpX, locate, pieceAt, progressAt, respawnX, speedAt, stateAt } from './level.js';
+import { keepsNormalCheckpoint } from './sectors.js';
 
 /**
  * @typedef {'ready' | 'playing' | 'dead' | 'finished'} Phase
  * @typedef {'normal' | 'practice'} Mode
- * @typedef {'start' | 'sector' | 'tier' | 'section' | 'portal' | 'death' | 'finish' | 'restart'} GameEvent
+ * @typedef {'start' | 'sector' | 'tier' | 'section' | 'portal' | 'death' | 'finish' | 'restart' | 'checkpoint'} GameEvent
  *   tier: a new Demon tier began (inside the same sector).
  * @typedef {{ sector: number, section: number, percent: number }} Result
  * @typedef {{ x: number, y: number }} Point
@@ -31,9 +32,11 @@ import { checkpointX, jumpX, locate, pieceAt, progressAt, respawnX, speedAt, sta
  *   run: Run, jumped: boolean, rules: GameRules,
  *   phase: Phase, phaseTime: number, time: number,
  *   wave: Vehicle, previous: { x: number, y: number },
- *   trail: Point[], attempt: number, checkpoint: number,
+ *   trail: Point[], attempt: number, checkpoint: number, sectorStart: number | null,
  *   where: { sector: number, section: number }, band: number, result: Result | null, lastPortal: import('./level.js').Portal | null,
  * }} Game
+ *   sectorStart: normal play's checkpoint, the start of the sector it is in when that sector
+ *   keeps one (sectors.js keepsNormalCheckpoint; never sector 1, which is the run's start).
  * @typedef {{ holding: boolean, tap: boolean }} Input
  * @typedef {{
  *   buildRun: (rng: () => number) => Run, buildFinale: () => Run,
@@ -43,6 +46,18 @@ import { checkpointX, jumpX, locate, pieceAt, progressAt, respawnX, speedAt, sta
  *   step: one fixed step of flight (crashed: it hit something on the way, e.g. a block's
  *   side); crashed: does the vehicle touch anything where it is now (after portals).
  */
+
+/**
+ * Normal play's checkpoint at x: the start of its sector, if that sector keeps one (and is
+ * not the first), else null.
+ * @param {Game['mode']} mode @param {Run} run @param {number} x
+ */
+export function sectorCheckpointAt(mode, run, x) {
+  if (mode !== 'normal' || run.kind !== 'run') return null;
+  const index = locate(run, x).sector - 1;
+  const placed = run.sectors[index];
+  return placed && index > 0 && keepsNormalCheckpoint(placed.def) ? placed.x0 : null;
+}
 
 /** @param {number} x @param {number} y @returns {Vehicle} */
 export function createVehicle(x, y) {
@@ -97,6 +112,7 @@ export function createGame(rules, options) {
     trail: [],
     attempt: 1,
     checkpoint: target === null ? run.startX : checkpointX(run, target, level === 'finale' ? 'section' : (options.checkpointBy ?? 'sector')),
+    sectorStart: sectorCheckpointAt(options.mode, run, start),
     where: { sector: 1, section: 1 },
     band: -1,
     result: null,
@@ -140,6 +156,9 @@ function trackPlace(game, events) {
   if (where.sector !== game.where.sector) {
     game.wave = { ...game.wave, gravity: 1, mini: false };
     events.push('sector');
+    const start = sectorCheckpointAt(game.mode, game.run, game.wave.x);
+    if (start !== game.sectorStart && start !== null) events.push('checkpoint');
+    game.sectorStart = start;
   }
   const piece = pieceAt(game.run, game.wave.x);
   if (piece.kind === 'section' && piece.band !== game.band) {
@@ -198,15 +217,19 @@ function fly(game, holding, dt, events) {
 }
 
 /**
- * After a crash: normal mode builds a new run from the start, practice goes back to the
- * checkpoint of the same run.
+ * After a crash: normal mode goes back to its sector's start if the sector keeps a
+ * checkpoint (the same run), else builds a new run from the start; practice goes back to
+ * the checkpoint of the same run.
  * @param {Game} game
  */
 function restart(game) {
-  if (game.mode === 'normal') {
+  if (game.mode === 'normal' && game.sectorStart !== null) {
+    placeWave(game, respawnX(game.run, game.sectorStart));
+  } else if (game.mode === 'normal') {
     game.run = game.level === 'finale' ? game.rules.buildFinale() : game.rules.buildRun(game.rng);
     game.jumped = false;
     game.checkpoint = game.run.startX;
+    game.sectorStart = null;
     placeWave(game, game.run.startX);
   } else {
     placeWave(game, respawnX(game.run, game.checkpoint));

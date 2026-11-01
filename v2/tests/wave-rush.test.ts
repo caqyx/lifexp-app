@@ -685,16 +685,16 @@ function crash(game: Game) {
 }
 
 describe('game', () => {
-  test('normal mode: a crash restarts at sector 1, section 1 with a new shuffle', () => {
-    const game = createGame({ rng: createRng(9), mode: 'normal', jump: { sector: 2, section: 4 } });
-    expect(game.where).toEqual({ sector: 2, section: 3 });
+  test('normal mode in Insane (no sector checkpoint): a crash restarts at sector 1, section 1 with a new shuffle', () => {
+    const game = createGame({ rng: createRng(9), mode: 'normal', jump: { sector: 5, section: 4 } });
+    expect(game.where).toEqual({ sector: 5, section: 3 });
     expect(keepsRecords(game)).toBe(false);
     stepGame(game, { holding: false, tap: true }, STEP);
     expect(game.phase).toBe('playing');
     const firstRun = game.run;
     crash(game);
     expect(game.phase).toBe('dead');
-    expect(game.result?.sector).toBe(2);
+    expect(game.result?.sector).toBe(5);
     // Locked a moment, then a tap starts again from the very start.
     stepGame(game, { holding: false, tap: true }, STEP);
     expect(game.phase).toBe('dead');
