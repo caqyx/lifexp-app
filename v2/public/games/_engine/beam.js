@@ -209,7 +209,9 @@ export function verifyBeam(spec, holds) {
  * @param {BeamSpec} spec @param {{ verify?: boolean, tries?: number, bands?: [number, 'min' | 'rateSafe'][], grain?: Grain }} [options]
  *   verify: false for the pilot; bands: the tries (room to spare, and the interval used);
  *   grain: how finely the beam keeps states.
- * @returns {{ holds: Int8Array | null, problem: string | null }}
+ * @returns {{ holds: Int8Array | null, problem: string | null, x: number | null }}
+ *   x: where the last try failed (the furthest the search got, or the tap that crashed
+ *   when shifted), for the level editor.
  */
 export function solveBeam(spec, options = {}) {
   const verify = options.verify ?? true;
@@ -217,11 +219,17 @@ export function solveBeam(spec, options = {}) {
   const rateSafe = Math.max(spec.limits.minInterval, 1 / Math.floor(spec.limits.maxRate) + 0.005);
   const tries = options.bands ?? [[spec.band ?? 0.3, 'min'], [0.5, 'min'], [0.3, 'rateSafe'], [0.15, 'min']];
   let problem = 'no path';
+  /** @type {number | null} */
+  let failX = null;
+  const xs = layerXs(spec);
   for (const [band, which] of tries) {
     const interval = which === 'min' ? spec.limits.minInterval : rateSafe;
     const layers = searchLayers(spec, Math.ceil(interval / decision - 1e-9), band, options.grain ?? GRAIN);
     const last = /** @type {Node[]} */ (layers[layers.length - 1]);
-    if (layers.length - 1 < layerXs(spec).length) continue;
+    if (layers.length - 1 < xs.length) {
+      failX = Math.max(failX ?? -Infinity, xs[Math.max(0, layers.length - 1)] ?? spec.x0);
+      continue;
+    }
     // Try ends nearest the middle of their band first (most room around them).
     const order = last
       .map((n, i) => ({ i, d: Math.abs(n.v.vy), c: spec.fewest ? n.changes : 0 }))
@@ -229,11 +237,14 @@ export function solveBeam(spec, options = {}) {
       .slice(0, options.tries ?? 60);
     for (const { i } of order) {
       const holds = holdsOf(layers, i);
-      if (!verify) return { holds, problem: null };
+      if (!verify) return { holds, problem: null, x: null };
       const fail = verifyBeam(spec, holds);
-      if (!fail) return { holds, problem: null };
+      if (!fail) return { holds, problem: null, x: null };
       problem = fail;
+      const tap = /tap (\d+)/.exec(fail);
+      const at = tap ? changesOf(holds)[Number(tap[1]) - 1] : undefined;
+      failX = at !== undefined ? (xs[Math.floor(at / N)] ?? failX) : failX;
     }
   }
-  return { holds: null, problem };
+  return { holds: null, problem, x: failX };
 }

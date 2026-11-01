@@ -9,6 +9,8 @@ import { records } from './records.js';
 import { createRenderer, renderFrame } from './render/index.js';
 import { drawWave } from './render/sprites.js';
 import { SKINS } from './skins.js';
+import { PALETTE } from './palette.js';
+import { buildCustom } from './run.js';
 
 const lang = pickLang(location.search);
 
@@ -22,6 +24,9 @@ runApp({
   createRenderer,
   renderFrame,
   slopeOf: (w) => (w.mini ? WAVE.miniSlope : WAVE.slope),
+  // The level editor (stage r-3): its button on the menu, and its test play.
+  palette: PALETTE,
+  buildCustom,
   loadAutopilot: () => import('./autopilot.js').then((m) => m.createAutopilot()),
   demon: true,
   finale: true,

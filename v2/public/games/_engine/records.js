@@ -7,7 +7,8 @@
 /** @typedef {Pick<Storage, 'getItem' | 'setItem'>} GameStorage */
 /** @typedef {import('./game.js').Result} Result */
 /**
- * @typedef {{ best: string, attempts: string, skin: string, progress: string, finaleBest: string, checkpoint: string }} Keys
+ * @typedef {{ best: string, attempts: string, skin: string, progress: string, finaleBest: string, checkpoint: string,
+ *   editorSlots: string, editorWork: string, editorPlay: string }} Keys
  *   progress: achievements { demonComplete, finaleComplete } (the first unlocks the last
  *   skin and the finale).
  */
@@ -21,6 +22,11 @@ export function keysFor(prefix) {
     progress: `${prefix}progress`,
     finaleBest: `${prefix}finale-best`,
     checkpoint: `${prefix}checkpoint`,
+    // The level editor (stage r-3): its saves (this browser), and in this tab the level
+    // being edited and the level left for a test play.
+    editorSlots: `${prefix}editor-slots`,
+    editorWork: `${prefix}editor-work`,
+    editorPlay: `${prefix}editor-play`,
   };
 }
 
@@ -28,7 +34,7 @@ export function keysFor(prefix) {
  * @param {GameStorage | null} storage @param {string} key
  * @returns {unknown}
  */
-function readJson(storage, key) {
+export function readJson(storage, key) {
   try {
     const raw = storage?.getItem(key);
     return raw ? JSON.parse(raw) : null;
@@ -38,7 +44,7 @@ function readJson(storage, key) {
 }
 
 /** @param {GameStorage | null} storage @param {string} key @param {unknown} value */
-function writeJson(storage, key, value) {
+export function writeJson(storage, key, value) {
   try {
     storage?.setItem(key, JSON.stringify(value));
   } catch {
