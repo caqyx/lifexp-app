@@ -32,9 +32,9 @@ export const GAMES: readonly GameDef[] = [
   { id: 'wartime', sessionName: 'Wartime', icon: Swords, src: 'games/wartime/index.html', landscape: true, downloads: true },
   { id: 'gridlock', sessionName: 'Gridlock', icon: Grid3x3, src: 'games/gridlock/index.html' },
   { id: 'quick-math', sessionName: 'Szybkie liczenie', icon: Calculator, src: 'games/quick-math/index.html' },
-  { id: 'wave-rush', sessionName: 'Wave Rush', icon: Activity, src: 'games/wave-rush/index.html', landscape: true },
-  { id: 'ship-rush', sessionName: 'Ship Rush', icon: Rocket, src: 'games/ship-rush/index.html', landscape: true },
-  { id: 'flip-rush', sessionName: 'Flip Rush', icon: Cog, src: 'games/flip-rush/index.html', landscape: true },
+  { id: 'wave-rush', sessionName: 'Wave Rush', icon: Activity, src: 'games/wave-rush/index.html', landscape: true, downloads: true },
+  { id: 'ship-rush', sessionName: 'Ship Rush', icon: Rocket, src: 'games/ship-rush/index.html', landscape: true, downloads: true },
+  { id: 'flip-rush', sessionName: 'Flip Rush', icon: Cog, src: 'games/flip-rush/index.html', landscape: true, downloads: true },
 ];
 
 /**

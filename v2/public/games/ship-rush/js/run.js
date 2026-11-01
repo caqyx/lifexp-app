@@ -4,6 +4,7 @@
 // Every section is flown as the ship unless it says otherwise (the finale's wave
 // stretches, stage s-2); the finale is built the same way from one fixed sector.
 import { buildLevel } from '../../_engine/level.js';
+import { customSector } from '../../_engine/editor/play.js';
 import { FINALE, FINALE_ID, SECTORS, tierSpeed } from './config.js';
 import { SECTION_LIBRARY } from './sections/index.js';
 
@@ -50,4 +51,14 @@ export function buildRun(rng, options = {}) {
 /** The finale: one fixed sequence of ship and wave stretches. @returns {Run} */
 export function buildFinale() {
   return buildLevel('finale', [FINALE], { [FINALE_ID]: SECTION_LIBRARY[FINALE_ID] ?? [] }, () => 0, RULES);
+}
+
+/**
+ * A level from the level editor (stage r-3) as a run: its sections in order, never
+ * shuffled, at its tier (../../_engine/editor/play.js).
+ * @param {import('../../_engine/editor/format.js').Level} level
+ * @returns {Run}
+ */
+export function buildCustom(level) {
+  return buildLevel('finale', [customSector(level, SECTORS, FINALE)], { 1: level.sections }, () => 0, RULES);
 }

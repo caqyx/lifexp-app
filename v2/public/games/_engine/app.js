@@ -20,6 +20,7 @@ import { portalColor } from './render/sprites.js';
 import { easeAngle, targetAngle } from './render/turn.js';
 import { computeView } from './render/view.js';
 import { createRng, parseSwitches } from './rng.js';
+import { readPlay } from './editor/play.js';
 import { isUnlocked, resolveSkin } from './skins.js';
 
 /**
@@ -41,13 +42,17 @@ import { isUnlocked, resolveSkin } from './skins.js';
  *   slopeOf: (vehicle: Vehicle) => number,
  *   loadAutopilot: () => Promise<{ advise: (run: Run, vehicle: Vehicle) => boolean }>,
  *   demon: boolean, finale: boolean, holdTaps?: boolean,
+ *   palette?: import('./editor/format.js').Palette, buildCustom?: (level: import('./editor/format.js').Level) => Run,
  * }} AppDef
  *   t: the game's translator (every key of APP_TEXT_KEYS, plus sector1..n and the Demon
  *   bands' keys); paintSkin: a skin's preview in a 96 × 64 box (CSS px); slopeOf: the
  *   wave's |dy/dx| now (the icon turns toward it); demon: the run ends with the Demon
  *   sector (finishing it is the achievement that unlocks the last skin and the finale);
  *   finale: the game has its finale level (its box on the menu); holdTaps: a short tap is
- *   held down until the ball or the spider has acted on it (or INPUT_BUFFER_MS passes).
+ *   held down until the ball or the spider has acted on it (or INPUT_BUFFER_MS passes);
+ *   palette, buildCustom: the level editor (stage r-3): the page opened with ?editor=1
+ *   plays the level the editor left for it (editor/play.js), in practice, and offers the
+ *   way back to the editor.
  */
 
 /** The texts the page itself uses (each game's i18n has them all; its tests check). */
@@ -55,7 +60,7 @@ export const APP_TEXT_KEYS = [
   'canvas', 'bestValue', 'bestNone', 'finaleLocked', 'finaleBest', 'finaleReady', 'sectorLabel', 'sectionLabel',
   'attempt', 'result', 'tapRespawn', 'tapRestart', 'finaleResult', 'finaleDoneTitle', 'finishedTitle', 'finaleDoneBody',
   'finishedBody', 'achFinale', 'achDemon', 'achFinaleBody', 'achDemonBody', 'unlockSkin', 'unlockFinale', 'gravityFlip',
-  'gravityBack', 'shipOn', 'waveOn', 'finaleName', 'selected', 'locked', 'checkpoint', 'tapSector',
+  'gravityBack', 'shipOn', 'waveOn', 'finaleName', 'selected', 'locked', 'checkpoint', 'tapSector', 'editor', 'editorLevel', 'editorBack',
 ];
 
 /**
@@ -156,6 +161,10 @@ export function runApp(def) {
 
   /** @typedef {'menu' | 'skins' | 'ready' | 'playing' | 'dead' | 'finished' | 'achievement' | 'paused'} Screen */
 
+  // The level editor's test play (stage r-3).
+  const custom = def.palette && def.buildCustom ? readPlay(def.palette, search, def.records.KEYS.editorPlay) : null;
+  const customRules = custom && def.buildCustom ? { ...def.rules, buildFinale: () => /** @type {NonNullable<typeof def.buildCustom>} */ (def.buildCustom)(custom.level) } : null;
+
   const state = {
     /** @type {Screen} */
     screen: 'menu',
@@ -219,6 +228,16 @@ export function runApp(def) {
 
   /** @param {'normal' | 'practice'} mode @param {'run' | 'finale'} [level] */
   function startGame(mode, level = 'run') {
+    if (customRules) {
+      // The editor's level: practice (a checkpoint every section, no records), from where the editor said.
+      state.game = createGame(customRules, { rng: gameRng, mode: 'practice', level: 'finale', checkpointBy: 'section', jump: custom && custom.from > 1 ? { sector: 1, section: custom.from } : null });
+      state.newBest = false;
+      dom.stage.classList.add('is-practice');
+      input.pressedAt = null;
+      updateHud();
+      show('ready');
+      return;
+    }
     if (level === 'finale' && !(def.finale && records.readProgress(storage).demonComplete)) return;
     const jump = level === 'finale' ? (switches.finale ? { sector: 1, section: switches.finale } : null) : switches.jump;
     state.game = createGame(def.rules, { rng: gameRng, mode, level, checkpointBy: state.checkpointBy, jump });
@@ -362,6 +381,17 @@ export function runApp(def) {
     addEventListener('keyup', handleKeyUp);
     addEventListener('contextmenu', (event) => event.preventDefault());
     dom.play.addEventListener('click', () => startGame('normal'));
+    // The level editor (stage r-3), and from its test play the way back to it.
+    const editorOpen = document.getElementById('editor-open');
+    const editorBack = document.getElementById('editor-back');
+    if (editorOpen) {
+      editorOpen.hidden = !def.palette;
+      editorOpen.addEventListener('click', () => (location.href = `editor.html?lang=${def.lang}`));
+    }
+    if (editorBack) {
+      editorBack.hidden = !customRules;
+      editorBack.addEventListener('click', () => (location.href = `editor.html?lang=${def.lang}`));
+    }
     dom.practice.addEventListener('click', () => startGame('practice'));
     dom.skinsOpen.addEventListener('click', () => {
       buildSkinList();
@@ -478,7 +508,7 @@ export function runApp(def) {
    * @param {Game} game
    */
   function bandName(game) {
-    if (game.level === 'finale') return t('finaleName');
+    if (game.level === 'finale') return t(customRules ? 'editorLevel' : 'finaleName');
     const piece = pieceAt(game.run, game.wave.x);
     const sector = game.run.sectors[piece.sector];
     const band = piece.band >= 0 ? sector?.def.bands?.[piece.band] : null;
@@ -490,7 +520,7 @@ export function runApp(def) {
     const where = game.where;
     const sector = game.run.sectors[where.sector - 1];
     const band = bandName(game);
-    const label = game.level === 'finale' ? t('finaleName') : t('sectorLabel', { n: where.sector, name: band ?? sectorName(where.sector) });
+    const label = game.level === 'finale' ? t(customRules ? 'editorLevel' : 'finaleName') : t('sectorLabel', { n: where.sector, name: band ?? sectorName(where.sector) });
     dom.hudSector.textContent = `${label} · ${t('sectionLabel', { section: where.section, count: sector ? sector.count : 0 })}`;
     dom.hudAttempt.textContent = t('attempt', { n: game.attempt });
   }
@@ -694,7 +724,8 @@ export function runApp(def) {
   document.addEventListener('visibilitychange', handleVisibilityChange);
   updateMenu();
   updateHud();
-  show('menu');
+  if (customRules) startGame('practice');
+  else show('menu');
   startLoop();
   if (debug && pilot.sections > 0) {
     def.loadAutopilot().then((pilotModule) => {

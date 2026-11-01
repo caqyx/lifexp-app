@@ -660,3 +660,18 @@ body {
     font-size: 22px;
   }
 }
+
+/* The level editor's test play (stage r-3): the way back to the editor, over the HUD. */
+.editor-back {
+  position: fixed;
+  left: 10px;
+  bottom: 10px;
+  z-index: 5;
+  min-height: 40px;
+  padding: 6px 14px;
+  font-size: 14px;
+}
+
+.editor-back[hidden] {
+  display: none;
+}

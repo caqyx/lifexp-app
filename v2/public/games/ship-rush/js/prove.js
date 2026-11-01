@@ -20,7 +20,8 @@ import { sectionWorld } from './solids.js';
  * @typedef {import('../../_engine/geometry.js').SectionData} SectionData
  * @typedef {{ gravity: 1 | -1, mini: boolean }} State
  * @typedef {{ y: number, vy: number }} Entry
- * @typedef {{ entry: Entry, problem: string | null, changes: number, holds: Int8Array | null }} EntryResult
+ * @typedef {{ entry: Entry, problem: string | null, changes: number, holds: Int8Array | null, x: number | null }} EntryResult
+ *   x: where it failed (stage r-3, for the level editor).
  */
 
 /**
@@ -145,12 +146,12 @@ export function proveEntry(data, tier, state, entry, options = {}) {
     ...(stepper.plain ? {} : { speedAt: stepper.speedAt }),
     safe: (v, band) => roomy(world, v, band),
   };
-  let result = { holds: /** @type {Int8Array | null} */ (null), problem: /** @type {string | null} */ ('no path') };
+  let result = { holds: /** @type {Int8Array | null} */ (null), problem: /** @type {string | null} */ ('no path'), x: /** @type {number | null} */ (null) };
   for (const grain of SHIP_GRAINS) {
     result = solveBeam(spec, { bands: TRIES, grain, ...options });
     if (result.holds) break;
   }
-  return { entry, problem: result.problem, changes: result.holds ? changesOf(result.holds).length : -1, holds: result.holds };
+  return { entry, problem: result.problem, changes: result.holds ? changesOf(result.holds).length : -1, holds: result.holds, x: result.x };
 }
 
 /**
@@ -166,7 +167,7 @@ export function sectionProblems(data, sector, number) {
   for (const state of statesOf(sector, data)) {
     for (const entry of entriesOf(state.mini)) {
       const result = proveEntry(data, tier, state, entry);
-      if (result.problem) problems.push(`${data.id} (gravity ${state.gravity}${state.mini ? ', mini' : ''}) from y=${entry.y.toFixed(2)} vy=${entry.vy}: ${result.problem}`);
+      if (result.problem) problems.push(`${data.id} (gravity ${state.gravity}${state.mini ? ', mini' : ''}) from y=${entry.y.toFixed(2)} vy=${entry.vy}: ${result.problem}${result.x !== null ? ` (x≈${result.x.toFixed(1)})` : ''}`);
     }
   }
   return problems;

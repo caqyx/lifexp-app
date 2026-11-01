@@ -1,0 +1,242 @@
+/* The Rush level editor (docs/v2/PLAN.md 9.1, stage r-3): the games' tokens (shell.css is
+   loaded first); a bar of actions on top, the board in the middle, the section's settings
+   and the tools below, panels over the board. Works held upright on a phone: the bars
+   wrap and the tools scroll sideways. */
+
+body.ed-page {
+  display: flex;
+  flex-direction: column;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.ed-bar,
+.ed-sectionbar,
+.ed-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ed-toolbar {
+  border-top: 1px solid var(--color-border);
+  border-bottom: 0;
+}
+
+/* Each bar is one row that scrolls sideways (a phone held upright keeps the board tall). */
+.ed-bar,
+.ed-sectionbar,
+.ed-toolbar {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.ed-options {
+  flex-wrap: nowrap;
+}
+
+.ed-title {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  margin: 0 6px 0 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.ed-button,
+.ed-tool {
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 9%);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--duration-exit) var(--ease-in);
+}
+
+.ed-button:hover:not(:disabled),
+.ed-tool:hover {
+  background: rgb(255 255 255 / 15%);
+}
+
+.ed-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ed-button--primary,
+.ed-tool[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.ed-button:focus-visible,
+.ed-tool:focus-visible,
+.ed-field input:focus-visible,
+.ed-field select:focus-visible,
+.ed-panel textarea:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.ed-field {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.ed-field input,
+.ed-field select,
+.ed-panel textarea,
+.ed-panel select {
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: rgb(0 0 0 / 35%);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.ed-field input[type='checkbox'] {
+  min-height: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.ed-field--wide input {
+  width: 11em;
+}
+
+.ed-shape {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.ed-label {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ed-board {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 160px;
+  overflow: hidden;
+}
+
+.ed-board canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.ed-options {
+  display: flex;
+  gap: 8px;
+}
+
+.ed-panel {
+  position: absolute;
+  inset: 8px;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: rgb(14 15 19 / 96%);
+}
+
+.ed-panel h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+}
+
+.ed-panel p {
+  margin: 0 0 10px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.ed-panel textarea {
+  width: 100%;
+  min-height: 9em;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+}
+
+.ed-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.ed-panel ul {
+  margin: 8px 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.ed-slot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.ed-check-fail {
+  color: #ff8a8a;
+}
+
+.ed-check-ok {
+  color: #8cf2b4;
+}
+
+.ed-toast {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgb(0 0 0 / 80%);
+  font-size: 14px;
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  pointer-events: none;
+  transition:
+    opacity var(--duration-exit) var(--ease-in),
+    transform var(--duration-exit) var(--ease-in);
+}
+
+.ed-toast.is-on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  transition-duration: var(--duration-enter);
+  transition-timing-function: var(--ease-out);
+}
