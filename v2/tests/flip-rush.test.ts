@@ -180,7 +180,7 @@ describe('the run', () => {
     expect(buildRun(createRng(5)).sectors.map((s) => s.order)).toEqual(buildRun(createRng(5)).sectors.map((s) => s.order));
   });
 
-  test('the finale: ten fixed stretches, ball and spider in turn, a vehicle portal at every change, never shuffled; every kind of orb and pad', () => {
+  test('the finale: ten fixed stretches, ball and spider in turn, a vehicle portal at every change, never shuffled; orbs and pads and stage r-2’s mechanics', () => {
     const a = buildFinale();
     const b = buildFinale();
     const sections = a.pieces.filter((p) => p.kind === 'section');

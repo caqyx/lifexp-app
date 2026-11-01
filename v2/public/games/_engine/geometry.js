@@ -24,7 +24,11 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  * @typedef {{ type: 'spike' | 'halfSpike', x: number, on?: 'floor' | 'ceil', count?: number, y?: number, dir?: 'up' | 'down' }} SpikeData
  * @typedef {{ type: 'block', x: number, y: number, w: number, h: number }} BlockData
  * @typedef {{ type: 'pillar', x: number, on: 'floor' | 'ceil', h: number, w?: number }} PillarData
- * @typedef {{ type: 'saw' | 'orb' | 'mine', x: number, y: number, r: number, chain?: boolean }} RoundData
+ * @typedef {{ dx: number, dy: number, every: number, phase?: number }} Move
+ *   A moving hazard (stage r-2): it swings by (dx, dy) cells along a sine, a whole swing
+ *   every `every` cells the vehicle runs (keyed to the vehicle's place, as the genre's move
+ *   triggers are, so a proof and the game see the same thing at the same x).
+ * @typedef {{ type: 'saw' | 'orb' | 'mine', x: number, y: number, r: number, chain?: boolean, move?: Move }} RoundData
  *   chain: hangs on a chain from the ceiling (drawn only; the chain never hurts).
  * @typedef {'jump' | 'small' | 'gravity' | 'gravityJump' | 'dash'} RingKind
  * @typedef {'jump' | 'small' | 'gravity'} PadKind
@@ -32,7 +36,16 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  *   Flip Rush's orbs (`ring`, at its centre) and pads (`pad`, one cell from x, on the floor
  *   or the ceiling under/over x + 0.5, or on a block's top or underside at `y`): they help,
  *   never hurt (flip-rush/js/boosters.js has their effects).
- * @typedef {SpikeData | BlockData | PillarData | RoundData | BoosterData} HazardData
+ * @typedef {'slow' | 'normal' | 'fast' | 'veryFast'} SpeedKind
+ * @typedef {{ type: 'speed', x: number, k: SpeedKind }
+ *   | { type: 'portal', x: number, kind: 'flip' | 'mini' | 'big' }
+ *   | { type: 'dark', from: number, to: number }
+ *   | { type: 'invert', from: number, to: number }} EffectData
+ *   Stage r-2, inside a section: a speed portal (the tier's speed × SPEED_FACTORS[k] from
+ *   x to the section's end or the next one); a gravity flip or a size portal (flips come in
+ *   pairs and a mini stretch ends in `big`, so a section ends as it began); a dark stretch
+ *   (the view narrows round the vehicle — drawing only); an inverted-controls stretch.
+ * @typedef {SpikeData | BlockData | PillarData | RoundData | BoosterData | EffectData} HazardData
  * @typedef {{ type: 'chain', x: number, len: number, ornament?: 'diamond' | 'star' | 'triangle' | 'eye' | 'debris' | 'none' }
  *   | { type: 'star' | 'diamond' | 'gear' | 'eye', x: number, y: number, size: number }
  *   | { type: 'frame', x: number, y: number, w: number, h: number }
@@ -48,13 +61,15 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  * @typedef {'wave' | 'ship' | 'ball' | 'spider'} VehicleMode
  *
  * @typedef {{ type: 'spike' | 'halfSpike' | 'block' | 'pillar', shape: 'poly', pts: Pt[], vis: Pt[], dir: 'up' | 'down' | 'none', bbox: number[] }} PolyHazard
- * @typedef {{ type: 'saw' | 'orb' | 'mine', shape: 'circle', x: number, y: number, r: number, hit: number, bbox: number[], chain: boolean }} CircleHazard
+ * @typedef {{ type: 'saw' | 'orb' | 'mine', shape: 'circle', x: number, y: number, r: number, hit: number, bbox: number[], chain: boolean, move?: Move }} CircleHazard
  * @typedef {PolyHazard | CircleHazard} Hazard
  * @typedef {{ type: 'ring', kind: RingKind, x: number, y: number, dir: 'none' } | { type: 'pad', kind: PadKind, x: number, y: number, dir: 'up' | 'down' }} Booster
  *   A pad's x is its centre and y the surface it sits on; dir: the way it faces.
  * @typedef {{ id: string, length: number, ceil: Pt[], floor: Pt[], ceilSegs: Seg[], floorSegs: Seg[],
  *   mini: boolean, tier: string | null, mode: VehicleMode,
- *   hazards: Hazard[], boosters: Booster[], deco: DecoData[], buckets: Map<number, Hazard[]>, segBuckets: Map<number, Seg[]> }} Geometry
+ *   hazards: Hazard[], boosters: Booster[], deco: DecoData[], buckets: Map<number, Hazard[]>, segBuckets: Map<number, Seg[]>,
+ *   speeds: { x: number, k: SpeedKind }[], portals: { x: number, kind: 'flip' | 'mini' | 'big' }[],
+ *   dark: { from: number, to: number }[], invert: { from: number, to: number }[] }} Geometry
  */
 
 const EPS = 1e-9;
@@ -219,7 +234,7 @@ function resolveSpikes(data, ceil, floor) {
  * @returns {Hazard[]}
  */
 function resolveHazard(data, ceil, floor) {
-  if (data.type === 'ring' || data.type === 'pad') return [];
+  if (data.type === 'ring' || data.type === 'pad' || data.type === 'speed' || data.type === 'portal' || data.type === 'dark' || data.type === 'invert') return [];
   if (data.type === 'spike' || data.type === 'halfSpike') return resolveSpikes(data, ceil, floor);
   if (data.type === 'block') {
     const pts = rect(data.x, data.y, data.x + data.w, data.y + data.h);
@@ -233,7 +248,9 @@ function resolveHazard(data, ceil, floor) {
   }
   if (data.type !== 'saw' && data.type !== 'orb' && data.type !== 'mine') throw new Error('unknown hazard');
   const hit = data.r * ROUND_HIT[data.type];
-  return [{ type: data.type, shape: 'circle', x: data.x, y: data.y, r: data.r, hit, bbox: [data.x - data.r, data.y - data.r, data.x + data.r, data.y + data.r], chain: data.chain === true }];
+  const mx = Math.abs(data.move?.dx ?? 0);
+  const my = Math.abs(data.move?.dy ?? 0);
+  return [{ type: data.type, shape: 'circle', x: data.x, y: data.y, r: data.r, hit, bbox: [data.x - data.r - mx, data.y - data.r - my, data.x + data.r + mx, data.y + data.r + my], chain: data.chain === true, ...(data.move ? { move: data.move } : {}) }];
 }
 
 /**
@@ -280,6 +297,22 @@ export function buildGeometry(data) {
   const floorSegs = profileSegments(floor, 'floor');
   const hazards = data.hazards.flatMap((h) => resolveHazard(h, ceil, floor));
   const boosters = data.hazards.flatMap((h) => resolveBooster(h, ceil, floor));
+  /** @type {Geometry['speeds']} */
+  const speeds = [];
+  /** @type {Geometry['portals']} */
+  const portals = [];
+  /** @type {Geometry['dark']} */
+  const dark = [];
+  /** @type {Geometry['invert']} */
+  const invert = [];
+  for (const h of data.hazards) {
+    if (h.type === 'speed') speeds.push({ x: h.x, k: h.k });
+    if (h.type === 'portal') portals.push({ x: h.x, kind: h.kind });
+    if (h.type === 'dark') dark.push({ from: h.from, to: h.to });
+    if (h.type === 'invert') invert.push({ from: h.from, to: h.to });
+  }
+  speeds.sort((a, b) => a.x - b.x);
+  portals.sort((a, b) => a.x - b.x);
   return {
     id: data.id,
     length: data.length,
@@ -292,6 +325,10 @@ export function buildGeometry(data) {
     floorSegs,
     hazards,
     boosters,
+    speeds,
+    portals,
+    dark,
+    invert,
     deco: data.deco ?? [],
     buckets: bucketize(hazards, (h) => [/** @type {number} */ (h.bbox[0]), /** @type {number} */ (h.bbox[2])]),
     segBuckets: bucketize([...ceilSegs, ...floorSegs], (s) => [Math.min(s.x0, s.x1), Math.max(s.x0, s.x1)]),
@@ -367,6 +404,7 @@ export function insideConvex(pts, x, y) {
  * @param {Hazard} h @param {number} x @param {number} ya @param {number} yb @param {number} r
  */
 export function capsuleHitsHazard(h, x, ya, yb, r) {
+  if (h.shape === 'circle' && h.move) h = movedAt(h, x);
   if (x + r < /** @type {number} */ (h.bbox[0]) || x - r > /** @type {number} */ (h.bbox[2])) return false;
   if (yb + r < /** @type {number} */ (h.bbox[1]) || ya - r > /** @type {number} */ (h.bbox[3])) return false;
   if (h.shape === 'circle') {
@@ -380,6 +418,21 @@ export function capsuleHitsHazard(h, x, ya, yb, r) {
     if (verticalSegment(x, ya, yb, ax, ay, bx, by).d2 < r * r) return true;
   }
   return false;
+}
+
+/**
+ * Where a moving round hazard is when the vehicle is at local x (stage r-2): swung by
+ * (dx, dy) along a sine, a whole swing every `every` cells.
+ * @param {CircleHazard} h @param {number} x
+ * @returns {CircleHazard}
+ */
+export function movedAt(h, x) {
+  const m = h.move;
+  if (!m) return h;
+  const s = Math.sin(((x / m.every) + (m.phase ?? 0)) * Math.PI * 2);
+  const cx = h.x + m.dx * s;
+  const cy = h.y + m.dy * s;
+  return { ...h, x: cx, y: cy, bbox: [cx - h.r, cy - h.r, cx + h.r, cy + h.r], move: undefined };
 }
 
 /**
@@ -511,6 +564,11 @@ export function checkSection(data, minGap) {
       const points = item.on === 'floor' ? g.floor : g.ceil;
       if (!isFlatBetween(points, item.x, item.x + (item.w ?? 1))) problems.push(`${data.id}: pillar at ${item.x} not on flat ${item.on}`);
     }
+  }
+  if (g.portals.filter((p) => p.kind === 'flip').length % 2) problems.push(`${data.id}: gravity flips inside a section come in pairs`);
+  if (g.portals.filter((p) => p.kind === 'mini').length !== g.portals.filter((p) => p.kind === 'big').length) problems.push(`${data.id}: a mini stretch inside a section ends in a big portal`);
+  for (const p of [...g.portals, ...g.speeds]) {
+    if (p.x < JOINT_CLEAR || p.x > data.length - JOINT_CLEAR) problems.push(`${data.id}: portal too close to an end`);
   }
   for (const b of g.boosters) {
     if (b.x - 0.5 < JOINT_CLEAR || b.x + 0.5 > data.length - JOINT_CLEAR) problems.push(`${data.id}: ${b.type} too close to an end`);

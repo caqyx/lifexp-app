@@ -8,6 +8,7 @@
 // press held through a landing still acts there, so an early press is the genre's
 // buffered press). Used by v2/tests/flip-rush-sections.test.ts on every section, in every
 // state the run can fly it in.
+import { sectionStepper } from '../../_engine/stretch.js';
 import { solveBeam } from '../../_engine/beam.js';
 import { checkSection, widestGapAt } from '../../_engine/geometry.js';
 import { changesOf } from '../../_engine/limits.js';
@@ -106,9 +107,12 @@ export const FLIP_GRAINS = [
  * The beam validator's view of a body flying a world.
  * @param {import('../../_engine/solids.js').World} world @param {number} x0 @param {number} x1 @param {number} speed
  * @param {import('./config.js').Tier} limits @param {import('./physics.js').Body} start
+ * @param {import('../../_engine/geometry.js').Geometry} [g] the section (local x) when its own stretches apply (stage r-2)
  * @returns {import('../../_engine/beam.js').BeamSpec}
  */
-export function beamSpec(world, x0, x1, speed, limits, start) {
+export function beamSpec(world, x0, x1, speed, limits, start, g) {
+  const real = g ? sectionStepper(g, speed, (v, h, sp, dt) => { const n = stepBody(v, h, sp, dt, world); return n.crashed ? null : n.vehicle; }) : null;
+  const strict = g ? sectionStepper(g, speed, (v, h, sp, dt) => { const n = stepBody(v, h, sp, dt, world, sp * (limits.tolerance + 1 / 240)); return n.crashed ? null : n.vehicle; }) : null;
   return {
     x0,
     x1,
@@ -116,12 +120,15 @@ export function beamSpec(world, x0, x1, speed, limits, start) {
     limits,
     start,
     step(v, holding, dt) {
+      if (real) return real.step(v, holding, dt);
       const next = stepBody(v, holding, speed, dt, world);
       return next.crashed ? null : next.vehicle;
     },
+    ...(real && !real.plain ? { speedAt: real.speedAt } : {}),
     // The search's orbs reach less far by the way a mistimed press slips (and a step), so
     // a press it picks fires the real orb however it slips.
     search(v, holding, dt) {
+      if (strict) return strict.step(v, holding, dt);
       const next = stepBody(v, holding, speed, dt, world, speed * (limits.tolerance + 1 / 240));
       return next.crashed ? null : next.vehicle;
     },
@@ -133,7 +140,7 @@ export function beamSpec(world, x0, x1, speed, limits, start) {
     safe: (v, band) => {
       if (!roomy(world, v, band)) return false;
       if (band <= 0) return true;
-      const across = speed * limits.tolerance * Math.min(1.5, band);
+      const across = (real ? real.speedAt(v.x) : speed) * limits.tolerance * Math.min(1.5, band);
       const { radius, half } = bodyOf(v.mini);
       if (overlapsSolid(world, v.x + across, v.y, half)) return false;
       return !world.hazard(v.x - across, v.y, v.y, radius) && !world.hazard(v.x + across, v.y, v.y, radius);
@@ -154,7 +161,7 @@ export function beamSpec(world, x0, x1, speed, limits, start) {
 export function proveEntry(data, tier, state, entry, options = {}) {
   const g = geometryOf(data);
   const start = { ...createBody(0, entry.y, data.mode === 'spider' ? 'spider' : 'ball'), vy: entry.vy, gravity: state.gravity, mini: state.mini };
-  const spec = beamSpec(sectionWorld(g), 0, g.length, tierSpeed(tier), tierOf(tier), start);
+  const spec = beamSpec(sectionWorld(g), 0, g.length, tierSpeed(tier), tierOf(tier), start, g);
   let result = { holds: /** @type {Int8Array | null} */ (null), problem: /** @type {string | null} */ ('no path') };
   for (const grain of FLIP_GRAINS) {
     result = solveBeam(spec, { bands: TRIES, grain, ...options });

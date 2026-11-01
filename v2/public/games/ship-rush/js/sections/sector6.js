@@ -8,6 +8,8 @@
 // hand-made; the Demon's ornament (ornament.js) is added on top, denser tier by tier.
 // Every section is proven fair by v2/tests/ship-rush-sections.test.ts.
 import { ornament } from './ornament.js';
+// Stage r-2: inverted controls (d-03), dark stretches with moving blades (d-12), flips with
+// inverted controls (d-18), the dark at very fast speed (d-27).
 
 /** @typedef {import('../../../_engine/geometry.js').SectionData} SectionData */
 
@@ -54,16 +56,16 @@ const EASY = [
     ],
   },
   {
-    // Spiked steps: a block on the floor, one from the ceiling, one on the floor.
+    // Inverted controls (stage r-2): hold to sink, let go to climb, between two columns.
     id: 'd-03',
-    ...open(30),
+    length: 30,
+    ceil: '2 r30',
+    floor: '10 r30',
     hazards: [
-      { type: 'block', x: 9, y: 7, w: 3, h: 3 },
-      { type: 'spike', x: 10, y: 7, dir: 'up' },
-      { type: 'block', x: 15.5, y: 2, w: 3, h: 3.6 },
-      { type: 'spike', x: 16.5, y: 5.6, dir: 'down' },
-      { type: 'block', x: 22, y: 6.6, w: 3, h: 3.4 },
-      { type: 'spike', x: 23, y: 6.6, dir: 'up' },
+      { type: 'invert', from: 6, to: 20 },
+      { type: 'pillar', x: 10, on: 'floor', h: 3.3 },
+      { type: 'pillar', x: 16, on: 'ceil', h: 3.3 },
+      { type: 'saw', x: 25, y: 6, r: 0.8 },
     ],
   },
   {
@@ -86,20 +88,20 @@ const EASY = [
     hazards: windows([[11, 3.6, 6.2], [15, 5, 7.6], [19, 3.8, 6.4], [23, 5.2, 7.8]]),
   },
   {
-    // A mine swarm: ten mines over every height.
+    // A mine swarm: ten mines over every height, two of them drifting (stage r-2).
     id: 'd-06',
     ...open(30),
     hazards: [
-      { type: 'mine', x: 7.5, y: 4, r: 0.5 },
-      { type: 'mine', x: 9.5, y: 7.5, r: 0.5 },
-      { type: 'mine', x: 11.5, y: 5.5, r: 0.5 },
-      { type: 'mine', x: 13.5, y: 3.2, r: 0.5 },
-      { type: 'mine', x: 15.5, y: 8.4, r: 0.5 },
-      { type: 'mine', x: 17.5, y: 6, r: 0.5 },
-      { type: 'mine', x: 19.5, y: 3.6, r: 0.5 },
-      { type: 'mine', x: 21.5, y: 7.2, r: 0.5 },
-      { type: 'mine', x: 23.5, y: 4.6, r: 0.5 },
-      { type: 'mine', x: 25.5, y: 8, r: 0.5 },
+      { type: 'mine', x: 7.5, y: 4.4, r: 0.5 },
+      { type: 'mine', x: 9.5, y: 7.1, r: 0.5 },
+      { type: 'mine', x: 11.5, y: 5.5, r: 0.5, move: { dx: 0, dy: 1.2, every: 8 } },
+      { type: 'mine', x: 13.5, y: 3.6, r: 0.5 },
+      { type: 'mine', x: 15.5, y: 8.1, r: 0.5 },
+      { type: 'mine', x: 17.5, y: 6.4, r: 0.5 },
+      { type: 'mine', x: 19.5, y: 3.2, r: 0.5 },
+      { type: 'mine', x: 21.5, y: 7.2, r: 0.5, move: { dx: 0, dy: 1, every: 7, phase: 0.5 } },
+      { type: 'mine', x: 23.5, y: 5, r: 0.5 },
+      { type: 'mine', x: 25.5, y: 8.3, r: 0.5 },
     ],
   },
   {
@@ -166,17 +168,16 @@ const HARD = [
     ],
   },
   {
-    // A curtain of chained mines at every length.
+    // In the dark (stage r-2): two swinging blades and a column, seen only close round the ship.
     id: 'd-12',
-    ...open(30),
+    length: 30,
+    ceil: '2 r30',
+    floor: '10 r30',
     hazards: [
-      { type: 'mine', x: 8, y: 4.2, r: 0.55, chain: true },
-      { type: 'mine', x: 11, y: 6.6, r: 0.55, chain: true },
-      { type: 'mine', x: 14, y: 4.8, r: 0.55, chain: true },
-      { type: 'mine', x: 17, y: 7, r: 0.55, chain: true },
-      { type: 'mine', x: 20, y: 4.2, r: 0.55, chain: true },
-      { type: 'mine', x: 23, y: 6.4, r: 0.55, chain: true },
-      { type: 'mine', x: 26, y: 5, r: 0.55, chain: true },
+      { type: 'dark', from: 5, to: 25 },
+      { type: 'saw', x: 10, y: 6, r: 1, move: { dx: 0, dy: 2.2, every: 8 } },
+      { type: 'pillar', x: 16, on: 'ceil', h: 3.5 },
+      { type: 'saw', x: 22, y: 6, r: 1, move: { dx: 0, dy: 2.2, every: 8, phase: 0.25 } },
     ],
   },
   {
@@ -244,33 +245,32 @@ const INSANE = [
     ],
   },
   {
-    // Saw pairs: the gap in the middle, high, then low.
+    // Gravity over and the controls inverted at once, between two columns.
     id: 'd-18',
-    length: 32,
-    ceil: '2 r32',
-    floor: '10 r32',
+    length: 30,
+    ceil: '2 r30',
+    floor: '10 r30',
     hazards: [
-      { type: 'saw', x: 10, y: 3.4, r: 1.1 },
-      { type: 'saw', x: 10, y: 8.6, r: 1.1 },
-      { type: 'saw', x: 17, y: 2.4, r: 1.1 },
-      { type: 'saw', x: 17, y: 7.6, r: 1.1 },
-      { type: 'saw', x: 24, y: 4.4, r: 1.1 },
-      { type: 'saw', x: 24, y: 9.6, r: 1.1 },
+      { type: 'portal', x: 6, kind: 'flip' },
+      { type: 'invert', from: 8, to: 22 },
+      { type: 'pillar', x: 12, on: 'floor', h: 3 },
+      { type: 'pillar', x: 18, on: 'ceil', h: 3 },
+      { type: 'portal', x: 24, kind: 'flip' },
     ],
   },
   {
-    // A mine lattice: two rows, offset.
+    // A mine lattice: two rows, offset, the middle pair sliding to and fro (stage r-2).
     id: 'd-19',
     length: 32,
     ceil: '2 r32',
     floor: '10 r32',
     hazards: [
-      { type: 'mine', x: 9, y: 4.4, r: 0.45 },
-      { type: 'mine', x: 12, y: 7.6, r: 0.45 },
-      { type: 'mine', x: 15, y: 4.4, r: 0.45 },
-      { type: 'mine', x: 18, y: 7.6, r: 0.45 },
-      { type: 'mine', x: 21, y: 4.4, r: 0.45 },
-      { type: 'mine', x: 24, y: 7.6, r: 0.45 },
+      { type: 'mine', x: 9, y: 4, r: 0.45 },
+      { type: 'mine', x: 12.5, y: 8, r: 0.45 },
+      { type: 'mine', x: 16, y: 4, r: 0.45, move: { dx: 1.2, dy: 0, every: 9 } },
+      { type: 'mine', x: 19.5, y: 8, r: 0.45, move: { dx: 1.2, dy: 0, every: 9, phase: 0.5 } },
+      { type: 'mine', x: 23, y: 4, r: 0.45 },
+      { type: 'mine', x: 26.5, y: 8, r: 0.45 },
     ],
   },
   {
@@ -363,16 +363,18 @@ const EXTREME = [
     ],
   },
   {
-    // A saw curtain: four blades, high and low.
+    // In the dark at very fast speed: a swinging blade, a column, another blade.
     id: 'd-27',
-    length: 34,
-    ceil: '2 r34',
-    floor: '10 r34',
+    length: 30,
+    ceil: '2 r30',
+    floor: '10 r30',
     hazards: [
-      { type: 'saw', x: 10, y: 3.6, r: 1.2 },
-      { type: 'saw', x: 16, y: 8.4, r: 1.2 },
-      { type: 'saw', x: 22, y: 3.6, r: 1.2 },
-      { type: 'saw', x: 28, y: 8.4, r: 1.2 },
+      { type: 'dark', from: 4, to: 26 },
+      { type: 'speed', x: 5, k: 'veryFast' },
+      { type: 'saw', x: 12, y: 6, r: 0.9, move: { dx: 0, dy: 2.3, every: 10 } },
+      { type: 'pillar', x: 18, on: 'ceil', h: 3 },
+      { type: 'speed', x: 21, k: 'normal' },
+      { type: 'saw', x: 25, y: 6, r: 0.8, move: { dx: 0, dy: 2, every: 7, phase: 0.3 } },
     ],
   },
   {

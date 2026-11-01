@@ -182,17 +182,17 @@ export const SECTOR2 = [
     ],
   },
   {
-    // Spider: beds both sides in turn, two cells apart.
+    // Spider: short and long beds in turn, then a mine under the ceiling.
     id: 'r2-14',
     mode: 'spider',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'spike', x: 6, on: 'floor', count: 3 },
-      { type: 'spike', x: 11, on: 'ceil', count: 3 },
-      { type: 'spike', x: 16, on: 'floor', count: 3 },
-      { type: 'spike', x: 21, on: 'ceil', count: 3 },
+      { type: 'spike', x: 6, on: 'floor', count: 2 },
+      { type: 'spike', x: 10.5, on: 'ceil', count: 4 },
+      { type: 'spike', x: 17, on: 'floor', count: 2 },
+      { type: 'mine', x: 22, y: 2.8, r: 0.7 },
     ],
   },
   {

@@ -18,7 +18,7 @@ const w9 = join(tunnel({ gap: 3, legs: [4, -4, 3, -3, 4, -4], tail: 2 }), open(3
 
 /** @type {import('../../../_engine/geometry.js').SectionData[]} */
 export const FINALE_SECTIONS = [
-  { id: 'f1', tier: W, ...tunnel({ gap: 3, legs: [3, -3, 4, -4, 3, -3, 4, -4] }), hazards: [] },
+  { id: 'f1', tier: W, ...tunnel({ gap: 3, legs: [4, -3, 2, -3, 4, -4, 3, -3] }), hazards: [] },
   {
     id: 'f2',
     tier: S,

@@ -7,7 +7,7 @@
 // input and the fixed steps. Each game brings its levels and its vehicle's flight
 // (`GameRules`); everything else here is shared by Wave Rush and Ship Rush.
 import { JOINT, RESTART_LOCK } from './world.js';
-import { checkpointX, jumpX, locate, pieceAt, progressAt, respawnX, speedAt, stateAt } from './level.js';
+import { checkpointX, invertedAt, jumpX, locate, pieceAt, progressAt, respawnX, speedAt, stateAt } from './level.js';
 import { keepsNormalCheckpoint } from './sectors.js';
 
 /**
@@ -139,8 +139,11 @@ function passPortals(game, from, to, events) {
   for (const p of game.run.portals) {
     if (p.x <= from || p.x > to) continue;
     if (p.kind === 'gravity') game.wave = { ...game.wave, gravity: p.on ? -1 : 1 };
+    else if (p.kind === 'flip') game.wave = { ...game.wave, gravity: /** @type {1 | -1} */ (-game.wave.gravity) };
     else if (p.kind === 'mini') game.wave = { ...game.wave, mini: p.on };
-    else game.wave = { ...game.wave, ship: p.on, vy: 0, mode: p.mode ?? (p.on ? 'ship' : 'wave') };
+    else if (p.kind === 'speed') {
+      // The speed comes from speedAt at every step.
+    } else game.wave = { ...game.wave, ship: p.on, vy: 0, mode: p.mode ?? (p.on ? 'ship' : 'wave') };
     game.lastPortal = p;
     events.push('portal');
   }
@@ -195,7 +198,9 @@ function trackTrail(game, previousDir) {
 function fly(game, holding, dt, events) {
   const before = game.wave;
   game.previous = { x: before.x, y: before.y };
-  const flown = game.rules.step(before, holding, speedAt(game.run, before.x), dt, game.run);
+  // An inverted-controls stretch (stage r-2) turns the input over.
+  const input = invertedAt(game.run, before.x) ? !holding : holding;
+  const flown = game.rules.step(before, input, speedAt(game.run, before.x), dt, game.run);
   game.wave = flown.vehicle;
   passPortals(game, before.x, game.wave.x, events);
   trackPlace(game, events);

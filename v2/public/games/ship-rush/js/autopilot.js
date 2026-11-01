@@ -9,13 +9,14 @@ import { courseHold, expected, planCourse } from '../../_engine/wavepilot.js';
 import { JOINT, STEP, tierOf } from './config.js';
 import { roomy, stepShip } from './physics.js';
 import { SHIP_GRAINS } from './prove.js';
-import { pieceAt, sectorAt, speedAt } from './run.js';
+import { invertedAt, pieceAt, sectorAt, speedAt } from './run.js';
 import { runWorld } from './solids.js';
 
 /**
  * @typedef {import('./run.js').Run} Run
  * @typedef {import('./physics.js').Ship} Ship
- * @typedef {{ x0: number, x1: number, speed: number, holds: Int8Array, ys: Float64Array }} Flight
+ * @typedef {{ x0: number, x1: number, speed: number, holds: Int8Array, ys: Float64Array, xs: Float64Array }} Flight
+ *   xs: where each step starts (the speed may change along the way).
  *   The hold for every physics step, and where the ship should be after it.
  */
 
@@ -33,7 +34,7 @@ function horizon(run, x) {
   const speed = speedAt(run, x);
   for (const p of run.pieces) if (p.x0 > x && p.x0 < end && p.speed !== speed) end = Math.min(end, p.x0 + 0.5);
   // Gravity and size portals are flown through (the plan applies them); a change of vehicle ends the plan.
-  for (const p of run.portals) if (p.kind === 'ship' && p.x > x + 0.05 && p.x < end) end = p.x - 0.01;
+  for (const p of run.portals) if (p.kind === 'ship' && p.x > x + 1e-6 && p.x < end) end = p.x - 0.01;
   return end;
 }
 
@@ -47,6 +48,7 @@ function throughPortals(run, from, ship) {
   for (const p of run.portals) {
     if (p.x <= from || p.x > ship.x) continue;
     if (p.kind === 'gravity') out = { ...out, gravity: p.on ? -1 : 1 };
+    else if (p.kind === 'flip') out = { ...out, gravity: /** @type {1 | -1} */ (-out.gravity) };
     else if (p.kind === 'mini') out = { ...out, mini: p.on };
   }
   return out;
@@ -62,17 +64,20 @@ function planFlight(run, ship) {
   const x1 = horizon(run, ship.x);
   if (x1 - ship.x < 0.5) return null;
   const world = runWorld(run);
-  const speed = piece.speed;
+  const speed = speedAt(run, ship.x);
+  // Speed portals are flown through: the plan runs at the speed of each place (stage r-2).
+  const speedHere = (/** @type {number} */ x) => speedAt(run, x);
   const vehicleAhead = run.portals.some((p) => p.kind === 'ship' && p.x > ship.x && p.x <= x1 + 0.6);
   /** @type {import('../../_engine/beam.js').BeamSpec} */
   const spec = {
     x0: ship.x,
     x1,
     speed,
+    speedAt: speedHere,
     limits: { ...tierOf(piece.tier), minInterval: 0.05 },
     start: ship,
     step(v, holding, dt) {
-      const next = stepShip(v, holding, speed, dt, world);
+      const next = stepShip(v, holding, speedHere(v.x), dt, world);
       return next.crashed ? null : throughPortals(run, v.x, next.vehicle);
     },
     // Before a change of vehicle, arrive in the middle of the joint (the wave cannot start
@@ -83,15 +88,33 @@ function planFlight(run, ship) {
     const { holds } = solveBeam(spec, { verify: false, grain, bands: [[0.35, 'min'], [0.2, 'min'], [0.05, 'min']] });
     if (!holds) continue;
     const ys = new Float64Array(holds.length);
+    const xs = new Float64Array(holds.length);
     /** @type {Ship} */
     let s = ship;
     holds.forEach((h, i) => {
-      s = stepShip(s, h > 0, speed, STEP, world).vehicle;
+      xs[i] = s.x;
+      s = throughPortals(run, s.x, stepShip(s, h > 0, speedHere(s.x), STEP, world).vehicle);
       ys[i] = s.y;
     });
-    return { x0: ship.x, x1, speed, holds, ys };
+    return { x0: ship.x, x1, speed, holds, ys, xs };
   }
   return null;
+}
+
+/**
+ * The step of a flight the vehicle is at: the last one starting at or before x.
+ * @param {{ xs: Float64Array }} f @param {number} x
+ */
+function stepIndex(f, x) {
+  let lo = 0;
+  let hi = f.xs.length - 1;
+  if (hi < 0 || x < /** @type {number} */ (f.xs[0]) - 1e-6) return -1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (/** @type {number} */ (f.xs[mid]) <= x + 1e-6) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo;
 }
 
 /** @returns {{ advise: (run: Run, ship: Ship) => boolean }} */
@@ -120,7 +143,7 @@ export function createAutopilot() {
     advise(run, ship) {
       if (!ship.ship) return adviseWave(run, ship);
       course = null;
-      const at = (/** @type {Flight} */ f) => Math.round((ship.x - f.x0) / (f.speed * STEP));
+      const at = (/** @type {Flight} */ f) => stepIndex(f, ship.x);
       const i = flight ? at(flight) : -1;
       const expected = flight && i > 0 ? (flight.ys[i - 1] ?? ship.y) : ship.y;
       const ending = flight !== null && ship.x > flight.x1 - LOOKAHEAD && horizon(run, ship.x) > flight.x1 + 0.5;
@@ -129,7 +152,9 @@ export function createAutopilot() {
         forRun = run;
       }
       if (!flight) return false;
-      return /** @type {number} */ (flight.holds[Math.min(Math.max(0, at(flight)), flight.holds.length - 1)]) > 0;
+      const hold = /** @type {number} */ (flight.holds[Math.min(Math.max(0, at(flight)), flight.holds.length - 1)]) > 0;
+      // In an inverted stretch the game turns the input over: hand it the other way.
+      return invertedAt(run, ship.x) ? !hold : hold;
     },
   };
 }

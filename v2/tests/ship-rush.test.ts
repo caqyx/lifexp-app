@@ -115,7 +115,9 @@ describe('the run', () => {
       const cells = list.reduce((n, d) => n + d.length, 0);
       // Obstacles: hazards and solids, and every step of the floor or the ceiling (a wall).
       const steps = (d: SectionData) => [...buildGeometry(d).ceilSegs, ...buildGeometry(d).floorSegs].filter((seg) => seg.slope === null).length;
-      const things = list.reduce((n, d) => n + buildGeometry(d).hazards.length + steps(d), 0);
+      // ...and stage r-2's speed portals, flips and size portals, inverted and dark stretches.
+      const effects = (d: SectionData) => { const g = buildGeometry(d); return g.speeds.length + g.portals.length + g.invert.length + g.dark.length; };
+      const things = list.reduce((n, d) => n + buildGeometry(d).hazards.length + steps(d) + effects(d), 0);
       const mean = list.reduce((n, d) => n + narrowestGap(d), 0) / list.length;
       return { density: things / cells, mean, least: Math.min(...list.map(narrowestGap)) };
     });
@@ -151,8 +153,9 @@ describe('the run', () => {
   test('sector 3: exactly one flip and its way back two sections later; sectors 1–2 have none', () => {
     for (const seed of [1, 2, 3, 4, 5, 6]) {
       const run = buildRun(createRng(seed));
-      expect(run.portals.filter((p) => p.sector < 2)).toEqual([]);
-      const flips = run.portals.filter((p) => p.sector === 2);
+      // (Speed portals inside sections are stage r-2's, not the sector's.)
+      expect(run.portals.filter((p) => p.sector < 2 && p.kind !== 'speed')).toEqual([]);
+      const flips = run.portals.filter((p) => p.sector === 2 && p.kind !== 'speed');
       expect(flips.map((p) => [p.kind, p.on])).toEqual([['gravity', true], ['gravity', false]]);
       const [on, off] = flips as [(typeof flips)[0], (typeof flips)[0]];
       const placed = run.sectors[2]!;
@@ -178,10 +181,12 @@ describe('the run', () => {
           const off = gravity[k + 1]!;
           expect([on.on, off.on]).toEqual([true, false]);
           expect(pieceAt(run, off.x).place - pieceAt(run, on.x).place).toBe(1);
-          expect(stateAt(run, (on.x + off.x) / 2).gravity).toBe(-1);
+          // (Just past it: a section of sector 5 may flip gravity over and back inside itself.)
+          expect(stateAt(run, on.x + 0.1).gravity).toBe(-1);
         }
         expect(stateAt(run, placed.x1 - 0.1).gravity).toBe(1);
-        const mini = portals.filter((p) => p.kind === 'mini');
+        // The sector's mini stretch (a section of sector 5 also has a mini pair of its own, stage r-2).
+        const mini = portals.filter((p) => p.kind === 'mini' && pieceAt(run, p.x).g.mini);
         expect(mini.map((p) => p.on)).toEqual([true, false]);
         const piece = pieceAt(run, mini[0]!.x);
         expect(piece.g.mini).toBe(true);
