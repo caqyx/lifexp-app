@@ -32,6 +32,8 @@ export function profileFromData(data: DocumentData): Profile {
     modulesChosen: data.enabledModules !== undefined,
     enabledModules: stringsOrNull(data.enabledModules),
     disabledModules: stringsOrNull(data.disabledModules),
+    // New in v2 (reader): missing means no opt-in module is on.
+    optInModules: stringsOrNull(data.optInModules) ?? [],
     lang: data.lang === 'pl' || data.lang === 'en' ? data.lang : null,
     points: {
       total: numberOr(points.total),

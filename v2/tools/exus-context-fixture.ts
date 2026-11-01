@@ -30,6 +30,7 @@ const profile: Profile = {
   modulesChosen: true,
   enabledModules: ['chores', 'money', 'stats', 'notes', 'aichat'],
   disabledModules: null,
+  optInModules: [],
   lang: 'pl',
   points: { total: 1240, earnedAllTime: 1600, spentAllTime: 360 },
   dailyLimit: 150,

@@ -2,6 +2,7 @@
 // onboarding, the module list in Settings and Ex-us commands are generated from
 // this list: adding a module = one folder + one entry here.
 import {
+  BookOpen,
   ChartLine,
   ClipboardCheck,
   Gamepad2,
@@ -30,6 +31,7 @@ export type ModuleId =
   | 'notes'
   | 'stats'
   | 'games'
+  | 'reader'
   | 'reports'
   | 'settings'
   | 'exus'
@@ -63,6 +65,11 @@ export interface FeatureDef {
    * parentEmail (stores/parent). The route itself stays reachable and explains.
    */
   audience?: 'parent';
+  /**
+   * Route patterns shown full screen, without the menu, the tab bar and the top bar
+   * (the reader's reading view): the screen brings its own way back.
+   */
+  bare?: readonly string[];
 }
 
 export const FEATURES: readonly FeatureDef[] = [
@@ -148,6 +155,17 @@ export const FEATURES: readonly FeatureDef[] = [
     nav: { group: 'main', order: 80 },
     stage: 'g',
     view: () => import('@/features/games/GamesModule'),
+  },
+  {
+    id: 'reader',
+    labelKey: 'nav.reader',
+    optional: 'reader',
+    icon: BookOpen,
+    paths: ['/reader', '/reader/:id'],
+    nav: { group: 'main', order: 90 },
+    stage: 'r',
+    view: () => import('@/features/reader/ReaderModule'),
+    bare: ['/reader/:id'],
   },
   {
     id: 'reports',
@@ -252,6 +270,13 @@ export function tabItems(choice: ModuleChoice = ALL_ON): FeatureDef[] {
 export interface ResolvedRoute {
   feature: FeatureDef;
   params: RouteParams;
+  /** The pattern of feature.paths that matched. */
+  pattern: string;
+}
+
+/** The route is shown full screen, outside the app shell (FeatureDef.bare). */
+export function isBareRoute(route: ResolvedRoute): boolean {
+  return route.feature.bare?.includes(route.pattern) ?? false;
 }
 
 /** Two paths that are views of the same screen (FeatureDef.views), so not a new screen. */
@@ -264,7 +289,7 @@ export function resolveRoute(path: string): ResolvedRoute | null {
   for (const feature of FEATURES) {
     for (const pattern of feature.paths) {
       const params = matchPath(pattern, path);
-      if (params) return { feature, params };
+      if (params) return { feature, params, pattern };
     }
   }
   return null;

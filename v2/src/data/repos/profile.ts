@@ -59,6 +59,8 @@ export interface SettingsFields {
   pointsRateChoresPts?: number;
   enabledModules?: string[];
   disabledModules?: string[];
+  /** v2 only: opt-in modules turned on (domain/modules). */
+  optInModules?: string[];
   /** v1 saveOnboarding() sets it with the survey. */
   onboardingDone?: boolean;
   accountMode?: AccountMode;

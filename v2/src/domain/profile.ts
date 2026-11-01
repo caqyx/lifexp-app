@@ -43,6 +43,8 @@ export interface Profile {
   enabledModules: readonly string[] | null;
   /** Modules turned off, written by v2 (M3, domain/modules); null = not written yet. */
   disabledModules: readonly string[] | null;
+  /** Opt-in modules turned on (v2 only, domain/modules OPT_IN_MODULES, e.g. the reader); [] = none. */
+  optInModules: readonly string[];
   lang: Language | null;
   points: PointsTotals;
   /** Daily points cap; null = v1's default (domain/points DAILY_LIMIT_DEFAULT). */

@@ -2,9 +2,9 @@
 // solo or supervised, then the modules, everything ticked so that saving without a
 // change hides nothing. Each step writes the profile; the next one follows from it.
 // Loaded on demand, like the login page, so Firebase stays out of the first chunk.
-import { Bot, ChartLine, ClipboardCheck, Gamepad2, NotebookPen, Wallet, type LucideIcon } from 'lucide-preact';
+import { BookOpen, Bot, ChartLine, ClipboardCheck, Gamepad2, NotebookPen, Wallet, type LucideIcon } from 'lucide-preact';
 import { useState } from 'preact/hooks';
-import { OPTIONAL_MODULES, type OptionalModule } from '@/domain/modules';
+import { DEFAULT_ON_MODULES, type OptionalModule } from '@/domain/modules';
 import type { AccountMode } from '@/domain/profile';
 import { t } from '@/i18n';
 import { chooseAccountMode, finishModuleSurvey } from '@/services/settings';
@@ -20,6 +20,7 @@ const ICONS: Record<OptionalModule, LucideIcon> = {
   stats: ChartLine,
   games: Gamepad2,
   aichat: Bot,
+  reader: BookOpen,
 };
 
 const MODES: readonly AccountMode[] = ['solo', 'supervised'];
@@ -78,14 +79,14 @@ function AccountModeStep({ uid }: { uid: string }) {
 }
 
 function ModulesStep({ uid }: { uid: string }) {
-  const [on, setOn] = useState<readonly OptionalModule[]>(OPTIONAL_MODULES);
+  const [on, setOn] = useState<readonly OptionalModule[]>(DEFAULT_ON_MODULES);
   const [failed, setFailed] = useState(false);
   return (
     <>
       <h1 class="auth__title">{t('setup.modulesTitle')}</h1>
       <p class="auth__intro">{t('setup.modulesIntro')}</p>
       <div class="setup-modules">
-        {OPTIONAL_MODULES.map((id) => {
+        {DEFAULT_ON_MODULES.map((id) => {
           const Icon = ICONS[id];
           return (
             <Switch

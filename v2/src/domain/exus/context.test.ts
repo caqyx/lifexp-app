@@ -49,6 +49,7 @@ const profile = (over: Partial<Profile> = {}): Profile => ({
   modulesChosen: true,
   enabledModules: null,
   disabledModules: null,
+  optInModules: [],
   lang: 'pl',
   points: { total: 1240, earnedAllTime: 1100, spentAllTime: 0 },
   dailyLimit: null,

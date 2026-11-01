@@ -49,6 +49,7 @@ describe('profile converter', () => {
       modulesChosen: true,
       enabledModules: ['chores', 'money'],
       disabledModules: null,
+      optInModules: [],
       lang: 'en',
       points: { total: 1234, earnedAllTime: 620, spentAllTime: 50 },
       dailyLimit: 120,
@@ -82,6 +83,8 @@ describe('profile converter', () => {
     expect(profileFromData({ enabledModules: [] }).modulesChosen).toBe(true);
     // M3: written by v2; anything but strings is left out.
     expect(profileFromData({ disabledModules: ['games', 3] }).disabledModules).toEqual(['games']);
+    expect(profileFromData({}).optInModules).toEqual([]);
+    expect(profileFromData({ optInModules: ['reader', 7] }).optInModules).toEqual(['reader']);
   });
 
   // INVENTORY: pointsRateChoresZl is int or float; only 3 of 6 profiles set a limit or rate.
@@ -122,6 +125,7 @@ describe('profile converter', () => {
       modulesChosen: true,
       enabledModules: ['chores'],
       disabledModules: null,
+      optInModules: [],
       lang: null,
       points: { total: 0, earnedAllTime: 0, spentAllTime: 0 },
       dailyLimit: null,

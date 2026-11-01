@@ -41,6 +41,8 @@ export const MODULE_WORD = oneOf<OptionalModule>({
   'ex-us': 'aichat',
   exus: 'aichat',
   aichat: 'aichat',
+  czytnik: 'reader',
+  reader: 'reader',
 });
 
 export const THEME_FAMILY_WORD = oneOf<ThemeFamily>({ lifexp: 'lifexp', ios: 'ios', gold: 'gold' });

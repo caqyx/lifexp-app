@@ -15,13 +15,16 @@
     "gen:shared-domain": "node tools/gen-shared-domain.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/literata": "5.3.0",
     "@fontsource-variable/manrope": "5.3.0",
     "@preact/signals": "2.11.2",
     "dompurify": "3.4.16",
     "firebase": "10.12.0",
     "i18next": "26.4.2",
+    "jszip": "3.10.1",
     "lucide-preact": "1.48.0",
     "marked": "18.0.14",
+    "pdfjs-dist": "4.10.38",
     "preact": "10.29.8"
   },
   "devDependencies": {

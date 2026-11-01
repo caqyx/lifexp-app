@@ -1,0 +1,142 @@
+/* The reader's library (#/reader), in the app's design system. */
+
+.reader-lib__intro,
+.reader-lib__local,
+.reader-lib__hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.reader-lib__local {
+  font-size: var(--font-size-xs);
+}
+
+.reader-lib__drop > .ui-card {
+  border: 1.5px dashed var(--color-border);
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+.reader-lib__drop.is-over > .ui-card {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.reader-lib__add,
+.reader-lib__busy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  text-align: center;
+}
+
+.reader-lib__busy {
+  align-items: stretch;
+  animation: reader-lib-in var(--duration-enter) var(--ease-out);
+}
+
+.reader-lib__busy-name {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: var(--font-weight-medium);
+}
+
+.reader-lib__books {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reader-lib__book {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-right: var(--space-2);
+  animation: reader-lib-in var(--duration-enter) var(--ease-out);
+}
+
+.reader-lib__book + .reader-lib__book {
+  border-top: 1px solid var(--color-separator);
+}
+
+.reader-lib__open {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.reader-lib__open:hover {
+  background: var(--color-surface-raised);
+}
+
+.reader-lib__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.reader-lib__title {
+  font-weight: var(--font-weight-semibold);
+}
+
+.reader-lib__meta {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.reader-lib__text .ui-progress {
+  margin-top: var(--space-1);
+}
+
+.reader-lib__delete {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.reader-lib__delete:hover {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+.reader-lib__delete.is-sure {
+  background: var(--color-negative);
+  color: var(--color-on-accent);
+}
+
+@keyframes reader-lib-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}

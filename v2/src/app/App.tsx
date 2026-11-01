@@ -11,7 +11,8 @@ import { BootScreen } from './BootScreen';
 import { ComingSoonPage } from './ComingSoonPage';
 import { sessionGate, type Gate } from './gates';
 import { LazyView } from './LazyView';
-import { DEFAULT_PATH, featureOn, resolveRoute } from './registry';
+import { ToastHost } from '@/ui/components/ToastHost';
+import { DEFAULT_PATH, featureOn, isBareRoute, resolveRoute } from './registry';
 import { currentPath, navigate } from './router';
 import { signOut } from './sign-out';
 
@@ -111,6 +112,16 @@ export function App() {
   if (alone) return <ParentAlone />;
   if (gate.kind !== 'ready') return <GateScreen gate={gate} />;
   if (!route || off) return null;
+
+  // A full-screen route (the reader's reading view) has no menu or bars; it brings its own Back.
+  if (isBareRoute(route) && route.feature.view) {
+    return (
+      <div class="bare-screen">
+        <LazyView load={route.feature.view} props={{ path, params: route.params, navigate }} fallback={<BootScreen />} />
+        <ToastHost />
+      </div>
+    );
+  }
 
   const account = { name: gate.profile.name, email: gate.user.email };
   return (

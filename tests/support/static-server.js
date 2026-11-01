@@ -9,7 +9,7 @@ const ROOT = path.join(__dirname, '..', '..');
 const PORT = parseInt(process.env.PORT || '4173', 10);
 
 const MIME = {
-  '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript',
+  '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.mjs': 'application/javascript',
   '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
   '.woff2': 'font/woff2', '.map': 'application/json', '.webmanifest': 'application/manifest+json',
 };
