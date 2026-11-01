@@ -40,3 +40,16 @@ export function sectionStyle(sector, number) {
   const band = bandOf(sector, number);
   return { tier: band ? band.tier : sector.tier, theme: band ? band.theme : sector.theme };
 }
+
+/** Tiers too hard for a checkpoint in normal play (owner): Insane and every Demon tier. */
+const NO_CHECKPOINT = new Set(['insane', 'easyDemon', 'hardDemon', 'insaneDemon', 'extremeDemon']);
+
+/**
+ * Does normal play keep a checkpoint at this sector's start (owner, after f-2)? Every
+ * sector of the run but Insane, the Demon (its bands) and the finale: dying there starts
+ * the sector again, not the whole run.
+ * @param {SectorDef} def
+ */
+export function keepsNormalCheckpoint(def) {
+  return !def.fixed && !def.bands && !NO_CHECKPOINT.has(def.tier);
+}

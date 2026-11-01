@@ -834,7 +834,7 @@ test.describe('Wave Rush', () => {
     });
   });
 
-  test('sideways 800×360: the full height, a jump to sector 2, a crash goes back to sector 1; Praktyka goes back to the sector’s checkpoint', async ({ page, account }) => {
+  test('sideways 800×360: the full height, a jump to sector 2, a crash goes back to sector 2’s start (its checkpoint) and in Insane to sector 1; Praktyka goes back to the sector’s checkpoint', async ({ page, account }) => {
     test.setTimeout(90000);
     await page.setViewportSize({ width: 800, height: 360 });
     const problems = await watchProblems(page);
@@ -847,7 +847,8 @@ test.describe('Wave Rush', () => {
     const stageBox = await stage.boundingBox();
     expect(Math.abs(stageBox.height - frameBox.height)).toBeLessThan(2);
 
-    // Normal mode, jumped (test only) into sector 2: a crash still starts again at sector 1.
+    // Normal mode, jumped (test only) into sector 2: sector 2 keeps a checkpoint at its
+    // start, so a crash starts sector 2 again (the same run), not sector 1.
     await reopenFrameWith(page, host, 'seed=11&sector=2&section=3');
     await game.getByRole('button', { name: 'Graj', exact: true }).click();
     await host.locator('iframe').focus();
@@ -855,7 +856,25 @@ test.describe('Wave Rush', () => {
     await page.keyboard.up('Space');
     await expect(stage).toHaveAttribute('data-state', 'playing');
     expect((await waveState(game)).sector).toBe(2);
+    const sectorStart = Number(await stage.getAttribute('data-debug-sector-start'));
+    const order = await stage.getAttribute('data-debug-order');
     await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 10000 });
+    await expect(game.getByText('Stuknij, żeby zacząć ten sektor od nowa')).toBeVisible();
+    await page.waitForTimeout(600);
+    await page.keyboard.press('Space');
+    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    const back = await waveState(game);
+    expect(back.x).toBeLessThan(sectorStart + 0.5);
+    expect(back.x).toBeGreaterThan(sectorStart - 3);
+    expect(await stage.getAttribute('data-debug-order')).toBe(order);
+    await expect.poll(async () => (await waveState(game)).sector).toBe(2);
+    // Sector 5 (Insane) keeps none: a crash there starts the whole run again.
+    await openWaveWith(page, host, 'seed=11&sector=5&section=2');
+    await game.getByRole('button', { name: 'Graj', exact: true }).click();
+    await host.locator('iframe').focus();
+    await page.keyboard.press('Space');
+    await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 10000 });
+    await expect(game.getByText('Stuknij, żeby zacząć od nowa')).toBeVisible();
     await page.waitForTimeout(600);
     await page.keyboard.press('Space');
     await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
@@ -866,7 +885,7 @@ test.describe('Wave Rush', () => {
 
     // Praktyka from sector 2, section 3: the pilot flies that section, lets go in section 4,
     // the wave crashes, and a tap brings it back at sector 2's start.
-    await reopenFrameWith(page, host, 'seed=12&sector=2&section=3&autopilot=1');
+    await openWaveWith(page, host, 'seed=12&sector=2&section=3&autopilot=1');
     await game.getByRole('button', { name: 'Praktyka', exact: true }).click();
     await stage.click();
     await expect(stage).toHaveAttribute('data-state', 'playing');
@@ -1483,4 +1502,45 @@ test.describe('Flip Rush f-2, sectors 4–6 and the finale', () => {
     expect(after.x).toBeLessThan(crash.x);
     expect(problems).toEqual([]);
   });
+});
+
+// ── Normal play's sector checkpoints (after f-2), Ship Rush and Flip Rush ──
+
+test.describe('Sector checkpoints in normal play', () => {
+  for (const [name, button] of [['Ship Rush', 'Graj'], ['Flip Rush', 'Graj']]) {
+    test(`${name}, sideways 800×360: the pilot reaches sector 2 (a toast says so), a crash there starts sector 2 again; Demon starts the run again`, async ({ page, account }) => {
+      test.setTimeout(120000);
+      await page.setViewportSize({ width: 800, height: 360 });
+      const problems = await watchProblems(page);
+      const { host, game } = await playFromList(page, account, name);
+      const stage = game.locator('#stage');
+      // The validator's path plays sector 1's last section and lets go in sector 2.
+      await openWaveWith(page, host, 'seed=9&sector=1&section=10&autopilot=1');
+      await flyFrom(game, button);
+      await expect.poll(async () => (await waveState(game)).sector, { timeout: 20000 }).toBe(2);
+      await expect(game.locator('.toast')).toContainText('Punkt kontrolny');
+      const sectorStart = Number(await stage.getAttribute('data-debug-sector-start'));
+      expect(sectorStart).toBeGreaterThan(0);
+      await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 20000 });
+      await expect(game.getByText('Stuknij, żeby zacząć ten sektor od nowa')).toBeVisible();
+      await page.waitForTimeout(600);
+      await stage.click();
+      await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+      const back = await waveState(game);
+      expect(back.x).toBeLessThan(sectorStart + 0.5);
+      expect(back.x).toBeGreaterThan(sectorStart - 3);
+      await expect.poll(async () => (await waveState(game)).sector).toBe(2);
+
+      // The Demon keeps none.
+      await openWaveWith(page, host, 'seed=9&sector=6&section=2');
+      await flyFrom(game, button);
+      await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 20000 });
+      await expect(game.getByText('Stuknij, żeby zacząć od nowa')).toBeVisible();
+      await page.waitForTimeout(600);
+      await stage.click();
+      await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+      expect(await waveState(game)).toMatchObject({ sector: 1, section: 1 });
+      expect(problems).toEqual([]);
+    });
+  }
 });
