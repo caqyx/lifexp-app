@@ -405,6 +405,7 @@ export function runApp(def) {
         const p = game.lastPortal;
         fx.ring = { x: p.x, color: portalColor(p), at: clock.time };
         if (p.kind === 'gravity') showToast(t(p.on ? 'gravityFlip' : 'gravityBack'));
+        if (p.kind === 'flip') showToast(t(game.wave.gravity < 0 ? 'gravityFlip' : 'gravityBack'));
         if (p.kind === 'ship') showToast(t(p.mode ? `${p.mode}On` : p.on ? 'shipOn' : 'waveOn'));
       }
       if (event === 'checkpoint') showToast(t('checkpoint'), true);

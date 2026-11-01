@@ -51,13 +51,14 @@ export const SECTOR3 = [
     ],
   },
   {
-    // Ball: saws over the floor and under the ceiling.
+    // Ball: a fast portal (stage r-2, the first), then saws over the floor and under the ceiling.
     id: 'r3-04',
     mode: 'ball',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
+      { type: 'speed', x: 4, k: 'fast' },
       { type: 'saw', x: 9, y: 9.3, r: 1 },
       { type: 'saw', x: 15, y: 2.7, r: 1 },
       { type: 'saw', x: 21, y: 9.3, r: 1 },
@@ -147,13 +148,14 @@ export const SECTOR3 = [
     ],
   },
   {
-    // Spider: two saws to snap past.
+    // Spider: a slow portal (stage r-2), then two saws to snap past.
     id: 'r3-11',
     mode: 'spider',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
+      { type: 'speed', x: 4, k: 'slow' },
       { type: 'saw', x: 10, y: 9.3, r: 1 },
       { type: 'spike', x: 14, on: 'ceil', count: 3 },
       { type: 'saw', x: 21, y: 9.3, r: 1 },

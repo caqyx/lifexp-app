@@ -5,22 +5,20 @@
 // belt, a pillar comb, a tunnel run, spiked platforms, a wreck, double beds, stairs both
 // ways and rapid windows. Openings ≥ 3.3 ship bodies. Every section is proven fair by
 // v2/tests/ship-rush-sections.test.ts.
+// Stage r-2: gravity flipped inside tunnels and in the open, the ship turned mini and
+// back inside a section, speed with moving blades (s5-01, s5-03, s5-05, s5-06).
 
 /** @type {import('../../../_engine/geometry.js').SectionData[]} */
 export const SECTOR5 = [
   {
-    // Ring gates: pairs of blades, the gap between them stepping up and down.
+    // A tunnel with gravity turned over inside it and back (stage r-2 flip portals).
     id: 's5-01',
     length: 30,
-    ceil: '2 r30',
-    floor: '10 r30',
+    ceil: '2 r8 +2 r6 +1 r8 -3 r8',
+    floor: '10 r8 -3 r6 +1 r8 +2 r8',
     hazards: [
-      { type: 'saw', x: 9, y: 3.3, r: 1.1 },
-      { type: 'saw', x: 9, y: 8.4, r: 1.1 },
-      { type: 'saw', x: 15, y: 2.3, r: 1.1 },
-      { type: 'saw', x: 15, y: 7.4, r: 1.1 },
-      { type: 'saw', x: 21, y: 4.3, r: 1.1 },
-      { type: 'saw', x: 21, y: 9.4, r: 1.1 },
+      { type: 'portal', x: 10, kind: 'flip' },
+      { type: 'portal', x: 18, kind: 'flip' },
     ],
   },
   {
@@ -42,15 +40,18 @@ export const SECTOR5 = [
     ],
   },
   {
-    // A comb: long teeth from the ceiling, the floor and the ceiling — under, over, under.
+    // Gravity flips in the open: columns flown upside down, then the right way up again.
     id: 's5-03',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'pillar', x: 10, on: 'ceil', h: 4.2 },
-      { type: 'pillar', x: 17, on: 'floor', h: 4.2 },
-      { type: 'pillar', x: 24, on: 'ceil', h: 4.2 },
+      { type: 'spike', x: 10, on: 'ceil', count: 3 },
+      { type: 'spike', x: 16.5, on: 'floor', count: 2 },
+      { type: 'portal', x: 8, kind: 'flip' },
+      { type: 'pillar', x: 13, on: 'floor', h: 2.8 },
+      { type: 'pillar', x: 20, on: 'ceil', h: 2.8 },
+      { type: 'portal', x: 24, kind: 'flip' },
     ],
   },
   {
@@ -62,34 +63,31 @@ export const SECTOR5 = [
     hazards: [],
   },
   {
-    // Spiked platforms: slabs spiked on top, then below, then on top.
+    // The ship turns mini inside the section and slips through a slot, then back to full size.
     id: 's5-05',
     length: 30,
-    ceil: '2 r30',
-    floor: '10 r30',
+    ceil: '2 r8 +3 r14 -3 r8',
+    floor: '10 r8 -2.8 r14 +2.8 r8',
     hazards: [
-      { type: 'block', x: 7, y: 6, w: 4, h: 1 },
-      { type: 'spike', x: 7, y: 6, dir: 'up', count: 4 },
-      { type: 'block', x: 14, y: 5, w: 4, h: 1 },
-      { type: 'spike', x: 14, y: 6, dir: 'down', count: 4 },
-      { type: 'block', x: 21, y: 6, w: 4, h: 1 },
-      { type: 'spike', x: 21, y: 6, dir: 'up', count: 4 },
+      { type: 'portal', x: 5, kind: 'mini' },
+      { type: 'portal', x: 25, kind: 'big' },
     ],
   },
   {
-    // A wreck: a broken hull to fly through, spikes on its torn edges.
+    // Fast past two blades swinging out of step, back to normal before a column.
     id: 's5-06',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'block', x: 8, y: 2, w: 3, h: 2.5 },
-      { type: 'spike', x: 8, y: 4.5, dir: 'down', count: 3 },
-      { type: 'block', x: 8, y: 8, w: 6, h: 2 },
-      { type: 'block', x: 14, y: 4, w: 5, h: 1 },
-      { type: 'spike', x: 15, y: 4, dir: 'up', count: 3 },
-      { type: 'block', x: 20, y: 6.5, w: 3, h: 3.5 },
-      { type: 'mine', x: 24, y: 4.2, r: 0.55 },
+      { type: 'spike', x: 8, on: 'floor', count: 3 },
+      { type: 'spike', x: 14.5, on: 'ceil', count: 2 },
+      { type: 'spike', x: 20.5, on: 'floor', count: 2 },
+      { type: 'speed', x: 5, k: 'fast' },
+      { type: 'saw', x: 11, y: 6, r: 1, move: { dx: 0, dy: 2.2, every: 8 } },
+      { type: 'saw', x: 18, y: 6, r: 1, move: { dx: 0, dy: 2.2, every: 8, phase: 0.5 } },
+      { type: 'speed', x: 22, k: 'normal' },
+      { type: 'pillar', x: 25, on: 'floor', h: 3 },
     ],
   },
   {

@@ -24,7 +24,10 @@ import { STEP } from './world.js';
  *   step: (v: Vehicle, holding: boolean, dt: number) => Vehicle | null,
  *   safe: (v: Vehicle, band: number) => boolean, band?: number, tag?: (v: Vehicle) => string, fewest?: boolean, released?: boolean,
  *   allow?: (v: Vehicle, holding: boolean) => boolean, search?: (v: Vehicle, holding: boolean, dt: number) => Vehicle | null,
+ *   speedAt?: (x: number) => number,
  * }} BeamSpec
+ *   speedAt: the speed at x when it changes along the way (speed portals, stage r-2; `step`
+ *   must advance x by the same speed); else `speed` everywhere.
  *   tag: what else tells two states apart besides height, speed and input (Flip Rush:
  *   gravity, contact and a waiting press), so the beam never merges them; fewest: of two
  *   alike states keep the one with fewer input changes so far (tapping vehicles: a path of
@@ -88,17 +91,37 @@ function keep(buckets, node, grain, tag, fewest) {
 }
 
 /**
+ * Where each decision starts: x at every N steps from x0 to x1, at the speed there.
+ * @param {BeamSpec} spec @returns {number[]}
+ */
+export function layerXs(spec) {
+  const out = [];
+  if (!spec.speedAt) {
+    const dx = spec.speed * N * STEP;
+    const steps = Math.ceil((spec.x1 - spec.x0) / dx - 1e-9);
+    for (let i = 0; i < steps; i++) out.push(spec.x0 + i * dx);
+    return out;
+  }
+  let x = spec.x0;
+  while (x < spec.x1 - 1e-9) {
+    out.push(x);
+    for (let k = 0; k < N; k++) x += spec.speedAt(x) * STEP;
+  }
+  return out;
+}
+
+/**
  * The beam search: every layer's surviving states, from the start to the end.
  * @param {BeamSpec} spec @param {number} interval minimum decisions between changes @param {number} band @param {Grain} grain
  * @returns {Node[][]}
  */
 function searchLayers(spec, interval, band, grain) {
-  const dx = spec.speed * N * STEP;
-  const steps = Math.ceil((spec.x1 - spec.x0) / dx - 1e-9);
+  const xs = layerXs(spec);
+  const steps = xs.length;
   /** @type {Node[][]} */
   const layers = [[{ v: spec.start, hold: 0, cool: interval, parent: -1, changes: 0 }]];
   for (let i = 0; i < steps; i++) {
-    const x = spec.x0 + i * dx;
+    const x = /** @type {number} */ (xs[i]);
     /** @type {Map<string, Node[]>} */
     const buckets = new Map();
     (/** @type {Node[]} */ (layers[i])).forEach((node, index) => {
@@ -198,8 +221,7 @@ export function solveBeam(spec, options = {}) {
     const interval = which === 'min' ? spec.limits.minInterval : rateSafe;
     const layers = searchLayers(spec, Math.ceil(interval / decision - 1e-9), band, options.grain ?? GRAIN);
     const last = /** @type {Node[]} */ (layers[layers.length - 1]);
-    const steps = Math.ceil((spec.x1 - spec.x0) / (spec.speed * decision) - 1e-9);
-    if (layers.length - 1 < steps) continue;
+    if (layers.length - 1 < layerXs(spec).length) continue;
     // Try ends nearest the middle of their band first (most room around them).
     const order = last
       .map((n, i) => ({ i, d: Math.abs(n.v.vy), c: spec.fewest ? n.changes : 0 }))

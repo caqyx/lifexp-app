@@ -35,3 +35,6 @@ export const INPUT_BUFFER_MS = 130;
 export const START_PAD = 8;
 /** A respawn starts this far before its checkpoint (inside the open joint). */
 export const RESPAWN_BACK = 2;
+
+/** Speed portals inside a section (stage r-2): the tier's speed times this, to the section's end or the next one. */
+export const SPEED_FACTORS = { slow: 0.8, normal: 1, fast: 1.25, veryFast: 1.5 };

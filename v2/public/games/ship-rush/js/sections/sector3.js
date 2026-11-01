@@ -5,6 +5,7 @@
 // tunnel, mines in a corridor, saw gates, switchbacks, block steps, windows, a pillar
 // forest, a saw tunnel, a gauntlet, chained mines and the squeeze. Every section is
 // proven fair by v2/tests/ship-rush.test.ts.
+// Stage r-2: the first new idea — speed portals inside a section (s3-08, s3-13).
 
 /** @type {import('../../../_engine/geometry.js').SectionData[]} */
 export const SECTOR3 = [
@@ -108,18 +109,22 @@ export const SECTOR3 = [
     ],
   },
   {
-    // Platform hops: four slabs over a long spike bed, spikes over the high ones.
+    // Speed gates (stage r-2): a fast portal, columns from the floor and the ceiling, a slow portal before a blade.
     id: 's3-08',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'spike', x: 5, on: 'floor', count: 20 },
-      { type: 'block', x: 6, y: 7.2, w: 2.5, h: 0.6 },
-      { type: 'block', x: 11, y: 6.2, w: 2.5, h: 0.6 },
-      { type: 'spike', x: 11, on: 'ceil', count: 2 },
-      { type: 'block', x: 16, y: 7.2, w: 2.5, h: 0.6 },
-      { type: 'block', x: 21, y: 6.2, w: 2.5, h: 0.6 },
+      { type: 'spike', x: 15.5, on: 'floor', count: 3 },
+      { type: 'spike', x: 7, on: 'floor', count: 2 },
+      { type: 'spike', x: 23, on: 'ceil', count: 3 },
+      { type: 'spike', x: 13, on: 'ceil', count: 3 },
+      { type: 'spike', x: 19, on: 'floor', count: 3 },
+      { type: 'speed', x: 5, k: 'fast' },
+      { type: 'pillar', x: 11, on: 'floor', h: 3.5 },
+      { type: 'pillar', x: 17, on: 'ceil', h: 3.5 },
+      { type: 'speed', x: 21, k: 'slow' },
+      { type: 'saw', x: 25, y: 6, r: 0.9 },
     ],
   },
   {
@@ -189,17 +194,23 @@ export const SECTOR3 = [
     ],
   },
   {
-    // The gauntlet: two spiked slabs (over the first, under the second), then ceiling spikes.
+    // A very fast burst past two columns, back to normal speed before a mine.
     id: 's3-13',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'block', x: 8, y: 5.5, w: 4, h: 1.5 },
-      { type: 'spike', x: 8, y: 7, dir: 'down', count: 4 },
-      { type: 'block', x: 17, y: 4.5, w: 4, h: 1.5 },
-      { type: 'spike', x: 17, y: 4.5, dir: 'up', count: 4 },
-      { type: 'spike', x: 23, on: 'ceil', count: 3 },
+      { type: 'spike', x: 25, on: 'ceil', count: 2 },
+      { type: 'spike', x: 10, on: 'floor', count: 2 },
+      { type: 'spike', x: 21, on: 'floor', count: 3 },
+      { type: 'spike', x: 8, on: 'ceil', count: 2 },
+      { type: 'spike', x: 13, on: 'ceil', count: 4 },
+      { type: 'spike', x: 15, on: 'floor', count: 3 },
+      { type: 'speed', x: 5, k: 'veryFast' },
+      { type: 'pillar', x: 11, on: 'floor', h: 3 },
+      { type: 'pillar', x: 19, on: 'ceil', h: 3 },
+      { type: 'speed', x: 23, k: 'normal' },
+      { type: 'mine', x: 25.5, y: 6, r: 0.6 },
     ],
   },
   {

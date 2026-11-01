@@ -145,7 +145,7 @@ export const SECTOR6 = [
       { type: 'orb', x: 33, y: 9.8, r: 1.4 },
     ],
   },
-  { id: 'd22', ...tunnel({ gap: 2.6, legs: [2, -4, 4, -4, 4, -4, 2] }), hazards: [] },
+  { id: 'd22', ...tunnel({ gap: 2.6, legs: [2, -3, 3, -4, 4, -3, 1] }), hazards: [] },
   { id: 'd23', ...d23, hazards: orbRow(9, 4, 3, 3.6, 8.4, 1.05) },
   { id: 'd24', ...tunnel({ gap: 2.6, legs: [-4, 4, -3, 3, -4, 4, -3, 3] }), hazards: [] },
   {

@@ -6,7 +6,7 @@
 // and placed at x0. Every piece knows its tier (speed and human limits), its look and
 // its vehicle. Each game passes its own rules: its tiers' speeds and the vehicle a
 // section is flown with unless it says otherwise (Wave Rush: the wave; Ship Rush: the ship).
-import { JOINT, RESPAWN_BACK, START_PAD } from './world.js';
+import { JOINT, RESPAWN_BACK, SPEED_FACTORS, START_PAD } from './world.js';
 import { buildGeometry, capsuleHits } from './geometry.js';
 import { shuffle } from './rng.js';
 import { sectionStyle } from './sectors.js';
@@ -22,8 +22,10 @@ import { sectionStyle } from './sectors.js';
  *   its Demon tier in the sector's bands, or -1.
  * @typedef {{ kind: 'gravity', boundary: number, on: boolean } | { kind: 'mini', place: number, on: boolean }} PortalSlot
  *   gravity: at a boundary (b = between places b and b+1); mini: inside its section's own joints.
- * @typedef {'gravity' | 'mini' | 'ship'} PortalKind
- * @typedef {{ x: number, kind: PortalKind, on: boolean, sector: number, mode?: VehicleMode }} Portal
+ * @typedef {'gravity' | 'mini' | 'ship' | 'flip' | 'speed'} PortalKind
+ * @typedef {{ x: number, kind: PortalKind, on: boolean, sector: number, mode?: VehicleMode, speed?: import('./geometry.js').SpeedKind }} Portal
+ *   'flip' (stage r-2, inside a section) turns gravity over whichever way it is; 'speed'
+ *   marks a speed portal (the speed itself comes from speedAt).
  *   A vehicle portal ('ship') says the vehicle after it in `mode` (and `on`: is it the ship).
  * @typedef {{ def: SectorDef, x0: number, x1: number, order: number[], first: number, count: number }} PlacedSector
  *   first: index of its first piece.
@@ -195,6 +197,16 @@ function placeSector(def, s, x, into) {
       into.portals.push({ x: slot.on ? piece.x0 + PORTAL_OFFSET.mini : piece.x1 - PORTAL_OFFSET.miniBack, kind: 'mini', on: slot.on, sector: s });
     }
   }
+  // A section's own portals (stage r-2): gravity flips, size and speed portals.
+  for (let i = first; i < into.pieces.length; i++) {
+    const piece = /** @type {Piece} */ (into.pieces[i]);
+    for (const p of piece.g.portals) {
+      const x = piece.x0 + p.x;
+      if (p.kind === 'flip') into.portals.push({ x, kind: 'flip', on: true, sector: s });
+      else into.portals.push({ x, kind: 'mini', on: p.kind === 'mini', sector: s });
+    }
+    for (const p of piece.g.speeds) into.portals.push({ x: piece.x0 + p.x, kind: 'speed', on: false, sector: s, speed: p.k });
+  }
   // Ship and wave portals where the vehicle changes (the finales).
   for (let i = first; i < into.pieces.length; i++) {
     const piece = /** @type {Piece} */ (into.pieces[i]);
@@ -268,7 +280,30 @@ export function sectorAt(run, x) {
 }
 
 /** The flying speed at x (cells per second): the tier of the piece there. @param {Run} run @param {number} x */
-export const speedAt = (run, x) => pieceAt(run, x).speed;
+export function speedAt(run, x) {
+  const piece = pieceAt(run, x);
+  return piece.speed * speedFactorAt(piece.g, x - piece.x0);
+}
+
+/**
+ * The speed factor at local x of a section: its last speed portal before x, else 1.
+ * @param {Geometry} g @param {number} x
+ */
+export function speedFactorAt(g, x) {
+  let k = 1;
+  for (const p of g.speeds) {
+    if (p.x > x) break;
+    k = SPEED_FACTORS[p.k];
+  }
+  return k;
+}
+
+/** Are the controls inverted at x (stage r-2)? @param {Run} run @param {number} x */
+export function invertedAt(run, x) {
+  const piece = pieceAt(run, x);
+  const local = x - piece.x0;
+  return piece.g.invert.some((r) => local >= r.from && local < r.to);
+}
 
 /**
  * Does a wave at (x, ya..yb) touch anything? (The game asks with ya = yb.)
@@ -299,7 +334,9 @@ export function stateAt(run, x) {
   for (const p of run.portals) {
     if (p.sector !== sector || p.x > x) continue;
     if (p.kind === 'gravity') gravity = p.on ? -1 : 1;
+    else if (p.kind === 'flip') gravity = /** @type {1 | -1} */ (-gravity);
     else if (p.kind === 'mini') mini = p.on;
+    else if (p.kind === 'speed') continue;
     else mode = p.mode ?? (p.on ? 'ship' : 'wave');
   }
   return { gravity, mini, ship: mode === 'ship', mode };

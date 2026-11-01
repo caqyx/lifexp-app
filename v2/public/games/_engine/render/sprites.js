@@ -159,16 +159,23 @@ export const PORTAL_COLORS = {
   shipOff: '#7fe0ff',
   ball: '#ffb347',
   spider: '#c77dff',
+  flip: '#ffe14d',
+  slow: '#ff9f43',
+  normal: '#5ee7ff',
+  fast: '#3ddc84',
+  veryFast: '#ff5ad1',
 };
 
 /**
  * A portal's colour.
- * @param {{ kind: 'gravity' | 'mini' | 'ship', on: boolean, mode?: string }} p
+ * @param {{ kind: import('../level.js').PortalKind, on: boolean, mode?: string, speed?: string }} p
  */
 export function portalColor(p) {
   if (p.kind === 'ship' && p.mode === 'ball') return PORTAL_COLORS.ball;
   if (p.kind === 'ship' && p.mode === 'spider') return PORTAL_COLORS.spider;
   if (p.kind === 'gravity') return p.on ? PORTAL_COLORS.gravityOn : PORTAL_COLORS.gravityOff;
+  if (p.kind === 'flip') return PORTAL_COLORS.flip;
+  if (p.kind === 'speed') return /** @type {Record<string, string>} */ (PORTAL_COLORS)[p.speed ?? 'normal'] ?? PORTAL_COLORS.normal;
   if (p.kind === 'mini') return p.on ? PORTAL_COLORS.miniOn : PORTAL_COLORS.miniOff;
   return p.on ? PORTAL_COLORS.shipOn : PORTAL_COLORS.shipOff;
 }
@@ -176,9 +183,13 @@ export function portalColor(p) {
 /**
  * A portal: a tall ring across the joint's corridor with arrows for the new gravity.
  * @param {CanvasRenderingContext2D} ctx @param {number} x px @param {number} top px @param {number} bottom px
- * @param {number} cell px @param {{ kind: 'gravity' | 'mini' | 'ship', on: boolean }} p @param {number} time @param {boolean} reduced
+ * @param {number} cell px @param {{ kind: import('../level.js').PortalKind, on: boolean, mode?: string, speed?: string }} p @param {number} time @param {boolean} reduced
  */
 export function drawPortal(ctx, x, top, bottom, cell, p, time, reduced) {
+  if (p.kind === 'speed') {
+    drawSpeedPortal(ctx, x, top, bottom, cell, p.speed ?? 'normal', time, reduced);
+    return;
+  }
   const color = portalColor(p);
   const cy = (top + bottom) / 2;
   const ry = (bottom - top) / 2;
@@ -201,7 +212,23 @@ export function drawPortal(ctx, x, top, bottom, cell, p, time, reduced) {
   ctx.beginPath();
   ctx.ellipse(x, cy, rx * 0.72, ry * 0.94, 0, 0, Math.PI * 2);
   ctx.stroke();
-  // Chevrons pointing the way gravity will pull (gravity) or inward/outward (size).
+  // Chevrons pointing the way gravity will pull (gravity) or inward/outward (size); a flip
+  // (either way) gets chevrons both ways.
+  if (p.kind === 'flip') {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = cell * 0.12;
+    ctx.lineCap = 'round';
+    for (const d of [-1, 1]) {
+      const y = cy + d * cell * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(x - cell * 0.28, y - d * cell * 0.2);
+      ctx.lineTo(x, y + d * cell * 0.08);
+      ctx.lineTo(x + cell * 0.28, y - d * cell * 0.2);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
   const dir = p.kind === 'gravity' ? (p.on ? -1 : 1) : p.on ? 1 : -1;
   const drift = reduced ? 0 : ((time * 1.6) % 1) * cell * 0.5 * dir;
   ctx.strokeStyle = color;
@@ -257,5 +284,44 @@ export function drawTrail(ctx, points, width, color) {
   ctx.strokeStyle = fade(1);
   ctx.lineWidth = width;
   ctx.stroke(path);
+  ctx.restore();
+}
+
+/**
+ * A speed portal (stage r-2): a tall frame with arrows, one back for slow, one for
+ * normal, two for fast, three for very fast — the count reads without the colour.
+ * @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} top @param {number} bottom @param {number} cell
+ * @param {string} kind @param {number} time @param {boolean} reduced
+ */
+export function drawSpeedPortal(ctx, x, top, bottom, cell, kind, time, reduced) {
+  const color = /** @type {Record<string, string>} */ (PORTAL_COLORS)[kind] ?? PORTAL_COLORS.normal;
+  const cy = (top + bottom) / 2;
+  const h = bottom - top;
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = color;
+  ctx.fillRect(x - cell * 0.5, top, cell, h);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = cell * 0.14;
+  ctx.strokeRect(x - cell * 0.5, top, cell, h);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = Math.max(1, cell * 0.05);
+  ctx.strokeRect(x - cell * 0.36, top + cell * 0.14, cell * 0.72, h - cell * 0.28);
+  const count = kind === 'slow' ? 1 : kind === 'normal' ? 1 : kind === 'fast' ? 2 : 3;
+  const back = kind === 'slow' ? -1 : 1;
+  const pulse = reduced ? 0 : ((time * 2) % 1) * cell * 0.12 * back;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = cell * 0.13;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for (let k = 0; k < count; k++) {
+    const ax = x + (k - (count - 1) / 2) * cell * 0.26 + pulse;
+    ctx.beginPath();
+    ctx.moveTo(ax - back * cell * 0.12, cy - cell * 0.3);
+    ctx.lineTo(ax + back * cell * 0.12, cy);
+    ctx.lineTo(ax - back * cell * 0.12, cy + cell * 0.3);
+    ctx.stroke();
+  }
   ctx.restore();
 }

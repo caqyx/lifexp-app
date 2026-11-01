@@ -4,6 +4,7 @@
 // Rush engine's beam validator (../../_engine/beam.js), flying this game's own physics
 // (physics.js) through the section's solids and hazards (solids.js). Used by
 // v2/tests/ship-rush.test.ts on every section, in every state the run can fly it in.
+import { sectionStepper } from '../../_engine/stretch.js';
 import { solveBeam } from '../../_engine/beam.js';
 import { capsuleHits, checkSection, widestGapAt } from '../../_engine/geometry.js';
 import { entryHeights, proveFrom, toleranceBand } from '../../_engine/solver.js';
@@ -128,6 +129,11 @@ export function proveEntry(data, tier, state, entry, options = {}) {
   const g = geometryOf(data);
   const world = sectionWorld(g);
   const speed = tierSpeed(tier);
+  // The section's own stretches (stage r-2): speed, gravity and size portals, inverted controls.
+  const stepper = sectionStepper(g, speed, (v, h, sp, dt) => {
+    const next = stepShip(v, h, sp, dt, world);
+    return next.crashed ? null : next.vehicle;
+  });
   /** @type {import('../../_engine/beam.js').BeamSpec} */
   const spec = {
     x0: 0,
@@ -135,10 +141,8 @@ export function proveEntry(data, tier, state, entry, options = {}) {
     speed,
     limits: tierOf(tier),
     start: { ...createShip(0, entry.y), vy: entry.vy, gravity: state.gravity, mini: state.mini },
-    step(v, holding, dt) {
-      const next = stepShip(v, holding, speed, dt, world);
-      return next.crashed ? null : next.vehicle;
-    },
+    step: stepper.step,
+    ...(stepper.plain ? {} : { speedAt: stepper.speedAt }),
     safe: (v, band) => roomy(world, v, band),
   };
   let result = { holds: /** @type {Int8Array | null} */ (null), problem: /** @type {string | null} */ ('no path') };

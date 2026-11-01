@@ -12,6 +12,7 @@ export {
   PORTAL_OFFSET,
   checkpointX,
   geometryOf,
+  invertedAt,
   jumpX,
   locate,
   orderSections,

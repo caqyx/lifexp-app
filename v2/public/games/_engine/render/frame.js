@@ -7,7 +7,8 @@
 // background and how its vehicle is drawn.
 import { JOINT } from '../world.js';
 import { keepsNormalCheckpoint } from '../sectors.js';
-import { pieceIndexAt } from '../level.js';
+import { pieceAt, pieceIndexAt } from '../level.js';
+import { movedAt, profileY } from '../geometry.js';
 import { paintPattern, paintSection, STRIP_BOTTOM, STRIP_TOP } from './section.js';
 import { drawMine, drawOrb, drawPortal, drawSaw, drawTrail } from './sprites.js';
 import { screenX, screenY } from './view.js';
@@ -196,8 +197,10 @@ function drawSpinners(ctx, s, pieces, camX, look) {
     const th = look.themeOf(piece.theme);
     for (const h of piece.g.hazards) {
       if (h.shape !== 'circle') continue;
-      const x = screenX(v, camX, piece.x0 + h.x);
-      const y = screenY(v, h.y);
+      // A moving one is where the vehicle's place puts it (geometry.js movedAt).
+      const at = h.move ? movedAt(h, s.wave.x - piece.x0) : h;
+      const x = screenX(v, camX, piece.x0 + at.x);
+      const y = screenY(v, at.y);
       const spin = s.reduced ? 0 : s.time * (h.type === 'saw' ? -5 : h.type === 'mine' ? 0.8 : 1.4);
       if (th.fx?.hazardGlow) {
         const halo = ctx.createRadialGradient(x, y, h.r * v.cell * 0.5, x, y, h.r * v.cell * 1.6);
@@ -218,7 +221,55 @@ function drawPortals(ctx, s, camX) {
   const v = s.view;
   for (const p of s.run.portals) {
     if (p.x < camX - 2 || p.x > camX + v.cells + 2) continue;
-    drawPortal(ctx, screenX(v, camX, p.x), screenY(v, JOINT.ceil + 0.25), screenY(v, JOINT.floor - 0.25), v.cell, p, s.time, s.reduced);
+    // Spanning the corridor where it stands (a section's own portal may be in a tunnel).
+    const piece = pieceAt(s.run, p.x);
+    const local = p.x - piece.x0;
+    const top = profileY(piece.g.ceil, local, 'ceil');
+    const bottom = profileY(piece.g.floor, local, 'floor');
+    drawPortal(ctx, screenX(v, camX, p.x), screenY(v, top + 0.25), screenY(v, bottom - 0.25), v.cell, p, s.time, s.reduced);
+  }
+}
+
+/**
+ * A section's dark stretches (stage r-2): the view closes in round the vehicle, fading in
+ * and out over two cells; an inverted-controls stretch tints the screen and frames it.
+ * @param {CanvasRenderingContext2D} ctx @param {Scene} s @param {number} camX
+ */
+function drawStretchEffects(ctx, s, camX) {
+  const v = s.view;
+  const piece = pieceAt(s.run, s.wave.x);
+  const local = s.wave.x - piece.x0;
+  let dark = 0;
+  for (const r of piece.g.dark) dark = Math.max(dark, Math.min(1, (local - r.from) / 2 + 1, (r.to - local) / 2 + 1));
+  if (dark > 0) {
+    const x = screenX(v, camX, s.wave.x);
+    const y = screenY(v, s.wave.y);
+    const g = ctx.createRadialGradient(x, y, v.cell * 2.2, x, y, v.cell * 5.5);
+    g.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    g.addColorStop(1, `rgba(0, 0, 0, ${0.94 * dark})`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, v.width, v.height);
+  }
+  if (piece.g.invert.some((r) => local >= r.from && local < r.to)) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255, 60, 200, 0.1)';
+    ctx.fillRect(0, 0, v.width, v.height);
+    ctx.strokeStyle = 'rgba(255, 90, 210, 0.85)';
+    ctx.lineWidth = v.cell * 0.18;
+    ctx.strokeRect(v.cell * 0.1, v.cell * 0.1, v.width - v.cell * 0.2, v.height - v.cell * 0.2);
+    ctx.restore();
+  }
+  // Where an inverted stretch begins and ends: a magenta band across the corridor.
+  for (const p of [piece, s.run.pieces[s.run.pieces.indexOf(piece) + 1]]) {
+    if (!p) continue;
+    for (const r of p.g.invert) {
+      for (const edge of [r.from, r.to]) {
+        const ex = screenX(v, camX, p.x0 + edge);
+        if (ex < -v.cell || ex > v.width + v.cell) continue;
+        ctx.fillStyle = 'rgba(255, 90, 210, 0.5)';
+        ctx.fillRect(ex - v.cell * 0.12, screenY(v, profileY(p.g.ceil, edge, 'ceil')), v.cell * 0.24, (profileY(p.g.floor, edge, 'floor') - profileY(p.g.ceil, edge, 'ceil')) * v.cell);
+      }
+    }
   }
 }
 
@@ -333,6 +384,7 @@ export function renderFrame(ctx, r, s, look) {
   drawPortals(ctx, s, camX);
   drawCheckpoints(ctx, s, camX);
   drawPlayer(ctx, s, camX, look);
+  drawStretchEffects(ctx, s, camX);
   drawEffects(ctx, s, camX);
   ctx.restore();
 }

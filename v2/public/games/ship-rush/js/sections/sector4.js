@@ -5,6 +5,7 @@
 // one as the mini ship. In orbit: solar arrays, a docking tunnel, satellites, antenna
 // forests, debris, station modules. Openings ≥ 3.6 ship bodies (mini: its own bodies).
 // Every section is proven fair by v2/tests/ship-rush-sections.test.ts.
+// Stage r-2: moving blades and mines that swing as the ship comes (s4-04, s4-07).
 
 /** @type {import('../../../_engine/geometry.js').SectionData[]} */
 export const SECTOR4 = [
@@ -48,22 +49,18 @@ export const SECTOR4 = [
     ],
   },
   {
-    // An antenna forest: masts from the floor and the ceiling, each tipped with a spike.
+    // Moving blades (stage r-2): three saws swinging up and down, out of step.
     id: 's4-04',
     length: 30,
     ceil: '2 r30',
     floor: '10 r30',
     hazards: [
-      { type: 'pillar', x: 7, on: 'floor', h: 2.6 },
-      { type: 'spike', x: 7, y: 7.4, dir: 'up' },
-      { type: 'pillar', x: 11.5, on: 'ceil', h: 2.6 },
-      { type: 'spike', x: 11.5, y: 4.6, dir: 'down' },
-      { type: 'pillar', x: 16, on: 'floor', h: 2.6 },
-      { type: 'spike', x: 16, y: 7.4, dir: 'up' },
-      { type: 'pillar', x: 20.5, on: 'ceil', h: 2.6 },
-      { type: 'spike', x: 20.5, y: 4.6, dir: 'down' },
-      { type: 'pillar', x: 25, on: 'floor', h: 2.6 },
-      { type: 'spike', x: 25, y: 7.4, dir: 'up' },
+      { type: 'spike', x: 12.5, on: 'floor', count: 3 },
+      { type: 'spike', x: 19.5, on: 'ceil', count: 3 },
+      { type: 'spike', x: 6, on: 'ceil', count: 2 },
+      { type: 'saw', x: 10, y: 6, r: 1, move: { dx: 0, dy: 2.4, every: 9 } },
+      { type: 'saw', x: 17, y: 6, r: 1, move: { dx: 0, dy: 2.4, every: 9, phase: 0.5 } },
+      { type: 'saw', x: 24, y: 6, r: 0.9, move: { dx: 0, dy: 2, every: 7 } },
     ],
   },
   {
@@ -94,12 +91,19 @@ export const SECTOR4 = [
     ],
   },
   {
-    // A narrow orbit: a corridor under three bodies high, swaying half a cell.
+    // A column, a mine drifting on a slant, a column, a blade sliding to and fro.
     id: 's4-07',
     length: 30,
-    ceil: '2 r8 +2 r6 +0.5 r6 -0.5 r5 -2 r5',
-    floor: '10 r8 -3.2 r6 +0.5 r6 -0.5 r5 +3.2 r5',
-    hazards: [],
+    ceil: '2 r30',
+    floor: '10 r30',
+    hazards: [
+      { type: 'spike', x: 12, on: 'floor', count: 2 },
+      { type: 'spike', x: 21.5, on: 'ceil', count: 2 },
+      { type: 'pillar', x: 9, on: 'floor', h: 3 },
+      { type: 'mine', x: 14, y: 5, r: 0.7, move: { dx: 2, dy: 1, every: 10 } },
+      { type: 'pillar', x: 19, on: 'ceil', h: 3 },
+      { type: 'saw', x: 24, y: 7, r: 0.8, move: { dx: 1.5, dy: 0, every: 6 } },
+    ],
   },
   {
     // Panels with saws on their tips.
