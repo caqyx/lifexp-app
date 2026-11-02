@@ -21,6 +21,7 @@ import { easeAngle, targetAngle } from './render/turn.js';
 import { computeView } from './render/view.js';
 import { createRng, parseSwitches } from './rng.js';
 import { readPlay, verifiedWord } from './editor/play.js';
+import { mixedRules } from './editor/vehicles.js';
 import { writeJson } from './records.js';
 import { isUnlocked, resolveSkin } from './skins.js';
 
@@ -61,7 +62,7 @@ export const APP_TEXT_KEYS = [
   'canvas', 'bestValue', 'bestNone', 'finaleLocked', 'finaleBest', 'finaleReady', 'sectorLabel', 'sectionLabel',
   'attempt', 'result', 'tapRespawn', 'tapRestart', 'finaleResult', 'finaleDoneTitle', 'finishedTitle', 'finaleDoneBody',
   'finishedBody', 'achFinale', 'achDemon', 'achFinaleBody', 'achDemonBody', 'unlockSkin', 'unlockFinale', 'gravityFlip',
-  'gravityBack', 'shipOn', 'waveOn', 'finaleName', 'selected', 'locked', 'checkpoint', 'tapSector', 'editor', 'editorLevel', 'editorBack',
+  'gravityBack', 'shipOn', 'waveOn', 'ballOn', 'spiderOn', 'finaleName', 'selected', 'locked', 'checkpoint', 'tapSector', 'editor', 'editorLevel', 'editorBack',
   'editorVerify', 'editorDoneTitle', 'editorDoneBody', 'verifyDoneTitle', 'verifyDoneBody',
 ];
 
@@ -166,7 +167,10 @@ export function runApp(def) {
   // The level editor's test play (stage r-3) or its verification (stage r-4). Neither
   // counts attempts, keeps records or gives achievements.
   const custom = def.palette && def.buildCustom ? readPlay(def.palette, search, def.records.KEYS.editorPlay) : null;
-  const customRules = custom && def.buildCustom ? { ...def.rules, buildFinale: () => /** @type {NonNullable<typeof def.buildCustom>} */ (def.buildCustom)(custom.level) } : null;
+  // Its levels may fly any vehicle (stage r-5): the game's own by its rules, the others by theirs.
+  const customRules = custom && def.buildCustom && def.palette
+    ? { ...mixedRules(def.rules, def.palette.native), buildFinale: () => /** @type {NonNullable<typeof def.buildCustom>} */ (def.buildCustom)(custom.level) }
+    : null;
 
   const state = {
     /** @type {Screen} */
@@ -617,7 +621,8 @@ export function runApp(def) {
     // spider, which act only on the ground) a short tap is kept until it has acted or the
     // buffer runs out, so a tap just before landing counts.
     const w = state.game.wave;
-    const waits = def.holdTaps === true && (w.mode === 'ball' || w.mode === 'spider') && w.sinceAct !== 0;
+    // (An editor's level may bring the ball or the spider into any game: stage r-5.)
+    const waits = (def.holdTaps === true || customRules !== null) && (w.mode === 'ball' || w.mode === 'spider') && w.sinceAct !== 0;
     if (!input.down && tap && state.game.phase === 'playing' && !waits) input.pressedAt = null;
     clock.time += STEP;
     reactToEvents(events);

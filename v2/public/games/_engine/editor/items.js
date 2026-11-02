@@ -87,6 +87,10 @@ export function itemFor(tool, opt, x, y, s, grid = 1) {
     case 'pad':
       return /** @type {Item} */ ({ type: 'pad', kind: String(opt.kind ?? 'jump'), x: inside(sn(x - 0.5)), on, y: sn(y) });
     case 'flip':
+      // Gravity: turned over (either way), or down (normal) or up (upside down) — stage r-5.
+      return /** @type {Item} */ ({ type: 'portal', x: inside(sn(x)), kind: String(opt.gravity ?? 'flip') });
+    case 'vehicle':
+      return /** @type {Item} */ ({ type: 'portal', x: inside(sn(x)), kind: String(opt.vehicle ?? 'ship') });
     case 'mini':
     case 'big':
       return { type: 'portal', x: inside(sn(x)), kind: tool };

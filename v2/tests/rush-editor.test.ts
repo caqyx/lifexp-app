@@ -9,6 +9,13 @@ import { FORMAT, changedLevel, checkLevel, emptyLevel, fromJson, playHash, toJso
 import { verifiedWord } from '../public/games/_engine/editor/play.js';
 import { buildGeometry, capsuleHitsHazard, type SectionData } from '../public/games/_engine/geometry.js';
 import { isSolid, sectionWorld, settle } from '../public/games/_engine/solids.js';
+import { createGame, stepGame, type Game } from '../public/games/_engine/game.js';
+import { stateAt, endModeOf } from '../public/games/_engine/level.js';
+import { STEP } from '../public/games/_engine/world.js';
+import { mixedRules } from '../public/games/_engine/editor/vehicles.js';
+import { RULES as WAVE_RULES } from '../public/games/wave-rush/js/game.js';
+import { RULES as SHIP_RULES } from '../public/games/ship-rush/js/game.js';
+import { RULES as FLIP_RULES } from '../public/games/flip-rush/js/game.js';
 import { EDITOR_KEYS, editorTextsOf } from '../public/games/_engine/editor/i18n.js';
 import { customSector } from '../public/games/_engine/editor/play.js';
 import { PALETTE as WAVE } from '../public/games/wave-rush/js/palette.js';
@@ -325,5 +332,104 @@ describe('texts and play', () => {
     const problems = flipProblems(wall, sector, 1);
     expect(problems.length).toBeGreaterThan(0);
     expect(problems.some((p) => /x≈\d/.test(p))).toBe(true);
+  });
+});
+
+describe('every portal in every game (stage r-5)', () => {
+  // A Wave Rush level: wave → (fast) → ship → spider → (up) → wave → (mini) → section 2 goes
+  // on as it was (still the mini wave, upside down) → ball (gravity down) → the end.
+  const waveLevel = (): Level => {
+    const level = emptyLevel(WAVE, 'All portals');
+    level.tier = 'easy';
+    level.sections = [
+      {
+        id: 'e-01', length: 40, ceil: '2 r40', floor: '10 r40', mode: 'wave',
+        hazards: [
+          { type: 'speed', x: 5, k: 'fast' },
+          { type: 'portal', x: 8, kind: 'ship' },
+          { type: 'portal', x: 16, kind: 'spider' },
+          { type: 'portal', x: 22, kind: 'up' },
+          // Gravity goes up under the spider; it falls up, and halfway it is the wave.
+          { type: 'portal', x: 23, kind: 'wave' },
+          { type: 'portal', x: 30, kind: 'mini' },
+        ],
+      },
+      {
+        id: 'e-02', length: 30, ceil: '2 r30', floor: '10 r30', mode: 'wave',
+        hazards: [
+          { type: 'speed', x: 6, k: 'slow' },
+          { type: 'portal', x: 10, kind: 'big' },
+          { type: 'portal', x: 14, kind: 'down' },
+          { type: 'portal', x: 18, kind: 'ball' },
+        ],
+      },
+    ];
+    return level;
+  };
+
+  /** Plays a run with a simple pilot: the wave and the ship keep to the middle; the ball and the spider are left alone. */
+  const play = (game: Game) => {
+    stepGame(game, { holding: false, tap: true }, STEP);
+    const seen: string[] = [];
+    for (let i = 0; i < 240 * 40 && game.phase === 'playing'; i++) {
+      const w = game.wave;
+      const mode = w.mode ?? (w.ship ? 'ship' : 'wave');
+      if (w.x > 2 && seen[seen.length - 1] !== mode) seen.push(mode);
+      const flying = mode === 'wave' || mode === 'ship';
+      const holding = flying && (w.y > 6) === (w.gravity === 1);
+      stepGame(game, { holding, tap: false }, STEP);
+    }
+    return seen;
+  };
+
+  test('the file takes every portal in every game; it goes out and back unchanged', () => {
+    const level = waveLevel();
+    const back = fromJson(toJson(level), WAVE);
+    expect(back.problems).toEqual([]);
+    expect(back.level!.sections.map((s) => s.hazards)).toEqual(level.sections.map((s) => s.hazards));
+    for (const palette of [WAVE, SHIP, FLIP]) {
+      expect(palette.modes.slice().sort()).toEqual(['ball', 'ship', 'spider', 'wave']);
+      expect(palette.items).toEqual(expect.arrayContaining(['speed', 'portal']));
+      for (const kind of ['flip', 'down', 'up', 'mini', 'big', 'wave', 'ship', 'ball', 'spider']) {
+        const one = { ...JSON.parse(toJson(emptyLevel(palette, 'x'))), sections: [{ length: 30, ceil: '2 r30', floor: '10 r30', mode: 'ball', hazards: [{ type: 'portal', x: 12, kind, y: 6, sy: 0.5 }] }] };
+        expect(checkLevel(one, palette).problems, `${palette.id} ${kind}`).toEqual([]);
+      }
+    }
+    expect(keysOf(checkLevel({ ...JSON.parse(toJson(emptyLevel(WAVE, 'x'))), sections: [{ length: 30, ceil: '2 r30', floor: '10 r30', hazards: [{ type: 'portal', x: 12, kind: 'cube' }] }] }, WAVE).problems)).toEqual(['errWord']);
+  });
+
+  test('a Wave Rush level switches vehicle, speed, size and gravity inside sections, and carries it all over the joint', () => {
+    const run = waveCustom(waveLevel());
+    const [s1, s2] = run.pieces.filter((p) => p.kind === 'section');
+    expect(endModeOf(s1!)).toBe('wave');
+    // No vehicle portal at the joint: section 2 starts in the wave that section 1 ends in.
+    expect(run.portals.filter((p) => p.kind === 'ship' && Math.abs(p.x - s2!.x0 - 1) < 1e-9)).toEqual([]);
+    const at = (piece: typeof s1, x: number) => stateAt(run, piece!.x0 + x);
+    expect(at(s1, 10)).toMatchObject({ mode: 'ship', gravity: 1, mini: false });
+    expect(at(s1, 20)).toMatchObject({ mode: 'spider', gravity: 1 });
+    expect(at(s1, 22.5)).toMatchObject({ mode: 'spider', gravity: -1 });
+    expect(at(s1, 35)).toMatchObject({ mode: 'wave', gravity: -1, mini: true });
+    expect(at(s2, 2)).toMatchObject({ mode: 'wave', gravity: -1, mini: true });
+    expect(at(s2, 20)).toMatchObject({ mode: 'ball', gravity: 1, mini: false });
+
+    // The game plays it to the end, in every vehicle.
+    const game = createGame({ ...mixedRules(WAVE_RULES, WAVE.native), buildFinale: () => waveCustom(waveLevel()) }, { rng: () => 0, mode: 'normal', level: 'finale' });
+    const seen = play(game);
+    expect(game.phase).toBe('finished');
+    expect(seen).toEqual(['wave', 'ship', 'spider', 'wave', 'ball']);
+  });
+
+  test('a section starting in another vehicle gets its vehicle portal at the joint; the same level plays in Ship Rush and Flip Rush', () => {
+    const level = waveLevel();
+    level.sections[1]!.mode = 'ship';
+    const run = waveCustom(level);
+    const s2 = run.pieces.filter((p) => p.kind === 'section')[1]!;
+    expect(run.portals.some((p) => p.kind === 'ship' && p.mode === 'ship' && p.x > s2.x0 && p.x < s2.x0 + 2)).toBe(true);
+    for (const [palette, rules, build] of [[SHIP, SHIP_RULES, shipCustom], [FLIP, FLIP_RULES, flipCustom]] as const) {
+      const own = { ...waveLevel(), game: palette.id, tier: palette.tiers[0]! };
+      const game = createGame({ ...mixedRules(rules, palette.native), buildFinale: () => build(own) }, { rng: () => 0, mode: 'normal', level: 'finale' });
+      expect(play(game), palette.id).toEqual(['wave', 'ship', 'spider', 'wave', 'ball']);
+      expect(game.phase, palette.id).toBe('finished');
+    }
   });
 });

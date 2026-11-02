@@ -1702,6 +1702,48 @@ test.describe('Rush level editor', () => {
     expect(problems).toEqual([]);
   });
 
+  test('Wave Rush: speed, mini and vehicle portals placed in a section; the test play passes through them as the ball and the spider', async ({ page, account }) => {
+    test.setTimeout(120000);
+    await page.setViewportSize({ width: 1000, height: 600 });
+    const problems = await watchProblems(page);
+    const { game } = await playFromList(page, account, 'Wave Rush');
+    await game.getByRole('button', { name: 'Edytor poziomów' }).click();
+    const editor = await frameAt(page, '/wave-rush/editor.html');
+    // Every vehicle in Wave Rush too: the section starts as the ball (it rolls on the floor).
+    await editor.locator('#ed-mode').selectOption('ball');
+    await editor.getByRole('button', { name: 'Portal prędkości' }).click();
+    await editor.locator('#ed-options select').selectOption('fast');
+    await tapBoard(editor, 7, 6);
+    await editor.getByRole('button', { name: 'Portal mini' }).click();
+    await tapBoard(editor, 10, 6);
+    await editor.getByRole('button', { name: 'Portal pojazdu' }).click();
+    await editor.locator('#ed-options select').selectOption('spider');
+    await tapBoard(editor, 14, 6);
+    await editor.getByRole('button', { name: 'Portal grawitacji' }).click();
+    await editor.locator('#ed-options select').selectOption('up');
+    await tapBoard(editor, 18, 6);
+    const level = await exported(editor);
+    expect(level.sections[0].mode).toBe('ball');
+    expect(level.sections[0].hazards).toEqual([
+      { type: 'speed', x: 7, k: 'fast' },
+      { type: 'portal', x: 10, kind: 'mini' },
+      { type: 'portal', x: 14, kind: 'spider' },
+      { type: 'portal', x: 18, kind: 'up' },
+    ]);
+
+    // The game plays it: the ball, faster, mini, then the spider falling up — to the end.
+    await editor.getByRole('button', { name: 'Testuj od początku' }).click();
+    const play = await frameAt(page, '/wave-rush/index.html');
+    const stage = play.locator('#stage');
+    await expect(stage).toHaveAttribute('data-state', 'ready');
+    await stage.click();
+    await expect(stage).toHaveAttribute('data-state', 'finished', { timeout: 30000 });
+    await expect(play.getByText('Poziom ukończony')).toBeVisible();
+    await play.getByRole('button', { name: '← Edytor' }).click();
+    await frameAt(page, '/wave-rush/editor.html');
+    expect(problems).toEqual([]);
+  });
+
   test.describe('on a touch phone held upright', () => {
     test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 

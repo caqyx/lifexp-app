@@ -15,6 +15,7 @@
 // a few saves in this browser.
 import { JOINT, VIEW_H } from '../world.js';
 import { buildGeometry, movedAt, profileY } from '../geometry.js';
+import { runPortalOf } from '../level.js';
 import { paintSection } from '../render/section.js';
 import { drawMine, drawOrb, drawPortal, drawSaw } from '../render/sprites.js';
 import { changedLevel, emptyLevel, emptySection, fromJson, playHash, toJson } from './format.js';
@@ -62,12 +63,18 @@ const OPTIONS = /** @type {Record<string, { key: 'optCount' | 'optSize' | 'optKi
   ring: [{ key: 'optKind', name: 'kind', choices: ['jump', 'small', 'gravity', 'gravityJump', 'dash'] }],
   pad: [{ key: 'optKind', name: 'kind', choices: ['jump', 'small', 'gravity'] }],
   speed: [{ key: 'optKind', name: 'k', choices: ['slow', 'normal', 'fast', 'veryFast'] }],
+  flip: [{ key: 'optKind', name: 'gravity', choices: ['flip', 'down', 'up'] }],
+  vehicle: [{ key: 'optKind', name: 'vehicle', choices: ['ship', 'wave', 'ball', 'spider'] }],
 });
+/** Option lists whose first choice is the default (the others default to their second). */
+const FIRST_DEFAULT = new Set(['kind', 'k', 'gravity', 'vehicle']);
+/** How an option's choice is named. @type {Record<string, string>} */
+const CHOICE_PREFIX = { kind: 'kind_', k: 'speed_', gravity: 'gravity_', vehicle: 'mode_' };
 /** Tools whose items can move. */
 const MOVABLE = new Set(['saw', 'mine', 'orb']);
 const TOOL_KEYS = /** @type {const} */ ({
   select: 'toolSelect', box: 'toolBox', erase: 'toolErase', spike: 'toolSpike', block: 'toolBlock', pillar: 'toolPillar', saw: 'toolSaw', mine: 'toolMine',
-  orb: 'toolOrb', ring: 'toolRing', pad: 'toolPad', flip: 'toolFlip', mini: 'toolMini', big: 'toolBig', speed: 'toolSpeed', dark: 'toolDark', invert: 'toolInvert',
+  orb: 'toolOrb', ring: 'toolRing', pad: 'toolPad', flip: 'toolFlip', mini: 'toolMini', big: 'toolBig', vehicle: 'toolVehicle', speed: 'toolSpeed', dark: 'toolDark', invert: 'toolInvert',
 });
 
 /**
@@ -355,9 +362,7 @@ export function runEditor(def) {
     for (const p2 of g.portals) {
       const top = p2.y0 ?? profileY(g.ceil, p2.x, 'ceil');
       const bottom = p2.y1 ?? profileY(g.floor, p2.x, 'floor');
-      /** @type {any} */
-      const look = p2.kind === 'flip' ? { kind: 'flip', on: true } : { kind: 'mini', on: p2.kind === 'mini' };
-      drawPortal(ctx, X(o + p2.x), Y(top + 0.25), Y(bottom - 0.25), c, look, 0, true);
+      drawPortal(ctx, X(o + p2.x), Y(top + 0.25), Y(bottom - 0.25), c, runPortalOf(p2.kind), 0, true);
     }
     for (const sp of g.speeds) {
       drawPortal(ctx, X(o + sp.x), Y(profileY(g.ceil, sp.x, 'ceil') + 0.25), Y(profileY(g.floor, sp.x, 'floor') - 0.25), c, /** @type {any} */ ({ kind: 'speed', on: false, speed: sp.k }), 0, true);
@@ -817,10 +822,11 @@ export function runEditor(def) {
       for (const c of o.choices) {
         const option = document.createElement('option');
         option.value = String(c);
-        option.textContent = typeof c === 'number' ? String(c) : o.name === 'kind' ? t(/** @type {any} */ (`kind_${c}`)) : o.name === 'k' ? t(/** @type {any} */ (`speed_${c}`)) : c;
+        const prefix = CHOICE_PREFIX[o.name];
+        option.textContent = typeof c === 'number' ? String(c) : prefix ? t(/** @type {any} */ (`${prefix}${c}`)) : c;
         select.append(option);
       }
-      select.value = String(state.opt[o.name] ?? o.choices[o.name === 'kind' || o.name === 'k' ? 0 : Math.min(1, o.choices.length - 1)]);
+      select.value = String(state.opt[o.name] ?? o.choices[FIRST_DEFAULT.has(o.name) ? 0 : Math.min(1, o.choices.length - 1)]);
       state.opt[o.name] = typeof o.choices[0] === 'number' ? Number(select.value) : select.value;
       select.addEventListener('change', () => (state.opt[o.name] = typeof o.choices[0] === 'number' ? Number(select.value) : select.value));
       label.append(select);
@@ -889,7 +895,7 @@ export function runEditor(def) {
 
   /** @param {Item} item */
   function toolOf(item) {
-    if (item.type === 'portal') return item.kind;
+    if (item.type === 'portal') return item.kind === 'down' || item.kind === 'up' ? 'flip' : item.kind === 'mini' || item.kind === 'big' || item.kind === 'flip' ? item.kind : 'vehicle';
     if (item.type === 'halfSpike') return 'spike';
     return item.type;
   }

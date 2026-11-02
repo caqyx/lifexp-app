@@ -234,12 +234,72 @@ export function drawPortal(ctx, x, top, bottom, cell, p, time, reduced) {
   ctx.strokeStyle = color;
   ctx.lineWidth = cell * 0.12;
   ctx.lineCap = 'round';
+  // A vehicle portal shows its vehicle in the middle (stage r-5: told apart without colour).
+  const vehicle = p.kind === 'ship' ? (p.mode ?? (p.on ? 'ship' : 'wave')) : null;
+  if (vehicle) drawVehicleGlyph(ctx, x, cy, cell, vehicle);
   for (let k = -1; k <= 1; k++) {
+    if (vehicle && k === 0) continue;
     const y = cy + k * cell * 1.1 + drift;
     ctx.beginPath();
     ctx.moveTo(x - cell * 0.28, y - dir * cell * 0.2);
     ctx.lineTo(x, y + dir * cell * 0.08);
     ctx.lineTo(x + cell * 0.28, y - dir * cell * 0.2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * A vehicle's sign in a portal: the wave a zigzag, the ship a hull, the ball a rolling
+ * circle, the spider a body with legs; white on a dark disc.
+ * @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} cell @param {string} mode
+ */
+export function drawVehicleGlyph(ctx, x, y, cell, mode) {
+  const r = cell * 0.42;
+  ctx.save();
+  ctx.fillStyle = 'rgba(10, 12, 20, 0.8)';
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#ffffff';
+  ctx.fillStyle = '#ffffff';
+  ctx.lineWidth = Math.max(1.5, cell * 0.07);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  const u = r * 0.6;
+  ctx.beginPath();
+  if (mode === 'wave') {
+    ctx.moveTo(x - u, y + u * 0.4);
+    ctx.lineTo(x - u * 0.35, y - u * 0.4);
+    ctx.lineTo(x + u * 0.3, y + u * 0.4);
+    ctx.lineTo(x + u, y - u * 0.4);
+    ctx.stroke();
+  } else if (mode === 'ship') {
+    ctx.moveTo(x - u, y + u * 0.45);
+    ctx.lineTo(x + u, y + u * 0.45);
+    ctx.lineTo(x + u * 0.2, y - u * 0.15);
+    ctx.lineTo(x - u * 0.4, y - u * 0.15);
+    ctx.lineTo(x - u * 0.4, y - u * 0.6);
+    ctx.lineTo(x - u, y - u * 0.6);
+    ctx.closePath();
+    ctx.stroke();
+  } else if (mode === 'ball') {
+    ctx.arc(x, y, u * 0.85, 0, Math.PI * 2);
+    ctx.moveTo(x - u * 0.85, y);
+    ctx.lineTo(x + u * 0.85, y);
+    ctx.moveTo(x, y - u * 0.85);
+    ctx.lineTo(x, y + u * 0.85);
+    ctx.stroke();
+  } else {
+    ctx.arc(x, y - u * 0.15, u * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    for (const s of [-1, 1]) {
+      ctx.moveTo(x + s * u * 0.35, y);
+      ctx.lineTo(x + s * u * 0.9, y + u * 0.75);
+      ctx.moveTo(x + s * u * 0.2, y + u * 0.1);
+      ctx.lineTo(x + s * u * 0.45, y + u * 0.85);
+    }
     ctx.stroke();
   }
   ctx.restore();

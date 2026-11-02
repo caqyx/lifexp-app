@@ -48,8 +48,12 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  *   drawing × the larger of sx, sy; a pad turned upside down (fy, or rot near 180°) faces
  *   the other way; pads keep their size.
  * @typedef {'slow' | 'normal' | 'fast' | 'veryFast'} SpeedKind
+ * @typedef {'flip' | 'down' | 'up' | 'mini' | 'big' | VehicleMode} SectionPortalKind
+ *   A portal inside a section: gravity turned over (flip), gravity down (normal) or up
+ *   (upside down), mini or full size, or a vehicle (stage r-5; the editor's levels — the
+ *   game's own sections use flip, mini and big only).
  * @typedef {{ type: 'speed', x: number, k: SpeedKind }
- *   | { type: 'portal', x: number, kind: 'flip' | 'mini' | 'big', y?: number, sy?: number }
+ *   | { type: 'portal', x: number, kind: SectionPortalKind, y?: number, sy?: number }
  *   | { type: 'dark', from: number, to: number }
  *   | { type: 'invert', from: number, to: number }} EffectData
  *   Stage r-2, inside a section: a speed portal (the tier's speed × SPEED_FACTORS[k] from
@@ -85,7 +89,7 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  * @typedef {{ id: string, length: number, ceil: Pt[], floor: Pt[], ceilSegs: Seg[], floorSegs: Seg[],
  *   mini: boolean, tier: string | null, mode: VehicleMode,
  *   hazards: Hazard[], boosters: Booster[], deco: DecoData[], buckets: Map<number, Hazard[]>, segBuckets: Map<number, Seg[]>,
- *   speeds: { x: number, k: SpeedKind }[], portals: { x: number, kind: 'flip' | 'mini' | 'big', y0?: number, y1?: number }[],
+ *   speeds: { x: number, k: SpeedKind }[], portals: { x: number, kind: SectionPortalKind, y0?: number, y1?: number }[],
  *   dark: { from: number, to: number }[], invert: { from: number, to: number }[] }} Geometry
  */
 

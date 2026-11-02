@@ -4,6 +4,7 @@
 // backgrounds, and the ship (or, in the finale's wave stretches, the wave) in the
 // player's skin.
 import { createRenderer, renderFrame as renderWith } from '../../../_engine/render/frame.js';
+import { mixedLook } from '../../../_engine/editor/look.js';
 import { WAVE } from '../../../_engine/wave.js';
 import { SHIP } from '../config.js';
 import { drawBackground } from './background.js';
@@ -18,7 +19,7 @@ export { createRenderer };
  */
 
 /** @type {import('../../../_engine/render/frame.js').Look} */
-export const LOOK = {
+const OWN_LOOK = {
   themeOf,
   drawBackground: (ctx, v, th, camX, clock) => drawBackground(ctx, v, /** @type {import('./themes.js').Theme} */ (th), camX, clock),
   trailWidth: (w) => (w.ship ? (w.mini ? 0.13 : 0.2) : w.mini ? 0.2 : 0.3),
@@ -32,6 +33,9 @@ export const LOOK = {
     drawShip(ctx, s.skin, x, y, size, w.angle, w.thrust && !s.reduced, w.flipped, s.time);
   },
 };
+
+/** Any vehicle an editor's level brings (stage r-5): the others drawn by their own game. */
+export const LOOK = mixedLook(OWN_LOOK, ['ship', 'wave']);
 
 /**
  * Draws a whole frame.
