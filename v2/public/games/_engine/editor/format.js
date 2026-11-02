@@ -13,9 +13,10 @@ import { SCALE, buildGeometry, parseProfile } from '../geometry.js';
  * @typedef {{ format: 'LifeXP Rush level', version: 2, game: string, name: string, tier: string, verified: boolean, sections: SectionData[] }} Level
  *   verified: its maker finished it in the game from the start, in normal mode, with no
  *   checkpoints, and has not changed it since (stage r-4).
- * @typedef {{ id: string, tiers: string[], modes: string[], items: string[], moving?: boolean }} Palette
- *   What a game allows: its tier keys, its vehicles and the item types of its sections;
- *   moving: round hazards may move (its validator proves them).
+ * @typedef {{ id: string, tiers: string[], modes: string[], native: string[], items: string[], moving?: boolean }} Palette
+ *   What a game allows: its tier keys, the vehicles its levels may fly (every one since
+ *   stage r-5: `native` are the game's own, the others fly by their own game's physics) and
+ *   the item types of its sections; moving: round hazards may move.
  * @typedef {{ path: string, key: string, values?: Record<string, string | number> }} Problem
  *   path: where (e.g. "sections[2].hazards[5].x"); key: the text that says what (editor i18n).
  */
@@ -53,7 +54,7 @@ const WORDS = /** @type {Record<string, string[]>} */ ({
   k: ['slow', 'normal', 'fast', 'veryFast'],
   'ring.kind': ['jump', 'small', 'gravity', 'gravityJump', 'dash'],
   'pad.kind': ['jump', 'small', 'gravity'],
-  'portal.kind': ['flip', 'mini', 'big'],
+  'portal.kind': ['flip', 'down', 'up', 'mini', 'big', 'wave', 'ship', 'ball', 'spider'],
 });
 
 /** @param {unknown} v @returns {v is Record<string, unknown>} */

@@ -58,11 +58,19 @@ verified, and may not use the new fields.
   - `dN` or `uN`: a 45° slope (Wave Rush only).
 
   The joints are the ceiling at 2 and the floor at 10, with 2 level cells at each end.
-- **`mode`**: the vehicle.
-  - Wave Rush: `wave` or `ship`.
-  - Ship Rush: `ship` or `wave`.
-  - Flip Rush: `ball` or `spider`.
-- **`mini`**: `true` makes the section a mini stretch, proven as mini.
+- **`mode`**: the vehicle the section starts in: `wave`, `ship`, `ball` or `spider`, in
+  every game. A game flies its own vehicles as it always does: Wave Rush the wave and its
+  own ship, Ship Rush the ship and the wave, Flip Rush the ball and the spider. A vehicle
+  from another game flies by that game's physics, in the same world. For example, the ship
+  in a Wave Rush level that starts as the ball is Ship Rush's ship, which can land on
+  blocks. It is drawn by that game's drawing in the player's colours.
+  - The level starts in its first section's vehicle.
+  - Where a section starts in a vehicle other than the one the section before ends in, a
+    vehicle portal stands 1 cell into it.
+  - Gravity, size and speed carry on over a joint as they are. Nothing resets between the
+    sections of an editor's level.
+- **`mini`**: `true` marks the section as a mini stretch. Inside it, use the mini and big
+  portals.
 
 ## Items in `hazards`
 
@@ -74,11 +82,23 @@ verified, and may not use the new fields.
 | `saw`, `mine`, `orb` | `x`, `y`, `r`, `move?`, `rot?`, `sx?`, `sy?` (`orb`: Wave and Ship) | all |
 | `ring` (orb) | `x`, `y`, `kind: jump/small/gravity/gravityJump/dash`, `sx?`, `sy?` | Flip |
 | `pad` | `x`, `on`, `kind: jump/small/gravity`, `y?`, `fy?`, `rot?` | Flip |
-| `speed` | `x`, `k: slow/normal/fast/veryFast` (× 0.8 / 1 / 1.25 / 1.5) | Ship, Flip |
-| `portal` | `x`, `kind: flip/mini/big`, `y?`, `sy?` (a gate) | Ship, Flip |
+| `speed` | `x`, `k: slow/normal/fast/veryFast` (× 0.8 / 1 / 1.25 / 1.5) | all |
+| `portal` | `x`, `kind` (below), `y?`, `sy?` (a gate) | all |
 | `dark` | `from`, `to` (only the view narrows) | all |
 | `invert` | `from`, `to` (hold = sink) | Ship |
 
+- **Portal kinds**:
+  - `flip` turns gravity over, whichever way it is (yellow, chevrons both ways).
+  - `down` sets gravity to normal (blue, chevrons down).
+  - `up` sets it upside down (amber, chevrons up).
+  - `mini` makes the vehicle small; `big` makes it full size again (chevrons in or out).
+  - `wave`, `ship`, `ball` and `spider` switch the vehicle. The ring shows the vehicle in
+    the middle: a zigzag, a hull, a crossed circle or a body with legs.
+
+  Every portal is told apart by its shape and signs, not only its colour. Every kind
+  works in every game, anywhere in a section and any number of times. A section may end
+  in another state than it began. The game's own sections still use only `flip`, `mini`
+  and `big`, flips in pairs and mini back to big, as their validator requires.
 - **`move`** is `{ dx, dy, every, phase? }`. The item swings by (dx, dy) along a sine, once
   every `every` cells the vehicle runs. It works in Ship Rush and Flip Rush.
 - **`x`** is cells from the section's start.
@@ -106,7 +126,7 @@ turns with the drawing in every vehicle (wave, ship, ball, spider):
   turn or mirror.
 - **Pads**: `fy` (or `rot` between 90° and 270°) turns the pad upside down, so it faces the
   other way. Pads keep their size.
-- **Portals** (`flip`, `mini`, `big`): a portal spans the corridor where it stands. With
+- **Portals** (every kind): a portal spans the corridor where it stands. With
   `y`, it is a gate 3 × `sy` cells high, centred on `y`. Only a vehicle inside the gate
   passes it. A practice respawn after a gate counts it as passed. Portals stay upright.
 - **Speed portals**, **`dark`** and **`invert`** always span the corridor. They have no
@@ -126,6 +146,12 @@ turns with the drawing in every vehicle (wave, ship, ball, spider):
   copy, paste, duplicate and delete. The keyboard does the same: arrows, Delete,
   Ctrl+C, Ctrl+V and Ctrl+D. On a phone, the round handle under the selection moves it.
 - An item moved past a section border goes into that section.
+- Every game has every portal tool:
+  - **Portal prędkości** (speed);
+  - **Portal grawitacji** (gravity: turn over, down or up);
+  - **Portal mini** and **Portal duży** (mini and big);
+  - **Portal pojazdu** (vehicle: ship, wave, ball or spider).
+- The section's vehicle (Pojazd) offers all four vehicles.
 - **Testuj** (Test) plays the level in the game, from the start or from the current
   section. It plays in practice mode, with a checkpoint every section.
 - **Zweryfikuj** (Verify) plays the level from the start in normal mode, with no

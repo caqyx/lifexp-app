@@ -48,6 +48,9 @@ const geometryCache = new Map();
 
 /** @param {SectionData} data */
 export function geometryOf(data) {
+  // An editor's section (ids e-01, e-02, …: editor/format.js) changes under the same id:
+  // never cached.
+  if (data.id.startsWith('e-')) return buildGeometry(data);
   let g = geometryCache.get(data.id);
   if (!g) {
     g = buildGeometry(data);
@@ -170,6 +173,32 @@ function sectionsOf(sector, library) {
   return list;
 }
 
+/** Vehicles a section's own portal may switch to (stage r-5). */
+const VEHICLES = new Set(['wave', 'ship', 'ball', 'spider']);
+
+/**
+ * A section's own portal as a run's portal: flip; gravity down or up; mini or big; a vehicle.
+ * @param {import('./geometry.js').SectionPortalKind} kind
+ * @returns {{ kind: PortalKind, on: boolean, mode?: VehicleMode }}
+ */
+export function runPortalOf(kind) {
+  if (kind === 'flip') return { kind: 'flip', on: true };
+  if (kind === 'down' || kind === 'up') return { kind: 'gravity', on: kind === 'up' };
+  if (kind === 'mini' || kind === 'big') return { kind: 'mini', on: kind === 'mini' };
+  return { kind: 'ship', on: kind === 'ship', mode: kind };
+}
+
+/**
+ * The vehicle a piece ends in: its last vehicle portal's, else its own.
+ * @param {Piece} piece
+ * @returns {VehicleMode}
+ */
+export function endModeOf(piece) {
+  let mode = piece.mode;
+  for (const p of piece.g.portals) if (VEHICLES.has(p.kind)) mode = /** @type {VehicleMode} */ (p.kind);
+  return mode;
+}
+
 /**
  * Places one sector's sections and portals after x.
  * @param {SectorDef} def @param {number} s its index @param {number} x
@@ -205,8 +234,7 @@ function placeSector(def, s, x, into) {
     for (const p of piece.g.portals) {
       const x = piece.x0 + p.x;
       const gate = p.y0 === undefined ? {} : { y0: p.y0, y1: p.y1 };
-      if (p.kind === 'flip') into.portals.push({ x, kind: 'flip', on: true, sector: s, ...gate });
-      else into.portals.push({ x, kind: 'mini', on: p.kind === 'mini', sector: s, ...gate });
+      into.portals.push({ ...runPortalOf(p.kind), x, sector: s, ...gate });
     }
     for (const p of piece.g.speeds) into.portals.push({ x: piece.x0 + p.x, kind: 'speed', on: false, sector: s, speed: p.k });
   }
@@ -216,7 +244,9 @@ function placeSector(def, s, x, into) {
     // Against the piece before; a sector's start also against baseMode, since each sector
     // begins in it (stateAt, a practice checkpoint) — so a sector that starts in another
     // vehicle has its portal even when the sector before ended in that vehicle too.
-    const prev = i === 0 ? into.rules.baseMode : /** @type {Piece} */ (into.pieces[i - 1]).mode;
+    // (Against the vehicle the piece before ends in: an editor's section may change vehicle
+    // inside itself, stage r-5; the game's own sections never do, so for them it is their mode.)
+    const prev = i === 0 ? into.rules.baseMode : endModeOf(/** @type {Piece} */ (into.pieces[i - 1]));
     const changes = piece.mode !== prev || (i === first && piece.mode !== into.rules.baseMode);
     if (changes) into.portals.push({ x: piece.x0 + PORTAL_OFFSET.ship, kind: 'ship', on: piece.mode === 'ship', mode: piece.mode, sector: s });
   }

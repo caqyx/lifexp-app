@@ -62,5 +62,7 @@ export function buildFinale() {
  * @returns {Run}
  */
 export function buildCustom(level) {
-  return buildLevel('finale', [customSector(level, SECTORS, FINALE)], { 1: level.sections }, () => 0, RULES);
+  // It starts in its first section's vehicle (stage r-5: any vehicle in any game).
+  const baseMode = level.sections[0]?.mode ?? RULES.baseMode;
+  return buildLevel('finale', [customSector(level, SECTORS, FINALE)], { 1: level.sections }, () => 0, { ...RULES, baseMode });
 }

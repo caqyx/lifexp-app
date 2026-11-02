@@ -5,6 +5,7 @@
 // f-2) with their flash. Neither vehicle leaves a trail; the spider's snap leaves a short
 // streak instead.
 import { createRenderer, renderFrame as renderWith } from '../../../_engine/render/frame.js';
+import { mixedLook } from '../../../_engine/editor/look.js';
 import { screenX, screenY } from '../../../_engine/render/view.js';
 import { STREAK_TIME, bodyOf } from '../config.js';
 import { drawBackground } from './background.js';
@@ -20,7 +21,7 @@ export { createRenderer };
  */
 
 /** @type {import('../../../_engine/render/frame.js').Look} */
-export const LOOK = {
+const OWN_LOOK = {
   themeOf,
   drawBackground: (ctx, v, th, camX, clock) => drawBackground(ctx, v, /** @type {import('./themes.js').Theme} */ (th), camX, clock),
   trailWidth: () => 0,
@@ -40,6 +41,9 @@ export const LOOK = {
     drawBall(ctx, s.skin, x, y, size, rollAngle(w.x, kind.half, w.flipped));
   },
 };
+
+/** Any vehicle an editor's level brings (stage r-5): the others drawn by their own game. */
+export const LOOK = mixedLook(OWN_LOOK, ['ball', 'spider']);
 
 /**
  * Draws a whole frame.

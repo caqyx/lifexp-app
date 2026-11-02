@@ -30,7 +30,9 @@ export function sectionStepper(g, base, step) {
       if (p.x <= v.x || p.x > next.x) continue;
       if (p.y0 !== undefined && (next.y < p.y0 || next.y > /** @type {number} */ (p.y1))) continue;
       if (p.kind === 'flip') out = { ...out, gravity: /** @type {1 | -1} */ (-out.gravity) };
-      else out = { ...out, mini: p.kind === 'mini' };
+      else if (p.kind === 'down' || p.kind === 'up') out = { ...out, gravity: p.kind === 'up' ? -1 : 1 };
+      else if (p.kind === 'mini' || p.kind === 'big') out = { ...out, mini: p.kind === 'mini' };
+      // (A vehicle portal — the editor's levels only, stage r-5 — is never proven here.)
     }
     return out;
   };

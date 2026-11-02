@@ -8,10 +8,13 @@ import { TIERS } from './config.js';
 export const PALETTE = {
   id: 'flip-rush',
   tiers: Object.keys(TIERS),
-  modes: ['ball', 'spider'],
+  // Every vehicle (stage r-5): the game's own first (`native`); the others fly by their own
+  // game's physics (_engine/editor/vehicles.js).
+  modes: ['ball', 'spider', 'wave', 'ship'],
+  native: ['ball', 'spider'],
   moving: true,
   items: ['spike', 'block', 'pillar', 'saw', 'mine', 'ring', 'pad', 'speed', 'portal', 'dark'],
 };
 
 /** The editor's item tools, in the order shown. */
-export const TOOLS = ['spike', 'block', 'pillar', 'saw', 'mine', 'ring', 'pad', 'speed', 'flip', 'mini', 'big', 'dark'];
+export const TOOLS = ['spike', 'block', 'pillar', 'saw', 'mine', 'ring', 'pad', 'speed', 'flip', 'mini', 'big', 'vehicle', 'dark'];
