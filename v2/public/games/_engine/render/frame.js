@@ -201,7 +201,7 @@ function drawSpinners(ctx, s, pieces, camX, look) {
       const at = h.move ? movedAt(h, s.wave.x - piece.x0) : h;
       const x = screenX(v, camX, piece.x0 + at.x);
       const y = screenY(v, at.y);
-      const spin = s.reduced ? 0 : s.time * (h.type === 'saw' ? -5 : h.type === 'mine' ? 0.8 : 1.4);
+      const spin = (h.rot ?? 0) * (Math.PI / 180) + (s.reduced ? 0 : s.time * (h.type === 'saw' ? -5 : h.type === 'mine' ? 0.8 : 1.4));
       if (th.fx?.hazardGlow) {
         const halo = ctx.createRadialGradient(x, y, h.r * v.cell * 0.5, x, y, h.r * v.cell * 1.6);
         halo.addColorStop(0, th.fx.hazardGlow);
@@ -224,8 +224,8 @@ function drawPortals(ctx, s, camX) {
     // Spanning the corridor where it stands (a section's own portal may be in a tunnel).
     const piece = pieceAt(s.run, p.x);
     const local = p.x - piece.x0;
-    const top = profileY(piece.g.ceil, local, 'ceil');
-    const bottom = profileY(piece.g.floor, local, 'floor');
+    const top = p.y0 ?? profileY(piece.g.ceil, local, 'ceil');
+    const bottom = p.y1 ?? profileY(piece.g.floor, local, 'floor');
     drawPortal(ctx, screenX(v, camX, p.x), screenY(v, top + 0.25), screenY(v, bottom - 0.25), v.cell, p, s.time, s.reduced);
   }
 }

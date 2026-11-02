@@ -138,6 +138,7 @@ export function resultOf(game) {
 function passPortals(game, from, to, events) {
   for (const p of game.run.portals) {
     if (p.x <= from || p.x > to) continue;
+    if (p.y0 !== undefined && (game.wave.y < p.y0 || game.wave.y > /** @type {number} */ (p.y1))) continue;
     if (p.kind === 'gravity') game.wave = { ...game.wave, gravity: p.on ? -1 : 1 };
     else if (p.kind === 'flip') game.wave = { ...game.wave, gravity: /** @type {1 | -1} */ (-game.wave.gravity) };
     else if (p.kind === 'mini') game.wave = { ...game.wave, mini: p.on };

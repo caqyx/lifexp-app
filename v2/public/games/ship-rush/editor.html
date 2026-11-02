@@ -14,18 +14,19 @@
 <body class="ed-page">
 <header class="ed-bar">
   <h1 class="ed-title"><span id="ed-game"></span> · <span data-t="title"></span></h1>
+  <p id="ed-verified" class="ed-badge" role="status" aria-live="polite"></p>
   <label class="ed-field ed-field--wide"><span data-t="name"></span><input id="ed-name" type="text" maxlength="60"></label>
   <label class="ed-field"><span data-t="tier"></span><select id="ed-tier"></select></label>
+  <button id="ed-test" class="ed-button ed-button--primary" type="button" data-t="testStart"></button>
+  <button id="ed-test-here" class="ed-button" type="button" data-t="testFrom"></button>
+  <button id="ed-verify" class="ed-button" type="button" data-t="verify" data-title="verifyHint"></button>
+  <button id="ed-undo" class="ed-button" type="button" data-t="undo"></button>
+  <button id="ed-redo" class="ed-button" type="button" data-t="redo"></button>
   <button id="ed-new" class="ed-button" type="button" data-t="newLevel"></button>
   <button id="ed-official-open" class="ed-button" type="button" data-t="official"></button>
   <button id="ed-slots-open" class="ed-button" type="button" data-t="slots"></button>
   <button id="ed-import-open" class="ed-button" type="button" data-t="importLevel"></button>
   <button id="ed-export-open" class="ed-button" type="button" data-t="exportLevel"></button>
-  <button id="ed-undo" class="ed-button" type="button" data-t="undo"></button>
-  <button id="ed-redo" class="ed-button" type="button" data-t="redo"></button>
-  <button id="ed-check-open" class="ed-button" type="button" data-t="check"></button>
-  <button id="ed-test" class="ed-button ed-button--primary" type="button" data-t="testStart"></button>
-  <button id="ed-test-here" class="ed-button" type="button" data-t="testFrom"></button>
   <button id="ed-back" class="ed-button" type="button" data-t="back"></button>
 </header>
 <div class="ed-sectionbar">
@@ -52,6 +53,7 @@
   <section id="ed-export" class="ed-panel" hidden aria-labelledby="ed-export-title">
     <h2 id="ed-export-title" data-t="exportTitle"></h2>
     <p data-t="exportHint"></p>
+    <p id="ed-export-verified"></p>
     <textarea id="ed-export-text" readonly spellcheck="false" data-label="exportTitle"></textarea>
     <div class="ed-row">
       <button id="ed-copy" class="ed-button" type="button" data-t="copy"></button>
@@ -89,16 +91,38 @@
       <button class="ed-button ed-close" type="button" data-t="close"></button>
     </div>
   </section>
-  <section id="ed-check" class="ed-panel" hidden aria-labelledby="ed-check-title">
-    <h2 id="ed-check-title" data-t="check"></h2>
-    <p id="ed-check-status" role="status"></p>
-    <ul id="ed-check-list"></ul>
-    <button class="ed-button ed-close" type="button" data-t="close"></button>
-  </section>
 </main>
+<div id="ed-inspector" class="ed-inspector" role="group" data-label="selection">
+  <p id="ed-sel-count" class="ed-label"></p>
+  <label class="ed-field"><span data-t="posX"></span><input id="ed-x" class="ed-num" type="number" step="0.25"></label>
+  <label class="ed-field"><span data-t="posY"></span><input id="ed-y" class="ed-num" type="number" step="0.25" min="-1.5" max="13.5"></label>
+  <button id="ed-left" class="ed-button" type="button" data-t="nudgeLeft"></button>
+  <button id="ed-up" class="ed-button" type="button" data-t="nudgeUp"></button>
+  <button id="ed-down" class="ed-button" type="button" data-t="nudgeDown"></button>
+  <button id="ed-right" class="ed-button" type="button" data-t="nudgeRight"></button>
+  <label class="ed-field"><span data-t="turn"></span><input id="ed-rot" class="ed-num" type="number" min="-360" max="360" step="15"></label>
+  <label class="ed-field"><span data-t="turnStep"></span><select id="ed-rot-step"></select></label>
+  <button id="ed-rot-left" class="ed-button" type="button" data-t="turnLeft"></button>
+  <button id="ed-rot-right" class="ed-button" type="button" data-t="turnRight"></button>
+  <button id="ed-flip-x" class="ed-button" type="button" data-t="flipX"></button>
+  <button id="ed-flip-y" class="ed-button" type="button" data-t="flipY"></button>
+  <label id="ed-scale-one" class="ed-field"><span data-t="scale"></span><input id="ed-scale" class="ed-num" type="number" min="0.25" max="4" step="0.25"></label>
+  <span id="ed-scale-xy" class="ed-shape" hidden>
+    <label class="ed-field"><span data-t="scaleX"></span><input id="ed-sx" class="ed-num" type="number" min="0.25" max="4" step="0.25"></label>
+    <label class="ed-field"><span data-t="scaleY"></span><input id="ed-sy" class="ed-num" type="number" min="0.25" max="4" step="0.25"></label>
+  </span>
+  <label class="ed-field"><input id="ed-axes" type="checkbox"><span data-t="axes"></span></label>
+  <label id="ed-gate-field" class="ed-field" hidden><input id="ed-gate" type="checkbox"><span data-t="gate"></span></label>
+  <button id="ed-copy-items" class="ed-button" type="button" data-t="copyItems"></button>
+  <button id="ed-paste" class="ed-button" type="button" data-t="pasteItems"></button>
+  <button id="ed-duplicate" class="ed-button" type="button" data-t="duplicateItems"></button>
+  <button id="ed-delete" class="ed-button" type="button" data-t="deleteItems"></button>
+  <button id="ed-deselect" class="ed-button" type="button" data-t="deselect"></button>
+</div>
 <footer class="ed-toolbar">
   <p class="ed-label" data-t="tools"></p>
   <div id="ed-tools" class="ed-options"></div>
+  <label class="ed-field"><span data-t="grid"></span><select id="ed-grid"></select></label>
   <div id="ed-options" class="ed-options"></div>
 </footer>
 </body>

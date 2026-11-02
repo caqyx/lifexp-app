@@ -8,7 +8,7 @@
 /** @typedef {import('./game.js').Result} Result */
 /**
  * @typedef {{ best: string, attempts: string, skin: string, progress: string, finaleBest: string, checkpoint: string,
- *   editorSlots: string, editorWork: string, editorPlay: string }} Keys
+ *   editorSlots: string, editorWork: string, editorPlay: string, editorVerified: string }} Keys
  *   progress: achievements { demonComplete, finaleComplete } (the first unlocks the last
  *   skin and the finale).
  */
@@ -23,10 +23,12 @@ export function keysFor(prefix) {
     finaleBest: `${prefix}finale-best`,
     checkpoint: `${prefix}checkpoint`,
     // The level editor (stage r-3): its saves (this browser), and in this tab the level
-    // being edited and the level left for a test play.
+    // being edited, the level left for a test play and the game's word that the level was
+    // finished in its verification (stage r-4).
     editorSlots: `${prefix}editor-slots`,
     editorWork: `${prefix}editor-work`,
     editorPlay: `${prefix}editor-play`,
+    editorVerified: `${prefix}editor-verified`,
   };
 }
 

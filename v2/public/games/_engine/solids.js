@@ -35,7 +35,8 @@ function bucketBoosters(list) {
   /** @type {Map<number, PlacedBooster[]>} */
   const map = new Map();
   for (const b of list) {
-    for (let c = Math.floor(b.x) - 2; c <= Math.floor(b.x) + 2; c++) {
+    const far = b.type === 'ring' && b.scale ? Math.ceil(2 * b.scale) : 2;
+    for (let c = Math.floor(b.x) - far; c <= Math.floor(b.x) + far; c++) {
       const into = map.get(c);
       if (into) into.push(b);
       else map.set(c, [b]);
@@ -47,8 +48,8 @@ function bucketBoosters(list) {
 /** @type {PlacedBooster[]} */
 const NONE = [];
 
-/** Blocks and pillars are solid in Ship Rush. @param {Hazard} h */
-export const isSolid = (h) => h.type === 'block' || h.type === 'pillar';
+/** Blocks and pillars are solid (not when tilted: stage r-4, a turned box is deadly). @param {Hazard} h */
+export const isSolid = (h) => (h.type === 'block' || h.type === 'pillar') && !(h.shape === 'poly' && h.tilted);
 
 /**
  * The level runs of a profile as boxes reaching away from the corridor; consecutive runs

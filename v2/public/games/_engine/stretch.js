@@ -28,6 +28,7 @@ export function sectionStepper(g, base, step) {
     let out = next;
     for (const p of g.portals) {
       if (p.x <= v.x || p.x > next.x) continue;
+      if (p.y0 !== undefined && (next.y < p.y0 || next.y > /** @type {number} */ (p.y1))) continue;
       if (p.kind === 'flip') out = { ...out, gravity: /** @type {1 | -1} */ (-out.gravity) };
       else out = { ...out, mini: p.kind === 'mini' };
     }
