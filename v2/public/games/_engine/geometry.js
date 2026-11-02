@@ -21,30 +21,44 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  * @typedef {{ x0: number, y0: number, x1: number, y1: number, slope: number | null, prevSlope: number, nextSlope: number, away: number }} Seg
  *   slope: dy/dx (−1, 0, 1) or null for a vertical step; prev/next: the neighbours' slope when it is ±1, else 0;
  *   away: the wave's direction that leaves this surface (−1 up off a floor, +1 down off a ceiling).
- * @typedef {{ type: 'spike' | 'halfSpike', x: number, on?: 'floor' | 'ceil', count?: number, y?: number, dir?: 'up' | 'down' }} SpikeData
- * @typedef {{ type: 'block', x: number, y: number, w: number, h: number }} BlockData
- * @typedef {{ type: 'pillar', x: number, on: 'floor' | 'ceil', h: number, w?: number }} PillarData
+ * @typedef {{ rot?: number, fx?: boolean, fy?: boolean, sx?: number, sy?: number }} Transform
+ *   Stage r-4 (the level editor): an item turned `rot` degrees clockwise, mirrored across
+ *   (fx) or up and down (fy) and scaled (sx, sy) about its own centre; the hit shape turns
+ *   with the drawing. Missing fields are the identity, so the official sections (which
+ *   have none) stay exactly as they were.
+ * @typedef {{ type: 'spike' | 'halfSpike', x: number, on?: 'floor' | 'ceil', count?: number, y?: number, dir?: 'up' | 'down' } & Transform} SpikeData
+ * @typedef {{ type: 'block', x: number, y: number, w: number, h: number } & Transform} BlockData
+ * @typedef {{ type: 'pillar', x: number, on: 'floor' | 'ceil', h: number, w?: number, y?: number } & Transform} PillarData
+ *   y (stage r-4): the pillar's top, anywhere, instead of standing on its surface.
  * @typedef {{ dx: number, dy: number, every: number, phase?: number }} Move
  *   A moving hazard (stage r-2): it swings by (dx, dy) cells along a sine, a whole swing
  *   every `every` cells the vehicle runs (keyed to the vehicle's place, as the genre's move
  *   triggers are, so a proof and the game see the same thing at the same x).
- * @typedef {{ type: 'saw' | 'orb' | 'mine', x: number, y: number, r: number, chain?: boolean, move?: Move }} RoundData
- *   chain: hangs on a chain from the ceiling (drawn only; the chain never hurts).
+ * @typedef {{ type: 'saw' | 'orb' | 'mine', x: number, y: number, r: number, chain?: boolean, move?: Move, sx?: number, sy?: number, rot?: number }} RoundData
+ *   chain: hangs on a chain from the ceiling (drawn only; the chain never hurts); sx, sy
+ *   (stage r-4): a round hazard stays round, its radius × the larger of the two; rot
+ *   turns only its drawing.
  * @typedef {'jump' | 'small' | 'gravity' | 'gravityJump' | 'dash'} RingKind
  * @typedef {'jump' | 'small' | 'gravity'} PadKind
- * @typedef {{ type: 'ring', kind: RingKind, x: number, y: number } | { type: 'pad', kind: PadKind, x: number, on: 'floor' | 'ceil', y?: number }} BoosterData
+ * @typedef {{ type: 'ring', kind: RingKind, x: number, y: number, sx?: number, sy?: number }
+ *   | { type: 'pad', kind: PadKind, x: number, on: 'floor' | 'ceil', y?: number, fy?: boolean, rot?: number }} BoosterData
  *   Flip Rush's orbs (`ring`, at its centre) and pads (`pad`, one cell from x, on the floor
  *   or the ceiling under/over x + 0.5, or on a block's top or underside at `y`): they help,
- *   never hurt (flip-rush/js/boosters.js has their effects).
+ *   never hurt (flip-rush/js/boosters.js has their effects). Stage r-4: an orb's reach and
+ *   drawing × the larger of sx, sy; a pad turned upside down (fy, or rot near 180°) faces
+ *   the other way; pads keep their size.
  * @typedef {'slow' | 'normal' | 'fast' | 'veryFast'} SpeedKind
  * @typedef {{ type: 'speed', x: number, k: SpeedKind }
- *   | { type: 'portal', x: number, kind: 'flip' | 'mini' | 'big' }
+ *   | { type: 'portal', x: number, kind: 'flip' | 'mini' | 'big', y?: number, sy?: number }
  *   | { type: 'dark', from: number, to: number }
  *   | { type: 'invert', from: number, to: number }} EffectData
  *   Stage r-2, inside a section: a speed portal (the tier's speed × SPEED_FACTORS[k] from
  *   x to the section's end or the next one); a gravity flip or a size portal (flips come in
  *   pairs and a mini stretch ends in `big`, so a section ends as it began); a dark stretch
  *   (the view narrows round the vehicle — drawing only); an inverted-controls stretch.
+ *   A portal spans the corridor where it stands; a gravity or size portal with `y`
+ *   (stage r-4) is a gate GATE × sy cells high centred on y, passed only by a vehicle
+ *   inside it. A speed portal always spans the corridor (the speed belongs to the place).
  * @typedef {SpikeData | BlockData | PillarData | RoundData | BoosterData | EffectData} HazardData
  * @typedef {{ type: 'chain', x: number, len: number, ornament?: 'diamond' | 'star' | 'triangle' | 'eye' | 'debris' | 'none' }
  *   | { type: 'star' | 'diamond' | 'gear' | 'eye', x: number, y: number, size: number }
@@ -60,15 +74,18 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  *   Rush: the wave unless `ship`; Ship Rush: the ship unless `wave`; Flip Rush: ball or spider).
  * @typedef {'wave' | 'ship' | 'ball' | 'spider'} VehicleMode
  *
- * @typedef {{ type: 'spike' | 'halfSpike' | 'block' | 'pillar', shape: 'poly', pts: Pt[], vis: Pt[], dir: 'up' | 'down' | 'none', bbox: number[] }} PolyHazard
- * @typedef {{ type: 'saw' | 'orb' | 'mine', shape: 'circle', x: number, y: number, r: number, hit: number, bbox: number[], chain: boolean, move?: Move }} CircleHazard
+ * @typedef {{ type: 'spike' | 'halfSpike' | 'block' | 'pillar', shape: 'poly', pts: Pt[], vis: Pt[], dir: 'up' | 'down' | 'none', bbox: number[], tilted?: boolean, rot?: number }} PolyHazard
+ *   tilted (stage r-4): a block or pillar turned by other than a right angle — no surface
+ *   to ride, deadly like a spike; rot: its turn (a pillar's capitals follow it).
+ * @typedef {{ type: 'saw' | 'orb' | 'mine', shape: 'circle', x: number, y: number, r: number, hit: number, bbox: number[], chain: boolean, move?: Move, rot?: number }} CircleHazard
  * @typedef {PolyHazard | CircleHazard} Hazard
- * @typedef {{ type: 'ring', kind: RingKind, x: number, y: number, dir: 'none' } | { type: 'pad', kind: PadKind, x: number, y: number, dir: 'up' | 'down' }} Booster
- *   A pad's x is its centre and y the surface it sits on; dir: the way it faces.
+ * @typedef {{ type: 'ring', kind: RingKind, x: number, y: number, dir: 'none', scale?: number } | { type: 'pad', kind: PadKind, x: number, y: number, dir: 'up' | 'down' }} Booster
+ *   A pad's x is its centre and y the surface it sits on; dir: the way it faces; scale: an
+ *   orb's size and reach (stage r-4).
  * @typedef {{ id: string, length: number, ceil: Pt[], floor: Pt[], ceilSegs: Seg[], floorSegs: Seg[],
  *   mini: boolean, tier: string | null, mode: VehicleMode,
  *   hazards: Hazard[], boosters: Booster[], deco: DecoData[], buckets: Map<number, Hazard[]>, segBuckets: Map<number, Seg[]>,
- *   speeds: { x: number, k: SpeedKind }[], portals: { x: number, kind: 'flip' | 'mini' | 'big' }[],
+ *   speeds: { x: number, k: SpeedKind }[], portals: { x: number, kind: 'flip' | 'mini' | 'big', y0?: number, y1?: number }[],
  *   dark: { from: number, to: number }[], invert: { from: number, to: number }[] }} Geometry
  */
 
@@ -78,6 +95,10 @@ const SPIKE_HIT = { inset: 0.2, tip: 0.75 };
 const HALF_SPIKE_HIT = { inset: 0.15, tip: 0.38 };
 /** Round hazards: the hit circle is this share of the drawn radius (a mine's spikes are thin: its core counts). */
 const ROUND_HIT = { saw: 0.8, orb: 0.72, mine: 0.66 };
+/** A portal gate's height at sy = 1 (stage r-4). */
+export const GATE = 3;
+/** Scales an item may have (stage r-4). */
+export const SCALE = { min: 0.25, max: 4 };
 
 // ── Profiles ─────────────────────────────────────────────────────────────────
 
@@ -202,6 +223,60 @@ function bboxOf(pts) {
 /** @param {number} x0 @param {number} y0 @param {number} x1 @param {number} y1 @returns {Pt[]} */
 const rect = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 
+/** @param {number} v (a right-angle turn's cos 6e-17 is 0) */
+const clean = (v) => Math.round(v * 1e9) / 1e9;
+
+/** Does the item have a turn, a mirror or a scale (stage r-4)? @param {Transform} t */
+export const hasTransform = (t) => Boolean(t.rot || t.fx || t.fy || (t.sx ?? 1) !== 1 || (t.sy ?? 1) !== 1);
+
+/** The turn in [0, 360). @param {Transform} t */
+export const turnOf = (t) => (((t.rot ?? 0) % 360) + 360) % 360;
+
+/** Is the turn a right angle (or none)? @param {Transform} t */
+export const isRightTurn = (t) => Math.abs(turnOf(t) / 90 - Math.round(turnOf(t) / 90)) < 1e-9;
+
+/**
+ * Points scaled, mirrored and then turned (clockwise on screen: y grows down) about (cx, cy).
+ * @param {Pt[]} pts @param {number} cx @param {number} cy @param {Transform} t
+ * @returns {Pt[]}
+ */
+export function transformPts(pts, cx, cy, t) {
+  const sx = (t.sx ?? 1) * (t.fx ? -1 : 1);
+  const sy = (t.sy ?? 1) * (t.fy ? -1 : 1);
+  const a = (turnOf(t) * Math.PI) / 180;
+  const cos = clean(Math.cos(a));
+  const sin = clean(Math.sin(a));
+  return pts.map(([x, y]) => {
+    const dx = (x - cx) * sx;
+    const dy = (y - cy) * sy;
+    return /** @type {Pt} */ ([clean(cx + dx * cos - dy * sin), clean(cy + dx * sin + dy * cos)]);
+  });
+}
+
+/** The centre of points' box. @param {Pt[]} pts @returns {Pt} */
+function centreOf(pts) {
+  const [x0, y0, x1, y1] = /** @type {[number, number, number, number]} */ (bboxOf(pts));
+  return [(x0 + x1) / 2, (y0 + y1) / 2];
+}
+
+/**
+ * A box (block or pillar) as a hazard, turned: by a right angle it is still a box (its
+ * corners in order from the top left, a solid to ride); by any other angle it is tilted.
+ * @param {'block' | 'pillar'} type @param {Pt[]} box @param {'up' | 'down' | 'none'} dir @param {Transform} t
+ * @returns {PolyHazard}
+ */
+function boxHazard(type, box, dir, t) {
+  if (!hasTransform(t)) return { type, shape: 'poly', pts: box, vis: box, dir, bbox: bboxOf(box) };
+  const [cx, cy] = centreOf(box);
+  const pts = transformPts(box, cx, cy, t);
+  if (isRightTurn(t)) {
+    const [x0, y0, x1, y1] = /** @type {[number, number, number, number]} */ (bboxOf(pts));
+    const out = rect(x0, y0, x1, y1);
+    return { type, shape: 'poly', pts: out, vis: out, dir, bbox: [x0, y0, x1, y1], ...(t.rot ? { rot: turnOf(t) } : {}) };
+  }
+  return { type, shape: 'poly', pts, vis: pts, dir, bbox: bboxOf(pts), tilted: true, rot: turnOf(t) };
+}
+
 /**
  * @param {SpikeData} data @param {Pt[]} ceil @param {Pt[]} floor
  * @returns {PolyHazard[]}
@@ -226,7 +301,13 @@ function resolveSpikes(data, ceil, floor) {
     const tri = spikeTriangles(x, y, dir, half);
     out.push({ type: data.type, shape: 'poly', pts: tri.pts, vis: tri.vis, dir, bbox: bboxOf(tri.vis) });
   }
-  return out;
+  if (!hasTransform(data) || !out.length) return out;
+  // A row turns, mirrors and scales as one, about its centre; each hit triangle with its drawing.
+  const [cx, cy] = centreOf(out.flatMap((h) => h.vis));
+  return out.map((h) => {
+    const vis = transformPts(h.vis, cx, cy, data);
+    return { ...h, vis, pts: transformPts(h.pts, cx, cy, data), bbox: bboxOf(vis) };
+  });
 }
 
 /**
@@ -236,22 +317,38 @@ function resolveSpikes(data, ceil, floor) {
 function resolveHazard(data, ceil, floor) {
   if (data.type === 'ring' || data.type === 'pad' || data.type === 'speed' || data.type === 'portal' || data.type === 'dark' || data.type === 'invert') return [];
   if (data.type === 'spike' || data.type === 'halfSpike') return resolveSpikes(data, ceil, floor);
-  if (data.type === 'block') {
-    const pts = rect(data.x, data.y, data.x + data.w, data.y + data.h);
-    return [{ type: 'block', shape: 'poly', pts, vis: pts, dir: 'none', bbox: bboxOf(pts) }];
-  }
+  if (data.type === 'block') return [boxHazard('block', rect(data.x, data.y, data.x + data.w, data.y + data.h), 'none', data)];
   if (data.type === 'pillar') {
     const w = data.w ?? 1;
+    const dir = data.on === 'floor' ? 'up' : 'down';
+    if (data.y !== undefined) return [boxHazard('pillar', rect(data.x, data.y, data.x + w, data.y + data.h), dir, data)];
     const base = data.on === 'floor' ? profileY(floor, data.x + w / 2, 'floor') : profileY(ceil, data.x + w / 2, 'ceil');
     const pts = data.on === 'floor' ? rect(data.x, base - data.h, data.x + w, base) : rect(data.x, base, data.x + w, base + data.h);
-    return [{ type: 'pillar', shape: 'poly', pts, vis: pts, dir: data.on === 'floor' ? 'up' : 'down', bbox: bboxOf(pts) }];
+    return [boxHazard('pillar', pts, dir, data)];
   }
   if (data.type !== 'saw' && data.type !== 'orb' && data.type !== 'mine') throw new Error('unknown hazard');
-  const hit = data.r * ROUND_HIT[data.type];
+  const r = data.r * Math.max(data.sx ?? 1, data.sy ?? 1);
+  const hit = r * ROUND_HIT[data.type];
   const mx = Math.abs(data.move?.dx ?? 0);
   const my = Math.abs(data.move?.dy ?? 0);
-  return [{ type: data.type, shape: 'circle', x: data.x, y: data.y, r: data.r, hit, bbox: [data.x - data.r - mx, data.y - data.r - my, data.x + data.r + mx, data.y + data.r + my], chain: data.chain === true, ...(data.move ? { move: data.move } : {}) }];
+  return [{ type: data.type, shape: 'circle', x: data.x, y: data.y, r, hit, bbox: [data.x - r - mx, data.y - r - my, data.x + r + mx, data.y + r + my], chain: data.chain === true, ...(data.move ? { move: data.move } : {}), ...(data.rot ? { rot: turnOf(data) } : {}) }];
 }
+
+/**
+ * A portal's gate, if it has one (stage r-4): from y0 to y1.
+ * @param {{ y?: number, sy?: number }} data
+ */
+function gateOf(data) {
+  if (data.y === undefined) return {};
+  const half = (GATE * (data.sy ?? 1)) / 2;
+  return { y0: data.y - half, y1: data.y + half };
+}
+
+/** Is a pad turned upside down (stage r-4)? @param {{ fy?: boolean, rot?: number }} data */
+const padTurned = (data) => {
+  const turn = turnOf(data);
+  return (data.fy === true) !== (turn > 90 && turn < 270);
+};
 
 /**
  * An orb or a pad placed (a pad on its surface), or nothing for any other item.
@@ -259,11 +356,15 @@ function resolveHazard(data, ceil, floor) {
  * @returns {Booster[]}
  */
 function resolveBooster(data, ceil, floor) {
-  if (data.type === 'ring') return [{ type: 'ring', kind: data.kind, x: data.x, y: data.y, dir: 'none' }];
+  if (data.type === 'ring') {
+    const scale = Math.max(data.sx ?? 1, data.sy ?? 1);
+    return [{ type: 'ring', kind: data.kind, x: data.x, y: data.y, dir: 'none', ...(scale !== 1 ? { scale } : {}) }];
+  }
   if (data.type !== 'pad') return [];
   const x = data.x + 0.5;
   const y = data.y ?? (data.on === 'floor' ? profileY(floor, x, 'floor') : profileY(ceil, x, 'ceil'));
-  return [{ type: 'pad', kind: data.kind, x, y, dir: data.on === 'floor' ? 'up' : 'down' }];
+  const up = (data.on === 'floor') !== padTurned(data);
+  return [{ type: 'pad', kind: data.kind, x, y, dir: up ? 'up' : 'down' }];
 }
 
 /**
@@ -307,7 +408,7 @@ export function buildGeometry(data) {
   const invert = [];
   for (const h of data.hazards) {
     if (h.type === 'speed') speeds.push({ x: h.x, k: h.k });
-    if (h.type === 'portal') portals.push({ x: h.x, kind: h.kind });
+    if (h.type === 'portal') portals.push({ x: h.x, kind: h.kind, ...gateOf(h) });
     if (h.type === 'dark') dark.push({ from: h.from, to: h.to });
     if (h.type === 'invert') invert.push({ from: h.from, to: h.to });
   }

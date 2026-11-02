@@ -20,7 +20,8 @@ import { portalColor } from './render/sprites.js';
 import { easeAngle, targetAngle } from './render/turn.js';
 import { computeView } from './render/view.js';
 import { createRng, parseSwitches } from './rng.js';
-import { readPlay } from './editor/play.js';
+import { readPlay, verifiedWord } from './editor/play.js';
+import { writeJson } from './records.js';
 import { isUnlocked, resolveSkin } from './skins.js';
 
 /**
@@ -61,6 +62,7 @@ export const APP_TEXT_KEYS = [
   'attempt', 'result', 'tapRespawn', 'tapRestart', 'finaleResult', 'finaleDoneTitle', 'finishedTitle', 'finaleDoneBody',
   'finishedBody', 'achFinale', 'achDemon', 'achFinaleBody', 'achDemonBody', 'unlockSkin', 'unlockFinale', 'gravityFlip',
   'gravityBack', 'shipOn', 'waveOn', 'finaleName', 'selected', 'locked', 'checkpoint', 'tapSector', 'editor', 'editorLevel', 'editorBack',
+  'editorVerify', 'editorDoneTitle', 'editorDoneBody', 'verifyDoneTitle', 'verifyDoneBody',
 ];
 
 /**
@@ -161,7 +163,8 @@ export function runApp(def) {
 
   /** @typedef {'menu' | 'skins' | 'ready' | 'playing' | 'dead' | 'finished' | 'achievement' | 'paused'} Screen */
 
-  // The level editor's test play (stage r-3).
+  // The level editor's test play (stage r-3) or its verification (stage r-4). Neither
+  // counts attempts, keeps records or gives achievements.
   const custom = def.palette && def.buildCustom ? readPlay(def.palette, search, def.records.KEYS.editorPlay) : null;
   const customRules = custom && def.buildCustom ? { ...def.rules, buildFinale: () => /** @type {NonNullable<typeof def.buildCustom>} */ (def.buildCustom)(custom.level) } : null;
 
@@ -228,11 +231,15 @@ export function runApp(def) {
 
   /** @param {'normal' | 'practice'} mode @param {'run' | 'finale'} [level] */
   function startGame(mode, level = 'run') {
-    if (customRules) {
-      // The editor's level: practice (a checkpoint every section, no records), from where the editor said.
-      state.game = createGame(customRules, { rng: gameRng, mode: 'practice', level: 'finale', checkpointBy: 'section', jump: custom && custom.from > 1 ? { sector: 1, section: custom.from } : null });
+    if (customRules && custom) {
+      // The editor's level: a test in practice (a checkpoint every section) from where the
+      // editor said, or the verification: normal mode from the start, no checkpoint (the
+      // custom sector keeps none), a crash starts it over.
+      state.game = custom.verify
+        ? createGame(customRules, { rng: gameRng, mode: 'normal', level: 'finale' })
+        : createGame(customRules, { rng: gameRng, mode: 'practice', level: 'finale', checkpointBy: 'section', jump: custom.from > 1 ? { sector: 1, section: custom.from } : null });
       state.newBest = false;
-      dom.stage.classList.add('is-practice');
+      dom.stage.classList.toggle('is-practice', !custom.verify);
       input.pressedAt = null;
       updateHud();
       show('ready');
@@ -423,7 +430,7 @@ export function runApp(def) {
     for (const event of events) {
       if (event === 'start' || event === 'restart') {
         visual.angle = null;
-        records.countAttempt(storage);
+        if (!customRules) records.countAttempt(storage);
         state.newBest = false;
         show('playing');
       }
@@ -450,7 +457,7 @@ export function runApp(def) {
     fx.deathAt = clock.time;
     if (!reduced()) spawnBurst(particles, game.wave.x, game.wave.y, [state.skin.body, state.skin.accent, state.skin.trail], effectRng);
     const result = game.result ?? resultOf(game);
-    if (keepsRecords(game)) state.newBest = records.saveBest(storage, result).isNew;
+    if (keepsRecords(game) && !customRules) state.newBest = records.saveBest(storage, result).isNew;
     dom.deadResult.textContent = t('result', result);
     dom.deadHint.textContent = t(game.mode === 'practice' ? 'tapRespawn' : game.sectorStart !== null ? 'tapSector' : 'tapRestart');
     dom.stage.classList.toggle('is-new-best', state.newBest);
@@ -461,6 +468,24 @@ export function runApp(def) {
     const game = state.game;
     const finale = game.level === 'finale';
     const result = game.result ?? resultOf(game);
+    if (custom) {
+      // The editor's level: a verification passed leaves word for the editor.
+      const verified = custom.verify && game.mode === 'normal' && !game.jumped;
+      if (verified) {
+        try {
+          writeJson(sessionStorage, records.KEYS.editorVerified, verifiedWord(custom.level));
+        } catch {
+          // No session storage: the editor cannot hear of it (the level stays unverified).
+        }
+      }
+      dom.finishedResult.textContent = t('editorLevel');
+      dom.finishedTitle.textContent = t(verified ? 'verifyDoneTitle' : 'editorDoneTitle');
+      dom.finishedBody.textContent = t(verified ? 'verifyDoneBody' : 'editorDoneBody');
+      dom.stage.classList.remove('is-new-best');
+      document.body.dataset.verified = String(verified);
+      show('finished');
+      return;
+    }
     if (keepsRecords(game)) state.newBest = records.saveBest(storage, result, finale ? records.KEYS.finaleBest : records.KEYS.best).isNew;
     dom.finishedResult.textContent = finale ? t('finaleResult') : t('result', result);
     dom.finishedTitle.textContent = t(finale ? 'finaleDoneTitle' : 'finishedTitle');
@@ -508,7 +533,7 @@ export function runApp(def) {
    * @param {Game} game
    */
   function bandName(game) {
-    if (game.level === 'finale') return t(customRules ? 'editorLevel' : 'finaleName');
+    if (game.level === 'finale') return t(custom?.verify ? 'editorVerify' : customRules ? 'editorLevel' : 'finaleName');
     const piece = pieceAt(game.run, game.wave.x);
     const sector = game.run.sectors[piece.sector];
     const band = piece.band >= 0 ? sector?.def.bands?.[piece.band] : null;
@@ -520,7 +545,7 @@ export function runApp(def) {
     const where = game.where;
     const sector = game.run.sectors[where.sector - 1];
     const band = bandName(game);
-    const label = game.level === 'finale' ? t(customRules ? 'editorLevel' : 'finaleName') : t('sectorLabel', { n: where.sector, name: band ?? sectorName(where.sector) });
+    const label = game.level === 'finale' ? t(custom?.verify ? 'editorVerify' : customRules ? 'editorLevel' : 'finaleName') : t('sectorLabel', { n: where.sector, name: band ?? sectorName(where.sector) });
     dom.hudSector.textContent = `${label} · ${t('sectionLabel', { section: where.section, count: sector ? sector.count : 0 })}`;
     dom.hudAttempt.textContent = t('attempt', { n: game.attempt });
   }

@@ -40,9 +40,11 @@ export function boostOf(type, kind, gravity, mini) {
  * @returns {PlacedBooster | null}
  */
 export function ringAt(world, x, y, mini, spent, shrink = 0) {
-  const reach = (mini ? RING_REACH.mini : RING_REACH.normal) - shrink;
+  const base = mini ? RING_REACH.mini : RING_REACH.normal;
   for (const b of world.boosters(x)) {
     if (b.type !== 'ring' || b.id === spent) continue;
+    // A scaled orb (stage r-4) reaches as far as it is drawn.
+    const reach = base * (b.scale ?? 1) - shrink;
     if ((b.x - x) ** 2 + (b.y - y) ** 2 <= reach * reach) return b;
   }
   return null;

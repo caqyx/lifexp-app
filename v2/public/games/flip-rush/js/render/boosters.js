@@ -175,7 +175,7 @@ export function drawPieceBoosters(ctx, s, piece, camX) {
     const x = screenX(v, camX, piece.x0 + b.x);
     if (x < -v.cell * 2 || x > v.width + v.cell * 2) return;
     const y = screenY(v, b.y);
-    if (b.type === 'ring') drawRing(ctx, b.kind, x, y, v.cell, pulse, s.wave.spentRing === id);
+    if (b.type === 'ring') drawRing(ctx, b.kind, x, y, v.cell * (b.scale ?? 1), pulse, s.wave.spentRing === id);
     else drawPad(ctx, b.kind, x, y, b.dir === 'up' ? 1 : -1, v.cell, pulse, s.wave.spentPad === id);
   });
 }

@@ -1,7 +1,8 @@
-/* The Rush level editor (docs/v2/PLAN.md 9.1, stage r-3): the games' tokens (shell.css is
-   loaded first); a bar of actions on top, the board in the middle, the section's settings
-   and the tools below, panels over the board. Works held upright on a phone: the bars
-   wrap and the tools scroll sideways. */
+/* The Rush level editor (docs/v2/PLAN.md 9.1, stages r-3 and r-4): the games' tokens
+   (shell.css is loaded first); a bar of actions on top, the section's settings, the board
+   in the middle, the selection's inspector (when something is selected) and the tools
+   below, panels over the board. Works held upright on a phone: each bar is one row that
+   scrolls sideways. */
 
 body.ed-page {
   display: flex;
@@ -12,6 +13,7 @@ body.ed-page {
 
 .ed-bar,
 .ed-sectionbar,
+.ed-inspector,
 .ed-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -22,14 +24,52 @@ body.ed-page {
   border-bottom: 1px solid var(--color-border);
 }
 
-.ed-toolbar {
+.ed-toolbar,
+.ed-inspector {
   border-top: 1px solid var(--color-border);
   border-bottom: 0;
+}
+
+/* Bars and fields set their own display: hidden has to win. */
+.ed-page [hidden] {
+  display: none !important;
+}
+
+.ed-num {
+  width: 5.2em;
+}
+
+.ed-field input.ed-num:disabled,
+.ed-field select:disabled {
+  opacity: 0.45;
+}
+
+/* The verification, said in words (and colour): verified or not. */
+.ed-badge {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+}
+
+.ed-badge.is-verified {
+  border-color: #8cf2b4;
+  color: #8cf2b4;
+}
+
+.ed-button[aria-pressed='true'] {
+  outline: 2px solid var(--color-accent);
 }
 
 /* Each bar is one row that scrolls sideways (a phone held upright keeps the board tall). */
 .ed-bar,
 .ed-sectionbar,
+.ed-inspector,
 .ed-toolbar {
   flex: 0 0 auto;
   flex-wrap: nowrap;
@@ -207,14 +247,6 @@ body.ed-page {
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
-}
-
-.ed-check-fail {
-  color: #ff8a8a;
-}
-
-.ed-check-ok {
-  color: #8cf2b4;
 }
 
 .ed-toast {

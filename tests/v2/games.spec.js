@@ -1545,7 +1545,7 @@ test.describe('Sector checkpoints in normal play', () => {
   }
 });
 
-// ── The Rush level editor (stage r-3) ──
+// ── The Rush level editor (stages r-3 and r-4) ──
 
 /** The frame's page once it is at a path ending so. */
 async function frameAt(page, ending) {
@@ -1553,75 +1553,136 @@ async function frameAt(page, ending) {
   return page.frames().find((f) => f.url().split('?')[0].endsWith(ending));
 }
 
-/** Taps the editor's board at a world place (cells) of the shown section. */
+/** A world place (cells) on the editor's board, in the page's pixels (camera at its start). */
+async function boardPoint(editor, x, y) {
+  const box = await editor.locator('#ed-canvas').boundingBox();
+  // The board's mapping (editor.js): cell = height/15 × zoom, camera x −2, y 6 in the middle.
+  const cell = box.height / 15;
+  return { x: box.x + (x + 2) * cell, y: box.y + box.height / 2 + (y - 6) * cell, cell };
+}
+
+/** Taps the editor's board at a world place (cells). */
 async function tapBoard(editor, x, y) {
   const canvas = editor.locator('#ed-canvas');
   const box = await canvas.boundingBox();
-  // The board's mapping (editor.js): cell = height/15 × zoom, camera x −2, y 6 in the middle.
   const cell = box.height / 15;
   await canvas.click({ position: { x: (x + 2) * cell, y: box.height / 2 + (y - 6) * cell } });
 }
 
+/** Drags on the board from one world place to another (a mouse; pointer events either way). */
+async function dragBoard(page, editor, from, to) {
+  const a = await boardPoint(editor, from[0], from[1]);
+  const b = await boardPoint(editor, to[0], to[1]);
+  await page.mouse.move(a.x, a.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 8; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / 8, a.y + ((b.y - a.y) * i) / 8);
+  await page.mouse.up();
+}
+
+/** The level as the editor exports it. */
+async function exported(editor) {
+  await editor.getByRole('button', { name: 'Eksport' }).click();
+  const level = JSON.parse(await editor.locator('#ed-export-text').inputValue());
+  await editor.locator('#ed-export').getByRole('button', { name: 'Zamknij' }).click();
+  return level;
+}
+
 test.describe('Rush level editor', () => {
-  test('Flip Rush, sideways: place items, undo and redo, check, export and import back, test-play and return', async ({ page, account }) => {
+  test('Flip Rush, sideways: a floating block, turned, mirrored, scaled and dragged; box select, duplicate, delete; export and import back; test-play', async ({ page, account }) => {
     test.setTimeout(150000);
     await page.setViewportSize({ width: 1000, height: 600 });
     const problems = await watchProblems(page);
-    const { host, game } = await playFromList(page, account, 'Flip Rush');
+    const { game } = await playFromList(page, account, 'Flip Rush');
     await game.getByRole('button', { name: 'Edytor poziomów' }).click();
     const editor = await frameAt(page, '/flip-rush/editor.html');
     await expect(editor.getByRole('heading', { name: /Edytor poziomów/ })).toBeVisible();
     const body = editor.locator('body');
     await expect(body).toHaveAttribute('data-items', '0');
+    // No checker any more: a person verifies.
+    await expect(editor.getByRole('button', { name: 'Sprawdź' })).toHaveCount(0);
+    await expect(editor.locator('#ed-verified')).toHaveText('Niezweryfikowany');
 
-    // A bed on the floor, a jump orb, a pad: three items.
-    await editor.getByRole('button', { name: 'Kolce' }).click();
-    await tapBoard(editor, 12.5, 9.2);
-    await editor.getByRole('button', { name: 'Orb', exact: true }).click();
-    await tapBoard(editor, 18, 7);
-    await editor.getByRole('button', { name: 'Pad', exact: true }).click();
-    await tapBoard(editor, 8.5, 9.5);
-    await expect(body).toHaveAttribute('data-items', '3');
+    // A block (2 × 1) in the air, at the height tapped (on the grid), selected once placed.
+    await editor.getByRole('button', { name: 'Blok', exact: true }).click();
+    await tapBoard(editor, 12, 4.4);
+    await expect(body).toHaveAttribute('data-items', '1');
+    await expect(body).toHaveAttribute('data-selected', '1');
+    let level = await exported(editor);
+    expect(level).toMatchObject({ version: 2, verified: false });
+    expect(level.sections[0].hazards).toEqual([{ type: 'block', x: 11, y: 4, w: 2, h: 1 }]);
+
+    // Turned, mirrored and scaled from the selection bar.
+    await editor.getByRole('button', { name: '+90°' }).click();
+    await editor.getByRole('button', { name: 'Odbij ↕' }).click();
+    await editor.locator('#ed-axes').check();
+    await editor.locator('#ed-sx').fill('2');
+    await editor.locator('#ed-sx').press('Enter');
+    await editor.locator('#ed-sy').fill('0.5');
+    await editor.locator('#ed-sy').press('Enter');
+    level = await exported(editor);
+    expect(level.sections[0].hazards).toEqual([{ type: 'block', x: 11, y: 4, w: 2, h: 1, rot: 90, fy: true, sx: 2, sy: 0.5 }]);
+    await editor.locator('#ed-rot').fill('45');
+    await editor.locator('#ed-rot').press('Enter');
+    level = await exported(editor);
+    expect(level.sections[0].hazards[0].rot).toBe(45);
+
+    // Dragged with the select tool: 3 cells on, 2 down (snapped to whole cells).
+    await editor.getByRole('button', { name: 'Zaznacz', exact: true }).click();
+    await dragBoard(page, editor, [12, 4.5], [15.1, 6.4]);
+    level = await exported(editor);
+    expect(level.sections[0].hazards[0]).toMatchObject({ type: 'block', x: 14, y: 6 });
+    // Undo takes the whole drag back in one step; redo brings it.
     await editor.getByRole('button', { name: 'Cofnij' }).click();
-    await expect(body).toHaveAttribute('data-items', '2');
+    expect((await exported(editor)).sections[0].hazards[0]).toMatchObject({ x: 11, y: 4 });
     await editor.getByRole('button', { name: 'Ponów' }).click();
-    await expect(body).toHaveAttribute('data-items', '3');
-    await editor.getByRole('button', { name: 'Gumka' }).click();
-    await tapBoard(editor, 18, 7);
-    await expect(body).toHaveAttribute('data-items', '2');
+    // Arrow keys nudge the selection.
+    await page.keyboard.press('ArrowLeft');
+    expect((await exported(editor)).sections[0].hazards[0]).toMatchObject({ x: 13, y: 6 });
 
-    // The game's validator on it.
-    await editor.getByRole('button', { name: 'Sprawdź' }).click();
-    await expect(editor.locator('#ed-check')).toHaveAttribute('data-result', /ok|fail/, { timeout: 60000 });
-    await expect(editor.locator('#ed-check-list')).toContainText('Sekcja 1');
-    await editor.locator('#ed-check').getByRole('button', { name: 'Zamknij' }).click();
+    // A floating row of spikes; then a box round both, duplicated, and the copies deleted.
+    await editor.getByRole('button', { name: 'Kolce' }).click();
+    await tapBoard(editor, 8, 7.2);
+    await expect(body).toHaveAttribute('data-items', '2');
+    await editor.getByRole('button', { name: 'Obszar' }).click();
+    await dragBoard(page, editor, [5, 2.5], [17, 9.5]);
+    await expect(body).toHaveAttribute('data-selected', '2');
+    await editor.getByRole('button', { name: 'Powiel', exact: true }).last().click();
+    await expect(body).toHaveAttribute('data-items', '4');
+    await expect(body).toHaveAttribute('data-selected', '2');
+    await editor.getByRole('button', { name: 'Usuń', exact: true }).click();
+    await expect(body).toHaveAttribute('data-items', '2');
+    level = await exported(editor);
+    expect(level.sections[0].hazards).toEqual(expect.arrayContaining([{ type: 'spike', x: 7, y: 7, dir: 'up', count: 2 }]));
 
     // Export, then import the text back under another name: the same level.
     await editor.locator('#ed-name').fill('Moja próba');
     await editor.locator('#ed-name').press('Enter');
     await editor.locator('#ed-name').blur();
-    await editor.getByRole('button', { name: 'Eksport' }).click();
-    const text = await editor.locator('#ed-export-text').inputValue();
-    const exported = JSON.parse(text);
-    expect(exported).toMatchObject({ format: 'LifeXP Rush level', version: 1, game: 'flip-rush', name: 'Moja próba' });
-    expect(exported.sections[0].hazards).toHaveLength(2);
-    await editor.locator('#ed-export').getByRole('button', { name: 'Zamknij' }).click();
+    const text = JSON.stringify(await exported(editor));
+    const out = JSON.parse(text);
+    expect(out).toMatchObject({ format: 'LifeXP Rush level', version: 2, game: 'flip-rush', name: 'Moja próba', verified: false });
     await editor.getByRole('button', { name: 'Import' }).click();
     // A broken file first: every problem is named.
-    await editor.locator('#ed-import-text').fill(JSON.stringify({ ...exported, game: 'ship-rush', tier: 'warp' }));
+    await editor.locator('#ed-import-text').fill(JSON.stringify({ ...out, game: 'ship-rush', tier: 'warp' }));
     await editor.getByRole('button', { name: 'Wczytaj', exact: true }).click();
     await expect(editor.locator('#ed-import-errors')).toContainText('game: to poziom z innej gry');
     await expect(editor.locator('#ed-import-errors')).toContainText('tier: nieznana trudność');
-    await editor.locator('#ed-import-text').fill(JSON.stringify({ ...exported, name: 'Z importu' }));
+    await editor.locator('#ed-import-text').fill(JSON.stringify({ ...out, name: 'Z importu' }));
     await editor.getByRole('button', { name: 'Wczytaj', exact: true }).click();
     await expect(editor.locator('#ed-name')).toHaveValue('Z importu');
-    await expect(body).toHaveAttribute('data-items', '2');
+    expect((await exported(editor)).sections).toEqual(out.sections);
+    // A version 1 file (stage r-3) still loads.
+    await editor.getByRole('button', { name: 'Import' }).click();
+    await editor.locator('#ed-import-text').fill(JSON.stringify({ ...out, version: 1, verified: undefined, name: 'Stary', sections: [{ length: 30, ceil: '2 r30', floor: '10 r30', mode: 'ball', hazards: [{ type: 'spike', x: 8, on: 'floor', count: 3 }] }] }));
+    await editor.getByRole('button', { name: 'Wczytaj', exact: true }).click();
+    await expect(editor.locator('#ed-name')).toHaveValue('Stary');
+    await expect(body).toHaveAttribute('data-items', '1');
 
     // A save in this browser, under the game's own key.
     await editor.getByRole('button', { name: 'Zapisy' }).click();
     await editor.locator('#ed-slot-list [data-slot="1"]').click();
     const slots = JSON.parse(await page.evaluate(() => localStorage.getItem('lifexp-fliprush-editor-slots')));
-    expect(JSON.parse(slots[0].level).name).toBe('Z importu');
+    expect(JSON.parse(slots[0].level).name).toBe('Stary');
     await editor.locator('#ed-slots').getByRole('button', { name: 'Zamknij' }).click();
 
     // Testuj: the game plays it in practice; back to the editor with the level kept.
@@ -1634,45 +1695,75 @@ test.describe('Rush level editor', () => {
     await expect(stage).toHaveAttribute('data-state', /playing|dead|finished/);
     await play.getByRole('button', { name: '← Edytor' }).click();
     const back = await frameAt(page, '/flip-rush/editor.html');
-    await expect(back.locator('#ed-name')).toHaveValue('Z importu');
-    await expect(back.locator('body')).toHaveAttribute('data-items', '2');
+    await expect(back.locator('#ed-name')).toHaveValue('Stary');
+    await expect(back.locator('body')).toHaveAttribute('data-items', '1');
+    // A test never verifies.
+    await expect(back.locator('#ed-verified')).toHaveText('Niezweryfikowany');
     expect(problems).toEqual([]);
   });
 
   test.describe('on a touch phone held upright', () => {
     test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
-    test('Ship Rush: load a whole official sector; a new level with a wall is found impassable and marked; tap to place', async ({ page, account }) => {
+    test('Ship Rush: the whole level in one view; a floating block nudged by buttons; verified by finishing it; any change unverifies', async ({ page, account }) => {
       test.setTimeout(120000);
       const problems = await watchProblems(page);
       const { game } = await playFromList(page, account, 'Ship Rush');
       await game.getByRole('button', { name: 'Edytor poziomów' }).tap();
       const editor = await frameAt(page, '/ship-rush/editor.html');
+      const body = editor.locator('body');
+      // A whole official sector: ten sections on one strip; the section bar follows the view.
       await editor.getByRole('button', { name: 'Wczytaj z gry' }).tap();
       await editor.locator('#ed-off-sector').selectOption('5');
       await editor.getByRole('button', { name: 'Cały sektor' }).tap();
       await expect(editor.locator('#ed-section')).toHaveText('Sekcja 1 z 10');
       await expect(editor.locator('#ed-tier')).toHaveValue('insane');
-      // A new level: a wall of two pillars, floor and ceiling meeting — no way through.
+      await editor.getByRole('button', { name: 'Następna' }).tap();
+      await expect(editor.locator('#ed-section')).toHaveText('Sekcja 2 z 10');
+      await expect(body).toHaveAttribute('data-all-items', /^[1-9]\d+$/);
+
+      // A new level: a block high up (out of the ship's way), nudged with the buttons.
       await editor.getByRole('button', { name: 'Nowy' }).tap();
       await expect(editor.locator('#ed-section')).toHaveText('Sekcja 1 z 1');
-      await editor.getByRole('button', { name: 'Filar' }).tap();
-      await editor.locator('#ed-options select').selectOption('4');
-      // (Held upright the board shows the first cells of the section: the wall goes at x 7.)
-      await tapBoard(editor, 7, 9);
-      await tapBoard(editor, 7, 3);
-      await expect(editor.locator('body')).toHaveAttribute('data-items', '2');
-      await editor.getByRole('button', { name: 'Sprawdź' }).tap();
-      await expect(editor.locator('#ed-check')).toHaveAttribute('data-result', 'fail', { timeout: 60000 });
-      await expect(editor.locator('#ed-check-status')).toHaveText('Nie przejdzie: 1');
-      await expect(editor.locator('#ed-check-list')).toContainText('Sekcja 1:');
-      // Undo the wall's second half: now it passes.
-      await editor.locator('#ed-check').getByRole('button', { name: 'Zamknij' }).tap();
-      await editor.getByRole('button', { name: 'Cofnij' }).tap();
-      await expect(editor.locator('body')).toHaveAttribute('data-items', '1');
-      await editor.getByRole('button', { name: 'Sprawdź' }).tap();
-      await expect(editor.locator('#ed-check')).toHaveAttribute('data-result', 'ok', { timeout: 60000 });
+      await editor.getByRole('button', { name: 'Blok', exact: true }).tap();
+      await tapBoard(editor, 5, 3.6);
+      await expect(body).toHaveAttribute('data-selected', '1');
+      await editor.getByRole('button', { name: 'W prawo' }).tap();
+      await editor.getByRole('button', { name: 'W górę' }).tap();
+      let level = await exported(editor);
+      expect(level.sections[0].hazards).toEqual([{ type: 'block', x: 5, y: 2, w: 2, h: 1 }]);
+
+      // Zweryfikuj: normal mode from the start, no checkpoints; finishing it verifies.
+      await editor.getByRole('button', { name: 'Zweryfikuj' }).tap();
+      const play = await frameAt(page, '/ship-rush/index.html');
+      const stage = play.locator('#stage');
+      await expect(stage).toHaveAttribute('data-state', 'ready');
+      await expect(play.locator('#hud-sector')).toContainText('Weryfikacja poziomu');
+      await expect(stage).not.toHaveClass(/is-practice/);
+      // The ship rests on the floor and rides to the end: nothing in the way.
+      await stage.tap();
+      await expect(stage).toHaveAttribute('data-state', 'finished', { timeout: 30000 });
+      await expect(play.getByText('Poziom zweryfikowany!')).toBeVisible();
+      await play.getByRole('button', { name: '← Edytor' }).tap();
+      const back = await frameAt(page, '/ship-rush/editor.html');
+      await expect(back.locator('#ed-verified')).toHaveText('Zweryfikowany');
+      await expect(back.locator('body')).toHaveAttribute('data-verified', 'true');
+      level = await exported(back);
+      expect(level.verified).toBe(true);
+      // Renaming keeps it; any change to the level takes it away.
+      await back.locator('#ed-name').fill('Gotowy');
+      await back.locator('#ed-name').blur();
+      await expect(back.locator('#ed-verified')).toHaveText('Zweryfikowany');
+      await back.getByRole('button', { name: 'Zaznacz', exact: true }).tap();
+      await tapBoard(back, 6.5, 2.5);
+      await expect(back.locator('body')).toHaveAttribute('data-selected', '1');
+      await back.getByRole('button', { name: 'W dół' }).tap();
+      await expect(back.locator('#ed-verified')).toHaveText('Niezweryfikowany');
+      expect((await exported(back)).verified).toBe(false);
+      // Verification counted no attempt and kept no record.
+      expect(await page.evaluate(() => [localStorage.getItem('lifexp-shiprush-attempts'), localStorage.getItem('lifexp-shiprush-finale-best')])).toEqual([null, null]);
       expect(problems).toEqual([]);
     });
   });
 });
+

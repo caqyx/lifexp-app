@@ -23,7 +23,9 @@ import { sectionStyle } from './sectors.js';
  * @typedef {{ kind: 'gravity', boundary: number, on: boolean } | { kind: 'mini', place: number, on: boolean }} PortalSlot
  *   gravity: at a boundary (b = between places b and b+1); mini: inside its section's own joints.
  * @typedef {'gravity' | 'mini' | 'ship' | 'flip' | 'speed'} PortalKind
- * @typedef {{ x: number, kind: PortalKind, on: boolean, sector: number, mode?: VehicleMode, speed?: import('./geometry.js').SpeedKind }} Portal
+ * @typedef {{ x: number, kind: PortalKind, on: boolean, sector: number, mode?: VehicleMode, speed?: import('./geometry.js').SpeedKind, y0?: number, y1?: number }} Portal
+ *   y0..y1 (stage r-4): a gate — only a vehicle between them passes it (a practice
+ *   respawn after it counts it as passed).
  *   'flip' (stage r-2, inside a section) turns gravity over whichever way it is; 'speed'
  *   marks a speed portal (the speed itself comes from speedAt).
  *   A vehicle portal ('ship') says the vehicle after it in `mode` (and `on`: is it the ship).
@@ -202,8 +204,9 @@ function placeSector(def, s, x, into) {
     const piece = /** @type {Piece} */ (into.pieces[i]);
     for (const p of piece.g.portals) {
       const x = piece.x0 + p.x;
-      if (p.kind === 'flip') into.portals.push({ x, kind: 'flip', on: true, sector: s });
-      else into.portals.push({ x, kind: 'mini', on: p.kind === 'mini', sector: s });
+      const gate = p.y0 === undefined ? {} : { y0: p.y0, y1: p.y1 };
+      if (p.kind === 'flip') into.portals.push({ x, kind: 'flip', on: true, sector: s, ...gate });
+      else into.portals.push({ x, kind: 'mini', on: p.kind === 'mini', sector: s, ...gate });
     }
     for (const p of piece.g.speeds) into.portals.push({ x: piece.x0 + p.x, kind: 'speed', on: false, sector: s, speed: p.k });
   }

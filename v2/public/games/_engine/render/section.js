@@ -376,33 +376,49 @@ function paintBlock(ctx, h, th, m) {
   const g = ctx.createLinearGradient(0, m.Y(y0), 0, m.Y(y1));
   g.addColorStop(0, th.block.top);
   g.addColorStop(1, th.block.bottom);
+  // A pillar's capitals stand at its ends: across it upright, along it when turned a quarter (stage r-4).
+  const upright = !h.tilted && (h.rot ?? 0) % 180 === 0;
+  const lying = !h.tilted && (h.rot ?? 0) % 180 === 90;
   ctx.save();
   ctx.beginPath();
-  ctx.rect(m.X(x0), m.Y(y0), m.X(x1) - m.X(x0), m.Y(y1) - m.Y(y0));
+  if (h.tilted) h.vis.forEach(([x, y], i) => (i ? ctx.lineTo(m.X(x), m.Y(y)) : ctx.moveTo(m.X(x), m.Y(y))));
+  else ctx.rect(m.X(x0), m.Y(y0), m.X(x1) - m.X(x0), m.Y(y1) - m.Y(y0));
+  ctx.closePath();
   ctx.fillStyle = g;
   ctx.fill();
   ctx.clip();
   paintPattern(ctx, th, m, x0, y0, x1, y1);
-  if (h.type === 'pillar') {
+  if (h.type === 'pillar' && (upright || lying)) {
     ctx.strokeStyle = th.block.shade;
     ctx.lineWidth = Math.max(1, m.c * 0.08);
     ctx.beginPath();
-    for (let x = x0 + 0.33; x < x1 - 0.1; x += 0.33) {
-      ctx.moveTo(m.X(x), m.Y(y0 + 0.4));
-      ctx.lineTo(m.X(x), m.Y(y1 - 0.4));
+    if (upright) {
+      for (let x = x0 + 0.33; x < x1 - 0.1; x += 0.33) {
+        ctx.moveTo(m.X(x), m.Y(y0 + 0.4));
+        ctx.lineTo(m.X(x), m.Y(y1 - 0.4));
+      }
+    } else {
+      for (let y = y0 + 0.33; y < y1 - 0.1; y += 0.33) {
+        ctx.moveTo(m.X(x0 + 0.4), m.Y(y));
+        ctx.lineTo(m.X(x1 - 0.4), m.Y(y));
+      }
     }
     ctx.stroke();
   }
   ctx.restore();
-  const rect = /** @type {Pt[]} */ ([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]);
-  paintOutline(ctx, [rect], th.block, m, th.fx?.glow ?? 0);
-  if (h.type === 'pillar') {
+  const outline = h.tilted ? [...h.vis, /** @type {Pt} */ (h.vis[0])] : /** @type {Pt[]} */ ([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]);
+  paintOutline(ctx, [outline], th.block, m, th.fx?.glow ?? 0);
+  if (h.type === 'pillar' && (upright || lying)) {
     // Capital and base: slabs a little wider than the shaft.
+    /** @type {[number, number, number, number][]} */
+    const slabs = upright
+      ? [y0, y1 - 0.3].map((y) => [m.X(x0 - 0.12), m.Y(y), m.X(x1 + 0.12) - m.X(x0 - 0.12), m.c * 0.3])
+      : [x0, x1 - 0.3].map((x) => [m.X(x), m.Y(y0 - 0.12), m.c * 0.3, m.Y(y1 + 0.12) - m.Y(y0 - 0.12)]);
     ctx.fillStyle = th.block.rim;
-    for (const y of [y0, y1 - 0.3]) ctx.fillRect(m.X(x0 - 0.12), m.Y(y), m.X(x1 + 0.12) - m.X(x0 - 0.12), m.c * 0.3);
+    for (const r of slabs) ctx.fillRect(...r);
     ctx.strokeStyle = th.block.edge;
     ctx.lineWidth = Math.max(1, m.c * 0.06);
-    for (const y of [y0, y1 - 0.3]) ctx.strokeRect(m.X(x0 - 0.12), m.Y(y), m.X(x1 + 0.12) - m.X(x0 - 0.12), m.c * 0.3);
+    for (const r of slabs) ctx.strokeRect(...r);
   }
 }
 
@@ -426,14 +442,18 @@ function paintSpike(ctx, h, th, m) {
   }
   ctx.fillStyle = th.hazard.fill;
   ctx.fill(tri);
-  // Inner facet: a smaller triangle toward the base.
+  // Inner facet: a smaller triangle toward the base (along the spike's own axis, so a
+  // turned spike keeps it: stage r-4).
   const k = 0.55;
   const cx = (a[0] + b[0]) / 2;
+  const cy = (a[1] + b[1]) / 2;
+  const ux = tip[0] - cx;
+  const uy = tip[1] - cy;
   ctx.fillStyle = th.hazard.inner;
   ctx.beginPath();
-  ctx.moveTo(m.X(cx + (a[0] - cx) * k), m.Y(a[1] + (tip[1] - a[1]) * 0.08));
-  ctx.lineTo(m.X(tip[0]), m.Y(a[1] + (tip[1] - a[1]) * 0.72));
-  ctx.lineTo(m.X(cx + (b[0] - cx) * k), m.Y(a[1] + (tip[1] - a[1]) * 0.08));
+  ctx.moveTo(m.X(cx + (a[0] - cx) * k + ux * 0.08), m.Y(cy + (a[1] - cy) * k + uy * 0.08));
+  ctx.lineTo(m.X(cx + ux * 0.72), m.Y(cy + uy * 0.72));
+  ctx.lineTo(m.X(cx + (b[0] - cx) * k + ux * 0.08), m.Y(cy + (b[1] - cy) * k + uy * 0.08));
   ctx.closePath();
   ctx.fill();
   ctx.lineJoin = 'miter';
