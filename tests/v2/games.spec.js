@@ -73,18 +73,18 @@ async function openGame(page, account) {
 test.describe('on a phone', () => {
   test.use({ viewport: PHONE });
 
-  test('the list: seven games, each with a line, its time today and "Graj"', async ({ page, account }) => {
+  test('the list: five games (Rush one of them, with its modes inside), each with a line, its time today and "Graj"', async ({ page, account }) => {
     await openSignedIn(page, account, '#/today');
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.getByLabel('Nawigacja').getByRole('link', { name: 'Gry' }).click();
     await expect(page).toHaveURL(/#\/games$/);
 
     const cards = page.getByRole('list', { name: 'Gry' }).getByRole('listitem');
-    await expect(cards).toHaveCount(7);
-    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush', 'Ship Rush', 'Flip Rush']);
+    await expect(cards).toHaveCount(5);
+    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Rush']);
     for (const card of await cards.all()) await expect(card.getByText('Dziś jeszcze nie grano')).toBeVisible();
     // All are in (g-2, g-3, g-4, w-1, s-1, f-1): nothing is "Wkrótce" any more.
-    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Wave Rush', 'Ship Rush', 'Flip Rush']) {
+    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Rush']) {
       await expect(page.getByRole('link', { name: `Graj: ${name}` })).toBeVisible();
     }
     await expect(page.getByText('Wkrótce')).toHaveCount(0);
@@ -288,11 +288,35 @@ async function watchProblems(page) {
 
 async function playFromList(page, account, name) {
   await openSignedIn(page, account, '#/games');
-  await page.getByRole('link', { name: `Graj: ${name}` }).click();
-  const host = page.getByRole('region', { name });
+  // Wave, Ship and Flip Rush are modes of the game Rush (stage rr-a): its tile, then the mode.
+  const mode = RUSH_MODES[name];
+  const tile = mode ? 'Rush' : name;
+  await page.getByRole('link', { name: `Graj: ${tile}` }).click();
+  const host = page.getByRole('region', { name: tile });
   await hostMounted(host);
-  return { host, game: host.frameLocator('iframe') };
+  const game = host.frameLocator('iframe');
+  if (mode) {
+    await game.getByRole('button', { name: new RegExp(`^Graj: ${name}\\.`) }).click();
+    await expect.poll(() => page.frames().some((f) => f.url().split('?')[0].endsWith(`/${mode}/index.html`))).toBe(true);
+  }
+  return { host, game };
 }
+
+/**
+ * Reloads the app with a Rush mode on: the game opens on its picker again, so pick the
+ * same mode (its page).
+ */
+async function reloadRush(page, game) {
+  const mode = page.frames().map((f) => /\/(wave|ship|flip)-rush\/index\.html$/.exec(f.url().split('?')[0])).find(Boolean);
+  await page.reload();
+  if (!mode) return;
+  await game.locator(`.mode[data-mode="${mode[1]}"]`).click();
+  await expect(game.locator('#stage')).toHaveAttribute('data-state', 'menu');
+}
+
+/** Rush's modes and their pages (stage rr-a). */
+const RUSH_MODES = { 'Wave Rush': 'wave-rush', 'Ship Rush': 'ship-rush', 'Flip Rush': 'flip-rush' };
+
 
 async function endAndExpectSession(page, account, name) {
   await page.clock.fastForward('01:00');
@@ -467,7 +491,8 @@ async function seedFlappy(page, host, seed = 7) {
 /** Reopens the game's frame with test-only query switches added (e.g. "seed=5&round=10"). */
 async function reopenFrameWith(page, host, query) {
   await host.locator('iframe').evaluate((frame, q) => {
-    frame.src = `${frame.src}&${q}`;
+    const now = frame.contentWindow?.location.href ?? frame.src;
+    frame.src = `${now}&${q}`;
   }, query);
   await expect.poll(() => page.frames().some((f) => f.url().endsWith(query))).toBe(true);
   return page.frames().find((f) => f.url().endsWith(query));
@@ -757,7 +782,8 @@ async function recordStates(frame) {
  */
 async function openWaveWith(page, host, query) {
   await host.locator('iframe').evaluate((frame, q) => {
-    frame.src = `${frame.src.split('?')[0]}?lang=pl&${q}`;
+    const now = frame.contentWindow?.location.href ?? frame.src;
+    frame.src = `${now.split('?')[0]}?lang=pl&${q}`;
   }, query);
   await expect.poll(() => page.frames().some((f) => f.url().endsWith(`?lang=pl&${query}`))).toBe(true);
   return page.frames().find((f) => f.url().endsWith(`?lang=pl&${query}`));
@@ -771,6 +797,65 @@ async function flyFrom(game, button) {
   await stage.click();
   await expect(stage).toHaveAttribute('data-state', 'playing');
 }
+
+// ── Rush: one game, its modes picked on its first screen (stage rr-a) ──
+
+test.describe('Rush, the mode picker', () => {
+  test('each mode starts from the picker and comes back to it; progress kept by the separate games shows; Zakończ records the time as Rush', async ({ page, account }) => {
+    test.setTimeout(90000);
+    const problems = await watchProblems(page);
+    await page.clock.install();
+    // A player of the separate games: their records under the keys those games used.
+    await page.addInitScript(() => {
+      if (localStorage.getItem('lifexp-waverush-best')) return;
+      localStorage.setItem('lifexp-waverush-best', JSON.stringify({ sector: 4, section: 2, percent: 57 }));
+      localStorage.setItem('lifexp-shiprush-progress', JSON.stringify({ demonComplete: true, finaleComplete: false }));
+      localStorage.setItem('lifexp-fliprush-progress', JSON.stringify({ demonComplete: true, finaleComplete: true }));
+    });
+    await openSignedIn(page, account, '#/games');
+    await page.getByRole('link', { name: 'Graj: Rush' }).click();
+    const host = page.getByRole('region', { name: 'Rush' });
+    await hostMounted(host);
+    const game = host.frameLocator('iframe');
+    await expect(game.getByRole('heading', { name: 'Rush' })).toBeVisible();
+    const modes = game.locator('.mode');
+    await expect(modes).toHaveCount(3);
+    await expect(game.locator('[data-progress="wave"]')).toHaveText('Najlepiej: 57% · Finał zamknięty');
+    await expect(game.locator('[data-progress="ship"]')).toHaveText('Jeszcze bez rekordu · Finał otwarty');
+    await expect(game.locator('[data-progress="flip"]')).toHaveText('Jeszcze bez rekordu · Finał ukończony');
+
+    for (const [name, mode] of Object.entries(RUSH_MODES)) {
+      await game.getByRole('button', { name: new RegExp(`^Graj: ${name}\\.`) }).click();
+      await expect(game.getByRole('heading', { name })).toBeVisible();
+      await expect(game.locator('#stage')).toHaveAttribute('data-state', 'menu');
+      expect(page.frames().some((f) => f.url().split('?')[0].endsWith(`/${mode}/index.html`))).toBe(true);
+      // The mode's own progress, as before.
+      if (name === 'Wave Rush') await expect(game.locator('#menu-best')).toContainText('57%');
+      await game.getByRole('button', { name: '← Wszystkie tryby Rush' }).click();
+      await expect(game.getByRole('heading', { name: 'Rush' })).toBeVisible();
+    }
+    // The records stayed where they were.
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('lifexp-waverush-best') ?? 'null'))).toEqual({ sector: 4, section: 2, percent: 57 });
+    await endAndExpectSession(page, account, 'Rush');
+    expect(problems).toEqual([]);
+  });
+
+  test('an old link to Wave, Ship or Flip Rush opens Rush in that mode', async ({ page, account }) => {
+    const problems = await watchProblems(page);
+    for (const [name, mode] of Object.entries(RUSH_MODES)) {
+      await openSignedIn(page, account, `#/games/${mode}`);
+      const host = page.getByRole('region', { name: 'Rush' });
+      await hostMounted(host);
+      const game = host.frameLocator('iframe');
+      await expect(game.getByRole('heading', { name })).toBeVisible();
+      await expect(game.locator('#stage')).toHaveAttribute('data-state', 'menu');
+      // Back to all the modes from there.
+      await game.getByRole('button', { name: '← Wszystkie tryby Rush' }).click();
+      await expect(game.locator('.mode')).toHaveCount(3);
+    }
+    expect(problems).toEqual([]);
+  });
+});
 
 test.describe('Wave Rush', () => {
   test.describe('on a touch phone held upright', () => {
@@ -801,7 +886,7 @@ test.describe('Wave Rush', () => {
       await skins.getByRole('button', { name: /Turkus/ }).tap();
       await expect(skins.getByRole('button', { name: /Turkus/ })).toHaveAttribute('aria-pressed', 'true');
       expect(await page.evaluate(() => localStorage.getItem('lifexp-waverush-skin'))).toBe('"teal"');
-      await page.reload();
+      await reloadRush(page, game);
       await game.getByRole('button', { name: 'Skórki' }).tap();
       await expect(skins.getByRole('button', { name: /Turkus/ })).toHaveAttribute('aria-pressed', 'true');
       await game.getByRole('button', { name: 'Gotowe' }).tap();
@@ -829,7 +914,7 @@ test.describe('Wave Rush', () => {
       await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
       expect(await waveState(game)).toMatchObject({ sector: 1, section: 1 });
 
-      await endAndExpectSession(page, account, 'Wave Rush');
+      await endAndExpectSession(page, account, 'Rush');
       expect(problems).toEqual([]);
     });
   });
@@ -988,7 +1073,7 @@ test.describe('Wave Rush w-2', () => {
       await expect(crown).toBeEnabled();
       await crown.tap();
       await expect(crown).toHaveAttribute('aria-pressed', 'true');
-      await page.reload();
+      await reloadRush(page, game);
       await game.getByRole('button', { name: 'Skórki' }).tap();
       await expect(game.locator('#skin-list').getByRole('button', { name: /Korona Demona/ })).toHaveAttribute('aria-pressed', 'true');
       expect(problems).toEqual([]);
@@ -1026,7 +1111,7 @@ test.describe('Ship Rush', () => {
       await skins.getByRole('button', { name: /Manta/ }).tap();
       await expect(skins.getByRole('button', { name: /Manta/ })).toHaveAttribute('aria-pressed', 'true');
       expect(await page.evaluate(() => localStorage.getItem('lifexp-shiprush-skin'))).toBe('"manta"');
-      await page.reload();
+      await reloadRush(page, game);
       await game.getByRole('button', { name: 'Skórki' }).tap();
       await expect(skins.getByRole('button', { name: /Manta/ })).toHaveAttribute('aria-pressed', 'true');
       await game.getByRole('button', { name: 'Gotowe' }).tap();
@@ -1055,7 +1140,7 @@ test.describe('Ship Rush', () => {
       await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
       expect(await waveState(game)).toMatchObject({ sector: 1, section: 1 });
 
-      await endAndExpectSession(page, account, 'Ship Rush');
+      await endAndExpectSession(page, account, 'Rush');
       expect(problems).toEqual([]);
     });
   });
@@ -1171,7 +1256,7 @@ test.describe('Ship Rush s-2', () => {
       await expect(crown).toBeEnabled();
       await crown.tap();
       await expect(crown).toHaveAttribute('aria-pressed', 'true');
-      await page.reload();
+      await reloadRush(page, game);
       await game.getByRole('button', { name: 'Skórki' }).tap();
       await expect(game.locator('#skin-list').getByRole('button', { name: /Korona Pustki/ })).toHaveAttribute('aria-pressed', 'true');
       expect(problems).toEqual([]);
@@ -1233,7 +1318,7 @@ test.describe('Flip Rush', () => {
       await skins.getByRole('button', { name: /Iskra/ }).tap();
       await expect(skins.getByRole('button', { name: /Iskra/ })).toHaveAttribute('aria-pressed', 'true');
       expect(await page.evaluate(() => localStorage.getItem('lifexp-fliprush-skin'))).toBe('"spark"');
-      await page.reload();
+      await reloadRush(page, game);
       await game.getByRole('button', { name: 'Skórki' }).tap();
       await expect(skins.getByRole('button', { name: /Iskra/ })).toHaveAttribute('aria-pressed', 'true');
       await game.getByRole('button', { name: 'Gotowe' }).tap();
@@ -1265,7 +1350,7 @@ test.describe('Flip Rush', () => {
       await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
       expect(await waveState(game)).toMatchObject({ sector: 1, section: 1 });
 
-      await endAndExpectSession(page, account, 'Flip Rush');
+      await endAndExpectSession(page, account, 'Rush');
       expect(problems).toEqual([]);
     });
   });
@@ -1338,7 +1423,7 @@ test.describe('Flip Rush, a plain run', () => {
       let seed = 0;
       for (let k = 1; k <= 40 && !seed; k++) {
         const query = `lang=${lang}&seed=${k}`;
-        await host.locator('iframe').evaluate((frame, q) => { frame.src = `${frame.src.split('?')[0]}?${q}`; }, query);
+        await host.locator('iframe').evaluate((frame, q) => { frame.src = `${(frame.contentWindow?.location.href ?? frame.src).split('?')[0]}?${q}`; }, query);
         await expect.poll(() => page.frames().some((f) => f.url().endsWith(`?${query}`))).toBe(true);
         const frame = page.frames().find((f) => f.url().endsWith(`?${query}`));
         await expect(frame.locator('#stage')).toHaveAttribute('data-debug-order', /\d/);

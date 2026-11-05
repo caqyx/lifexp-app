@@ -62,7 +62,7 @@ export const APP_TEXT_KEYS = [
   'canvas', 'bestValue', 'bestNone', 'finaleLocked', 'finaleBest', 'finaleReady', 'sectorLabel', 'sectionLabel',
   'attempt', 'result', 'tapRespawn', 'tapRestart', 'finaleResult', 'finaleDoneTitle', 'finishedTitle', 'finaleDoneBody',
   'finishedBody', 'achFinale', 'achDemon', 'achFinaleBody', 'achDemonBody', 'unlockSkin', 'unlockFinale', 'gravityFlip',
-  'gravityBack', 'shipOn', 'waveOn', 'ballOn', 'spiderOn', 'finaleName', 'selected', 'locked', 'checkpoint', 'tapSector', 'editor', 'editorLevel', 'editorBack',
+  'gravityBack', 'shipOn', 'waveOn', 'ballOn', 'spiderOn', 'finaleName', 'selected', 'locked', 'checkpoint', 'tapSector', 'editor', 'editorLevel', 'editorBack', 'modes',
   'editorVerify', 'editorDoneTitle', 'editorDoneBody', 'verifyDoneTitle', 'verifyDoneBody',
 ];
 
@@ -399,6 +399,9 @@ export function runApp(def) {
       editorOpen.hidden = !def.palette;
       editorOpen.addEventListener('click', () => (location.href = `editor.html?lang=${def.lang}`));
     }
+    // Rush's mode picker (stage rr-a): every mode is one of the game Rush's modes.
+    const modesOpen = document.getElementById('modes-open');
+    if (modesOpen) modesOpen.addEventListener('click', () => (location.href = `../rush/index.html?lang=${def.lang}`));
     if (editorBack) {
       editorBack.hidden = !customRules;
       editorBack.addEventListener('click', () => (location.href = `editor.html?lang=${def.lang}`));

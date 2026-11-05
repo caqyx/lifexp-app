@@ -44,6 +44,11 @@ function GameCard({ game, minutes }: { game: GameDef; minutes: number | undefine
   );
 }
 
+/** Today's minutes of a game, under its name now and the names it had (Rush's modes). */
+function minutesOf(byGame: Map<string, number>, game: GameDef): number {
+  return [game.sessionName, ...(game.pastNames ?? [])].reduce((sum, name) => sum + (byGame.get(name) ?? 0), 0);
+}
+
 export function GamesList({ state }: { state: GamingDayState }) {
   const byGame = state.sessions && state.day ? minutesByGame(state.sessions, state.day) : undefined;
   return (
@@ -56,7 +61,7 @@ export function GamesList({ state }: { state: GamingDayState }) {
       )}
       <ul class="games-list" aria-label={t('nav.games')}>
         {GAMES.map((game) => (
-          <GameCard key={game.id} game={game} minutes={byGame ? (byGame.get(game.sessionName) ?? 0) : undefined} />
+          <GameCard key={game.id} game={game} minutes={byGame ? minutesOf(byGame, game) : undefined} />
         ))}
       </ul>
     </>

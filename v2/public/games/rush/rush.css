@@ -1,0 +1,105 @@
+/* The Rush mode picker (docs/v2/PLAN.md 9.1, stage rr-a): the game's first screen, on the
+   modes' own tokens (../_engine/shell.css). One card per mode, its vehicle drawn, its name,
+   what it is and how far the player got; two across when there is room, else one. The
+   page scrolls (a phone held upright fits the cards one under another). */
+
+body.picker-page {
+  overflow-y: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgb(95 86 242 / 22%), transparent 60%),
+    var(--color-bg);
+}
+
+.picker {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+
+.picker__head {
+  margin-bottom: 12px;
+}
+
+.picker__title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.picker__lead {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 15px;
+}
+
+.modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mode {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-exit) var(--ease-in);
+}
+
+.mode:hover {
+  background: rgb(40 42 58 / 92%);
+}
+
+.mode:active {
+  transform: scale(0.98);
+  transition: transform var(--duration-exit) var(--ease-in);
+}
+
+.mode:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.mode__art {
+  width: 96px;
+  height: 64px;
+  border-radius: 12px;
+  background: rgb(0 0 0 / 35%);
+}
+
+.mode__name {
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.mode__desc {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.mode__progress {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-accent-text);
+  font-size: 13px;
+  font-weight: 700;
+}
