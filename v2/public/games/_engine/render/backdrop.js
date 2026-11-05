@@ -24,8 +24,40 @@ export function hash(n) {
   return s - Math.floor(s);
 }
 
-/** @param {CanvasRenderingContext2D} ctx @param {View} v @param {{ sky: [string, string], haze: string }} th */
+/** Still paintings of a background (its sky), by what they show and the view's size. @type {Map<string, HTMLCanvasElement>} */
+const stills = new Map();
+
+/**
+ * Draws a still part of a background (one that never moves or changes: a sky's gradients
+ * and haze) from a painting made once (stage q-rush: a full-screen gradient filled every
+ * frame was the backgrounds' biggest cost; copying a painting is cheap).
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {string} key what it shows
+ * @param {(ctx: CanvasRenderingContext2D) => void} paint draws it in the view's pixels
+ */
+export function drawStill(ctx, v, key, paint) {
+  const id = `${key}@${v.width}x${v.height}@${v.top}`;
+  let canvas = stills.get(id);
+  if (!canvas) {
+    if (stills.size > 24) stills.clear();
+    canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(v.width));
+    canvas.height = Math.max(1, Math.round(v.height));
+    paint(/** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d')));
+    stills.set(id, canvas);
+  }
+  ctx.drawImage(canvas, 0, 0);
+}
+
+/**
+ * The sky's gradient and haze, from its still painting.
+ * @param {CanvasRenderingContext2D} ctx @param {View} v @param {{ id?: string, sky: [string, string], haze: string }} th
+ */
 export function drawSky(ctx, v, th) {
+  drawStill(ctx, v, `sky:${th.id ?? th.sky.join()}:${th.haze}`, (c) => paintSky(c, v, th));
+}
+
+/** @param {CanvasRenderingContext2D} ctx @param {View} v @param {{ sky: [string, string], haze: string }} th */
+function paintSky(ctx, v, th) {
   const g = ctx.createLinearGradient(0, 0, 0, v.height);
   g.addColorStop(0, th.sky[0]);
   g.addColorStop(1, th.sky[1]);

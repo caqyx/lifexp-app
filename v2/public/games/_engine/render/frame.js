@@ -9,7 +9,7 @@ import { JOINT } from '../world.js';
 import { keepsNormalCheckpoint } from '../sectors.js';
 import { pieceAt, pieceIndexAt } from '../level.js';
 import { movedAt, profileY } from '../geometry.js';
-import { paintPattern, paintSection, STRIP_BOTTOM, STRIP_TOP } from './section.js';
+import { PAD, paintPattern, paintSectionTile, sectionSize, STRIP_BOTTOM, STRIP_TOP } from './section.js';
 import { drawMine, drawOrb, drawPortal, drawSaw, drawTrail } from './sprites.js';
 import { screenX, screenY } from './view.js';
 
@@ -42,15 +42,30 @@ import { screenX, screenY } from './view.js';
  * }} Look
  *   drawVehicle: at (x, y) device px; trailWidth: in cells; drawPieceItems: what a game
  *   draws per frame in each visible piece over its painting (Flip Rush: orbs and pads).
- * @typedef {{ painted: Map<Piece, Painted>, key: string, run: Run | null, patterns: Map<string, CanvasPattern | null> }} Renderer
+ * @typedef {{ tiles: Map<number, HTMLCanvasElement>, width: number, height: number }} PaintedPiece
+ *   A piece's painting in slices TILE device pixels wide, painted as each comes near the
+ *   screen (stage q-rush), its whole size.
+ * @typedef {{ painted: Map<Piece, PaintedPiece>, key: string, run: Run | null, patterns: Map<string, CanvasPattern | null>,
+ *   backdrop: { canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, view: View } | null, layer: HTMLCanvasElement | null }} Renderer
+ *   backdrop: the background is drawn at half the resolution (stage q-rush: it is soft and
+ *   far, and drawing it at full size was by far the frame's biggest cost); layer: the page's
+ *   own canvas for it, under the game's, stretched by CSS (the browser scales it when it
+ *   composes the page, which costs next to nothing) — else it is scaled up onto the frame.
  */
+
+/** A section painting's slice width, in cells (rounded to whole device pixels). */
+const TILE_CELLS = 6;
+/** Slices painted ahead of the screen's right edge, in cells. */
+const PAINT_AHEAD = 3;
+/** The background's resolution, as a share of the screen's. */
+const BACKDROP_SCALE = 0.5;
 
 /** Cells the background takes to fade from one sector's theme to the next. */
 const FADE = 10;
 
 /** @returns {Renderer} */
 export function createRenderer() {
-  return { painted: new Map(), key: '', run: null, patterns: new Map() };
+  return { painted: new Map(), key: '', run: null, patterns: new Map(), backdrop: null, layer: null };
 }
 
 /**
@@ -62,6 +77,7 @@ function keepCacheFresh(r, s) {
   if (key !== r.key || s.run !== r.run) {
     r.painted.clear();
     r.patterns.clear();
+    r.backdrop = null;
     r.key = key;
     r.run = s.run;
   }
@@ -75,22 +91,41 @@ function visiblePieces(run, camX, v) {
   const out = [];
   for (let i = pieceIndexAt(run, camX - 1); i < run.pieces.length; i++) {
     const p = /** @type {Piece} */ (run.pieces[i]);
-    if (p.x0 > camX + v.cells + 1) break;
+    if (p.x0 > camX + v.cells + 1 + PAINT_AHEAD) break;
     if (p.x1 >= camX - 1) out.push(p);
   }
   return out;
 }
 
 /**
- * The background, cross-faded between two sectors near their boundary.
- * @param {CanvasRenderingContext2D} ctx @param {Scene} s @param {number} camX @param {Look} look
+ * The background's buffer at BACKDROP_SCALE of the screen, with its view.
+ * @param {Renderer} r @param {View} v
  */
-function drawBackdrop(ctx, s, camX, look) {
+function backdropOf(r, v) {
+  if (r.backdrop) return r.backdrop;
+  const canvas = r.layer ?? document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(v.width * BACKDROP_SCALE));
+  canvas.height = Math.max(1, Math.round(v.height * BACKDROP_SCALE));
+  const k = canvas.width / v.width;
+  const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
+  /** @type {View} */
+  const view = { ...v, width: canvas.width, height: canvas.height, cell: v.cell * k, top: v.top * k, lead: v.lead * k, ratio: v.ratio * k };
+  r.backdrop = { canvas, ctx, view };
+  return r.backdrop;
+}
+
+/**
+ * The background, cross-faded between two sectors near their boundary, drawn at half the
+ * resolution and scaled up to the screen.
+ * @param {CanvasRenderingContext2D} ctx @param {Renderer} r @param {Scene} s @param {number} camX @param {Look} look
+ */
+function drawBackdrop(ctx, r, s, camX, look) {
   const centre = camX + s.view.cells / 2;
   const clock = { time: s.time, pulse: s.reduced ? 0 : s.pulse, reduced: s.reduced };
   const i = pieceIndexAt(s.run, centre);
   const here = /** @type {Piece} */ (s.run.pieces[i]);
-  look.drawBackground(ctx, s.view, look.themeOf(here.theme), camX, clock);
+  const b = backdropOf(r, s.view);
+  look.drawBackground(b.ctx, b.view, look.themeOf(here.theme), camX, clock);
   // Half-way at a change of look (a sector or a Demon tier), fading over FADE cells.
   const before = s.run.pieces[i - 1];
   const after = s.run.pieces[i + 1];
@@ -101,30 +136,46 @@ function drawBackdrop(ctx, s, camX, look) {
         ? { theme: after.theme, d: after.x0 - centre }
         : null;
   if (neighbour) {
-    ctx.globalAlpha = Math.max(0, 0.5 - neighbour.d / FADE);
-    look.drawBackground(ctx, s.view, look.themeOf(neighbour.theme), camX, clock);
-    ctx.globalAlpha = 1;
+    b.ctx.globalAlpha = Math.max(0, 0.5 - neighbour.d / FADE);
+    look.drawBackground(b.ctx, b.view, look.themeOf(neighbour.theme), camX, clock);
+    b.ctx.globalAlpha = 1;
   }
+  if (!r.layer) ctx.drawImage(b.canvas, 0, 0, s.view.width, s.view.height);
 }
 
 /**
- * Copies the visible part of each piece's painted canvas.
+ * Copies the visible slices of each piece's painting, painting a slice the first time it
+ * comes within PAINT_AHEAD cells of the screen (a slice at a time, so no frame pays for a
+ * whole section). The painting is placed on whole device pixels, so the slices meet.
  * @param {CanvasRenderingContext2D} ctx @param {Renderer} r @param {Scene} s @param {Piece[]} pieces @param {number} camX @param {Look} look
  */
 function drawPieces(ctx, r, s, pieces, camX, look) {
   const v = s.view;
+  const tile = Math.max(1, Math.round(TILE_CELLS * v.cell));
+  const ahead = PAINT_AHEAD * v.cell;
+  let fresh = 0;
   for (const piece of pieces) {
     let painted = r.painted.get(piece);
     if (!painted) {
-      painted = paintSection(piece.g, look.themeOf(piece.theme), v);
+      painted = { tiles: new Map(), ...sectionSize(piece.g, v) };
       r.painted.set(piece, painted);
     }
-    const dx = screenX(v, camX, piece.x0 + painted.left);
-    const dy = screenY(v, painted.top);
-    const sx = Math.max(0, -dx);
-    const sw = Math.min(painted.canvas.width - sx, v.width - Math.max(0, dx));
-    if (sw <= 0) continue;
-    ctx.drawImage(painted.canvas, sx, 0, sw, painted.canvas.height, Math.max(0, dx), dy, sw, painted.canvas.height);
+    const dx = Math.round(screenX(v, camX, piece.x0 - PAD));
+    const dy = Math.round(screenY(v, STRIP_TOP));
+    const count = Math.ceil(painted.width / tile);
+    for (let k = 0; k < count; k++) {
+      const left = dx + k * tile;
+      if (left + tile < 0 || left > v.width + ahead) continue;
+      let canvas = painted.tiles.get(k);
+      if (!canvas) {
+        // On screen it must be there now; ahead of it, one new slice a frame at most.
+        if (left > v.width && fresh > 0) continue;
+        canvas = paintSectionTile(piece.g, look.themeOf(piece.theme), v, k * tile, Math.min(tile, painted.width - k * tile));
+        painted.tiles.set(k, canvas);
+        fresh += 1;
+      }
+      if (left <= v.width) ctx.drawImage(canvas, left, dy);
+    }
   }
   for (const piece of r.painted.keys()) if (!pieces.includes(piece)) r.painted.delete(piece);
 }
@@ -373,10 +424,12 @@ export function renderFrame(ctx, r, s, look) {
   keepCacheFresh(r, s);
   const v = s.view;
   const camX = s.wave.x - v.lead;
+  // With the background on its own layer, this frame starts clear (the layer shows through).
+  if (r.layer) ctx.clearRect(0, 0, v.width, v.height);
   ctx.save();
   ctx.translate(s.shake.x * v.cell, s.shake.y * v.cell);
   const pieces = visiblePieces(s.run, camX, v);
-  drawBackdrop(ctx, s, camX, look);
+  drawBackdrop(ctx, r, s, camX, look);
   drawPieces(ctx, r, s, pieces, camX, look);
   drawBeyondBand(ctx, r, s, camX, look);
   drawSpinners(ctx, s, pieces, camX, look);

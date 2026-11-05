@@ -15,7 +15,7 @@
 // - heart (the finale): a great flywheel, pistons pumping to the beat, gold light pulsing.
 // Everything is placed by a repeatable hash (no state); with reduced motion nothing moves
 // on its own (only the scroll moves it).
-import { drawMotes, hash } from '../../../_engine/render/backdrop.js';
+import { drawMotes, drawStill, hash } from '../../../_engine/render/backdrop.js';
 import { screenY } from '../../../_engine/render/view.js';
 
 /**
@@ -853,7 +853,8 @@ function drawHeart(ctx, v, th, camX, clock) {
  * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock
  */
 export function drawBackground(ctx, v, th, camX, clock) {
-  drawWall(ctx, v, th);
+  // The still sky (or wall) from its painting (stage q-rush).
+  drawStill(ctx, v, `drawWall:${th.id}`, (c) => drawWall(c, v, th));
   if (th.backdrop === 'hall') drawHall(ctx, v, th, camX, clock);
   else if (th.backdrop === 'mine') drawMine(ctx, v, th, camX, clock);
   else if (th.backdrop === 'foundry') drawFoundry(ctx, v, th, camX, clock);

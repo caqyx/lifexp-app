@@ -6,7 +6,7 @@
 // shop signs, harbour cranes, railway arches with passing trains, rain and lightning, an
 // outline city on a grid, red warning lights in a blackout, every light at once, and a
 // beacon above the clouds. Nothing here hurts; the hazards are drawn over it.
-import { drawMotes } from '../../../_engine/render/backdrop.js';
+import { drawMotes, drawStill } from '../../../_engine/render/backdrop.js';
 import { screenY } from '../../../_engine/render/view.js';
 
 /**
@@ -151,17 +151,18 @@ function drawSigns(ctx, v, th, camX, clock, density) {
     const h = c * (0.5 + hash(i, 44) * 0.8);
     const color = /** @type {string} */ (th.neon[Math.floor(hash(i, 45) * th.neon.length)]);
     const flicker = clock.reduced ? 1 : Math.sin(clock.time * 17 + i * 3) > 0.92 ? 0.3 : 1;
-    ctx.globalAlpha = 0.85 * flicker;
+    // The glow: a wide faint stroke under the tube (no shadowBlur: far too slow per frame).
     ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.25 * flicker;
+    ctx.lineWidth = Math.max(3, c * 0.3);
+    ctx.strokeRect(x, y, w, h);
+    ctx.globalAlpha = 0.85 * flicker;
     ctx.lineWidth = Math.max(1.5, c * 0.08);
-    ctx.shadowColor = color;
-    ctx.shadowBlur = c * 0.5;
     ctx.strokeRect(x, y, w, h);
     // A line of "letters": short bars.
     ctx.fillStyle = color;
     for (let b = 0; b < Math.floor(w / (c * 0.35)); b++) ctx.fillRect(x + c * 0.15 + b * c * 0.35, y + h * 0.35, c * 0.2, h * 0.3);
   }
-  ctx.shadowBlur = 0;
   ctx.globalAlpha = 1;
 }
 
@@ -318,7 +319,8 @@ function drawSummit(ctx, v, th, camX, clock) {
  * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock
  */
 export function drawBackground(ctx, v, th, camX, clock) {
-  drawSky(ctx, v, th);
+  // The still sky (or wall) from its painting (stage q-rush).
+  drawStill(ctx, v, `drawSky:${th.id}`, (c) => drawSky(c, v, th));
   const b = th.backdrop;
   if (b !== 'storm' && b !== 'blackout') drawStars(ctx, v, camX, clock);
   if (b === 'rooftops' || b === 'cranes' || b === 'summit') drawMoon(ctx, v, b === 'rooftops' ? '#ffe2c4' : '#e8f4ff');

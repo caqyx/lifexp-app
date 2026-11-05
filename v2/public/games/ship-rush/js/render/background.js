@@ -5,7 +5,7 @@
 // horizon far below at night, and floating motes. Clouds are painted once per look and
 // size into small canvases and only copied per frame. With reduced motion nothing moves
 // on its own and the storm does not flash.
-import { beatPulse, hash } from '../../../_engine/render/backdrop.js';
+import { beatPulse, drawStill, hash } from '../../../_engine/render/backdrop.js';
 import { screenY } from '../../../_engine/render/view.js';
 
 export { beatPulse };
@@ -768,7 +768,8 @@ function drawSpace(ctx, v, th, camX, clock) {
  * @param {CanvasRenderingContext2D} ctx @param {View} v @param {Theme} th @param {number} camX @param {Clock} clock
  */
 export function drawBackground(ctx, v, th, camX, clock) {
-  drawSky(ctx, v, th);
+  // The still sky (or wall) from its painting (stage q-rush).
+  drawStill(ctx, v, `drawSky:${th.id}`, (c) => drawSky(c, v, th));
   if (th.backdrop === 'space') {
     drawSpace(ctx, v, th, camX, clock);
     if (th.motes && !clock.reduced) drawMotes(ctx, v, th.motes, camX, clock.time);

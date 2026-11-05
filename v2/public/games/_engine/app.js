@@ -57,6 +57,18 @@ import { isUnlocked, resolveSkin } from './skins.js';
  *   way back to the editor.
  */
 
+/**
+ * A canvas under the board for the background, stretched over it by CSS.
+ * @param {HTMLCanvasElement} board
+ */
+function backdropLayer(board) {
+  const layer = document.createElement('canvas');
+  layer.className = 'board board--backdrop';
+  layer.setAttribute('aria-hidden', 'true');
+  board.before(layer);
+  return layer;
+}
+
 /** The texts the page itself uses (each game's i18n has them all; its tests check). */
 export const APP_TEXT_KEYS = [
   'canvas', 'bestValue', 'bestNone', 'finaleLocked', 'finaleBest', 'finaleReady', 'sectorLabel', 'sectionLabel',
@@ -72,7 +84,9 @@ export const APP_TEXT_KEYS = [
  */
 export function runApp(def) {
   const { lang, t } = def;
-  const MAX_PIXEL_RATIO = 2;
+  // The canvas at most 1.5 device pixels per CSS pixel (stage q-rush: a phone at 2.6 drew
+  // 3× the pixels of 1.5 for little visible gain; the texts are the page's, always sharp).
+  const MAX_PIXEL_RATIO = 1.5;
   const TOAST_TIME = 1600;
 
   // ── Setup ────────────────────────────────────────────────────────────────────
@@ -156,6 +170,8 @@ export function runApp(def) {
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const dom = findElements();
   const renderer = def.createRenderer();
+  // The background's own canvas under the game's (stage q-rush; render/frame.js `layer`).
+  renderer.layer = backdropLayer(dom.board);
   const { records } = def;
   /** @type {{ advise: (run: Run, wave: Vehicle) => boolean } | null} */
   let autopilot = null;
