@@ -984,9 +984,23 @@ button:focus-visible {
   100% { transform: translate(0, 0) rotate(0deg); }
 }
 
-/* During a round the signs hold still: the eyes are on the card, and a still background
-   costs the phone nothing per frame. */
-body:has(.app[data-screen='play']) .glyphs span {
+/* During a round the signs fade away and stop: the eyes are on the card, and a hidden
+   layer costs the phone nothing per frame (body.is-playing, set by main.js). */
+.glyphs {
+  transition:
+    opacity var(--duration-enter) var(--ease-out),
+    visibility 0s;
+}
+
+body.is-playing .glyphs {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--duration-exit) var(--ease-in),
+    visibility 0s linear var(--duration-exit);
+}
+
+body.is-playing .glyphs span {
   animation-play-state: paused;
 }
 
@@ -1009,6 +1023,8 @@ body:has(.app[data-screen='play']) .glyphs span {
   width: 100%;
   height: 560px;
   pointer-events: none;
+  /* Drawn at half resolution (fx.js): kept as crisp squares, not blurred. */
+  image-rendering: pixelated;
 }
 
 .hud {
@@ -1026,7 +1042,6 @@ body:has(.app[data-screen='play']) .glyphs span {
   height: 4px;
   border-radius: 999px;
   background: var(--color-surface-raised);
-  transition: background-color var(--duration-fast) var(--ease-out);
 }
 
 .streak i:nth-child(3),
@@ -1047,26 +1062,21 @@ body:has(.app[data-screen='play']) .glyphs span {
   margin-top: 4px;
 }
 
-/* The card glows by multiplier: ×2 violet, ×3 gold, ×4 coral (colour transitions only). */
-.card {
-  transition:
-    border-color var(--duration-enter) var(--ease-out),
-    box-shadow var(--duration-enter) var(--ease-out);
-}
-
+/* The card's rim by multiplier: ×2 violet, ×3 gold, ×4 coral — solid rings, no blurred
+   shadows (cheap to paint while the card animates). */
 .card[data-tier='2'] {
   border-color: rgb(143 136 255 / 60%);
-  box-shadow: 0 0 0 1px rgb(143 136 255 / 25%), 0 10px 40px rgb(95 86 242 / 22%);
+  box-shadow: 0 0 0 1px rgb(143 136 255 / 30%);
 }
 
 .card[data-tier='3'] {
   border-color: rgb(255 209 102 / 70%);
-  box-shadow: 0 0 0 1px rgb(255 209 102 / 30%), 0 10px 44px rgb(255 209 102 / 20%);
+  box-shadow: 0 0 0 2px rgb(255 209 102 / 30%);
 }
 
 .card[data-tier='4'] {
   border-color: rgb(255 140 105 / 80%);
-  box-shadow: 0 0 0 2px rgb(255 140 105 / 35%), 0 12px 50px rgb(255 120 90 / 28%);
+  box-shadow: 0 0 0 3px rgb(255 140 105 / 35%);
 }
 
 .callout {

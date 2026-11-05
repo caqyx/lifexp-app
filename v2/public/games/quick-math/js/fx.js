@@ -33,6 +33,8 @@ export function createFx(canvas) {
     dpr: 1,
     /** The band's top on the page (CSS pixels): bits are kept in page coordinates. */
     top: 0,
+    /** Recent frame time (ms, smoothed): a slow phone gets fewer bits, or none. */
+    frameMs: 16.7,
     /** The loop's callback, made once (no closure per frame). */
     tick: /** @type {FrameRequestCallback} */ (() => {}),
   };
@@ -54,14 +56,15 @@ const BAND = 560;
 const BAND_ABOVE = 320;
 
 /**
- * Sizes the canvas: as wide as the window, BAND tall, in CSS pixels — paper bits need no
- * device sharpness, and a small canvas costs a phone little to clear and composite.
+ * Sizes the canvas: as wide as the window and BAND tall, at half the CSS resolution — paper
+ * bits need no sharpness (they are drawn as small solid rectangles), and a quarter of the
+ * pixels costs a phone little to clear and composite.
  * @param {Fx} fx
  */
 export function resizeFx(fx) {
-  fx.dpr = 1;
-  fx.canvas.width = Math.round(innerWidth);
-  fx.canvas.height = BAND;
+  fx.dpr = 0.5;
+  fx.canvas.width = Math.round(innerWidth * fx.dpr);
+  fx.canvas.height = Math.round(BAND * fx.dpr);
 }
 
 /**
@@ -81,8 +84,9 @@ function placeBand(fx, y) {
  * @param {readonly string[]} colors @param {number} power @param {number} spread
  */
 export function burst(fx, x, y, count, colors, power, spread) {
+  let left = Math.round(count * effectsBudget(fx.frameMs));
+  if (left === 0) return;
   placeBand(fx, y);
-  let left = count;
   for (const bit of fx.bits) {
     if (left === 0) break;
     if (bit.alive) continue;
@@ -105,6 +109,25 @@ export function burst(fx, x, y, count, colors, power, spread) {
   start(fx);
 }
 
+/**
+ * The share of effects a phone can afford by its recent frame time: all of them at 60 fps,
+ * half when frames run over ~18 ms, none past ~26 ms (the game itself comes first).
+ * @param {number} frameMs
+ */
+export function effectsBudget(frameMs) {
+  if (frameMs <= 18) return 1;
+  if (frameMs <= 26) return 0.5;
+  return 0;
+}
+
+/**
+ * Feeds a frame's length to the budget (an average that follows the last ~20 frames).
+ * @param {Fx} fx @param {number} ms
+ */
+export function noteFrame(fx, ms) {
+  if (ms > 0 && ms < 250) fx.frameMs += (ms - fx.frameMs) * 0.1;
+}
+
 /** @param {Fx} fx */
 function start(fx) {
   if (fx.frame) return;
@@ -112,10 +135,11 @@ function start(fx) {
   fx.frame = requestAnimationFrame(fx.tick);
 }
 
-/** @param {{ bits: Bit[], alive: number, last: number | null, frame: number, tick: FrameRequestCallback, ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, dpr: number, seed: number, top: number }} fx @param {number} now */
+/** @param {{ bits: Bit[], alive: number, last: number | null, frame: number, tick: FrameRequestCallback, ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, dpr: number, seed: number, top: number, frameMs: number }} fx @param {number} now */
 function step(fx, now) {
   const dt = fx.last === null ? 1 / 60 : Math.min(0.05, (now - fx.last) / 1000);
   fx.last = now;
+  noteFrame(fx, dt * 1000);
   updateBits(fx, dt);
   renderBits(fx);
   fx.frame = fx.alive > 0 ? requestAnimationFrame(fx.tick) : 0;

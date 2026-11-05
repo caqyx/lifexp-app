@@ -11,7 +11,7 @@
 import { LEVELS, createRng, formatNumber, formatQuestion, spokenQuestion } from './questions.js';
 import { readBest, saveBest } from './records.js';
 import { pickLang, testParams, translator } from './i18n.js';
-import { COLORS, burst, createFx, resizeFx } from './fx.js';
+import { COLORS, burst, createFx, effectsBudget, noteFrame, resizeFx } from './fx.js';
 import { ROUND_SECONDS, WRONG_PENALTY, createRound, endRound, multiplierFor, pressKey, roundStats, tick } from './round.js';
 
 /** @typedef {import('./questions.js').Level} Level */
@@ -140,6 +140,7 @@ function applyTexts(translate) {
  */
 function showScreen(screen, { focus = true } = {}) {
   dom.app.dataset.screen = screen;
+  document.body.classList.toggle('is-playing', screen === 'play');
   if (!focus) return;
   const first = /** @type {HTMLElement | null} */ (
     screen === 'start' ? document.querySelector(`.level[data-level="${state.level}"]`) : screen === 'end' ? dom.again : null
@@ -212,9 +213,14 @@ function centreOf(el) {
   return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
 }
 
-/** @param {Keyframe[]} frames @param {HTMLElement} el @param {number} duration */
-function animate(el, frames, duration) {
+/**
+ * A short decorative animation; skipped with reduced motion and, unless `essential`, when
+ * the phone is falling behind (fx.js effectsBudget: frames over ~18 ms).
+ * @param {HTMLElement} el @param {Keyframe[]} frames @param {number} duration @param {boolean} [essential]
+ */
+function animate(el, frames, duration, essential = false) {
   if (reducedMotion.matches) return;
+  if (!essential && effectsBudget(fx.frameMs) < 1) return;
   el.animate(frames, { duration, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' });
 }
 
@@ -274,7 +280,7 @@ function showWrong(round) {
     { transform: 'translateX(5px)' },
     { transform: 'translateX(-3px)' },
     { transform: 'translateX(0)' },
-  ], 280);
+  ], 280, true);
   state.shownMult = 1;
   if (round.mode !== 'timed') return;
   dom.penaltyPop.textContent = t('penalty', { n: WRONG_PENALTY });
@@ -282,7 +288,7 @@ function showWrong(round) {
     { opacity: 0, transform: 'translateY(4px)' },
     { opacity: 1, transform: 'translateY(0)', offset: 0.2 },
     { opacity: 0, transform: 'translateY(14px)' },
-  ], 900);
+  ], 900, true);
 }
 
 function clearFeedback() {
@@ -493,6 +499,7 @@ function frame(now) {
   clock.frame = requestAnimationFrame(frame);
   const seconds = clock.last === null ? 0 : Math.min(MAX_FRAME, (now - clock.last) / 1000);
   clock.last = now;
+  noteFrame(fx, seconds * 1000);
   if (!state.round) return;
   const step = tick(state.round, seconds);
   state.round = step.round;
