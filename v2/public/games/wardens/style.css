@@ -509,7 +509,7 @@ button:focus-visible {
   padding: 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
-  background: rgb(22 24 31 / 97%);
+  background: var(--color-surface);
   box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
   animation: sheet-in var(--duration-enter) var(--ease-out);
 }
@@ -611,11 +611,12 @@ button:focus-visible {
 }
 
 .option__name {
-  font-size: 12px;
+  max-width: 100%;
+  font-size: 11px;
   font-weight: 700;
+  letter-spacing: -0.01em;
   line-height: 1.15;
   text-align: center;
-  overflow-wrap: anywhere;
 }
 
 .option__cost {
@@ -630,7 +631,7 @@ button:focus-visible {
 
 .segmented {
   display: grid;
-  grid-template-columns: auto repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: center;
   gap: 4px;
   padding: 4px;
@@ -640,7 +641,8 @@ button:focus-visible {
 }
 
 .segmented__label {
-  padding: 0 6px;
+  grid-column: 1 / -1;
+  padding: 2px 6px 0;
   color: var(--color-text-secondary);
   font-size: 13px;
   font-weight: 700;

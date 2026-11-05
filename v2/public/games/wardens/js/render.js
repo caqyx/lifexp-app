@@ -123,7 +123,7 @@ function renderGround(ctx, layout, dpr, game) {
   const [a, b, c, d, e, f] = mapTransform(layout);
   ctx.setTransform(a * dpr, b * dpr, c * dpr, d * dpr, e * dpr, f * dpr);
   renderTiles(ctx, theme);
-  renderDecorations(ctx, game);
+  renderDecorations(ctx, game, layout.rotated);
   renderRoad(ctx, game);
   renderPads(ctx, game);
   renderGate(ctx, game);
@@ -139,8 +139,14 @@ function renderTiles(ctx, theme) {
   }
 }
 
-/** Tufts, stones and reeds on tiles off the road and the pads. @param {CanvasRenderingContext2D} ctx @param {Game} game */
-function renderDecorations(ctx, game) {
+/**
+ * Tufts, stones and reeds on tiles off the road and the pads, standing up on the screen
+ * (turned, the screen's "up" is the map's +x).
+ * @param {CanvasRenderingContext2D} ctx @param {Game} game @param {boolean} rotated
+ */
+function renderDecorations(ctx, game, rotated) {
+  const ux = rotated ? 1 : 0;
+  const uy = rotated ? 0 : -1;
   const road = roadTiles(game.map);
   const pads = new Set(game.map.pads.map(([c, r]) => `${c},${r}`));
   ctx.fillStyle = game.map.theme.deco;
@@ -155,19 +161,21 @@ function renderDecorations(ctx, game) {
       const y = r + 0.25 + tileNoise(c, r, 3) * 0.5;
       ctx.globalAlpha = 0.55;
       if (game.map.id === 'canyon') renderStone(ctx, x, y, 0.08 + tileNoise(c, r, 4) * 0.08);
-      else if (game.map.id === 'marsh') renderReeds(ctx, x, y);
-      else renderTuft(ctx, x, y);
+      else if (game.map.id === 'marsh') renderReeds(ctx, x, y, ux, uy);
+      else renderTuft(ctx, x, y, ux, uy);
     }
   }
   ctx.globalAlpha = 1;
 }
 
-/** @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y */
-function renderTuft(ctx, x, y) {
+/** @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} ux @param {number} uy */
+function renderTuft(ctx, x, y, ux, uy) {
+  const sx = -uy;
+  const sy = ux;
   ctx.beginPath();
   for (let i = -1; i <= 1; i++) {
-    ctx.moveTo(x + i * 0.06, y + 0.1);
-    ctx.lineTo(x + i * 0.11, y - 0.08);
+    ctx.moveTo(x - ux * 0.1 + sx * i * 0.06, y - uy * 0.1 + sy * i * 0.06);
+    ctx.lineTo(x + ux * 0.08 + sx * i * 0.11, y + uy * 0.08 + sy * i * 0.11);
   }
   ctx.stroke();
 }
@@ -179,18 +187,20 @@ function renderStone(ctx, x, y, size) {
   ctx.fill();
 }
 
-/** @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y */
-function renderReeds(ctx, x, y) {
+/** @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} ux @param {number} uy */
+function renderReeds(ctx, x, y, ux, uy) {
+  const sx = -uy;
+  const sy = ux;
   ctx.beginPath();
-  ctx.ellipse(x, y + 0.12, 0.2, 0.07, 0, 0, Math.PI * 2);
+  ctx.ellipse(x - ux * 0.12, y - uy * 0.12, ux ? 0.07 : 0.2, ux ? 0.2 : 0.07, 0, 0, Math.PI * 2);
   ctx.globalAlpha = 0.25;
   ctx.fill();
   ctx.globalAlpha = 0.6;
   ctx.beginPath();
-  ctx.moveTo(x - 0.05, y + 0.1);
-  ctx.lineTo(x - 0.08, y - 0.18);
-  ctx.moveTo(x + 0.04, y + 0.1);
-  ctx.lineTo(x + 0.07, y - 0.12);
+  ctx.moveTo(x - ux * 0.1 - sx * 0.05, y - uy * 0.1 - sy * 0.05);
+  ctx.lineTo(x + ux * 0.18 - sx * 0.08, y + uy * 0.18 - sy * 0.08);
+  ctx.moveTo(x - ux * 0.1 + sx * 0.04, y - uy * 0.1 + sy * 0.04);
+  ctx.lineTo(x + ux * 0.12 + sx * 0.07, y + uy * 0.12 + sy * 0.07);
   ctx.stroke();
 }
 

@@ -73,18 +73,18 @@ async function openGame(page, account) {
 test.describe('on a phone', () => {
   test.use({ viewport: PHONE });
 
-  test('the list: five games (Rush one of them, with its modes inside), each with a line, its time today and "Graj"', async ({ page, account }) => {
+  test('the list: six games (Rush one of them, with its modes inside; Strażnicy Doliny from td-1), each with a line, its time today and "Graj"', async ({ page, account }) => {
     await openSignedIn(page, account, '#/today');
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.getByLabel('Nawigacja').getByRole('link', { name: 'Gry' }).click();
     await expect(page).toHaveURL(/#\/games$/);
 
     const cards = page.getByRole('list', { name: 'Gry' }).getByRole('listitem');
-    await expect(cards).toHaveCount(5);
-    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Rush']);
+    await expect(cards).toHaveCount(6);
+    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Rush', 'Strażnicy Doliny']);
     for (const card of await cards.all()) await expect(card.getByText('Dziś jeszcze nie grano')).toBeVisible();
     // All are in (g-2, g-3, g-4, w-1, s-1, f-1): nothing is "Wkrótce" any more.
-    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Rush']) {
+    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Rush', 'Strażnicy Doliny']) {
       await expect(page.getByRole('link', { name: `Graj: ${name}` })).toBeVisible();
     }
     await expect(page.getByText('Wkrótce')).toHaveCount(0);

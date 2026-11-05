@@ -469,10 +469,8 @@ function handleBuild() {
   if (!game || !ui.previewType) return;
   if (!buildTower(game, ui.selectedPad, ui.previewType)) return;
   dom.hint.hidden = true;
-  ui.previewType = null;
-  renderPanel(game);
-  renderPadLabels(game);
-  dom.upgrade.focus({ preventScroll: true });
+  // Built: the sheet closes so the board is free for the next tap (tap the tower to upgrade it).
+  closePanel(true);
 }
 
 function handleUpgrade() {
