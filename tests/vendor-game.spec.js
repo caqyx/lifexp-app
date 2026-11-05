@@ -8,6 +8,8 @@ const os = require('os');
 const path = require('path');
 
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'vendor-game.mjs');
+const PATCHES = path.join(__dirname, '..', 'scripts', 'vendor-patches');
+const GAMES_DIR = path.join(__dirname, '..', 'v2', 'public', 'games');
 
 /** A git repo shaped like Gridlock, with `files` overriding its pages. */
 function fakeRepo(files = {}) {
@@ -15,11 +17,13 @@ function fakeRepo(files = {}) {
   const all = {
     'index.html':
       '<!DOCTYPE html>\n<html><head>\n<meta charset="UTF-8">\n<!-- [2.0-sdk] CrazyGames SDK. Loaded first. -->\n' +
-      '<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>\n<script src="js/main.js"></script>\n</head><body>' +
+      '<script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>\n</head><body>' +
+      '<script src="js/constants.js?v=1"></script>\n<script src="js/main.js"></script>' +
       '<svg xmlns="http://www.w3.org/2000/svg"></svg></body></html>\n',
     'cube_master.css': 'body { margin: 0; }\n',
     'js/constants.js': 'const ADS_ENABLED = false;\n',
     'js/main.js': 'console.log("game");\nfunction reset() { localStorage.clear(); location.reload(); }\n',
+    'js/board-render.js': "let skinCache = null;\nfunction cache() { skinCache = document.createElement('canvas'); }\n",
     'README.md': 'not copied\n',
     ...files,
   };
@@ -55,6 +59,14 @@ test('copies the game, drops the CrazyGames SDK, adds the CSP and VENDORED.json'
   expect(html).toContain("connect-src 'self'");
   // No favicon request (404) from the game page.
   expect(html).toContain('<link rel="icon" href="data:,">');
+  // LifeXP's polish (docs/v2/VENDOR-PATCHES.md): its files are added and linked, the polish
+  // script before the game's first script.
+  expect(html).toContain('<link rel="stylesheet" href="lifexp-polish.css">\n</head>');
+  expect(html).toContain('<script src="lifexp-polish.js"></script>\n<script src="js/constants.js?v=1"></script>');
+  for (const name of ['lifexp-polish.css', 'lifexp-polish.js']) {
+    expect(fs.readFileSync(path.join(out, name), 'utf8')).toBe(fs.readFileSync(path.join(PATCHES, 'gridlock', name), 'utf8'));
+  }
+  expect(fs.readFileSync(path.join(out, 'js', 'board-render.js'), 'utf8')).toContain("window.lifexpHiDpiCanvas(document.createElement('canvas'))");
   // Its reset clears only the game's own keys, not LifeXP's.
   const main = fs.readFileSync(path.join(out, 'js', 'main.js'), 'utf8');
   expect(main).not.toContain('localStorage.clear');
@@ -66,9 +78,9 @@ test('copies the game, drops the CrazyGames SDK, adds the CSP and VENDORED.json'
     source: 'https://github.com/szymonrogalski098-collab/gridlock',
     commit,
     dirty: false,
-    files: 4,
+    files: 7,
   });
-  expect(vendored.patches).toHaveLength(3);
+  expect(vendored.patches).toHaveLength(8);
   expect(Date.parse(vendored.vendoredAt)).not.toBeNaN();
 });
 
@@ -77,6 +89,46 @@ test('a patch that no longer matches stops the copy', () => {
   const run = vendor(dir, outDir());
   expect(run.status).toBe(1);
   expect(run.stderr).toContain('0 trafień w js/constants.js');
+});
+
+// The committed copies are upstream + every patch (docs/v2/VENDOR-PATCHES.md): the upstream
+// clones are not here, so check each patch's trace in the committed files instead.
+for (const id of ['wartime', 'gridlock']) {
+  test(`the committed ${id} carries every patch on the list, and VENDORED.json names them`, async () => {
+    const { GAMES } = await import(SCRIPT);
+    const dir = path.join(GAMES_DIR, id);
+    const vendored = JSON.parse(fs.readFileSync(path.join(dir, 'VENDORED.json'), 'utf8'));
+    expect(vendored.patches).toEqual(GAMES[id].patches.map((p) => `${p.file}: ${p.why}`));
+    for (const patch of GAMES[id].patches) {
+      const text = fs.readFileSync(path.join(dir, patch.file), 'utf8');
+      if (patch.add) expect(text, patch.file).toBe(fs.readFileSync(path.join(__dirname, '..', patch.add), 'utf8'));
+      else if (patch.expect) expect(text, patch.file).toMatch(patch.expect);
+      else if (!patch.replace) expect(text, `${patch.file}: ${patch.why}`).not.toMatch(patch.find);
+      else {
+        // Every literal piece of the replacement (between $1, $& …) is in the file.
+        for (const piece of patch.replace.split(/\$[&\d]/).filter((p) => p.trim().length > 8)) expect(text, patch.why).toContain(piece);
+      }
+    }
+  });
+}
+
+test('the committed patches: polish wired in, cached label widths, and the game names the polish relies on still exist', () => {
+  const gridlock = (f) => fs.readFileSync(path.join(GAMES_DIR, 'gridlock', f), 'utf8');
+  const html = gridlock('index.html');
+  expect(html).toContain('<link rel="stylesheet" href="lifexp-polish.css">');
+  expect(html.indexOf('<script src="lifexp-polish.js"></script>')).toBeLessThan(html.indexOf('<script src="js/constants.js'));
+  expect(gridlock('js/board-render.js')).toContain('window.lifexpHiDpiCanvas(');
+  // lifexp-polish.js reaches the game through these globals; a rename would switch a feature off.
+  const code = fs.readdirSync(path.join(GAMES_DIR, 'gridlock', 'js')).map((f) => gridlock(`js/${f}`)).join('\n');
+  for (const decl of [/function tryDash\(/, /function die\(/, /function skinColor\(/, /\blet _dashPressX = -1\b/, /\balive = true\b/, /\bcube = \{x:8,y:8\}/, /\bconst N = 16\b/]) {
+    expect(code).toMatch(decl);
+  }
+  expect(code).toMatch(/c\.addEventListener\('pointerdown', \(\) => \{ _dashPressX = x; _dashPressY = y; \}\)/);
+  for (const id of ['anim-canvas', 'board', 'board-wrap', 'death-overlay']) expect(html).toContain(`id="${id}"`);
+
+  const render = fs.readFileSync(path.join(GAMES_DIR, 'wartime', 'js', 'ui', 'render.js'), 'utf8');
+  expect(render).toContain('L.lxW = ctx.measureText(L.text).width / 100;');
+  expect(render.match(/measureText\(L\.text\)/g)).toHaveLength(1);
 });
 
 test('an external host left in the game stops the copy and leaves nothing behind', () => {

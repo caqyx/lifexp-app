@@ -788,15 +788,17 @@
       if (px < 8.5) continue;
       px = Math.min(px, 60);
       var track = px * 0.2;
-      ctx.font = '700 ' + px.toFixed(1) + 'px ' + FONT_SANS;
-      setLetterSpacing(track);
-      var tw = ctx.measureText(L.text).width;
-      if (tw > maxW && maxW > 0) { px *= maxW / tw; if (px < 8.5) continue; track = px * 0.2; ctx.font = '700 ' + px.toFixed(1) + 'px ' + FONT_SANS; setLetterSpacing(track); tw = ctx.measureText(L.text).width; }
+      // [lifexp] szerokość nazwy na 1 px czcionki, zmierzona raz (tekst z odstępem liter skaluje się liniowo)
+      if (L.lxW === undefined) { ctx.font = '700 100px ' + FONT_SANS; setLetterSpacing(20); L.lxW = ctx.measureText(L.text).width / 100; }
+      var tw = L.lxW * px;
+      if (tw > maxW && maxW > 0) { px *= maxW / tw; if (px < 8.5) continue; track = px * 0.2; tw = L.lxW * px; }
       var p = mapToScreen(L.x, L.y);
       if (p[0] < -tw || p[0] > viewW + tw || p[1] < -px || p[1] > viewH + px) continue;
       var box = [p[0] - tw / 2, p[1] - px / 2, p[0] + tw / 2, p[1] + px / 2];
       if (overlapsAny(box, placed)) continue;
       placed.push(box);
+      ctx.font = '700 ' + px.toFixed(1) + 'px ' + FONT_SANS;
+      setLetterSpacing(track);
       var x = p[0] + track / 2;            // letterSpacing dodaje odstęp także po ostatniej literze
       ctx.globalAlpha = fade * 0.22;
       ctx.lineWidth = Math.max(3, px * 0.28); ctx.strokeStyle = COLORS.labelHalo; ctx.strokeText(L.text, x, p[1]);

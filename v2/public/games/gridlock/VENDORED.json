@@ -2,7 +2,7 @@
   "game": "gridlock",
   "source": "https://github.com/szymonrogalski098-collab/gridlock",
   "commit": "876da06b2a65aace6baf4584912c5ad07dffc2ca",
-  "vendoredAt": "2026-10-26T21:08:55.190Z",
+  "vendoredAt": "2026-11-05T23:32:50.579Z",
   "dirty": false,
   "include": [
     "index.html",
@@ -12,8 +12,13 @@
   "patches": [
     "index.html: Bez CrazyGames SDK: zewnętrzny skrypt platformy z reklamami. Bez niego js/sdk.js działa „standalone”, a reklamy i nagrody za reklamy się nie pokazują.",
     "js/main.js: „Reset” gry kasuje tylko jej klucze (cm_*), nie cały localStorage wspólny z LifeXP.",
-    "js/constants.js: Reklamy i nagrody za reklamy wyłączone w samej grze (ADS_ENABLED = false)."
+    "js/constants.js: Reklamy i nagrody za reklamy wyłączone w samej grze (ADS_ENABLED = false).",
+    "lifexp-polish.css: Szlif LifeXP (styl): ukryte ekrany bez animacji (mniej przeliczeń stylu w grze), płótno planszy w rozmiarze planszy, dotyk bez zaznaczania i zoomu, pierścień po skoku, błysk i wstrząs przy śmierci, ograniczony ruch przy prefers-reduced-motion.",
+    "lifexp-polish.js: Szlif LifeXP (skrypt): ostra plansza na ekranach o dużej gęstości pikseli (do 2×), skok od razu przy dotknięciu zamiast przy puszczeniu palca, efekty pierścienia i trafienia.",
+    "index.html: Wpina lifexp-polish.css po stylu gry.",
+    "index.html: Wpina lifexp-polish.js przed skryptami gry (płótno ostre od pierwszej klatki).",
+    "js/board-render.js: Pamięć podręczna wyglądu kostki rysowana w gęstości ekranu (lifexpHiDpiCanvas z lifexp-polish.js), żeby kostka nie była rozmyta na telefonie."
   ],
   "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'",
-  "files": 23
+  "files": 25
 }

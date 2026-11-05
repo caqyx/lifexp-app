@@ -7,6 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Gridlock</title><!-- [1.9.1] renamed -->
 <link rel="stylesheet" href="cube_master.css?v=2.0-final">
+<link rel="stylesheet" href="lifexp-polish.css">
 </head>
 <body>
 <div id="intro-overlay"></div>
@@ -318,6 +319,7 @@
      declared before top-level code that runs at load time uses it. Hence:
      constants -> state -> dom -> everything else -> main last.
      main.js holds all the event wiring and the bootstrap, so it must stay last. -->
+<script src="lifexp-polish.js"></script>
 <script src="js/constants.js?v=2.0-final"></script>
 <script src="js/state.js?v=2.0-final"></script>
 <script src="js/dom.js?v=2.0-final"></script>
