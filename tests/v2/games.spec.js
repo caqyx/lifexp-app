@@ -440,6 +440,10 @@ test.describe('Gridlock', () => {
     const before = await dashes.textContent();
     await cells.nth(8 * 16 + 10).tap();
     await expect(dashes).not.toHaveText(before);
+    // LifeXP's polish (docs/v2/VENDOR-PATCHES.md): a press alone dashes, without waiting for the release.
+    const pressed = await dashes.textContent();
+    await game.locator('#board .cell.dashable:not(.block-charge)').first().dispatchEvent('pointerdown', { button: 0 });
+    await expect(dashes).not.toHaveText(pressed);
 
     // A round completes and pays. Every round fires a laser along the cube's row or
     // column, so standing still loses: a small autopilot inside the game's frame dodges
