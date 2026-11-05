@@ -55,7 +55,7 @@ export const GAMES: readonly GameDef[] = [
 ];
 
 /** The modes' old games (their links still work: the game Rush, opened in that mode). */
-const RUSH_MODES: Readonly<Record<string, string>> = { 'wave-rush': 'wave', 'ship-rush': 'ship', 'flip-rush': 'flip' };
+const RUSH_MODES: Readonly<Record<string, string>> = { 'wave-rush': 'wave', 'ship-rush': 'ship', 'flip-rush': 'flip', 'robot-rush': 'robot' };
 
 /**
  * A stand-in game for the browser tests (tests/v2/games.spec.js serves its page), only

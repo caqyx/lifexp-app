@@ -62,7 +62,7 @@ export const APP_TEXT_KEYS = [
   'canvas', 'bestValue', 'bestNone', 'finaleLocked', 'finaleBest', 'finaleReady', 'sectorLabel', 'sectionLabel',
   'attempt', 'result', 'tapRespawn', 'tapRestart', 'finaleResult', 'finaleDoneTitle', 'finishedTitle', 'finaleDoneBody',
   'finishedBody', 'achFinale', 'achDemon', 'achFinaleBody', 'achDemonBody', 'unlockSkin', 'unlockFinale', 'gravityFlip',
-  'gravityBack', 'shipOn', 'waveOn', 'ballOn', 'spiderOn', 'finaleName', 'selected', 'locked', 'checkpoint', 'tapSector', 'editor', 'editorLevel', 'editorBack', 'modes',
+  'gravityBack', 'shipOn', 'waveOn', 'ballOn', 'spiderOn', 'robotOn', 'finaleName', 'selected', 'locked', 'checkpoint', 'tapSector', 'editor', 'editorLevel', 'editorBack', 'modes',
   'editorVerify', 'editorDoneTitle', 'editorDoneBody', 'verifyDoneTitle', 'verifyDoneBody',
 ];
 
@@ -673,6 +673,7 @@ export function runApp(def) {
         mode: w.mode,
         grounded: w.grounded,
         streak: w.streak,
+        lift: w.lift,
         streakFrom: w.streakFrom,
         spentRing: w.spentRing,
         spentPad: w.spentPad,

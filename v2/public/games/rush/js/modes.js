@@ -1,5 +1,5 @@
 // @ts-check
-// Rush's modes (docs/v2/PLAN.md 9.1, stage rr-a): each is a game of its own page, next to
+// Rush's modes (docs/v2/PLAN.md 9.1, stages rr-a and rr-b): each is a game of its own page, next to
 // the picker — its sectors, records, skins, finale and editor saves stay its own, under the
 // same storage keys as when it was a game on its own, so a player's progress carries over
 // untouched. The picker reads them only through each mode's records.
@@ -15,6 +15,10 @@ import { records as flipRecords } from '../../flip-rush/js/records.js';
 import { SKINS as FLIP_SKINS, resolveSkin as flipSkin } from '../../flip-rush/js/skins.js';
 import { paintSkin as paintFlip } from '../../flip-rush/js/preview.js';
 import { translator as flipTexts } from '../../flip-rush/js/i18n.js';
+import { records as robotRecords } from '../../robot-rush/js/records.js';
+import { SKINS as ROBOT_SKINS, resolveSkin as robotSkin } from '../../robot-rush/js/skins.js';
+import { paintSkin as paintRobot } from '../../robot-rush/js/preview.js';
+import { translator as robotTexts } from '../../robot-rush/js/i18n.js';
 
 /**
  * @typedef {import('../../_engine/records.js').Records} Records
@@ -34,6 +38,7 @@ export const MODES = [
   { id: 'wave', dir: 'wave-rush', records: waveRecords, skin: waveSkin, paint: paintWave, texts: waveTexts, skins: WAVE_SKINS },
   { id: 'ship', dir: 'ship-rush', records: shipRecords, skin: shipSkin, paint: paintShip, texts: shipTexts, skins: SHIP_SKINS },
   { id: 'flip', dir: 'flip-rush', records: flipRecords, skin: flipSkin, paint: paintFlip, texts: flipTexts, skins: FLIP_SKINS },
+  { id: 'robot', dir: 'robot-rush', records: robotRecords, skin: robotSkin, paint: paintRobot, texts: robotTexts, skins: ROBOT_SKINS },
 ];
 
 /** @param {string | null} id */

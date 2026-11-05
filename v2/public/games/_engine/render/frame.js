@@ -20,7 +20,7 @@ import { screenX, screenY } from './view.js';
  * @typedef {import('../level.js').Piece} Piece
  * @typedef {import('./section.js').Painted} Painted
  * @typedef {{ x: number, y: number, dir: number, mini: boolean, alive: boolean, flipped: boolean, ship: boolean, angle: number, thrust: boolean,
- *   mode?: import('../geometry.js').VehicleMode, grounded?: boolean, streak?: number, streakFrom?: number,
+ *   mode?: import('../geometry.js').VehicleMode, grounded?: boolean, streak?: number, streakFrom?: number, lift?: number,
  *   spentRing?: string, spentPad?: string, burst?: number, burstAt?: { x: number, y: number, type: 'ring' | 'pad', kind: string } }} Pose
  *   mode, grounded, streak, streakFrom: Flip Rush's ball and spider (the spider's snap is drawn as a streak);
  *   spentRing, spentPad, burst, burstAt: its orbs and pads (a used one dims, a fired one flashes).

@@ -12,7 +12,7 @@ export const PALETTE = {
   tiers: Object.keys(TIERS),
   // Every vehicle (stage r-5): the game's own first (`native`); the others fly by their own
   // game's physics (_engine/editor/vehicles.js).
-  modes: ['wave', 'ship', 'ball', 'spider'],
+  modes: ['wave', 'ship', 'ball', 'spider', 'robot'],
   native: ['wave', 'ship'],
   items: ['spike', 'halfSpike', 'block', 'pillar', 'saw', 'mine', 'orb', 'speed', 'portal', 'dark'],
 };

@@ -114,11 +114,11 @@ test('Rush offline: the picker and a mode played once come from the cache', asyn
   await game.locator('.mode[data-mode="wave"]').click();
   await expect(game.getByRole('heading', { name: 'Wave Rush' })).toBeVisible();
   await game.getByRole('button', { name: '← Wszystkie tryby Rush' }).click();
-  await expect(game.locator('.mode')).toHaveCount(3);
+  await expect(game.locator('.mode')).toHaveCount(4);
 
   await context.setOffline(true);
   await page.reload();
-  await expect(game.locator('.mode')).toHaveCount(3);
+  await expect(game.locator('.mode')).toHaveCount(4);
   await game.locator('.mode[data-mode="wave"]').click();
   await expect(game.getByRole('heading', { name: 'Wave Rush' })).toBeVisible();
   await expect(game.locator('#stage')).toHaveAttribute('data-state', 'menu');

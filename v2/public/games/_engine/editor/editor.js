@@ -64,7 +64,7 @@ const OPTIONS = /** @type {Record<string, { key: 'optCount' | 'optSize' | 'optKi
   pad: [{ key: 'optKind', name: 'kind', choices: ['jump', 'small', 'gravity'] }],
   speed: [{ key: 'optKind', name: 'k', choices: ['slow', 'normal', 'fast', 'veryFast'] }],
   flip: [{ key: 'optKind', name: 'gravity', choices: ['flip', 'down', 'up'] }],
-  vehicle: [{ key: 'optKind', name: 'vehicle', choices: ['ship', 'wave', 'ball', 'spider'] }],
+  vehicle: [{ key: 'optKind', name: 'vehicle', choices: ['ship', 'wave', 'ball', 'spider', 'robot'] }],
 });
 /** Option lists whose first choice is the default (the others default to their second). */
 const FIRST_DEFAULT = new Set(['kind', 'k', 'gravity', 'vehicle']);

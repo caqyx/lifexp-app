@@ -13,7 +13,7 @@
 // re-join its old path after a shift, so each replay runs to the end): only a replay that
 // survives all of them counts as the proof. A vehicle resting on a surface is just
 // another state: resting there is a strategy the search may use.
-import { changesOf, peakRate, shiftTap } from './limits.js';
+import { changesOf, peakRate, shiftChange, shiftTap } from './limits.js';
 import { STEP } from './world.js';
 
 /**
@@ -24,7 +24,7 @@ import { STEP } from './world.js';
  *   step: (v: Vehicle, holding: boolean, dt: number) => Vehicle | null,
  *   safe: (v: Vehicle, band: number) => boolean, band?: number, tag?: (v: Vehicle) => string, fewest?: boolean, released?: boolean,
  *   allow?: (v: Vehicle, holding: boolean) => boolean, search?: (v: Vehicle, holding: boolean, dt: number) => Vehicle | null,
- *   speedAt?: (x: number) => number,
+ *   speedAt?: (x: number) => number, holdSlack?: boolean,
  * }} BeamSpec
  *   speedAt: the speed at x when it changes along the way (speed portals, stage r-2; `step`
  *   must advance x by the same speed); else `speed` everywhere.
@@ -35,7 +35,10 @@ import { STEP } from './world.js';
  *   tapping vehicle's changes then pair up as press and release); allow: which inputs the
  *   search may try from a state (a human's habits; the replays fly any input); search: a
  *   stricter step for the search only (Flip Rush: orbs reach less far, so a press it picks
- *   lies inside the real orb's window by the tolerance), the replays fly `step`.
+ *   lies inside the real orb's window by the tolerance), the replays fly `step`;
+ *   holdSlack (stage rr-b, the robot: how long a press is held is how high it jumps): the
+ *   replays also move every release alone, early and late by the tolerance — a hold that
+ *   is a little short or long must survive too.
  * @typedef {{ v: Vehicle, hold: number, cool: number, parent: number, changes: number }} Node
  *   hold: 1 held, -1 released, for the decision that led here; changes: input changes so far.
  */
@@ -198,6 +201,14 @@ export function verifyBeam(spec, holds) {
   for (let k = 0; k < changes.length; k++) {
     for (const sign of [-1, 1]) {
       if (!replayBeam(spec, shiftTap(holds, changes, k, sign * shift))) return `tap ${k + 1} ${sign < 0 ? 'early' : 'late'} crashes`;
+    }
+  }
+  if (spec.holdSlack) {
+    for (const [k, at] of changes.entries()) {
+      if (/** @type {number} */ (holds[at]) > 0) continue;
+      for (const sign of [-1, 1]) {
+        if (!replayBeam(spec, shiftChange(holds, at, sign * shift))) return `hold ${k + 1} ${sign < 0 ? 'short' : 'long'} crashes`;
+      }
     }
   }
   return null;

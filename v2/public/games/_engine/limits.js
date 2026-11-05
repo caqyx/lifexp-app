@@ -49,3 +49,17 @@ export function peakRate(changes) {
 export function toleranceSteps(tolerance) {
   return Math.ceil(tolerance / STEP - 1e-9);
 }
+
+/**
+ * The same input with one change alone moved by `shift` steps (stage rr-b: a hold that is
+ * a little too long or too short — the robot's jump height is the hold's length).
+ * @param {Int8Array} dirs @param {number} at the change's step @param {number} shift
+ */
+export function shiftChange(dirs, at, shift) {
+  const out = Int8Array.from(dirs);
+  const before = /** @type {number} */ (dirs[at - 1]);
+  const after = /** @type {number} */ (dirs[at]);
+  if (shift > 0) out.fill(before, at, Math.min(dirs.length, at + shift));
+  else out.fill(after, Math.max(0, at + shift), at);
+  return out;
+}

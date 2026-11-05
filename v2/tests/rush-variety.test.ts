@@ -20,6 +20,7 @@ import { buildRun as buildShipRun } from '../public/games/ship-rush/js/run.js';
 import { SECTION_LIBRARY as FLIP } from '../public/games/flip-rush/js/sections/index.js';
 import { SECTION_LIBRARY as SHIP } from '../public/games/ship-rush/js/sections/index.js';
 import { SECTION_LIBRARY as WAVE } from '../public/games/wave-rush/js/sections/index.js';
+import { SECTION_LIBRARY as ROBOT } from '../public/games/robot-rush/js/sections/index.js';
 
 const open = (hazards: SectionData['hazards'], mode?: 'ball' | 'spider'): SectionData => ({ id: `t-${Math.random()}`, length: 30, ceil: '2 r30', floor: '10 r30', hazards, ...(mode ? { mode } : {}) });
 
@@ -163,6 +164,7 @@ describe.each([
   ['Wave Rush', WAVE],
   ['Ship Rush', SHIP],
   ['Flip Rush', FLIP],
+  ['Robot Rush', ROBOT],
 ])('%s: no near-duplicate sections', (_name, library) => {
   test('no two sections, in any sectors or the finale, share 60% or more of their shape', () => {
     const all = Object.values(library).flat();

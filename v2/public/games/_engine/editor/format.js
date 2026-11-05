@@ -54,7 +54,7 @@ const WORDS = /** @type {Record<string, string[]>} */ ({
   k: ['slow', 'normal', 'fast', 'veryFast'],
   'ring.kind': ['jump', 'small', 'gravity', 'gravityJump', 'dash'],
   'pad.kind': ['jump', 'small', 'gravity'],
-  'portal.kind': ['flip', 'down', 'up', 'mini', 'big', 'wave', 'ship', 'ball', 'spider'],
+  'portal.kind': ['flip', 'down', 'up', 'mini', 'big', 'wave', 'ship', 'ball', 'spider', 'robot'],
 });
 
 /** @param {unknown} v @returns {v is Record<string, unknown>} */

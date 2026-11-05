@@ -6,13 +6,15 @@
 // - the wave: the engine's wave (wave.js), every touch of its hit circle a crash except
 //   grazing a 45° slope along its flight (as in Wave Rush and Ship Rush's finale);
 // - the ship: Ship Rush's ship (blocks and pillars are solids to land on);
-// - the ball and the spider: Flip Rush's (they fall, land, run and flip).
+// - the ball and the spider: Flip Rush's (they fall, land, run and flip);
+// - the robot: Robot Rush's (it runs and jumps, higher the longer it is held).
 // The game's own sections and runs never meet a vehicle that is not the game's own.
 import { stepWaveOnly, waveRadius, waveSlope } from '../wave.js';
 import { runHits } from '../level.js';
 import { runWorld } from '../solids.js';
 import { stepShip } from '../../ship-rush/js/physics.js';
 import { stepBody } from '../../flip-rush/js/physics.js';
+import { stepRobot } from '../../robot-rush/js/physics.js';
 
 /**
  * @typedef {import('../game.js').GameRules} GameRules
@@ -21,7 +23,7 @@ import { stepBody } from '../../flip-rush/js/physics.js';
  */
 
 /** Every vehicle the shared engine has. */
-export const ALL_VEHICLES = /** @type {VehicleMode[]} */ (['wave', 'ship', 'ball', 'spider']);
+export const ALL_VEHICLES = /** @type {VehicleMode[]} */ (['wave', 'ship', 'ball', 'spider', 'robot']);
 
 /** The vehicle flying now. @param {Vehicle} v @returns {VehicleMode} */
 export const modeOf = (v) => v.mode ?? (v.ship ? 'ship' : 'wave');
@@ -41,6 +43,7 @@ export function mixedRules(rules, native) {
       const mode = modeOf(v);
       if (mode === 'wave') return { vehicle: stepWaveOnly(v, holding, speed, dt), crashed: false };
       if (mode === 'ship') return stepShip(v, holding, speed, dt, runWorld(run));
+      if (mode === 'robot') return stepRobot(v, holding, speed, dt, runWorld(run));
       return stepBody(v, holding, speed, dt, runWorld(run));
     },
     crashed(run, v) {
