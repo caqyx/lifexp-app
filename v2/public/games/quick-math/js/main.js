@@ -11,6 +11,7 @@
 import { LEVELS, createRng, formatNumber, formatQuestion, spokenQuestion } from './questions.js';
 import { readBest, saveBest } from './records.js';
 import { pickLang, testParams, translator } from './i18n.js';
+import { COLORS, burst, createFx, resizeFx } from './fx.js';
 import { ROUND_SECONDS, WRONG_PENALTY, createRound, endRound, multiplierFor, pressKey, roundStats, tick } from './round.js';
 
 /** @typedef {import('./questions.js').Level} Level */
@@ -51,6 +52,10 @@ function findElements() {
     answerWrong: byId('answer-wrong'),
     feedback: byId('feedback'),
     pointsPop: byId('points-pop'),
+    callout: byId('callout'),
+    streak: byId('streak'),
+    penaltyPop: byId('penalty-pop'),
+    answerLine: byId('answer'),
     keypad: byId('keypad'),
     endTitle: byId('end-title'),
     endLevel: byId('end-level'),
@@ -100,12 +105,16 @@ const rng = createRng(test.seed ?? randomSeed());
 const roundSeconds = test.round ?? ROUND_SECONDS;
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const dom = findElements();
+const fx = createFx(/** @type {HTMLCanvasElement} */ (byId('fx')));
 
 const state = {
   mode: loadMode(),
   level: /** @type {Level} */ ('easy'),
   round: /** @type {Round | null} */ (null),
   newBest: false,
+  /** The multiplier and streak last shown (the HUD changes only when they do). */
+  shownMult: 1,
+  shownStreak: -1,
 };
 const clock = { frame: 0, last: /** @type {number | null} */ (null), running: false };
 
@@ -156,6 +165,7 @@ const OP_WORDS = () => ({ '+': t('op.+'), '-': t('op.-'), '*': t('op.*'), '/': t
 
 /** @param {Round} round */
 function renderQuestion(round) {
+  animate(dom.questionText, [{ opacity: 0, transform: 'translateX(18px)' }, { opacity: 1, transform: 'none' }], 220);
   dom.questionText.textContent = formatQuestion(round.question);
   dom.questionSpoken.textContent = `${spokenQuestion(round.question, OP_WORDS())} =`;
   if (test.seed !== null) dom.app.dataset.debugAnswer = String(round.question.answer);
@@ -163,12 +173,14 @@ function renderQuestion(round) {
 
 /** @param {Round} round */
 function renderAnswer(round) {
+  if (round.typed !== '') animate(dom.answer, [{ transform: 'scale(1.14)' }, { transform: 'scale(1)' }], 140);
   dom.answer.textContent = round.typed.replace('-', '−');
   dom.card.classList.toggle('is-empty', round.typed === '');
 }
 
 /** @param {Round} round */
 function renderHud(round) {
+  renderStreak(round.streak);
   dom.score.textContent = String(round.score);
   dom.comboMult.textContent = `×${multiplierFor(round.streak)}`;
   dom.combo.classList.toggle('is-active', round.streak >= 3);
@@ -179,6 +191,25 @@ function renderHud(round) {
     dom.timerFill.style.setProperty('--left', (round.timeLeft / round.total).toFixed(4));
     dom.app.classList.toggle('is-low', round.timeLeft <= LOW_TIME);
   }
+}
+
+/**
+ * The streak on screen: ten pips filling up (the multiplier steps at 3, 6 and 10) and
+ * the card's glow, one tier per multiplier.
+ * @param {number} streak
+ */
+function renderStreak(streak) {
+  if (state.shownStreak === streak) return;
+  state.shownStreak = streak;
+  const pips = dom.streak.children;
+  for (let i = 0; i < pips.length; i++) pips[i]?.classList.toggle('is-on', i < Math.min(streak, 10));
+  dom.card.dataset.tier = String(multiplierFor(streak));
+}
+
+/** The middle of an element on the page (for bursts). @param {HTMLElement} el */
+function centreOf(el) {
+  const box = el.getBoundingClientRect();
+  return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
 }
 
 /** @param {Keyframe[]} frames @param {HTMLElement} el @param {number} duration */
@@ -206,6 +237,24 @@ function showCorrect(round) {
     { opacity: 0, transform: 'translateY(-26px) scale(1)' },
   ], 650);
   if (round.streak >= 3) animate(dom.combo, [{ transform: 'scale(1.18)' }, { transform: 'scale(1)' }], 260);
+  const mult = multiplierFor(round.streak);
+  const levelUp = mult > state.shownMult;
+  state.shownMult = mult;
+  if (reducedMotion.matches) return;
+  const at = centreOf(dom.answerLine);
+  burst(fx, at.x, at.y, levelUp ? 40 : 8, levelUp ? COLORS.combo : COLORS.correct, levelUp ? 760 : 340, levelUp ? 2.6 : 1.2);
+  if (levelUp) showCallout(`${t('combo')} ×${mult}!`);
+}
+
+/** "Seria ×3!" pops over the card when the multiplier goes up. @param {string} text */
+function showCallout(text) {
+  dom.callout.textContent = text;
+  animate(dom.callout, [
+    { opacity: 0, transform: 'translate(-50%, 8px) scale(0.6)' },
+    { opacity: 1, transform: 'translate(-50%, -6px) scale(1.12)', offset: 0.3 },
+    { opacity: 1, transform: 'translate(-50%, -10px) scale(1)', offset: 0.7 },
+    { opacity: 0, transform: 'translate(-50%, -22px) scale(1)' },
+  ], 900);
 }
 
 /** @param {Round} round */
@@ -226,6 +275,14 @@ function showWrong(round) {
     { transform: 'translateX(-3px)' },
     { transform: 'translateX(0)' },
   ], 280);
+  state.shownMult = 1;
+  if (round.mode !== 'timed') return;
+  dom.penaltyPop.textContent = t('penalty', { n: WRONG_PENALTY });
+  animate(dom.penaltyPop, [
+    { opacity: 0, transform: 'translateY(4px)' },
+    { opacity: 1, transform: 'translateY(0)', offset: 0.2 },
+    { opacity: 0, transform: 'translateY(14px)' },
+  ], 900);
 }
 
 function clearFeedback() {
@@ -256,6 +313,8 @@ function reactToEvents(events) {
 
 /** @param {Level} level */
 function startRound(level) {
+  state.shownMult = 1;
+  state.shownStreak = -1;
   state.level = level;
   state.round = createRound({ level, mode: state.mode, rng, seconds: roundSeconds });
   dom.app.dataset.mode = state.mode;
@@ -280,7 +339,7 @@ function finishRound(round) {
   dom.app.classList.toggle('is-new-best', state.newBest);
   dom.endTitle.textContent = round.mode === 'timed' ? t('timeUp') : t('practiceOver');
   dom.endLevel.textContent = `${t(`level.${round.level}`)} · ${round.mode === 'timed' ? t('timed') : t('practice')}`;
-  dom.endScore.textContent = String(round.score);
+  countUp(dom.endScore, round.score);
   dom.endAccuracy.textContent = `${stats.accuracy}%`;
   const sub = document.createElement('span');
   sub.className = 'stats__sub';
@@ -293,6 +352,31 @@ function finishRound(round) {
   }
   renderBests();
   showScreen('end');
+  if (state.newBest && !reducedMotion.matches) {
+    requestAnimationFrame(() => {
+      const at = centreOf(dom.endScore);
+      burst(fx, at.x, at.y, 90, COLORS.best, 900, 2.2);
+    });
+  }
+}
+
+/**
+ * The end score counts up from 0 (ease-out, 0.7 s); with reduced motion it is just shown.
+ * The final number is in the element at once for readers (aria-label), the count only shows it.
+ * @param {HTMLElement} el @param {number} score
+ */
+function countUp(el, score) {
+  el.textContent = String(score);
+  if (reducedMotion.matches || score <= 0) return;
+  const start = performance.now();
+  const duration = 700;
+  /** @param {number} now */
+  const tickCount = (now) => {
+    const k = Math.min(1, (now - start) / duration);
+    el.textContent = String(Math.round(score * (1 - (1 - k) ** 3)));
+    if (k < 1) requestAnimationFrame(tickCount);
+  };
+  requestAnimationFrame(tickCount);
 }
 
 // ── Input ────────────────────────────────────────────────────────────────────
@@ -437,6 +521,8 @@ function handleVisibilityChange() {
 // ── Start ────────────────────────────────────────────────────────────────────
 
 applyTexts(t);
+resizeFx(fx);
+addEventListener('resize', () => resizeFx(fx));
 renderMode();
 renderBests();
 bindInput();

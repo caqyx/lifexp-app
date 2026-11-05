@@ -11,6 +11,7 @@
 <script type="module" src="js/main.js"></script>
 </head>
 <body>
+<div class="glyphs" aria-hidden="true"><span>+</span><span>−</span><span>×</span><span>÷</span><span>=</span><span>7</span><span>+</span><span>×</span><span>3</span><span>÷</span><span>−</span><span>9</span></div>
 <main id="app" class="app" data-screen="start">
 
   <section id="start" class="screen screen--start" aria-labelledby="start-title">
@@ -64,6 +65,8 @@
         <button id="end-practice" class="chip" type="button" data-t="endPractice"></button>
       </div>
       <div class="timer" aria-hidden="true"><div id="timer-fill" class="timer__fill"></div></div>
+      <span id="penalty-pop" class="penalty-pop numeric" aria-hidden="true"></span>
+      <div id="streak" class="streak" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     </header>
 
     <div class="board">
@@ -79,6 +82,7 @@
         </p>
         <p id="feedback" class="feedback" role="status"></p>
         <span id="points-pop" class="points-pop numeric" aria-hidden="true"></span>
+        <span id="callout" class="callout" aria-hidden="true"></span>
       </div>
     </div>
 
@@ -131,5 +135,6 @@
     </div>
   </section>
 </main>
+<canvas id="fx" class="fx" aria-hidden="true"></canvas>
 </body>
 </html>
