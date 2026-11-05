@@ -7,7 +7,7 @@
 // origin: no requests, no inline scripts. It touches one localStorage key of its own.
 // Query: ?lang=pl|en (from GameHost); ?seed=<n> makes the pipes repeatable and puts the
 // bird's and the next gap's positions on the stage (data-debug-*), for the browser test.
-import { createParticles, flashAlpha, shakeOffset, spawnBurst, updateParticles } from './effects.js';
+import { createParticles, flashAlpha, shakeOffset, spawnBurst, spawnFeathers, spawnPuff, updateParticles } from './effects.js';
 import { createGame, handlePress, stepGame } from './game.js';
 import { translator, pickLang } from './i18n.js';
 import {
@@ -23,7 +23,8 @@ import {
   lerp,
   parseSeed,
 } from './logic.js';
-import { renderFrame } from './render.js';
+import { createRenderer, renderFrame, resizeRenderer, setPalette } from './render.js';
+import { PIXEL, paletteFor, pixelGrid } from './pixel.js';
 
 const BEST_KEY = 'lifexp-flappy-best';
 const MAX_PIXEL_RATIO = 3;
@@ -39,12 +40,9 @@ function byId(id) {
 
 function findElements() {
   const board = /** @type {HTMLCanvasElement} */ (byId('board'));
-  const ctx = board.getContext('2d', { alpha: false });
-  if (!ctx) throw new Error('no 2D canvas');
   return {
     stage: byId('stage'),
     board,
-    ctx,
     score: byId('score'),
     readyBest: byId('ready-best'),
     overScore: byId('over-score'),
@@ -93,21 +91,24 @@ const gameRng = createRng(seed ?? randomSeed());
 const effectRng = createRng(randomSeed());
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const dom = findElements();
+const renderer = createRenderer(dom.board);
 
 let game = createGame(fitWorld(innerWidth, innerHeight).width, gameRng, loadBest());
 let pressedAt = /** @type {number | null} */ (null);
 let previousBirdY = game.bird.y;
 const particles = createParticles();
-const fx = { flapAt: -10, deathAt: -10 };
+const fx = { flapAt: -10, deathAt: -10, scoreAt: -10 };
+/** Runs so far: each run takes the next palette (dawn, day, dusk, night). */
+let run = seed ?? Math.floor(effectRng() * 4);
 const clock = { accumulator: 0, last: /** @type {number | null} */ (null), time: 0, frame: 0, paused: false, running: false };
-const view = { scale: 1, pixelScale: 1 };
+const view = { scale: 1 };
 
 // ── Layout ───────────────────────────────────────────────────────────────────
 
 /**
- * Sizes the stage to the world (letterboxed when the frame is wider) and the canvas to
- * the device's pixels. A new shape changes the world's width only on the ready screen,
- * never under a game in progress.
+ * Sizes the stage to the world (letterboxed when the frame is wider) and the art canvas
+ * to it: a whole number of device pixels per art pixel (pixel.js pixelGrid). A new shape
+ * changes the world's width only on the ready screen, never under a game in progress.
  */
 function layoutStage() {
   const fit = fitWorld(innerWidth, innerHeight);
@@ -118,16 +119,24 @@ function layoutStage() {
   const scale = Math.min(innerWidth / game.width, innerHeight / WORLD_HEIGHT);
   const cssWidth = game.width * scale;
   const cssHeight = WORLD_HEIGHT * scale;
-  const ratio = Math.min(devicePixelRatio || 1, MAX_PIXEL_RATIO);
-  dom.board.width = Math.round(cssWidth * ratio);
-  dom.board.height = Math.round(cssHeight * ratio);
+  const grid = pixelGrid(cssWidth, cssHeight, Math.min(devicePixelRatio || 1, MAX_PIXEL_RATIO));
+  resizeRenderer(renderer, grid, game.width, paletteFor(run));
   view.scale = scale;
-  view.pixelScale = dom.board.width / game.width;
   dom.stage.style.setProperty('--stage-w', `${cssWidth}px`);
   dom.stage.style.setProperty('--stage-h', `${cssHeight}px`);
-  dom.stage.style.setProperty('--s', scale.toFixed(4));
-  dom.stage.style.setProperty('--t', Math.max(scale, 0.85).toFixed(4));
+  dom.stage.style.setProperty('--board-w', `${grid.cssWidth}px`);
+  dom.stage.style.setProperty('--board-h', `${grid.cssHeight}px`);
+  // The world on screen is the art's size (a whole number of device pixels per art pixel),
+  // a little smaller than the stage: the panels are placed and sized by that scale.
+  const px = grid.cssHeight / grid.height;
+  const artScale = px / PIXEL;
+  dom.stage.style.setProperty('--s', artScale.toFixed(4));
+  dom.stage.style.setProperty('--t', Math.max(artScale, 0.85).toFixed(4));
+  dom.stage.style.setProperty('--px', `${px}px`);
+  // The art adds rows of sky above the world (pixelGrid's `top`): the panels follow the world.
+  dom.stage.style.setProperty('--world-top', `${(grid.top * grid.cssHeight) / grid.height}px`);
   dom.stage.classList.toggle('is-boxed', innerWidth - cssWidth > 24 || innerHeight - cssHeight > 24);
+  dom.stage.dataset.palette = paletteFor(run).name;
 }
 
 // ── Input ────────────────────────────────────────────────────────────────────
@@ -172,29 +181,29 @@ function bindInput() {
 
 const reduced = () => reducedMotion.matches;
 
-function popScore() {
-  if (reduced()) return;
-  dom.score.animate(
-    [{ transform: 'scale(1.22)' }, { transform: 'scale(1)' }],
-    { duration: 220, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
-  );
-}
-
 /** @param {import('./game.js').GameEvent[]} events */
 function reactToEvents(events) {
   for (const event of events) {
-    if (event === 'flap') fx.flapAt = clock.time;
+    if (event === 'flap') {
+      fx.flapAt = clock.time;
+      if (!reduced()) spawnPuff(particles, game.bird.x - BIRD.radius, game.bird.y + 4, effectRng);
+    }
     if (event === 'score') {
-      popScore();
+      fx.scoreAt = clock.time;
       if (!reduced()) spawnBurst(particles, game.bird.x + 4, game.bird.y, effectRng);
     }
     if (event === 'hit') {
       fx.deathAt = clock.time;
+      if (!reduced()) spawnFeathers(particles, game.bird.x, game.bird.y, effectRng);
       if (game.newBest) saveBest(game.best);
     }
     if (event === 'restart') {
       fx.deathAt = -10;
+      fx.scoreAt = -10;
       previousBirdY = game.bird.y;
+      run += 1;
+      setPalette(renderer, paletteFor(run));
+      dom.stage.dataset.palette = paletteFor(run).name;
     }
   }
   if (events.length) updateHud();
@@ -269,7 +278,7 @@ function drawFrame(alpha) {
   const since = clock.time - fx.deathAt;
   const calm = reduced();
   const bob = game.state === 'ready' ? readyBob() : 0;
-  renderFrame(dom.ctx, view.pixelScale, {
+  renderFrame(renderer, {
     width: game.width,
     distance: game.distance - lag,
     time: clock.time,
@@ -288,6 +297,9 @@ function drawFrame(alpha) {
     shake: calm ? { x: 0, y: 0 } : shakeOffset(since, effectRng),
     flash: calm ? 0 : flashAlpha(since),
     reduced: calm,
+    score: game.score,
+    showScore: game.state === 'playing' || game.state === 'dying' || clock.paused,
+    scoreSince: clock.time - fx.scoreAt,
   });
 }
 

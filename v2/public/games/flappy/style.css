@@ -1,7 +1,9 @@
-/* Flappy Bird (docs/v2/PLAN.md 9.1, stage g-3). The tokens copy LifeXP's dark theme
-   (v2/src/ui/tokens.css): the game's page cannot load the app's CSS. The stage is the
+/* Flappy Bird (docs/v2/PLAN.md 9.1, g-3; pixel art since q-own). The stage is the
    world's rectangle; main.js sets --stage-w, --stage-h, --s (world → CSS scale, for
-   positions) and --t (the same, but never below 0.85, for text: readable when small). */
+   positions), --t (the same, but never below 0.85, for text: readable when small),
+   --board-w/-h (the art canvas, a whole number of device pixels per art pixel) and --px
+   (one art pixel in CSS pixels: the panels' borders and shadows are whole art pixels,
+   hard-edged, to match the pixel art). */
 
 :root {
   color-scheme: dark;
@@ -14,7 +16,7 @@
   --color-accent-text: #8f88ff;
   --color-on-accent: #ffffff;
   --color-warning: #ffd166;
-  --color-focus: #8f88ff;
+  --color-focus: #ffc94a;
   --font: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --duration-enter: 260ms;
   --duration-exit: 160ms;
@@ -22,6 +24,13 @@
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --s: 1;
   --t: 1;
+  --px: 2px;
+  --ink: #2a1a2e;
+  --paper: #fff6dc;
+  --paper-shade: #e9cf9a;
+  --gold: #ffc94a;
+  --button: #ff6b3d;
+  --button-shade: #c9441c;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -68,54 +77,46 @@ body {
 
 /* Letterboxed (a sideways phone, a desktop): the world is a card on the page. */
 .stage.is-boxed {
-  border-radius: calc(var(--s) * 18px);
-  box-shadow: 0 16px 48px rgb(0 0 0 / 50%), 0 0 0 1px var(--color-border);
+  box-shadow: 0 0 0 var(--px) var(--ink), 0 16px 48px rgb(0 0 0 / 50%);
 }
 
+/* The art canvas, scaled up by whole device pixels with no smoothing: crisp squares. */
 .board {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: var(--board-w, 100%);
+  height: var(--board-h, 100%);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+@supports (image-rendering: pixelated) {
+  .board {
+    image-rendering: pixelated;
+  }
 }
 
 /* ── HUD ─────────────────────────────────────────────────────────────────── */
 
+/* The score is drawn in pixel digits on the canvas; this element keeps the number (for
+   the browser test), out of sight. */
 .score {
   position: absolute;
-  top: calc(var(--s) * 44px);
-  left: 0;
-  right: 0;
+  width: 1px;
+  height: 1px;
   margin: 0;
-  text-align: center;
-  font-size: calc(var(--t) * 56px);
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  color: #fff;
-  text-shadow: 0 calc(var(--t) * 3px) 0 rgb(14 15 19 / 70%), 0 0 calc(var(--t) * 18px) rgb(95 86 242 / 55%);
-  opacity: 0;
-  transform: translateY(calc(var(--t) * -8px));
-  transition:
-    opacity var(--duration-exit) var(--ease-in),
-    transform var(--duration-exit) var(--ease-in);
-  pointer-events: none;
-}
-
-.stage[data-state='playing'] .score,
-.stage[data-state='dying'] .score,
-.stage[data-state='paused'] .score {
-  opacity: 1;
-  transform: none;
-  transition-duration: var(--duration-enter);
-  transition-timing-function: var(--ease-out);
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* ── Panels (ready, game over, paused) ───────────────────────────────────── */
 
 .panel {
   position: absolute;
-  inset: 0;
+  top: var(--world-top, 0px);
+  left: 0;
+  right: 0;
+  height: calc(var(--s) * 640px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -149,26 +150,51 @@ body {
 
 .panel__title {
   margin: 0;
-  font-size: calc(var(--t) * 34px);
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-size: calc(var(--t) * 36px);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   white-space: nowrap;
   line-height: 1.05;
-  color: #fff;
-  text-shadow: 0 calc(var(--t) * 3px) 0 rgb(14 15 19 / 70%);
+  color: var(--gold);
+  /* A hard, stepped outline in whole art pixels (no blur): pixel lettering. */
+  text-shadow:
+    var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 var(--ink),
+    0 var(--px) 0 var(--ink),
+    0 calc(var(--px) * -1) 0 var(--ink),
+    var(--px) calc(var(--px) * 2) 0 var(--ink),
+    0 calc(var(--px) * 2) 0 var(--ink);
 }
 
 .pill {
   position: absolute;
-  top: calc(var(--s) * 314px);
+  top: calc(var(--s) * 330px);
   margin: 0;
-  padding: calc(var(--t) * 10px) calc(var(--t) * 20px);
-  border-radius: 999px;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-size: calc(var(--t) * 17px);
-  font-weight: 700;
-  box-shadow: 0 calc(var(--t) * 6px) calc(var(--t) * 20px) rgb(95 86 242 / 45%);
+  padding: calc(var(--t) * 8px) calc(var(--t) * 16px);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: calc(var(--t) * 16px);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  box-shadow:
+    0 0 0 var(--px) var(--ink),
+    0 calc(var(--px) * 2) 0 var(--px) var(--ink);
+  animation: pill-blink 1.1s steps(1) infinite;
+}
+
+/* "Tap to start" blinks like an arcade attract screen (off with reduced motion). */
+@keyframes pill-blink {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill {
+    animation: none;
+  }
 }
 
 .panel__foot {
@@ -184,7 +210,9 @@ body {
 .panel__best,
 .panel__hint {
   margin: 0;
-  color: var(--color-text-secondary);
+  color: #fff;
+  text-shadow: 0 var(--px) 0 var(--ink);
+  font-weight: 700;
   font-size: calc(var(--t) * 14px);
   line-height: 1.4;
 }
@@ -196,7 +224,7 @@ body {
 }
 
 .panel__best strong {
-  color: var(--color-warning);
+  color: var(--gold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -213,26 +241,39 @@ body {
 
 .card {
   width: min(100%, calc(var(--t) * 264px));
-  padding: calc(var(--t) * 22px) calc(var(--t) * 20px);
-  border: 1px solid var(--color-border);
-  border-radius: calc(var(--t) * 18px);
-  background: var(--color-surface);
-  box-shadow: 0 calc(var(--t) * 16px) calc(var(--t) * 40px) rgb(0 0 0 / 45%);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  padding: calc(var(--t) * 20px) calc(var(--t) * 18px);
+  background: var(--paper);
+  color: var(--ink);
+  /* A pixel frame: ink outline, a lighter inner rim, a hard drop shadow. */
+  box-shadow:
+    inset 0 0 0 var(--px) var(--paper-shade),
+    0 0 0 var(--px) var(--ink),
+    0 calc(var(--px) * 3) 0 var(--px) var(--ink);
   pointer-events: auto;
+}
+
+.stage[data-state='over'] .card {
+  animation: card-drop var(--duration-enter) steps(4, end);
+}
+
+/* The result card drops in four hard steps (pixel style). */
+@keyframes card-drop {
+  from {
+    transform: translateY(calc(var(--px) * -24));
+  }
 }
 
 .card__title {
   margin: 0;
   font-size: calc(var(--t) * 24px);
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .card__body {
   margin: calc(var(--t) * 8px) 0 0;
-  color: var(--color-text-secondary);
+  color: var(--ink);
   font-size: calc(var(--t) * 15px);
 }
 
@@ -241,11 +282,19 @@ body {
   margin: calc(var(--t) * 10px) auto 0;
   padding: calc(var(--t) * 4px) calc(var(--t) * 12px);
   width: fit-content;
-  border-radius: 999px;
-  background: rgb(255 209 102 / 16%);
-  color: var(--color-warning);
+  background: var(--gold);
+  color: var(--ink);
   font-size: calc(var(--t) * 13px);
-  font-weight: 700;
+  font-weight: 900;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 var(--px) var(--ink);
+  animation: badge-blink 0.5s steps(1) 4;
+}
+
+@keyframes badge-blink {
+  50% {
+    background: var(--paper);
+  }
 }
 
 .stage.is-new-best .badge {
@@ -261,12 +310,12 @@ body {
 
 .results__item {
   padding: calc(var(--t) * 10px) calc(var(--t) * 8px);
-  border-radius: calc(var(--t) * 12px);
-  background: rgb(255 255 255 / 4%);
+  background: var(--paper-shade);
+  box-shadow: inset 0 var(--px) 0 rgb(42 26 46 / 25%);
 }
 
 .results dt {
-  color: var(--color-text-secondary);
+  color: var(--ink);
   font-size: calc(var(--t) * 12px);
   font-weight: 600;
   text-transform: uppercase;
@@ -281,33 +330,42 @@ body {
 }
 
 #over-best {
-  color: var(--color-warning);
+  color: var(--button-shade);
 }
 
 .button {
   width: 100%;
+  min-height: 48px;
   padding: calc(var(--t) * 12px) calc(var(--t) * 16px);
   border: 0;
-  border-radius: 999px;
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background: var(--button);
+  color: #fff;
   font: inherit;
   font-size: calc(var(--t) * 16px);
-  font-weight: 700;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-shadow: 0 var(--px) 0 var(--button-shade);
+  box-shadow:
+    inset 0 calc(var(--px) * -2) 0 var(--button-shade),
+    0 0 0 var(--px) var(--ink);
   cursor: pointer;
   transition: background-color var(--duration-exit) var(--ease-in);
 }
 
 .button:disabled {
   cursor: default;
+  opacity: 0.6;
 }
 
 .button:hover:not(:disabled) {
-  background: #6d65f5;
+  background: #ff7d52;
 }
 
+/* Pressed: the button sinks by its 2-pixel lip. */
 .button:active:not(:disabled) {
-  background: #5048e0;
+  transform: translateY(calc(var(--px) * 2));
+  box-shadow: 0 0 0 var(--px) var(--ink);
 }
 
 .button:focus-visible {
