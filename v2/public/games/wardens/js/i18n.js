@@ -1,0 +1,230 @@
+// @ts-check
+// Strażnicy Doliny: the game's own texts and query (GameHost passes ?lang=pl|en; the
+// frame cannot use the app's i18n). ?test=1 and the switches that need it exist for the
+// browser test only.
+
+const TEXTS = {
+  pl: {
+    title: 'Strażnicy Doliny',
+    intro: 'Stawiaj wieże przy drodze i nie przepuść najeźdźców przez dolinę.',
+    pickMap: 'Wybierz mapę',
+    'map.meadow': 'Łąka',
+    'map.canyon': 'Kanion',
+    'map.marsh': 'Mokradła',
+    'mapDesc.meadow': 'Kręta droga przez łąkę. Na początek.',
+    'mapDesc.canyon': 'Długi zygzak, wcześnie przylatują ćmy.',
+    'mapDesc.marsh': 'Krótka droga, ciężkie pancerze i dwa Kolosy.',
+    endless: 'Bez końca',
+    endlessDesc: 'Mokradła fala za falą, aż padną mury.',
+    waves: 'Fale: {n}',
+    stars: 'Gwiazdki: {n}/3',
+    locked: 'Najpierw ukończ: {map}',
+    bestWave: 'Rekord: fala {n}',
+    noBest: 'Jeszcze bez rekordu',
+    gold: 'Złoto',
+    lives: 'Życia',
+    wave: 'Fala',
+    waveOf: '{n}/{total}',
+    pause: 'Pauza',
+    resume: 'Wznów',
+    speed: '{n}×',
+    speedLabel: 'Tempo',
+    restart: 'Od nowa',
+    maps: 'Mapy',
+    startWave: 'Start fali {n}',
+    callEarly: 'Wezwij falę {n} · +{gold} złota',
+    autoIn: 'Sama ruszy za {s} s',
+    nextWave: 'Fala {n}:',
+    inProgress: 'Fala {n} trwa · wrogów: {k}',
+    bossWave: 'Kolos!',
+    hint: 'Stuknij jasne pole przy drodze, by postawić wieżę.',
+    'tower.archer': 'Łucznik',
+    'tower.mortar': 'Moździerz',
+    'tower.frost': 'Szron',
+    'tower.ballista': 'Balista',
+    'tower.banner': 'Sztandar',
+    'role.archer': 'Szybkie strzały w jeden cel, także w lotników.',
+    'role.mortar': 'Wybuch na ziemi, wielu naraz. Nie sięga lotników.',
+    'role.frost': 'Spowalnia wszystkich wokół i lekko rani.',
+    'role.ballista': 'Daleki, ciężki strzał przez pancerz.',
+    'role.banner': 'Nie strzela: wieże obok biją mocniej (+{p}%).',
+    'enemy.crawler': 'Pełzacz',
+    'enemy.runner': 'Biegacz',
+    'enemy.shellback': 'Skorupiak',
+    'enemy.moth': 'Ćma',
+    'enemy.splitter': 'Dzielak',
+    'enemy.shard': 'Odłamek',
+    'enemy.colossus': 'Kolos',
+    'trait.runner': 'szybki',
+    'trait.shellback': 'pancerz',
+    'trait.moth': 'lata',
+    'trait.splitter': 'dzieli się',
+    'trait.colossus': 'boss',
+    build: 'Zbuduj wieżę',
+    cost: '{n} złota',
+    missing: 'Brakuje {n}',
+    level: 'Poziom {n}/3',
+    upgrade: 'Ulepsz · {n} złota',
+    maxed: 'Najwyższy poziom',
+    sell: 'Sprzedaj · +{n}',
+    target: 'Cel',
+    'priority.first': 'Pierwszy',
+    'priority.strongest': 'Najsilniejszy',
+    'priority.closest': 'Najbliższy',
+    close: 'Zamknij',
+    pad: 'Pole budowy {n}',
+    towerAt: '{name}, poziom {level}',
+    statDamage: 'Obrażenia {n}',
+    statRange: 'Zasięg {n}',
+    statRate: 'Strzały na s: {n}',
+    statSlow: 'Spowolnienie {n}%',
+    statBuff: 'Premia {n}%',
+    paused: 'Gra wstrzymana',
+    won: 'Dolina obroniona!',
+    lost: 'Mury padły',
+    endlessOver: 'Koniec: fala {n}',
+    livesLeft: 'Życia: {n}',
+    kills: 'Pokonani: {n}',
+    wavesCleared: 'Fale odparte: {n}',
+    newBest: 'Nowy rekord!',
+    nextMap: 'Następna mapa',
+    again: 'Jeszcze raz',
+    toMaps: 'Wybór mapy',
+    unlocked: 'Odblokowano: {map}',
+    keysHint: 'Na komputerze: Spacja — pauza, F — tempo, N — następna fala, Esc — zamknij.',
+  },
+  en: {
+    title: 'Valley Wardens',
+    intro: 'Build towers by the road and let no invader through the valley.',
+    pickMap: 'Pick a map',
+    'map.meadow': 'Meadow',
+    'map.canyon': 'Canyon',
+    'map.marsh': 'Marsh',
+    'mapDesc.meadow': 'A winding road through the meadow. Start here.',
+    'mapDesc.canyon': 'A long zigzag; moths come early.',
+    'mapDesc.marsh': 'A short road, heavy armor and two Colossi.',
+    endless: 'Endless',
+    endlessDesc: 'The Marsh, wave after wave, until the walls fall.',
+    waves: 'Waves: {n}',
+    stars: 'Stars: {n}/3',
+    locked: 'Finish {map} first',
+    bestWave: 'Best: wave {n}',
+    noBest: 'No best yet',
+    gold: 'Gold',
+    lives: 'Lives',
+    wave: 'Wave',
+    waveOf: '{n}/{total}',
+    pause: 'Pause',
+    resume: 'Resume',
+    speed: '{n}×',
+    speedLabel: 'Speed',
+    restart: 'Restart',
+    maps: 'Maps',
+    startWave: 'Start wave {n}',
+    callEarly: 'Call wave {n} · +{gold} gold',
+    autoIn: 'Starts by itself in {s} s',
+    nextWave: 'Wave {n}:',
+    inProgress: 'Wave {n} · enemies: {k}',
+    bossWave: 'Colossus!',
+    hint: 'Tap a light spot by the road to build a tower.',
+    'tower.archer': 'Archer',
+    'tower.mortar': 'Mortar',
+    'tower.frost': 'Frost',
+    'tower.ballista': 'Ballista',
+    'tower.banner': 'Banner',
+    'role.archer': 'Fast shots at one target, fliers too.',
+    'role.mortar': 'A ground blast that hits many. Cannot reach fliers.',
+    'role.frost': 'Slows everyone around and scratches them.',
+    'role.ballista': 'A long, heavy shot through armor.',
+    'role.banner': 'Does not shoot: towers nearby hit harder (+{p}%).',
+    'enemy.crawler': 'Crawler',
+    'enemy.runner': 'Runner',
+    'enemy.shellback': 'Shellback',
+    'enemy.moth': 'Moth',
+    'enemy.splitter': 'Splitter',
+    'enemy.shard': 'Shard',
+    'enemy.colossus': 'Colossus',
+    'trait.runner': 'fast',
+    'trait.shellback': 'armor',
+    'trait.moth': 'flies',
+    'trait.splitter': 'splits',
+    'trait.colossus': 'boss',
+    build: 'Build a tower',
+    cost: '{n} gold',
+    missing: '{n} short',
+    level: 'Level {n}/3',
+    upgrade: 'Upgrade · {n} gold',
+    maxed: 'Top level',
+    sell: 'Sell · +{n}',
+    target: 'Target',
+    'priority.first': 'First',
+    'priority.strongest': 'Strongest',
+    'priority.closest': 'Closest',
+    close: 'Close',
+    pad: 'Build spot {n}',
+    towerAt: '{name}, level {level}',
+    statDamage: 'Damage {n}',
+    statRange: 'Range {n}',
+    statRate: 'Shots a second: {n}',
+    statSlow: 'Slow {n}%',
+    statBuff: 'Bonus {n}%',
+    paused: 'Paused',
+    won: 'The valley holds!',
+    lost: 'The walls fell',
+    endlessOver: 'Over: wave {n}',
+    livesLeft: 'Lives: {n}',
+    kills: 'Defeated: {n}',
+    wavesCleared: 'Waves held: {n}',
+    newBest: 'New best!',
+    nextMap: 'Next map',
+    again: 'Play again',
+    toMaps: 'Pick a map',
+    unlocked: 'Unlocked: {map}',
+    keysHint: 'On a computer: Space — pause, F — speed, N — next wave, Esc — close.',
+  },
+};
+
+/** @typedef {keyof typeof TEXTS.pl} TextKey */
+/** @typedef {(key: TextKey, values?: Record<string, string | number>) => string} Translate */
+
+/** The keys of both languages, for the test that they match. */
+export const TEXT_KEYS = { pl: Object.keys(TEXTS.pl), en: Object.keys(TEXTS.en) };
+
+/** @param {string} search @returns {'pl' | 'en'} */
+export function pickLang(search) {
+  return new URLSearchParams(search).get('lang') === 'en' ? 'en' : 'pl';
+}
+
+/** @param {'pl' | 'en'} lang @returns {Translate} */
+export function translator(lang) {
+  const texts = TEXTS[lang];
+  return (key, values = {}) => texts[key].replace(/\{(\w+)\}/g, (_, name) => String(values[name] ?? ''));
+}
+
+/**
+ * @param {URLSearchParams} params @param {string} name @param {number} min @param {number} max
+ * @returns {number | null}
+ */
+function intParam(params, name, min, max) {
+  const raw = params.get(name);
+  if (raw === null || !/^\d{1,6}$/.test(raw)) return null;
+  return Math.min(max, Math.max(min, Number(raw)));
+}
+
+/**
+ * The query's test switches, all only with ?test=1: speed=<n> (the clock runs n times
+ * faster, up to 60), waves=<n> (a map ends after n waves), lives=<n>, gold=<n>. With
+ * ?test=1 the stage also carries its state in data-debug-* for the test to read.
+ * @param {string} search
+ */
+export function testParams(search) {
+  const params = new URLSearchParams(search);
+  const on = params.get('test') === '1';
+  return {
+    on,
+    speed: on ? intParam(params, 'speed', 1, 60) : null,
+    waves: on ? intParam(params, 'waves', 1, 20) : null,
+    lives: on ? intParam(params, 'lives', 1, 99) : null,
+    gold: on ? intParam(params, 'gold', 0, 99999) : null,
+  };
+}

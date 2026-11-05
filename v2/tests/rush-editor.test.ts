@@ -388,9 +388,9 @@ describe('every portal in every game (stage r-5)', () => {
     expect(back.problems).toEqual([]);
     expect(back.level!.sections.map((s) => s.hazards)).toEqual(level.sections.map((s) => s.hazards));
     for (const palette of [WAVE, SHIP, FLIP]) {
-      expect(palette.modes.slice().sort()).toEqual(['ball', 'ship', 'spider', 'wave']);
+      expect(palette.modes.slice().sort()).toEqual(['ball', 'robot', 'ship', 'spider', 'wave']);
       expect(palette.items).toEqual(expect.arrayContaining(['speed', 'portal']));
-      for (const kind of ['flip', 'down', 'up', 'mini', 'big', 'wave', 'ship', 'ball', 'spider']) {
+      for (const kind of ['flip', 'down', 'up', 'mini', 'big', 'wave', 'ship', 'ball', 'spider', 'robot']) {
         const one = { ...JSON.parse(toJson(emptyLevel(palette, 'x'))), sections: [{ length: 30, ceil: '2 r30', floor: '10 r30', mode: 'ball', hazards: [{ type: 'portal', x: 12, kind, y: 6, sy: 0.5 }] }] };
         expect(checkLevel(one, palette).problems, `${palette.id} ${kind}`).toEqual([]);
       }

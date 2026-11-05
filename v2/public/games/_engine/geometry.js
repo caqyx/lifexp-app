@@ -76,7 +76,7 @@ import { JOINT, JOINT_CLEAR, PLAY_H } from './world.js';
  *   mini: designed (and proven) for the mini wave, flown between its own mini portals;
  *   tier: its own speed and limits (the finale); mode: the vehicle it is flown with (Wave
  *   Rush: the wave unless `ship`; Ship Rush: the ship unless `wave`; Flip Rush: ball or spider).
- * @typedef {'wave' | 'ship' | 'ball' | 'spider'} VehicleMode
+ * @typedef {'wave' | 'ship' | 'ball' | 'spider' | 'robot'} VehicleMode
  *
  * @typedef {{ type: 'spike' | 'halfSpike' | 'block' | 'pillar', shape: 'poly', pts: Pt[], vis: Pt[], dir: 'up' | 'down' | 'none', bbox: number[], tilted?: boolean, rot?: number }} PolyHazard
  *   tilted (stage r-4): a block or pillar turned by other than a right angle — no surface

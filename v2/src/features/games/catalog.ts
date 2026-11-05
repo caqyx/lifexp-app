@@ -7,10 +7,10 @@
 // Flappy Bird, Szybkie liczenie, Wave Rush, Ship Rush and Flip Rush are LifeXP's own,
 // written in this repo in v2/public/games/flappy/, quick-math/, wave-rush/, ship-rush/ and
 // flip-rush/ (GAME.json; the Rush games share their engine in v2/public/games/_engine/).
-import { Activity, Bird, Calculator, FlaskConical, Grid3x3, type LucideIcon, Swords } from 'lucide-preact';
+import { Activity, Bird, Calculator, Castle, FlaskConical, Grid3x3, type LucideIcon, Swords } from 'lucide-preact';
 import { emulatorTarget } from '@/lib/emulator';
 
-export type GameId = 'flappy-bird' | 'wartime' | 'gridlock' | 'quick-math' | 'rush' | 'test';
+export type GameId = 'flappy-bird' | 'wartime' | 'gridlock' | 'quick-math' | 'rush' | 'wardens' | 'test';
 
 export interface GameDef {
   id: GameId;
@@ -50,10 +50,12 @@ export const GAMES: readonly GameDef[] = [
     downloads: true,
     pastNames: ['Wave Rush', 'Ship Rush', 'Flip Rush'],
   },
+  // LifeXP's own tower defense (stage td-1), written in this repo in games/wardens/.
+  { id: 'wardens', sessionName: 'Strażnicy Doliny', icon: Castle, src: 'games/wardens/index.html' },
 ];
 
 /** The modes' old games (their links still work: the game Rush, opened in that mode). */
-const RUSH_MODES: Readonly<Record<string, string>> = { 'wave-rush': 'wave', 'ship-rush': 'ship', 'flip-rush': 'flip' };
+const RUSH_MODES: Readonly<Record<string, string>> = { 'wave-rush': 'wave', 'ship-rush': 'ship', 'flip-rush': 'flip', 'robot-rush': 'robot' };
 
 /**
  * A stand-in game for the browser tests (tests/v2/games.spec.js serves its page), only

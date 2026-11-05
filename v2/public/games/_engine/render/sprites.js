@@ -159,6 +159,7 @@ export const PORTAL_COLORS = {
   shipOff: '#7fe0ff',
   ball: '#ffb347',
   spider: '#c77dff',
+  robot: '#39f6ff',
   flip: '#ffe14d',
   slow: '#ff9f43',
   normal: '#5ee7ff',
@@ -173,6 +174,7 @@ export const PORTAL_COLORS = {
 export function portalColor(p) {
   if (p.kind === 'ship' && p.mode === 'ball') return PORTAL_COLORS.ball;
   if (p.kind === 'ship' && p.mode === 'spider') return PORTAL_COLORS.spider;
+  if (p.kind === 'ship' && p.mode === 'robot') return PORTAL_COLORS.robot;
   if (p.kind === 'gravity') return p.on ? PORTAL_COLORS.gravityOn : PORTAL_COLORS.gravityOff;
   if (p.kind === 'flip') return PORTAL_COLORS.flip;
   if (p.kind === 'speed') return /** @type {Record<string, string>} */ (PORTAL_COLORS)[p.speed ?? 'normal'] ?? PORTAL_COLORS.normal;
@@ -251,7 +253,7 @@ export function drawPortal(ctx, x, top, bottom, cell, p, time, reduced) {
 
 /**
  * A vehicle's sign in a portal: the wave a zigzag, the ship a hull, the ball a rolling
- * circle, the spider a body with legs; white on a dark disc.
+ * circle, the spider a body with legs, the robot a boxy head on two legs; white on a dark disc.
  * @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} cell @param {string} mode
  */
 export function drawVehicleGlyph(ctx, x, y, cell, mode) {
@@ -290,6 +292,15 @@ export function drawVehicleGlyph(ctx, x, y, cell, mode) {
     ctx.moveTo(x, y - u * 0.85);
     ctx.lineTo(x, y + u * 0.85);
     ctx.stroke();
+  } else if (mode === 'robot') {
+    // A boxy head with a visor, on two legs.
+    ctx.rect(x - u * 0.55, y - u * 0.75, u * 1.1, u * 0.9);
+    ctx.moveTo(x - u * 0.3, y + u * 0.15);
+    ctx.lineTo(x - u * 0.4, y + u * 0.85);
+    ctx.moveTo(x + u * 0.3, y + u * 0.15);
+    ctx.lineTo(x + u * 0.4, y + u * 0.85);
+    ctx.stroke();
+    ctx.fillRect(x - u * 0.1, y - u * 0.5, u * 0.5, u * 0.22);
   } else {
     ctx.arc(x, y - u * 0.15, u * 0.45, 0, Math.PI * 2);
     ctx.fill();

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Strażnicy Doliny</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<main id="app" class="app" data-screen="start">
+
+  <section id="start" class="screen screen--start" aria-labelledby="start-title">
+    <header class="start__head">
+      <h1 id="start-title" class="start__title" data-t="title"></h1>
+      <p class="start__intro" data-t="intro"></p>
+    </header>
+    <h2 class="start__pick" data-t="pickMap"></h2>
+    <ul id="map-list" class="maps"></ul>
+    <p class="start__hint" data-t="keysHint"></p>
+  </section>
+
+  <section id="play" class="screen screen--play" aria-labelledby="play-map">
+    <header class="hud">
+      <h2 id="play-map" class="visually-hidden"></h2>
+      <ul class="hud__stats">
+        <li id="hud-gold" class="stat stat--gold">
+          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="8" fill="#ffd166"/><circle cx="10" cy="10" r="5" fill="none" stroke="#b8862b" stroke-width="1.6"/></svg>
+          <span data-t="gold"></span> <strong id="gold" class="numeric">0</strong>
+        </li>
+        <li id="hud-lives" class="stat stat--lives">
+          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><path d="M10 17s-6.5-4.1-6.5-8.6A3.6 3.6 0 0 1 10 6.2a3.6 3.6 0 0 1 6.5 2.2C16.5 12.9 10 17 10 17Z" fill="#ff6b6b"/></svg>
+          <span data-t="lives"></span> <strong id="lives" class="numeric">0</strong>
+        </li>
+        <li class="stat stat--wave">
+          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" focusable="false"><path d="M5 3v15" stroke="#e8eaf0" stroke-width="1.8" stroke-linecap="round"/><path d="M6 4h9l-2.5 3.5L15 11H6Z" fill="#8f88ff"/></svg>
+          <span data-t="wave"></span> <strong id="wave" class="numeric">0</strong>
+        </li>
+      </ul>
+    </header>
+
+    <div id="stage" class="stage">
+      <canvas id="board" class="board" aria-hidden="true"></canvas>
+      <div id="pads" class="pads" role="group" aria-labelledby="play-map"></div>
+      <p id="hint" class="hint" data-t="hint"></p>
+      <p id="banner" class="banner" role="status" aria-live="polite"></p>
+    </div>
+
+    <footer class="wavebar">
+      <div class="wavebar__info">
+        <p id="wave-status" class="wavebar__status"></p>
+        <ul id="wave-preview" class="preview"></ul>
+      </div>
+      <div class="wavebar__actions">
+        <button id="pause" class="chip" type="button" aria-pressed="false">
+          <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false"><rect x="5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/><rect x="11.5" y="4" width="3.5" height="12" rx="1" fill="currentColor"/></svg>
+          <span data-t="pause"></span>
+        </button>
+        <button id="speed" class="chip" type="button" aria-pressed="false">
+          <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false"><path d="M3 5l6 5-6 5Z M10 5l6 5-6 5Z" fill="currentColor"/></svg>
+          <span id="speed-text"></span>
+        </button>
+        <button id="call-wave" class="button button--primary wavebar__call" type="button"></button>
+      </div>
+    </footer>
+
+    <aside id="panel" class="panel" aria-labelledby="panel-title" hidden>
+      <header class="panel__head">
+        <h3 id="panel-title" class="panel__title"></h3>
+        <button id="panel-close" class="chip" type="button" data-t="close"></button>
+      </header>
+      <div id="build-menu" class="panel__body">
+        <ul id="tower-options" class="options" role="radiogroup" aria-labelledby="panel-title"></ul>
+        <p id="option-role" class="panel__role"></p>
+        <p id="option-stats" class="panel__stats"></p>
+        <button id="build" class="button button--primary" type="button"></button>
+      </div>
+      <div id="tower-menu" class="panel__body">
+        <p id="tower-level" class="panel__level"></p>
+        <p id="tower-stats" class="panel__stats"></p>
+        <div id="priority" class="segmented" role="radiogroup" aria-labelledby="priority-label">
+          <span id="priority-label" class="segmented__label" data-t="target"></span>
+          <button class="segmented__option" type="button" role="radio" aria-checked="true" data-priority="first" data-t="priority.first"></button>
+          <button class="segmented__option" type="button" role="radio" aria-checked="false" data-priority="strongest" data-t="priority.strongest"></button>
+          <button class="segmented__option" type="button" role="radio" aria-checked="false" data-priority="closest" data-t="priority.closest"></button>
+        </div>
+        <div class="panel__actions">
+          <button id="upgrade" class="button button--primary" type="button"></button>
+          <button id="sell" class="button button--secondary" type="button"></button>
+        </div>
+      </div>
+    </aside>
+
+    <div id="pause-overlay" class="overlay" hidden>
+      <div class="overlay__card" role="dialog" aria-modal="false" aria-labelledby="pause-title">
+        <h3 id="pause-title" class="overlay__title" data-t="paused"></h3>
+        <button id="resume" class="button button--primary" type="button" data-t="resume"></button>
+        <button id="restart" class="button button--secondary" type="button" data-t="restart"></button>
+        <button id="to-maps" class="button button--secondary" type="button" data-t="maps"></button>
+      </div>
+    </div>
+  </section>
+
+  <section id="end" class="screen screen--end" aria-labelledby="end-title">
+    <div class="end-card">
+      <h2 id="end-title" class="end__title"></h2>
+      <p id="end-map" class="end__map"></p>
+      <p id="end-stars" class="end__stars"></p>
+      <p id="end-badge" class="badge" hidden></p>
+      <ul class="end__stats">
+        <li id="end-lives" class="numeric"></li>
+        <li id="end-waves" class="numeric"></li>
+        <li id="end-kills" class="numeric"></li>
+      </ul>
+      <div class="end__actions">
+        <button id="next-map" class="button button--primary" type="button" data-t="nextMap"></button>
+        <button id="again" class="button button--secondary" type="button" data-t="again"></button>
+        <button id="end-maps" class="button button--secondary" type="button" data-t="toMaps"></button>
+      </div>
+    </div>
+  </section>
+</main>
+</body>
+</html>

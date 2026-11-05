@@ -73,18 +73,18 @@ async function openGame(page, account) {
 test.describe('on a phone', () => {
   test.use({ viewport: PHONE });
 
-  test('the list: five games (Rush one of them, with its modes inside), each with a line, its time today and "Graj"', async ({ page, account }) => {
+  test('the list: six games (Rush one of them, with its modes inside; Strażnicy Doliny from td-1), each with a line, its time today and "Graj"', async ({ page, account }) => {
     await openSignedIn(page, account, '#/today');
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.getByLabel('Nawigacja').getByRole('link', { name: 'Gry' }).click();
     await expect(page).toHaveURL(/#\/games$/);
 
     const cards = page.getByRole('list', { name: 'Gry' }).getByRole('listitem');
-    await expect(cards).toHaveCount(5);
-    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Rush']);
+    await expect(cards).toHaveCount(6);
+    await expect(cards.getByRole('heading')).toHaveText(['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Rush', 'Strażnicy Doliny']);
     for (const card of await cards.all()) await expect(card.getByText('Dziś jeszcze nie grano')).toBeVisible();
     // All are in (g-2, g-3, g-4, w-1, s-1, f-1): nothing is "Wkrótce" any more.
-    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Rush']) {
+    for (const name of ['Flappy Bird', 'Wartime', 'Gridlock', 'Szybkie liczenie', 'Rush', 'Strażnicy Doliny']) {
       await expect(page.getByRole('link', { name: `Graj: ${name}` })).toBeVisible();
     }
     await expect(page.getByText('Wkrótce')).toHaveCount(0);
@@ -307,7 +307,7 @@ async function playFromList(page, account, name) {
  * same mode (its page).
  */
 async function reloadRush(page, game) {
-  const mode = page.frames().map((f) => /\/(wave|ship|flip)-rush\/index\.html$/.exec(f.url().split('?')[0])).find(Boolean);
+  const mode = page.frames().map((f) => /\/(wave|ship|flip|robot)-rush\/index\.html$/.exec(f.url().split('?')[0])).find(Boolean);
   await page.reload();
   if (!mode) return;
   await game.locator(`.mode[data-mode="${mode[1]}"]`).click();
@@ -315,7 +315,7 @@ async function reloadRush(page, game) {
 }
 
 /** Rush's modes and their pages (stage rr-a). */
-const RUSH_MODES = { 'Wave Rush': 'wave-rush', 'Ship Rush': 'ship-rush', 'Flip Rush': 'flip-rush' };
+const RUSH_MODES = { 'Wave Rush': 'wave-rush', 'Ship Rush': 'ship-rush', 'Flip Rush': 'flip-rush', 'Robot Rush': 'robot-rush' };
 
 
 async function endAndExpectSession(page, account, name) {
@@ -733,6 +733,55 @@ test.describe('Szybkie liczenie', () => {
   });
 });
 
+// ── Robot Rush (stage rr-b): Rush's fourth mode ──
+
+test.describe('Robot Rush', () => {
+  test('sideways 800×360: from the picker, its neon city; the finale locked; a jump clears the first bed (the pilot), a crash in normal play starts sector 1 again', async ({ page, account }) => {
+    test.setTimeout(90000);
+    await page.setViewportSize({ width: 800, height: 360 });
+    const problems = await watchProblems(page);
+    const { host, game } = await playFromList(page, account, 'Robot Rush');
+    const stage = game.locator('#stage');
+    await expect(stage).toHaveAttribute('data-state', 'menu');
+    await expect(game.getByRole('heading', { name: 'Robot Rush' })).toBeVisible();
+    // The finale opens only after the whole Demon sector.
+    await expect(game.locator('#finale-play')).toBeDisabled();
+    await expect(game.locator('#finale-note')).toHaveText('Finał odblokujesz, kończąc cały sektor Demon.');
+    // The validator's path flies sections 1 and 2 and lets go at section 3.
+    const seeded = await openWaveWith(page, host, 'seed=7&autopilot=2');
+    await flyFrom(game, 'Graj');
+    await expect.poll(async () => (await waveState(game)).section, { timeout: 40000 }).toBeGreaterThanOrEqual(3);
+    expect(await waveState(game)).toMatchObject({ sector: 1, attempt: 1, mode: 'robot' });
+    await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 30000 });
+    await page.waitForTimeout(600);
+    await stage.click();
+    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    expect((await waveState(game)).sector).toBe(1);
+    void seeded;
+    expect(problems).toEqual([]);
+  });
+
+  test('its editor: the robot by default; an empty level verified by running it to the end', async ({ page, account }) => {
+    test.setTimeout(90000);
+    await page.setViewportSize({ width: 1000, height: 600 });
+    const problems = await watchProblems(page);
+    const { game } = await playFromList(page, account, 'Robot Rush');
+    await game.getByRole('button', { name: 'Edytor poziomów' }).click();
+    const editor = await frameAt(page, '/robot-rush/editor.html');
+    await expect(editor.locator('#ed-mode')).toHaveValue('robot');
+    await editor.getByRole('button', { name: 'Zweryfikuj' }).click();
+    const play = await frameAt(page, '/robot-rush/index.html');
+    const stage = play.locator('#stage');
+    await expect(stage).toHaveAttribute('data-state', 'ready');
+    await stage.click();
+    await expect(stage).toHaveAttribute('data-state', 'finished', { timeout: 30000 });
+    await play.getByRole('button', { name: '← Edytor' }).click();
+    const back = await frameAt(page, '/robot-rush/editor.html');
+    await expect(back.locator('#ed-verified')).toHaveText('Zweryfikowany');
+    expect(problems).toEqual([]);
+  });
+});
+
 // ── Wave Rush (stage w-1): LifeXP's own game, in the same frame and CSP ──
 
 /** The game's state (data-debug-*), as numbers where they are. */
@@ -819,10 +868,11 @@ test.describe('Rush, the mode picker', () => {
     const game = host.frameLocator('iframe');
     await expect(game.getByRole('heading', { name: 'Rush' })).toBeVisible();
     const modes = game.locator('.mode');
-    await expect(modes).toHaveCount(3);
+    await expect(modes).toHaveCount(4);
     await expect(game.locator('[data-progress="wave"]')).toHaveText('Najlepiej: 57% · Finał zamknięty');
     await expect(game.locator('[data-progress="ship"]')).toHaveText('Jeszcze bez rekordu · Finał otwarty');
     await expect(game.locator('[data-progress="flip"]')).toHaveText('Jeszcze bez rekordu · Finał ukończony');
+    await expect(game.locator('[data-progress="robot"]')).toHaveText('Jeszcze bez rekordu · Finał zamknięty');
 
     for (const [name, mode] of Object.entries(RUSH_MODES)) {
       await game.getByRole('button', { name: new RegExp(`^Graj: ${name}\\.`) }).click();
@@ -842,7 +892,7 @@ test.describe('Rush, the mode picker', () => {
 
   test('an old link to Wave, Ship or Flip Rush opens Rush in that mode', async ({ page, account }) => {
     const problems = await watchProblems(page);
-    for (const [name, mode] of Object.entries(RUSH_MODES)) {
+    for (const [name, mode] of Object.entries(RUSH_MODES).slice(0, 3)) {
       await openSignedIn(page, account, `#/games/${mode}`);
       const host = page.getByRole('region', { name: 'Rush' });
       await hostMounted(host);
@@ -851,7 +901,7 @@ test.describe('Rush, the mode picker', () => {
       await expect(game.locator('#stage')).toHaveAttribute('data-state', 'menu');
       // Back to all the modes from there.
       await game.getByRole('button', { name: '← Wszystkie tryby Rush' }).click();
-      await expect(game.locator('.mode')).toHaveCount(3);
+      await expect(game.locator('.mode')).toHaveCount(4);
     }
     expect(problems).toEqual([]);
   });
@@ -1592,7 +1642,7 @@ test.describe('Flip Rush f-2, sectors 4–6 and the finale', () => {
 // ── Normal play's sector checkpoints (after f-2), Ship Rush and Flip Rush ──
 
 test.describe('Sector checkpoints in normal play', () => {
-  for (const [name, button] of [['Ship Rush', 'Graj'], ['Flip Rush', 'Graj']]) {
+  for (const [name, button] of [['Ship Rush', 'Graj'], ['Flip Rush', 'Graj'], ['Robot Rush', 'Graj']]) {
     test(`${name}, sideways 800×360: the pilot reaches sector 2 (a toast says so), a crash there starts sector 2 again; Demon starts the run again`, async ({ page, account }) => {
       test.setTimeout(120000);
       await page.setViewportSize({ width: 800, height: 360 });

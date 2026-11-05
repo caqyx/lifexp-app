@@ -115,8 +115,11 @@ const OWN_GAMES = [
   { id: 'wave-rush', prefix: 'lifexp-waverush-', storageArgs: [], records: 'lifexp-waverush-' },
   { id: 'ship-rush', prefix: 'lifexp-shiprush-', storageArgs: [], records: 'lifexp-shiprush-' },
   { id: 'flip-rush', prefix: 'lifexp-fliprush-', storageArgs: [], records: 'lifexp-fliprush-' },
+  { id: 'robot-rush', prefix: 'lifexp-robotrush-', storageArgs: [], records: 'lifexp-robotrush-' },
   // Rush's mode picker (stage rr-a): it reads the modes' progress through their records only.
   { id: 'rush', prefix: 'lifexp-rush-', storageArgs: [] },
+  // Strażnicy Doliny (td-1): progress and settings through records.js's readJson/writeJson only.
+  { id: 'wardens', prefix: 'lifexp-wardens-', storageArgs: ['key'] },
 ];
 
 /** Every file of a directory, recursively. @param {string} dir */

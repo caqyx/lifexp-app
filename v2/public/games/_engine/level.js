@@ -174,7 +174,7 @@ function sectionsOf(sector, library) {
 }
 
 /** Vehicles a section's own portal may switch to (stage r-5). */
-const VEHICLES = new Set(['wave', 'ship', 'ball', 'spider']);
+const VEHICLES = new Set(['wave', 'ship', 'ball', 'spider', 'robot']);
 
 /**
  * A section's own portal as a run's portal: flip; gravity down or up; mini or big; a vehicle.

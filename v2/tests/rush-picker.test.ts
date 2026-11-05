@@ -9,6 +9,7 @@ import { APP_TEXT_KEYS } from '../public/games/_engine/app.js';
 import { translator as waveTexts } from '../public/games/wave-rush/js/i18n.js';
 import { translator as shipTexts } from '../public/games/ship-rush/js/i18n.js';
 import { translator as flipTexts } from '../public/games/flip-rush/js/i18n.js';
+import { translator as robotTexts } from '../public/games/robot-rush/js/i18n.js';
 
 /** A device's storage as a player of the separate games left it. */
 function storageOf(entries: Record<string, unknown>) {
@@ -17,8 +18,8 @@ function storageOf(entries: Record<string, unknown>) {
 }
 
 describe('the modes', () => {
-  test('Wave, Ship and Flip Rush, each its own page next to the picker; ?mode= and the language pass on', () => {
-    expect(MODES.map((m) => [m.id, m.dir])).toEqual([['wave', 'wave-rush'], ['ship', 'ship-rush'], ['flip', 'flip-rush']]);
+  test('Wave, Ship, Flip and Robot Rush, each its own page next to the picker; ?mode= and the language pass on', () => {
+    expect(MODES.map((m) => [m.id, m.dir])).toEqual([['wave', 'wave-rush'], ['ship', 'ship-rush'], ['flip', 'flip-rush'], ['robot', 'robot-rush']]);
     expect(modeById('ship')?.dir).toBe('ship-rush');
     expect(modeById('cube')).toBeNull();
     expect(modeHref(MODES[0]!, '?lang=en&mode=wave')).toBe('../wave-rush/index.html?lang=en');
@@ -41,8 +42,8 @@ describe('the modes', () => {
     // The player's skin, as the mode itself would wear it.
     expect(flip!.skin(flip!.records.readSkin(storage), flip!.records.readProgress(storage)).id).toBe('spark');
     // Every mode keeps its own keys: no key is shared, none was renamed.
-    expect(MODES.map((m) => m.records.KEYS.best)).toEqual(['lifexp-waverush-best', 'lifexp-shiprush-best', 'lifexp-fliprush-best']);
-    expect(MODES.map((m) => m.records.KEYS.editorSlots)).toEqual(['lifexp-waverush-editor-slots', 'lifexp-shiprush-editor-slots', 'lifexp-fliprush-editor-slots']);
+    expect(MODES.map((m) => m.records.KEYS.best)).toEqual(['lifexp-waverush-best', 'lifexp-shiprush-best', 'lifexp-fliprush-best', 'lifexp-robotrush-best']);
+    expect(MODES.map((m) => m.records.KEYS.editorSlots)).toEqual(['lifexp-waverush-editor-slots', 'lifexp-shiprush-editor-slots', 'lifexp-fliprush-editor-slots', 'lifexp-robotrush-editor-slots']);
     // Nothing is read without a storage.
     expect(progressOf(wave!, null)).toEqual({ best: null, finale: 'locked', finaleBest: null });
   });
@@ -53,7 +54,7 @@ describe('the modes', () => {
       expect(pickerTextsOf('en')[key]).toBeTruthy();
     }
     expect(APP_TEXT_KEYS).toContain('modes');
-    for (const texts of [waveTexts, shipTexts, flipTexts]) {
+    for (const texts of [waveTexts, shipTexts, flipTexts, robotTexts]) {
       expect(texts('pl')('modes')).toContain('Rush');
       expect(texts('en')('modes')).toContain('Rush');
     }

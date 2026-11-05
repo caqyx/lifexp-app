@@ -1,0 +1,7 @@
+{
+  "game": "wardens",
+  "source": "lifexp",
+  "code": "v2/public/games/wardens",
+  "note": "LifeXP's own tower defense, written in this repo (docs/v2/PLAN.md 9.1, td-1): not a vendored copy, so no VENDORED.json. Its CSP is in index.html; tests/vendor-game.spec.js checks it like a vendored game's. Art is drawn in canvas by js/render.js: no third-party assets.",
+  "tests": ["v2/tests/wardens.test.ts", "v2/tests/wardens-balance.test.ts", "tests/v2/wardens.spec.js"]
+}

@@ -1678,6 +1678,7 @@
       "gridlock": "Gridlock",
       "quick-math": "Szybkie liczenie",
       "rush": "Rush",
+      "wardens": "Strażnicy Doliny",
       "test": "Gra testowa"
     },
     "descriptions": {
@@ -1685,7 +1686,8 @@
       "wartime": "Turowa strategia: Europa, Azja i Afryka, od 1385 do 2026 roku.",
       "gridlock": "Neonowa gra zręcznościowa: unikaj laserów na planszy 16×16.",
       "quick-math": "Liczenie w pamięci na czas: poziomy trudności i rekordy.",
-      "rush": "Tryby w jednej grze: Wave, Ship i Flip Rush — każdy z własnymi sektorami, skórkami i finałem.",
+      "rush": "Cztery tryby w jednej grze: Wave, Ship, Flip i Robot Rush — każdy z własnymi sektorami, skórkami i finałem.",
+      "wardens": "Obrona wieżami: trzy mapy, pięć wież, fale coraz groźniejszych najeźdźców i tryb bez końca.",
       "test": "Gra do testów automatycznych."
     },
     "play": "Graj",
