@@ -1677,9 +1677,7 @@
       "wartime": "Wartime",
       "gridlock": "Gridlock",
       "quick-math": "Quick Math",
-      "wave-rush": "Wave Rush",
-      "ship-rush": "Ship Rush",
-      "flip-rush": "Flip Rush",
+      "rush": "Rush",
       "test": "Test game"
     },
     "descriptions": {
@@ -1687,9 +1685,7 @@
       "wartime": "Turn-based strategy: Europe, Asia and Africa, from 1385 to 2026.",
       "gridlock": "A neon arcade game: dodge the lasers on a 16×16 grid.",
       "quick-math": "Mental maths against the clock: difficulty levels and records.",
-      "wave-rush": "Hold to fly up, let go to dive: sectors of ever harder corridors.",
-      "ship-rush": "Hold to climb, let go to sink: from the clouds through the storm to the aurora.",
-      "flip-rush": "Tap to flip gravity: ball and spider in turns, through the hall, the mine and the foundry.",
+      "rush": "Modes in one game: Wave, Ship and Flip Rush — each with its own sectors, skins and finale.",
       "test": "A game for automated tests."
     },
     "play": "Play",

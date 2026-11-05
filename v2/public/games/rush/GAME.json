@@ -1,0 +1,10 @@
+{
+  "game": "rush",
+  "source": "lifexp",
+  "code": "v2/public/games/rush",
+  "note": "LifeXP's own game Rush (docs/v2/PLAN.md 9.1, stage rr-a): the mode picker that is the game's first screen. Each mode is its own page next to it (wave-rush/, ship-rush/, flip-rush/) with its own progress and storage keys; they share the Rush engine in v2/public/games/_engine/. The picker only reads the modes' progress through their records. Its CSP is in index.html; tests/vendor-game.spec.js checks it like a vendored game's.",
+  "tests": [
+    "v2/tests/rush-picker.test.ts",
+    "tests/v2/games.spec.js"
+  ]
+}

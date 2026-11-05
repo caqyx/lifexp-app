@@ -5,13 +5,13 @@
 // look. Finishing the whole run (the Demon included) is the achievement that unlocks the
 // last skin and the finale.
 import { runApp } from '../../_engine/app.js';
+import { paintSkin } from './preview.js';
 import { WAVE } from '../../_engine/wave.js';
 import { SECTORS } from './config.js';
 import { RULES } from './game.js';
 import { pickLang, translator } from './i18n.js';
 import { records } from './records.js';
 import { createRenderer, renderFrame } from './render/index.js';
-import { drawBall, drawSpider } from './render/vehicles.js';
 import { SKINS } from './skins.js';
 import { PALETTE } from './palette.js';
 import { buildCustom } from './run.js';
@@ -35,12 +35,5 @@ runApp({
   demon: true,
   finale: true,
   holdTaps: true,
-  /** The ball on the floor and the spider on the ceiling. @param {CanvasRenderingContext2D} ctx @param {import('./skins.js').Skin} skin */
-  paintSkin(ctx, skin) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.14)';
-    ctx.fillRect(4, 59, 88, 3);
-    ctx.fillRect(4, 2, 88, 3);
-    drawBall(ctx, skin, 28, 42, 34, 0.5);
-    drawSpider(ctx, skin, 68, 22, 34, 0.3, true, true);
-  },
+  paintSkin,
 });

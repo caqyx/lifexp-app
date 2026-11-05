@@ -104,3 +104,23 @@ test("a game's code comes from the network while online, even with an older copy
   expect(await read()).toBe('// an older deploy');
   await context.setOffline(false);
 });
+
+test('Rush offline: the picker and a mode played once come from the cache', async ({ page, context, account }) => {
+  // Stage rr-a: Rush is one game; its picker and its modes are pages under games/.
+  await openSignedIn(page, account, '#/today');
+  await waitForServiceWorker(page);
+  await page.goto(appUrl('#/games/rush'));
+  const game = page.frameLocator('iframe');
+  await game.locator('.mode[data-mode="wave"]').click();
+  await expect(game.getByRole('heading', { name: 'Wave Rush' })).toBeVisible();
+  await game.getByRole('button', { name: '← Wszystkie tryby Rush' }).click();
+  await expect(game.locator('.mode')).toHaveCount(3);
+
+  await context.setOffline(true);
+  await page.reload();
+  await expect(game.locator('.mode')).toHaveCount(3);
+  await game.locator('.mode[data-mode="wave"]').click();
+  await expect(game.getByRole('heading', { name: 'Wave Rush' })).toBeVisible();
+  await expect(game.locator('#stage')).toHaveAttribute('data-state', 'menu');
+  await context.setOffline(false);
+});
