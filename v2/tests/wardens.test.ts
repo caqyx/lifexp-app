@@ -1,0 +1,502 @@
+// Strażnicy Doliny's pure parts (docs/v2/PLAN.md 9.1, stage td-1): the game is plain ES
+// modules in public/games/wardens (no build step, its own CSP), and these tests import
+// the same files the game runs. The balance is in wardens-balance.test.ts.
+import { describe, expect, test } from 'vitest';
+import { DT, ENEMIES, ENEMY_TYPES, SELL_REFUND, START_LIVES, TOWERS, TOWER_TYPES } from '../public/games/wardens/js/config.js';
+import { COLS, MAPS, ROWS, createPath, distanceToRoad, pointAt, roadTiles } from '../public/games/wardens/js/maps.js';
+import { createSpawns, createWave, describeWave, isBossWave } from '../public/games/wardens/js/waves.js';
+import {
+  MAX_ENEMIES,
+  applySlow,
+  buildCost,
+  buildTower,
+  callWave,
+  canHit,
+  createGame,
+  damageAfterArmor,
+  earlyBonus,
+  enemyHp,
+  findTarget,
+  sellTower,
+  setPaused,
+  setPriority,
+  spawnEnemy,
+  starsFor,
+  updateGame,
+  upgradeCost,
+  upgradeTower,
+  waveBonus,
+  type Game,
+} from '../public/games/wardens/js/sim.js';
+import { computeLayout, mapTransform, toMap, toScreen } from '../public/games/wardens/js/layout.js';
+import {
+  PROGRESS_KEY,
+  SETTINGS_KEY,
+  isUnlocked,
+  readProgress,
+  readSettings,
+  saveEndless,
+  saveSettings,
+  saveWin,
+} from '../public/games/wardens/js/records.js';
+import { TEXT_KEYS, pickLang, testParams, translator } from '../public/games/wardens/js/i18n.js';
+import { addBurst, createEffects, plusLabel, updateEffects } from '../public/games/wardens/js/effects.js';
+
+const [meadow, canyon, marsh] = MAPS as [(typeof MAPS)[0], (typeof MAPS)[0], (typeof MAPS)[0]];
+
+/** A game in the middle of a wave with nothing left to spawn, so enemies can be placed by hand. */
+function waveGame(map = meadow, gold = 5000): Game {
+  const game = createGame(map, { gold });
+  game.phase = 'wave';
+  game.wave = 1;
+  game.spawns = [];
+  return game;
+}
+
+function run(game: Game, seconds: number) {
+  for (let i = 0; i < Math.round(seconds / DT); i++) updateGame(game, DT);
+}
+
+describe('maps', () => {
+  test('three maps, 15, 18 and 20 waves, endless only on the last', () => {
+    expect(MAPS.map((m) => [m.id, m.waves, m.endless === true])).toEqual([
+      ['meadow', 15, false],
+      ['canyon', 18, false],
+      ['marsh', 20, true],
+    ]);
+  });
+
+  for (const map of MAPS) {
+    test(`${map.id}: the road enters above and leaves below; pads are off the road, beside it, on the grid, each once`, () => {
+      const first = map.road[0] as readonly [number, number];
+      const last = map.road[map.road.length - 1] as readonly [number, number];
+      expect(first[1]).toBeLessThan(0);
+      expect(last[1]).toBeGreaterThan(ROWS - 1);
+      const road = roadTiles(map);
+      const path = createPath(map);
+      const keys = map.pads.map(([c, r]) => `${c},${r}`);
+      expect(new Set(keys).size).toBe(keys.length);
+      expect(map.pads.length).toBeGreaterThanOrEqual(12);
+      for (const [c, r] of map.pads) {
+        expect(road.has(`${c},${r}`)).toBe(false);
+        expect(c).toBeGreaterThanOrEqual(0);
+        expect(c).toBeLessThan(COLS);
+        expect(r).toBeGreaterThanOrEqual(0);
+        expect(r).toBeLessThan(ROWS);
+        expect(distanceToRoad(path, c + 0.5, r + 0.5)).toBeLessThanOrEqual(1.6);
+      }
+    });
+  }
+
+  test('the roads differ: lengths and corners', () => {
+    const lengths = MAPS.map((m) => Math.round(createPath(m).total));
+    expect(new Set(lengths).size).toBe(3);
+    expect(new Set(MAPS.map((m) => JSON.stringify(m.road))).size).toBe(3);
+  });
+
+  test('a point along the road: the start, a corner, the end and past it', () => {
+    const path = createPath(meadow);
+    const out = { x: 0, y: 0 };
+    pointAt(path, 0, out);
+    expect(out).toEqual({ x: 4.5, y: -0.7 });
+    pointAt(path, 4.2 + 3, out); // down to the first corner (4.2 tiles), then 3 to the left
+    expect(out.x).toBeCloseTo(1.5);
+    expect(out.y).toBeCloseTo(3.5);
+    pointAt(path, path.total + 5, out);
+    expect(out.y).toBeCloseTo(15.7);
+  });
+});
+
+describe('waves', () => {
+  test('every enemy type comes in the campaign; Colossus waves are the last and one at three fifths', () => {
+    const seen = new Set<string>();
+    for (const map of MAPS) {
+      for (let n = 1; n <= map.waves; n++) for (const g of createWave(map, n).groups) seen.add(g.type);
+      const bosses = Array.from({ length: map.waves }, (_, i) => i + 1).filter((n) => isBossWave(map, n));
+      expect(bosses).toEqual([Math.ceil(map.waves * 0.6), map.waves]);
+    }
+    seen.add('shard'); // shards only come out of splitters
+    expect([...seen].sort()).toEqual([...ENEMY_TYPES].sort());
+  });
+
+  test('waves grow; the canyon brings moths sooner, the marsh armor sooner', () => {
+    const size = (map: typeof meadow, n: number) => createSpawns(createWave(map, n)).length;
+    expect(size(meadow, 10)).toBeGreaterThan(size(meadow, 2));
+    const has = (map: typeof meadow, n: number, type: string) => createWave(map, n).groups.some((g) => g.type === type);
+    expect(has(canyon, 3, 'moth')).toBe(true);
+    expect(has(meadow, 3, 'moth')).toBe(false);
+    expect(has(marsh, 4, 'shellback')).toBe(true);
+    expect(has(meadow, 4, 'shellback')).toBe(false);
+  });
+
+  test('spawns are in time order and match the preview', () => {
+    const wave = createWave(marsh, 12);
+    const spawns = createSpawns(wave);
+    expect(spawns.map((s) => s.at)).toEqual([...spawns.map((s) => s.at)].sort((a, b) => a - b));
+    const total = describeWave(wave).reduce((n, row) => n + row.count, 0);
+    expect(total).toBe(spawns.length);
+  });
+
+  test('endless play goes on past the map, a Colossus every fifth wave', () => {
+    expect(createWave(marsh, 37).groups.length).toBeGreaterThan(2);
+    expect(isBossWave(marsh, 25)).toBe(true);
+    expect(isBossWave(marsh, 26)).toBe(false);
+  });
+
+  test('health grows with the wave and the map; past the map it grows faster', () => {
+    const game = createGame(marsh);
+    expect(enemyHp(game, 'crawler', 1)).toBe(Math.round(ENEMIES.crawler.hp * marsh.hpFactor));
+    expect(enemyHp(game, 'crawler', 10)).toBeGreaterThan(enemyHp(game, 'crawler', 5));
+    const step20 = enemyHp(game, 'crawler', 20) - enemyHp(game, 'crawler', 19);
+    const step22 = enemyHp(game, 'crawler', 22) - enemyHp(game, 'crawler', 21);
+    expect(step22).toBeGreaterThan(step20);
+  });
+});
+
+describe('combat', () => {
+  test('armor comes off every hit, at least 1 gets through; a piercing hit ignores it', () => {
+    expect(damageAfterArmor(6, 5, false)).toBe(1);
+    expect(damageAfterArmor(3, 5, false)).toBe(1);
+    expect(damageAfterArmor(15, 5, false)).toBe(10);
+    expect(damageAfterArmor(40, 5, true)).toBe(40);
+  });
+
+  test('fliers: the mortar cannot reach them, the others can (the banner does not attack)', () => {
+    const game = waveGame();
+    spawnEnemy(game, 'moth', 1, 1);
+    const moth = game.enemies.find((e) => e.alive)!;
+    expect(canHit(TOWERS.mortar, moth)).toBe(false);
+    for (const type of ['archer', 'frost', 'ballista'] as const) expect(canHit(TOWERS[type], moth)).toBe(true);
+    expect(canHit(TOWERS.banner, moth)).toBe(false);
+  });
+
+  test('targeting: first along the road, strongest by health, closest to the tower', () => {
+    const game = waveGame();
+    // Pad 4 (2,5) beside the left stretch of the meadow's road.
+    buildTower(game, 4, 'ballista');
+    spawnEnemy(game, 'crawler', 6.5, 1); // near the top-left corner
+    spawnEnemy(game, 'shellback', 8.5, 1); // closest to the pad, more health
+    spawnEnemy(game, 'runner', 10.5, 1); // furthest along
+    const slots = game.enemies.map((e, i) => (e.alive ? i : -1)).filter((i) => i >= 0);
+    const tower = game.towers[4]!;
+    const [crawler, shellback, runner] = slots as [number, number, number];
+    expect(findTarget(game, tower)).toBe(runner);
+    setPriority(game, 4, 'strongest');
+    expect(findTarget(game, tower)).toBe(shellback);
+    setPriority(game, 4, 'closest');
+    const d = (i: number) => Math.hypot(game.enemies[i]!.x - tower.x, game.enemies[i]!.y - tower.y);
+    const nearest = [crawler, shellback, runner].sort((a, b) => d(a) - d(b))[0];
+    expect(findTarget(game, tower)).toBe(nearest);
+  });
+
+  test('out of range: no target, and the tower stays ready', () => {
+    const game = waveGame();
+    buildTower(game, 0, 'archer');
+    spawnEnemy(game, 'crawler', 26, 1); // near the gate, far from pad 0
+    expect(findTarget(game, game.towers[0]!)).toBe(-1);
+  });
+
+  test('frost slows everything around it; a Colossus resists half; the slow wears off', () => {
+    const game = waveGame();
+    spawnEnemy(game, 'crawler', 1, 1);
+    spawnEnemy(game, 'colossus', 1, 1);
+    const [crawler, boss] = game.enemies.filter((e) => e.alive);
+    applySlow(crawler!, 0.4, 1);
+    applySlow(boss!, 0.4, 1);
+    expect(crawler!.slowFactor).toBeCloseTo(0.6);
+    expect(boss!.slowFactor).toBeCloseTo(0.8);
+    run(game, 1.1);
+    expect(crawler!.slowFactor).toBe(1);
+  });
+
+  test('a splitter breaks into two shards; every kill pays its gold', () => {
+    const game = waveGame(meadow, 0);
+    game.gold = 0;
+    spawnEnemy(game, 'splitter', 5, 1);
+    const splitter = game.enemies.find((e) => e.alive)!;
+    splitter.hp = 1;
+    game.towers[4] = null;
+    // Kill it the way a shot would: a piercing tower right there.
+    game.gold = 500;
+    buildTower(game, 4, 'ballista');
+    const before = game.gold;
+    run(game, 0.5);
+    expect(game.enemies.filter((e) => e.alive && e.type === 'shard')).toHaveLength(2);
+    expect(game.gold).toBe(before + ENEMIES.splitter.gold);
+    expect(game.stats.kills).toBe(1);
+  });
+
+  test('an enemy through the gate costs its lives (a Colossus five); at 0 the game is lost', () => {
+    const game = waveGame();
+    game.lives = 6;
+    const path = game.path.total;
+    spawnEnemy(game, 'colossus', path - 0.01, 1);
+    spawnEnemy(game, 'crawler', 0, 1);
+    run(game, 0.1);
+    expect(game.lives).toBe(1);
+    expect(game.phase).toBe('wave');
+    game.enemies.find((e) => e.alive)!.dist = path - 0.01;
+    run(game, 0.1);
+    expect(game.lives).toBe(0);
+    expect(game.phase).toBe('lost');
+  });
+
+  test('the pools are fixed: enemies past the pool are not created, nothing breaks', () => {
+    const game = waveGame();
+    for (let i = 0; i < MAX_ENEMIES + 10; i++) spawnEnemy(game, 'crawler', 0, 1);
+    expect(game.aliveCount).toBe(MAX_ENEMIES);
+    run(game, 0.5);
+    expect(game.enemies).toHaveLength(MAX_ENEMIES);
+  });
+});
+
+describe('economy and actions', () => {
+  test('build: the price comes off; not without the gold; not twice on a pad', () => {
+    const game = createGame(meadow, { gold: 100 });
+    expect(buildTower(game, 0, 'ballista')).toBe(true);
+    expect(game.gold).toBe(100 - buildCost('ballista'));
+    expect(buildTower(game, 1, 'ballista')).toBe(false);
+    expect(buildTower(game, 0, 'archer')).toBe(false);
+    expect(buildTower(game, 99, 'archer')).toBe(false);
+  });
+
+  test('upgrade to level 3 and no further; sell gives back 70 % of everything spent', () => {
+    const game = createGame(meadow, { gold: 1000 });
+    buildTower(game, 2, 'mortar');
+    const tower = game.towers[2]!;
+    expect(upgradeCost(tower)).toBe(TOWERS.mortar.cost[1]);
+    expect(upgradeTower(game, 2)).toBe(true);
+    expect(upgradeTower(game, 2)).toBe(true);
+    expect(tower.level).toBe(3);
+    expect(upgradeCost(tower)).toBeNull();
+    expect(upgradeTower(game, 2)).toBe(false);
+    const spent = TOWERS.mortar.cost.reduce((a, b) => a + b, 0);
+    const gold = game.gold;
+    expect(sellTower(game, 2)).toBe(Math.floor(spent * SELL_REFUND));
+    expect(game.gold).toBe(gold + Math.floor(spent * SELL_REFUND));
+    expect(game.towers[2]).toBeNull();
+  });
+
+  test('a banner makes towers in its range hit harder; banners do not stack', () => {
+    // A small field of its own: three pads in a row, 1 and 2 tiles apart.
+    const field = { ...meadow, pads: [[0, 10], [1, 10], [2, 10]] as const };
+    const game = createGame(field, { gold: 2000 });
+    buildTower(game, 0, 'archer');
+    buildTower(game, 2, 'banner'); // 2 tiles away: out of a level-1 banner's 1.6
+    expect(game.towers[0]!.buff).toBe(0);
+    upgradeTower(game, 2);
+    upgradeTower(game, 2); // level 3 reaches 2.05 tiles
+    expect(game.towers[0]!.buff).toBe(TOWERS.banner.buff![2]);
+    buildTower(game, 1, 'banner'); // a second banner, right next to it
+    expect(game.towers[0]!.buff).toBe(TOWERS.banner.buff![2]); // the strongest counts, no stacking
+    expect(game.towers[1]!.buff).toBe(0); // banners are not buffed
+    sellTower(game, 2);
+    expect(game.towers[0]!.buff).toBe(TOWERS.banner.buff![0]);
+  });
+
+  test('the first wave waits for the player; then each starts by itself after the break, or early for a bonus', () => {
+    const game = createGame(meadow, { waves: 3 });
+    run(game, 60);
+    expect(game.wave).toBe(0);
+    expect(callWave(game)).toBe(0);
+    expect(game.phase).toBe('wave');
+    expect(callWave(game)).toBe(-1); // not while one is running
+    // Clear it by hand: no enemies, no spawns left.
+    for (const e of game.enemies) e.alive = false;
+    game.aliveCount = 0;
+    game.spawnCursor = game.spawns.length;
+    const gold = game.gold;
+    run(game, DT);
+    expect(game.phase).toBe('build');
+    expect(game.gold).toBe(gold + waveBonus(1));
+    run(game, 9.5);
+    expect(earlyBonus(game)).toBe(15); // 25 s break − 9.5 s: 15 whole seconds left
+    const before = game.gold;
+    expect(callWave(game)).toBe(15);
+    expect(game.gold).toBe(before + 15);
+    expect(game.wave).toBe(2);
+  });
+
+  test('a wave left alone starts when the break ends', () => {
+    const game = createGame(meadow, { waves: 3 });
+    callWave(game);
+    for (const e of game.enemies) e.alive = false;
+    game.aliveCount = 0;
+    game.spawnCursor = game.spawns.length;
+    run(game, 26);
+    expect(game.wave).toBe(2);
+  });
+
+  test('winning the last wave ends the map; stars by lives left', () => {
+    const game = createGame(meadow, { waves: 1, gold: 2000 });
+    for (const pad of [4, 2, 8, 0]) buildTower(game, pad, 'ballista');
+    callWave(game);
+    run(game, 120);
+    expect(game.phase).toBe('won');
+    expect(starsFor(20)).toBe(3);
+    expect(starsFor(18)).toBe(3);
+    expect(starsFor(17)).toBe(2);
+    expect(starsFor(10)).toBe(2);
+    expect(starsFor(9)).toBe(1);
+    expect(starsFor(1)).toBe(1);
+    // With the test switch's lives, the thresholds scale: 5 lives of 5 is all of them.
+    expect(starsFor(5, 5)).toBe(3);
+  });
+
+  test('pause stops time; nothing changes after the end', () => {
+    const game = createGame(meadow);
+    callWave(game);
+    setPaused(game, true);
+    run(game, 5);
+    expect(game.time).toBe(0);
+    setPaused(game, false);
+    run(game, 1);
+    expect(game.time).toBeGreaterThan(0.9);
+    game.phase = 'lost';
+    expect(buildTower(game, 0, 'archer')).toBe(false);
+  });
+
+  test('start numbers: 20 lives, the map’s gold', () => {
+    const game = createGame(canyon);
+    expect(game.lives).toBe(START_LIVES);
+    expect(game.gold).toBe(canyon.startGold);
+    expect(game.totalWaves).toBe(18);
+    expect(createGame(marsh, { endless: true }).totalWaves).toBe(Infinity);
+    expect(createGame(meadow, { endless: true }).totalWaves).toBe(15); // no endless on the meadow
+  });
+
+  test('every tower type has three levels that get stronger', () => {
+    for (const type of TOWER_TYPES) {
+      const def = TOWERS[type];
+      expect(def.cost).toHaveLength(3);
+      expect(def.range[2]).toBeGreaterThan(def.range[0] ?? 0);
+      if (def.attack !== 'aura') expect(def.damage[2]).toBeGreaterThan(def.damage[0] ?? 0);
+      else expect(def.buff![2]).toBeGreaterThan(def.buff![0] ?? 0);
+    }
+  });
+});
+
+describe('layout', () => {
+  test('upright on a tall stage, turned on a wide one; tiles as big as fit', () => {
+    const tall = computeLayout(412, 700);
+    expect(tall.rotated).toBe(false);
+    expect(tall.tile).toBeCloseTo(412 / 9, 1);
+    expect(tall.mapHeight).toBeLessThanOrEqual(700);
+    const wide = computeLayout(640, 380);
+    expect(wide.rotated).toBe(true);
+    expect(wide.mapWidth).toBeLessThanOrEqual(640);
+    expect(wide.mapHeight).toBeLessThanOrEqual(380);
+    expect(wide.tile).toBeCloseTo(380 / 9, 1);
+  });
+
+  test('a point goes to the screen and back; the canvas transform agrees', () => {
+    for (const layout of [computeLayout(412, 700), computeLayout(800, 360)]) {
+      const s = { x: 0, y: 0 };
+      const m = { x: 0, y: 0 };
+      toScreen(layout, 2.5, 7.25, s);
+      toMap(layout, s.x, s.y, m);
+      expect(m.x).toBeCloseTo(2.5);
+      expect(m.y).toBeCloseTo(7.25);
+      const [a, b, c, d, e, f] = mapTransform(layout);
+      expect(a * 2.5 + c * 7.25 + e).toBeCloseTo(s.x);
+      expect(b * 2.5 + d * 7.25 + f).toBeCloseTo(s.y);
+    }
+  });
+
+  test('turned, the road enters on the left', () => {
+    const layout = computeLayout(800, 360);
+    const s = { x: 0, y: 0 };
+    toScreen(layout, 4.5, 0, s);
+    expect(s.x).toBe(layout.ox);
+  });
+});
+
+function memoryStorage(initial: Record<string, string> = {}) {
+  const data = new Map(Object.entries(initial));
+  return {
+    data,
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => void data.set(k, v),
+  };
+}
+
+describe('records', () => {
+  test('stars are kept when better; the next map opens after a win; endless after the marsh', () => {
+    const storage = memoryStorage();
+    const progress = readProgress(storage);
+    expect(isUnlocked(progress, MAPS, 0)).toBe(true);
+    expect(isUnlocked(progress, MAPS, 1)).toBe(false);
+    expect(saveWin(storage, progress, 'meadow', 2)).toBe(true);
+    expect(saveWin(storage, progress, 'meadow', 1)).toBe(false);
+    expect(isUnlocked(progress, MAPS, 1)).toBe(true);
+    expect(isUnlocked(progress, MAPS, 2)).toBe(false);
+    expect(saveEndless(storage, progress, 23)).toBe(true);
+    expect(saveEndless(storage, progress, 20)).toBe(false);
+    expect(readProgress(storage)).toEqual({ stars: { meadow: 2 }, endlessBest: 23 });
+    expect([...storage.data.keys()]).toEqual([PROGRESS_KEY]);
+  });
+
+  test('garbage and blocked storage read as nothing, and writing never throws', () => {
+    expect(readProgress(memoryStorage({ [PROGRESS_KEY]: '{oops' }))).toEqual({ stars: {}, endlessBest: 0 });
+    expect(readProgress(memoryStorage({ [PROGRESS_KEY]: '{"stars":{"meadow":9,"x":-1},"endlessBest":"7"}' }))).toEqual({
+      stars: { meadow: 3, x: 0 },
+      endlessBest: 0,
+    });
+    const blocked = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+    };
+    expect(readProgress(blocked)).toEqual({ stars: {}, endlessBest: 0 });
+    expect(() => saveWin(blocked, readProgress(blocked), 'meadow', 3)).not.toThrow();
+    expect(readProgress(null)).toEqual({ stars: {}, endlessBest: 0 });
+  });
+
+  test('settings: the speed, 1 or 2', () => {
+    const storage = memoryStorage();
+    expect(readSettings(storage)).toEqual({ speed: 1 });
+    saveSettings(storage, { speed: 2 });
+    expect(readSettings(storage)).toEqual({ speed: 2 });
+    expect(readSettings(memoryStorage({ [SETTINGS_KEY]: '{"speed":7}' }))).toEqual({ speed: 1 });
+  });
+});
+
+describe('texts and test switches', () => {
+  test('Polish and English have the same keys; ?lang=en picks English', () => {
+    expect(TEXT_KEYS.en).toEqual(TEXT_KEYS.pl);
+    expect(pickLang('?lang=en')).toBe('en');
+    expect(pickLang('?lang=de')).toBe('pl');
+    expect(translator('pl')('waveOf', { n: 3, total: 15 })).toBe('3/15');
+    expect(translator('en')('title')).toBe('Valley Wardens');
+  });
+
+  test('every tower and enemy has a name in both languages', () => {
+    for (const lang of ['pl', 'en'] as const) {
+      const keys = TEXT_KEYS[lang];
+      for (const type of TOWER_TYPES) expect(keys).toContain(`tower.${type}`);
+      for (const type of ENEMY_TYPES) expect(keys).toContain(`enemy.${type}`);
+      for (const map of MAPS) expect(keys).toContain(`map.${map.id}`);
+    }
+  });
+
+  test('the switches work only with ?test=1, within bounds', () => {
+    expect(testParams('?speed=20&waves=2')).toEqual({ on: false, speed: null, waves: null, lives: null, gold: null });
+    expect(testParams('?test=1&speed=500&waves=2&lives=3&gold=900')).toEqual({ on: true, speed: 60, waves: 2, lives: 3, gold: 900 });
+    expect(testParams('?test=1&speed=abc').speed).toBeNull();
+  });
+});
+
+describe('effects', () => {
+  test('fixed pools: a burst bigger than the pool fills it and stops; effects run out', () => {
+    const fx = createEffects();
+    addBurst(fx, 1, 1, 1000, '#fff', 2);
+    expect(fx.sparks.every((s) => s.alive)).toBe(true);
+    updateEffects(fx, 2);
+    expect(fx.sparks.some((s) => s.alive)).toBe(false);
+    expect(plusLabel(4)).toBe('+4');
+    expect(plusLabel(9999)).toBe('+200');
+  });
+});

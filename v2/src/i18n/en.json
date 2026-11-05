@@ -1678,6 +1678,7 @@
       "gridlock": "Gridlock",
       "quick-math": "Quick Math",
       "rush": "Rush",
+      "wardens": "Valley Wardens",
       "test": "Test game"
     },
     "descriptions": {
@@ -1686,6 +1687,7 @@
       "gridlock": "A neon arcade game: dodge the lasers on a 16×16 grid.",
       "quick-math": "Mental maths against the clock: difficulty levels and records.",
       "rush": "Modes in one game: Wave, Ship and Flip Rush — each with its own sectors, skins and finale.",
+      "wardens": "Tower defense: three maps, five towers, waves of ever tougher invaders and an endless mode.",
       "test": "A game for automated tests."
     },
     "play": "Play",

@@ -208,7 +208,7 @@ export function enemyHp(game, type, wave) {
  * Puts an enemy on the road `dist` tiles from its start (0 = the entrance).
  * @param {Game} game @param {EnemyType} type @param {number} dist @param {number} wave
  */
-function spawnEnemy(game, type, dist, wave) {
+export function spawnEnemy(game, type, dist, wave) {
   const enemy = freeSlot(game.enemies);
   if (!enemy) return;
   const def = ENEMIES[type];
