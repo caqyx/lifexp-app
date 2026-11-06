@@ -10,7 +10,7 @@
 //   Łąka 19 (3 stars) · Kanion 13 (2 stars) · Mokradła 9 (1 star) · endless: 24 waves.
 // Doing nothing loses every map by wave 3; a build that stops investing after its first
 // 24 steps still wins Łąka and Kanion but loses Mokradła; archers alone lose Mokradła.
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { DT } from '../public/games/wardens/js/config.js';
 import { MAPS, type MapDef } from '../public/games/wardens/js/maps.js';
 import {
@@ -88,6 +88,9 @@ function play(map: MapDef, steps: Step[], options: GameOptions = {}) {
   }
   return game;
 }
+
+// Each run plays whole maps (a few seconds on a busy machine): a timeout well past vitest's 5 s.
+vi.setConfig({ testTimeout: 60_000 });
 
 const byId = (id: MapDef['id']) => MAPS.find((m) => m.id === id) as MapDef;
 
