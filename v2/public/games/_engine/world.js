@@ -28,7 +28,11 @@ export const JOINT_CLEAR = 2.5;
 export const BASE_SPEED = 10.4;
 
 /** After a crash taps are ignored this long, so a frantic tap does not skip the result. */
-export const RESTART_LOCK = 0.45;
+export const RESTART_LOCK = 0.35;
+/** Practice shows no result: a tap respawns after this short lock (stage q-rush)… */
+export const PRACTICE_LOCK = 0.15;
+/** …and with no tap the vehicle respawns by itself this long after the crash. */
+export const PRACTICE_RESPAWN = 0.5;
 /** A tap this close before the lock ends still counts. */
 export const INPUT_BUFFER_MS = 130;
 /** Where a run starts: this many open cells before sector 1. */

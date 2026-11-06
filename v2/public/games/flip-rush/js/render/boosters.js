@@ -37,8 +37,10 @@ function turnArrows(ctx, r) {
 /**
  * An orb at (x, y) device px, cell px per cell.
  * @param {CanvasRenderingContext2D} ctx @param {string} kind @param {number} x @param {number} y @param {number} cell @param {number} pulse @param {boolean} used
+ * @param {number} [near] 0 far … 1 the vehicle is at it: an approach ring closes in on an
+ *   unused orb as the vehicle comes (stage q-rush: when to press, read ahead of time)
  */
-export function drawRing(ctx, kind, x, y, cell, pulse, used) {
+export function drawRing(ctx, kind, x, y, cell, pulse, used, near = 0) {
   const color = BOOSTER_COLORS[kind] ?? '#ffffff';
   const r = RING_R * cell * (kind === 'small' ? 0.82 : 1) * (1 + 0.06 * pulse);
   ctx.save();
@@ -89,7 +91,35 @@ export function drawRing(ctx, kind, x, y, cell, pulse, used) {
     ctx.arc(0, 0, r * 0.16, 0, Math.PI * 2);
     ctx.fill();
   }
+  if (!used && near > 0 && near < 1) drawApproach(ctx, color, r, near);
   ctx.restore();
+}
+
+/**
+ * The approach ring round an orb (already translated to it): wide and faint while the
+ * vehicle is far, tight and bright as it arrives.
+ * @param {CanvasRenderingContext2D} ctx @param {string} color @param {number} r @param {number} near 0…1
+ */
+function drawApproach(ctx, color, r, near) {
+  ctx.globalAlpha = 0.25 + 0.6 * near;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = r * 0.12;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * (1.15 + 1.6 * (1 - near)), 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/** Cells ahead of the vehicle at which an orb's approach ring appears. */
+const APPROACH_CELLS = 5;
+
+/**
+ * 0 while the vehicle is APPROACH_CELLS or more before x, rising to 1 when it is there; 0 once past.
+ * @param {number} x @param {number} at the vehicle's x
+ */
+export function nearness(x, at) {
+  const ahead = x - at;
+  if (ahead < 0 || ahead > APPROACH_CELLS) return 0;
+  return 1 - ahead / APPROACH_CELLS;
 }
 
 /**
@@ -175,7 +205,7 @@ export function drawPieceBoosters(ctx, s, piece, camX) {
     const x = screenX(v, camX, piece.x0 + b.x);
     if (x < -v.cell * 2 || x > v.width + v.cell * 2) return;
     const y = screenY(v, b.y);
-    if (b.type === 'ring') drawRing(ctx, b.kind, x, y, v.cell * (b.scale ?? 1), pulse, s.wave.spentRing === id);
+    if (b.type === 'ring') drawRing(ctx, b.kind, x, y, v.cell * (b.scale ?? 1), pulse, s.wave.spentRing === id, s.wave.alive ? nearness(piece.x0 + b.x, s.wave.x) : 0);
     else drawPad(ctx, b.kind, x, y, b.dir === 'up' ? 1 : -1, v.cell, pulse, s.wave.spentPad === id);
   });
 }

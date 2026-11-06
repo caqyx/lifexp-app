@@ -338,3 +338,44 @@ describe('language', () => {
     expect(translator('pl')('again')).toBe('Jeszcze raz');
   });
 });
+
+// Pixel art (q-own): the sprites are rectangles of letters, the canvas is scaled by a
+// whole number, and the palettes take turns.
+describe('pixel art', async () => {
+  const { ART_HEIGHT, PALETTES, SPRITES, isRectangular, paletteFor, pixelGrid } = await import('../public/games/flappy/js/pixel.js');
+  const { birdFrame } = await import('../public/games/flappy/js/render.js');
+
+  test('every sprite is a clean rectangle: the bird 17 × 12, its wings 7 × 5, digits 5 × 7', () => {
+    expect(isRectangular(SPRITES.BIRD_BODY)).toBe(true);
+    expect([SPRITES.BIRD_BODY[0]?.length, SPRITES.BIRD_BODY.length]).toEqual([17, 12]);
+    for (const wing of SPRITES.WINGS) expect(isRectangular(wing) && wing.length === 5 && wing[0]?.length === 7).toBe(true);
+    expect(SPRITES.DIGITS).toHaveLength(10);
+    for (const digit of SPRITES.DIGITS) expect(isRectangular(digit) && digit.length === 7 && digit[0]?.length === 5).toBe(true);
+  });
+
+  test('a whole number of device pixels per art pixel, covering the stage; the world is 256 pixels tall', () => {
+    for (const [w, h, dpr] of [[412, 839, 2.625], [360, 800, 3], [284, 360, 1], [1280, 720, 1]] as const) {
+      const grid = pixelGrid(w, h, dpr);
+      expect(Number.isInteger(grid.k)).toBe(true);
+      expect(grid.height * grid.k).toBeGreaterThanOrEqual(Math.round(h * dpr));
+      expect(grid.width * grid.k).toBeGreaterThanOrEqual(Math.round(w * dpr));
+      expect(grid.height).toBeGreaterThanOrEqual(ART_HEIGHT);
+      expect(grid.top).toBeGreaterThanOrEqual(0);
+    }
+    expect(pixelGrid(412, 839, 2.625).k).toBe(8);
+  });
+
+  test('runs take the four palettes in turn; each has six sky bands and four pipe shades', () => {
+    expect([0, 1, 2, 3, 4, -1].map((n) => paletteFor(n).name)).toEqual(['dawn', 'day', 'dusk', 'night', 'dawn', 'night']);
+    for (const p of PALETTES) {
+      expect(p.sky).toHaveLength(6);
+      expect(p.pipe).toHaveLength(4);
+    }
+  });
+
+  test('the wing beats down right after a flap, and slowly while gliding', () => {
+    expect(birdFrame(0, 0)).toBe(2);
+    expect(birdFrame(0.13, 0)).toBe(0);
+    expect(new Set([0, 0.15, 0.3, 0.45].map((t) => birdFrame(5, t))).size).toBeGreaterThan(1);
+  });
+});

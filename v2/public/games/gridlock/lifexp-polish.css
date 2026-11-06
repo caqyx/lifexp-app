@@ -1,0 +1,84 @@
+/* LifeXP polish for Gridlock (docs/v2/VENDOR-PATCHES.md). Not part of the upstream game:
+   scripts/vendor-game.mjs copies it into the vendored copy and links it after cube_master.css.
+   Looks and rules stay the game's own; this only makes it lighter and steadier on a phone. */
+
+/* 1. Screens the game hides (showScreen() sets an inline visibility:hidden) and a closed death
+   overlay run no animations. Before, the menu logo's text-shadow pulse, the death title's
+   flicker and the Cubek face kept animating behind the board, so every frame of play recalculated
+   styles and repainted things nobody could see (half the long frames of a boss round on a
+   phone-speed CPU). Entrance animations play again from the start when the screen comes back. */
+[style*="visibility: hidden"],
+[style*="visibility: hidden"] *,
+#death-overlay:not(.show),
+#death-overlay:not(.show) * {
+  animation-name: none !important;
+}
+
+/* 1b. The warning pulse on cells where a block is about to land animated `filter: brightness`,
+   which the browser cannot hand to the compositor: with a boss's block rain (dozens of such
+   cells) every frame recalculated and repainted them. The same rhythm as an opacity pulse runs
+   on the compositor; the cells keep their colour and timing. */
+.laser-charge, .block-charge { animation-name: lx-telegraph !important; }
+@keyframes lx-telegraph {
+  0%, 100% { opacity: .42; }
+  50%      { opacity: .95; }
+}
+
+/* 2. The animation canvas is drawn at the screen's pixel density (lifexp-polish.js), so its CSS
+   size is the board's, not its bitmap's. */
+#anim-canvas { width: 100%; height: 100%; }
+
+/* 3. Touch inside the LifeXP frame: no text selection, callout menu or double-tap zoom while
+   playing; fields (the PIN screen) still select. */
+html, body {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+input, textarea { -webkit-user-select: text; user-select: text; }
+
+/* 4. Juice: a ring where a dash lands and a hit flash + shake on death (transform/opacity only). */
+.lx-ring {
+  position: absolute; z-index: 4; pointer-events: none;
+  left: calc(var(--lx-x) * 100% / var(--lx-n)); top: calc(var(--lx-y) * 100% / var(--lx-n));
+  width: calc(100% / var(--lx-n)); height: calc(100% / var(--lx-n));
+  border: 2px solid var(--lx-color, #00ffe0); border-radius: 4px;
+  opacity: 0; transform: scale(.6);
+}
+.lx-ring--on { animation: lx-ring 300ms cubic-bezier(.2, .7, .3, 1) both; }
+@keyframes lx-ring {
+  from { opacity: .85; transform: scale(.7); }
+  to   { opacity: 0;   transform: scale(1.9); }
+}
+#board-wrap::after {
+  content: ''; position: absolute; inset: 0; z-index: 7; pointer-events: none;
+  border-radius: 6px; background: radial-gradient(circle, rgba(255, 60, 40, 0) 35%, rgba(255, 40, 30, .55) 100%);
+  opacity: 0;
+}
+#board-wrap.lx-hit { animation: lx-shake 340ms cubic-bezier(.3, .7, .4, 1); }
+#board-wrap.lx-hit::after { animation: lx-flash 420ms ease-out; }
+@keyframes lx-shake {
+  0%   { transform: translate(0, 0); }
+  15%  { transform: translate(-7px, 3px); }
+  30%  { transform: translate(6px, -4px); }
+  45%  { transform: translate(-4px, 2px); }
+  60%  { transform: translate(3px, -1px); }
+  80%  { transform: translate(-1px, 1px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes lx-flash {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* 5. Reduced motion: no shake (the flash alone says "hit"), no floating logo or board strike
+   shake, decorative loops stopped. Gameplay warnings keep their colours. */
+@media (prefers-reduced-motion: reduce) {
+  #board-wrap.lx-hit { animation: none; }
+  #menu-title, #board-wrap.bolt-strike, #cubek2-face, .tut-hand,
+  #bar-missions.lucky, #bar-missions.luckiest, #missions-week-badge.lucky, #missions-week-badge.luckiest {
+    animation: none !important;
+  }
+  #bg-canvas { display: none; }
+}

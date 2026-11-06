@@ -483,8 +483,8 @@ describe('texts and test switches', () => {
   });
 
   test('the switches work only with ?test=1, within bounds', () => {
-    expect(testParams('?speed=20&waves=2')).toEqual({ on: false, speed: null, waves: null, lives: null, gold: null });
-    expect(testParams('?test=1&speed=500&waves=2&lives=3&gold=900')).toEqual({ on: true, speed: 60, waves: 2, lives: 3, gold: 900 });
+    expect(testParams('?speed=20&waves=2')).toEqual({ on: false, speed: null, waves: null, lives: null, gold: null, start: null });
+    expect(testParams('?test=1&speed=500&waves=2&lives=3&gold=900&start=21')).toEqual({ on: true, speed: 60, waves: 2, lives: 3, gold: 900, start: 21 });
     expect(testParams('?test=1&speed=abc').speed).toBeNull();
   });
 });
@@ -498,5 +498,26 @@ describe('effects', () => {
     expect(fx.sparks.some((s) => s.alive)).toBe(false);
     expect(plusLabel(4)).toBe('+4');
     expect(plusLabel(9999)).toBe('+200');
+  });
+});
+
+describe('smooth drawing and the perf switch (q-own)', () => {
+  test('each step keeps where enemies and shots were, for drawing between steps', () => {
+    const game = waveGame();
+    spawnEnemy(game, 'runner', 2, 1);
+    const enemy = game.enemies.find((e) => e.alive)!;
+    expect([enemy.px, enemy.py]).toEqual([enemy.x, enemy.y]);
+    const before = { x: enemy.x, y: enemy.y };
+    run(game, DT);
+    expect([enemy.px, enemy.py]).toEqual([before.x, before.y]);
+    expect(enemy.y).not.toBe(before.y);
+  });
+
+  test('?start= (test only) begins at a later wave, counted as cleared', () => {
+    const game = createGame(marsh, { start: 18 });
+    expect([game.wave, game.cleared, game.nextWave?.number]).toEqual([17, 17, 18]);
+    callWave(game);
+    expect(game.wave).toBe(18);
+    expect(createGame(marsh, { endless: true, start: 24 }).nextWave?.number).toBe(24);
   });
 });

@@ -1,7 +1,8 @@
 // @ts-check
-// Feedback that is not gameplay (docs/v2/PLAN.md 9.1, stage g-3): squash on a flap,
-// a short shake and flash on a death, a few sparks on a point. Kept subtle, and all
-// off with prefers-reduced-motion (main.js passes `reduced`).
+// Feedback that is not gameplay (docs/v2/PLAN.md 9.1, g-3, q-own): a puff of pixels on
+// a flap, sparks on a point, feathers, a short shake and a two-step flash on a death.
+// Kept subtle, and all off with prefers-reduced-motion (main.js passes `reduced`).
+// Particles live in world units; render.js draws them as 1- or 2-pixel squares.
 
 /** @typedef {{ alive: boolean, x: number, y: number, vx: number, vy: number, age: number, life: number, size: number, hue: number }} Particle */
 
@@ -9,7 +10,7 @@ export const SQUASH_TIME = 0.14;
 export const SHAKE_TIME = 0.28;
 export const SHAKE_MAGNITUDE = 6;
 export const FLASH_TIME = 0.22;
-const POOL_SIZE = 48;
+const POOL_SIZE = 64;
 const BURST = 10;
 
 /** @param {number} t 0..1 */
@@ -50,29 +51,57 @@ export function createParticles() {
 }
 
 /**
- * A small burst of sparks at a point (a scored pipe).
+ * Wakes up to `count` sleeping particles at a point, flying out at `speed` (± half),
+ * nudged by (`pushX`, `pushY`), coloured by `hues` (render.js's colour list).
  * @param {Particle[]} pool @param {number} x @param {number} y @param {() => number} rng
+ * @param {{ count: number, speed: number, pushX: number, pushY: number, life: number, hues: readonly number[] }} kind
  */
-export function spawnBurst(pool, x, y, rng) {
-  let left = BURST;
+function spawn(pool, x, y, rng, kind) {
+  let left = kind.count;
   for (const p of pool) {
     if (left === 0) break;
     if (p.alive) continue;
     const angle = rng() * Math.PI * 2;
-    const speed = 60 + rng() * 90;
-    Object.assign(p, {
-      alive: true,
-      x,
-      y,
-      vx: Math.cos(angle) * speed - 40,
-      vy: Math.sin(angle) * speed - 30,
-      age: 0,
-      life: 0.35 + rng() * 0.2,
-      size: 1.5 + rng() * 2,
-      hue: rng() < 0.5 ? 0 : 1,
-    });
+    const speed = kind.speed * (0.5 + rng());
+    p.alive = true;
+    p.x = x;
+    p.y = y;
+    p.vx = Math.cos(angle) * speed + kind.pushX;
+    p.vy = Math.sin(angle) * speed + kind.pushY;
+    p.age = 0;
+    p.life = kind.life * (0.8 + rng() * 0.4);
+    p.size = 1.5 + rng() * 2;
+    p.hue = kind.hues[Math.floor(rng() * kind.hues.length)] ?? 0;
     left -= 1;
   }
+}
+
+const SPARKS = { count: BURST, speed: 100, pushX: -40, pushY: -30, life: 0.45, hues: [0, 1] };
+const FEATHERS = { count: 14, speed: 140, pushX: -20, pushY: -90, life: 0.7, hues: [2, 3] };
+const PUFF = { count: 3, speed: 30, pushX: -70, pushY: 20, life: 0.25, hues: [3] };
+
+/**
+ * A small burst of sparks at a point (a scored pipe).
+ * @param {Particle[]} pool @param {number} x @param {number} y @param {() => number} rng
+ */
+export function spawnBurst(pool, x, y, rng) {
+  spawn(pool, x, y, rng, SPARKS);
+}
+
+/**
+ * Feathers when the bird hits something.
+ * @param {Particle[]} pool @param {number} x @param {number} y @param {() => number} rng
+ */
+export function spawnFeathers(pool, x, y, rng) {
+  spawn(pool, x, y, rng, FEATHERS);
+}
+
+/**
+ * A puff behind the bird on a flap.
+ * @param {Particle[]} pool @param {number} x @param {number} y @param {() => number} rng
+ */
+export function spawnPuff(pool, x, y, rng) {
+  spawn(pool, x, y, rng, PUFF);
 }
 
 /**

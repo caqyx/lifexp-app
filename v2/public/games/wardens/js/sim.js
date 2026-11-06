@@ -36,7 +36,7 @@ import { createSpawns, createWave } from './waves.js';
  *   dist: number, x: number, y: number, speed: number, armor: number,
  *   flying: boolean, boss: boolean, radius: number, gold: number, lives: number,
  *   slowFactor: number, slowLeft: number, slowResist: number, flash: number,
- *   wave: number,
+ *   wave: number, px: number, py: number,
  * }} Enemy
  * @typedef {{
  *   type: TowerType, level: number, pad: number, x: number, y: number,
@@ -47,11 +47,12 @@ import { createSpawns, createWave } from './waves.js';
  *   alive: boolean, kind: 'arrow' | 'shell' | 'bolt', x: number, y: number,
  *   sx: number, sy: number, tx: number, ty: number, targetSlot: number, targetId: number,
  *   speed: number, damage: number, pierce: boolean, radius: number, t: number, flight: number,
+ *   px: number, py: number,
  * }} Projectile
  * @typedef {'hit' | 'kill' | 'leak' | 'shot' | 'pulse' | 'blast' | 'build' | 'upgrade' | 'sell' | 'wave' | 'cleared' | 'early'} EventType
  * @typedef {{ type: EventType, x: number, y: number, value: number, kind: string }} GameEvent
  * @typedef {'build' | 'wave' | 'won' | 'lost'} Phase
- * @typedef {{ endless?: boolean, lives?: number, gold?: number, waves?: number }} GameOptions
+ * @typedef {{ endless?: boolean, lives?: number, gold?: number, waves?: number, start?: number }} GameOptions
  */
 
 export const MAX_ENEMIES = 320;
@@ -72,7 +73,7 @@ function createEnemySlot() {
   return {
     alive: false, id: 0, type: 'crawler', hp: 0, maxHp: 0, dist: 0, x: 0, y: 0, speed: 0, armor: 0,
     flying: false, boss: false, radius: 0, gold: 0, lives: 0, slowFactor: 1, slowLeft: 0, slowResist: 0,
-    flash: 0, wave: 0,
+    flash: 0, wave: 0, px: 0, py: 0,
   };
 }
 
@@ -80,7 +81,7 @@ function createEnemySlot() {
 function createProjectileSlot() {
   return {
     alive: false, kind: 'arrow', x: 0, y: 0, sx: 0, sy: 0, tx: 0, ty: 0, targetSlot: -1, targetId: 0,
-    speed: 0, damage: 0, pierce: false, radius: 0, t: 0, flight: 0,
+    speed: 0, damage: 0, pierce: false, radius: 0, t: 0, flight: 0, px: 0, py: 0,
   };
 }
 
@@ -96,6 +97,7 @@ function createEventSlot() {
 export function createGame(map, options = {}) {
   const endless = options.endless === true && map.endless === true;
   const totalWaves = endless ? Infinity : Math.max(1, Math.min(map.waves, options.waves ?? map.waves));
+  const skipped = Math.max(0, Math.min((options.start ?? 1) - 1, endless ? 199 : totalWaves - 1));
   return {
     map,
     path: createPath(map),
@@ -108,14 +110,14 @@ export function createGame(map, options = {}) {
     lives: options.lives ?? START_LIVES,
     startLives: options.lives ?? START_LIVES,
     /** Waves started and waves cleared. */
-    wave: 0,
-    cleared: 0,
+    wave: skipped,
+    cleared: skipped,
     waveTime: 0,
     /** Seconds until the next wave starts by itself; −1 = it waits for the player. */
     countdown: -1,
     spawns: /** @type {Spawn[]} */ ([]),
     spawnCursor: 0,
-    nextWave: /** @type {Wave | null} */ (createWave(map, 1)),
+    nextWave: /** @type {Wave | null} */ (createWave(map, skipped + 1)),
     enemies: Array.from({ length: MAX_ENEMIES }, createEnemySlot),
     aliveCount: 0,
     nextEnemyId: 1,
@@ -230,6 +232,8 @@ export function spawnEnemy(game, type, dist, wave) {
   enemy.flash = 0;
   enemy.wave = wave;
   pointAt(game.path, enemy.dist, enemy);
+  enemy.px = enemy.x;
+  enemy.py = enemy.y;
   game.aliveCount += 1;
 }
 
@@ -237,6 +241,8 @@ export function spawnEnemy(game, type, dist, wave) {
 function updateEnemies(game, dt) {
   for (const enemy of game.enemies) {
     if (!enemy.alive) continue;
+    enemy.px = enemy.x;
+    enemy.py = enemy.y;
     updateSlow(enemy, dt);
     if (enemy.flash > 0) enemy.flash = Math.max(0, enemy.flash - dt);
     enemy.dist += enemy.speed * enemy.slowFactor * dt;
@@ -413,8 +419,8 @@ function launchProjectile(game, kind, from, tx, ty, slot, id, damage, pierce, ra
   if (!p) return;
   p.alive = true;
   p.kind = kind;
-  p.x = p.sx = from.x;
-  p.y = p.sy = from.y;
+  p.x = p.sx = p.px = from.x;
+  p.y = p.sy = p.py = from.y;
   p.tx = tx;
   p.ty = ty;
   p.targetSlot = slot;
@@ -431,6 +437,8 @@ function launchProjectile(game, kind, from, tx, ty, slot, id, damage, pierce, ra
 function updateProjectiles(game, dt) {
   for (const p of game.projectiles) {
     if (!p.alive) continue;
+    p.px = p.x;
+    p.py = p.y;
     if (p.kind === 'shell') updateShell(game, p, dt);
     else updateHoming(game, p, dt);
   }

@@ -70,6 +70,7 @@ function findElements() {
     stage: byId('stage'),
     board: /** @type {HTMLCanvasElement} */ (byId('board')),
     pads: byId('pads'),
+    edge: /** @type {HTMLElement} */ (document.querySelector('.edge')),
     hint: byId('hint'),
     banner: byId('banner'),
     waveStatus: byId('wave-status'),
@@ -119,7 +120,7 @@ const t = translator(lang);
 const test = testParams(location.search);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const dom = findElements();
-const renderer = createRenderer(dom.board);
+const renderer = createRenderer(dom.board, /** @type {HTMLCanvasElement} */ (byId('ground')));
 const fx = createEffects();
 const progress = readProgress(storage());
 const settings = readSettings(storage());
@@ -136,11 +137,20 @@ const ui = {
   ended: false,
   endTimer: 0,
   bannerTimer: 0,
+  /** The bonus of the last early call, said in the next wave's banner. */
+  earlyBonus: 0,
   /** What the HUD shows now, so text is only written when it changes. */
   shown: { gold: -1, lives: -1, wave: '', status: '', call: '', previewWave: -1, phase: '' },
 };
 const clock = { last: /** @type {number | null} */ (null), acc: 0, frame: 0, time: 0 };
-const view = { selectedPad: -1, previewType: /** @type {TowerType | null} */ (null), clock: 0, reduced: false };
+const view = { selectedPad: -1, previewType: /** @type {TowerType | null} */ (null), clock: 0, reduced: false, alpha: 1 };
+/**
+ * Rendering quality: the canvas starts at the screen's pixel density (at most 2×) and steps
+ * down — 2 → 1.5 → 1.25 → 1, or straight to 1 when far behind — while frames keep running
+ * long for ¾ s (a slow phone stays smooth instead of sharp). It never steps back up within
+ * a visit.
+ */
+const quality = { cap: 2, frameMs: 16.7, slowFor: 0 };
 const pt = { x: 0, y: 0 };
 
 /** @param {string} key */
@@ -236,6 +246,7 @@ function startGame(mapIndex, endless) {
     waves: test.waves ?? undefined,
     lives: test.lives ?? undefined,
     gold: test.gold ?? undefined,
+    start: test.start ?? undefined,
   });
   ui.ended = false;
   window.clearTimeout(ui.endTimer);
@@ -288,14 +299,15 @@ function handleResize() {
   const layout = computeLayout(box.width, box.height);
   ui.layout = layout;
   dom.app.dataset.rotated = String(layout.rotated);
-  resizeRenderer(renderer, layout, Math.min(2, window.devicePixelRatio || 1), game);
+  resizeRenderer(renderer, layout, Math.min(quality.cap, window.devicePixelRatio || 1), game);
   positionPads(game, layout);
   renderBoard();
 }
 
 /** @param {Game} game @param {Layout} layout */
 function positionPads(game, layout) {
-  const size = layout.tile;
+  // At least 44 px to tap, even where a tile is smaller (a small window held sideways).
+  const size = Math.max(44, layout.tile);
   game.pads.forEach((pad, i) => {
     const button = ui.padButtons[i];
     if (!button) return;
@@ -589,8 +601,7 @@ function handleCallWave() {
   const bonus = callWave(game);
   if (bonus < 0) return;
   dom.hint.hidden = true;
-  const boss = game.spawns.some((s) => s.type === 'colossus');
-  showBanner(bonus > 0 ? `${t('wave')} ${game.wave} · +${bonus} ${t('gold').toLowerCase()}` : boss ? `${t('wave')} ${game.wave} · ${t('bossWave')}` : `${t('wave')} ${game.wave}`);
+  ui.earlyBonus = bonus;
   updateHud(game);
 }
 
@@ -704,6 +715,7 @@ function loop(now) {
   const elapsed = clock.last === null ? 0 : Math.min(MAX_FRAME, (now - clock.last) / 1000);
   clock.last = now;
   if (!game || dom.app.dataset.screen !== 'play') return;
+  checkQuality(elapsed);
   const running = !game.paused && game.phase !== 'won' && game.phase !== 'lost';
   if (running || game.phase === 'won' || game.phase === 'lost') stepGame(game, elapsed * speedFactor());
   clock.time += running ? elapsed : 0;
@@ -732,8 +744,52 @@ function renderBoard() {
   view.selectedPad = ui.selectedPad;
   view.previewType = ui.previewType;
   view.clock = clock.time;
-  consumeEvents(renderer, game, fx, view.reduced);
+  view.alpha = game.paused || game.phase === 'build' ? 1 : Math.min(1, clock.acc / DT);
+  const news = consumeEvents(renderer, game, fx, view.reduced);
   renderFrame(renderer, game, fx, view);
+  reactToNews(news);
+}
+
+/**
+ * Steps the canvas's pixel density down when frames run long for a second (see `quality`).
+ * @param {number} elapsed
+ */
+function checkQuality(elapsed) {
+  const ms = elapsed * 1000;
+  if (ms <= 0 || ms > 200) return;
+  quality.frameMs += (ms - quality.frameMs) * 0.1;
+  quality.slowFor = quality.frameMs > 19 ? quality.slowFor + elapsed : 0;
+  if (quality.slowFor < 0.75 || quality.cap <= 1) return;
+  // Far behind (under ~40 fps): straight to 1×; a little behind: one step.
+  quality.cap = quality.frameMs > 24 ? 1 : quality.cap > 1.5 ? 1.5 : quality.cap > 1.25 ? 1.25 : 1;
+  quality.slowFor = 0;
+  quality.frameMs = 16.7;
+  handleResize();
+  if (test.on) dom.stage.dataset.quality = String(quality.cap);
+}
+
+/**
+ * Banners for a wave's start and end, a shake when a Colossus falls, a red edge on a leak.
+ * @param {{ bossKilled: boolean, leaked: boolean, cleared: number, wave: number, boss: boolean }} news
+ */
+function reactToNews(news) {
+  if (news.wave > 0) {
+    const early = ui.earlyBonus > 0 ? ` · ${t('earlyBonus', { gold: ui.earlyBonus })}` : '';
+    showBanner(`${t('wave')} ${news.wave}${news.boss ? ` · ${t('bossWave')}` : ''}${early}`);
+    ui.earlyBonus = 0;
+  } else if (news.cleared > 0 && ui.game && ui.game.phase === 'build') {
+    showBanner(t('waveCleared', { n: ui.game.wave, gold: news.cleared }));
+  }
+  if (reducedMotion.matches) return;
+  if (news.bossKilled) {
+    dom.stage.animate(
+      [{ transform: 'translate(0, 0)' }, { transform: 'translate(-5px, 3px)' }, { transform: 'translate(4px, -3px)' }, { transform: 'translate(-2px, 1px)' }, { transform: 'translate(0, 0)' }],
+      { duration: 320, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' },
+    );
+  }
+  if (news.leaked) {
+    dom.edge.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 520, easing: 'cubic-bezier(0.4, 0, 1, 1)' });
+  }
 }
 
 // ── Input ────────────────────────────────────────────────────────────────────

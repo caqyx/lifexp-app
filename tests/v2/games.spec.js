@@ -440,6 +440,10 @@ test.describe('Gridlock', () => {
     const before = await dashes.textContent();
     await cells.nth(8 * 16 + 10).tap();
     await expect(dashes).not.toHaveText(before);
+    // LifeXP's polish (docs/v2/VENDOR-PATCHES.md): a press alone dashes, without waiting for the release.
+    const pressed = await dashes.textContent();
+    await game.locator('#board .cell.dashable:not(.block-charge)').first().dispatchEvent('pointerdown', { button: 0 });
+    await expect(dashes).not.toHaveText(pressed);
 
     // A round completes and pays. Every round fires a laser along the cube's row or
     // column, so standing still loses: a small autopilot inside the game's frame dodges
@@ -1019,7 +1023,7 @@ test.describe('Wave Rush', () => {
     expect(kept === null || JSON.parse(kept).sector === 1).toBe(true);
 
     // Praktyka from sector 2, section 3: the pilot flies that section, lets go in section 4,
-    // the wave crashes, and a tap brings it back at sector 2's start.
+    // the wave crashes and comes back by itself at sector 2's start.
     await openWaveWith(page, host, 'seed=12&sector=2&section=3&autopilot=1');
     await game.getByRole('button', { name: 'Praktyka', exact: true }).click();
     await stage.click();
@@ -1028,11 +1032,13 @@ test.describe('Wave Rush', () => {
     const start = await waveState(game);
     await expect.poll(async () => (await waveState(game)).section, { timeout: 30000 }).toBeGreaterThanOrEqual(4);
     await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 10000 });
+    const crashedAt = Date.now();
     expect((await waveState(game)).section).toBe(4);
-    await expect(game.getByText('Stuknij, żeby wrócić do punktu kontrolnego')).toBeVisible();
-    await page.waitForTimeout(600);
-    await stage.click();
-    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    // Practice shows no result card and needs no tap: the wave is back by itself in about
+    // half a second (stage q-rush; the margin is for a slow CI machine).
+    await expect(game.getByText('Stuknij, żeby wrócić do punktu kontrolnego')).toBeHidden();
+    await expect.poll(async () => (await waveState(game)).attempt, { timeout: 3000 }).toBe(2);
+    expect(Date.now() - crashedAt).toBeLessThan(2000);
     const after = await waveState(game);
     expect(after.checkpoint).toBe(start.checkpoint);
     expect(after.x).toBeLessThan(start.checkpoint + 2);
@@ -1218,7 +1224,7 @@ test.describe('Ship Rush', () => {
     expect((await waveState(game)).state).toBe('playing');
 
     // Praktyka from sector 2, section 3: the pilot flies it and lets go; after the crash a
-    // tap brings the ship back to sector 2's start, and practice keeps no record.
+    // moment later the ship is back at sector 2's start, and practice keeps no record.
     const kept = await page.evaluate(() => localStorage.getItem('lifexp-shiprush-best'));
     await openWaveWith(page, host, 'seed=12&sector=2&section=3&autopilot=1');
     await flyFrom(game, 'Praktyka');
@@ -1226,10 +1232,9 @@ test.describe('Ship Rush', () => {
     const start = await waveState(game);
     await expect.poll(async () => (await waveState(game)).section, { timeout: 30000 }).toBeGreaterThanOrEqual(4);
     await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 20000 });
-    await expect(game.getByText('Stuknij, żeby wrócić do punktu kontrolnego')).toBeVisible();
-    await page.waitForTimeout(600);
-    await stage.click();
-    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    // Practice shows no result card and needs no tap: the vehicle is back by itself.
+    await expect(game.getByText('Stuknij, żeby wrócić do punktu kontrolnego')).toBeHidden();
+    await expect.poll(async () => (await waveState(game)).attempt, { timeout: 3000 }).toBe(2);
     const after = await waveState(game);
     expect(after.checkpoint).toBe(start.checkpoint);
     expect(after.x).toBeLessThan(start.x);
@@ -1437,7 +1442,7 @@ test.describe('Flip Rush', () => {
     expect((await waveState(game)).state).toBe('playing');
 
     // Praktyka from sector 2, section 3: the pilot plays it and lets go; after the crash a
-    // tap brings the vehicle back to sector 2's start, and practice keeps no record.
+    // moment later the vehicle is back at sector 2's start, and practice keeps no record.
     const kept = await page.evaluate(() => localStorage.getItem('lifexp-fliprush-best'));
     await openWaveWith(page, host, 'seed=12&sector=2&section=3&autopilot=1');
     await flyFrom(game, 'Praktyka');
@@ -1445,10 +1450,9 @@ test.describe('Flip Rush', () => {
     const start = await waveState(game);
     await expect.poll(async () => (await waveState(game)).section, { timeout: 30000 }).toBeGreaterThanOrEqual(4);
     await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 20000 });
-    await expect(game.getByText('Stuknij, żeby wrócić do punktu kontrolnego')).toBeVisible();
-    await page.waitForTimeout(600);
-    await stage.click();
-    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    // Practice shows no result card and needs no tap: the vehicle is back by itself.
+    await expect(game.getByText('Stuknij, żeby wrócić do punktu kontrolnego')).toBeHidden();
+    await expect.poll(async () => (await waveState(game)).attempt, { timeout: 3000 }).toBe(2);
     const after = await waveState(game);
     expect(after.checkpoint).toBe(start.checkpoint);
     expect(after.x).toBeLessThan(start.x);
@@ -1619,7 +1623,7 @@ test.describe('Flip Rush f-2, sectors 4–6 and the finale', () => {
     await achievement.getByRole('button', { name: 'Dalej' }).click();
     await expect(game.getByRole('region', { name: 'Serce Fabryki za tobą!' })).toBeVisible();
 
-    // Practice from stretch 3: the pilot plays it and lets go; a tap goes back to the start
+    // Practice from stretch 3: the pilot plays it and lets go; the respawn goes back to the start
     // of the stretch it crashed in (a checkpoint every stretch), not the finale's start.
     await openWaveWith(page, host, 'seed=1&finale=3&autopilot=1');
     await flyFrom(game, 'Praktyka finału');
@@ -1627,9 +1631,8 @@ test.describe('Flip Rush f-2, sectors 4–6 and the finale', () => {
     await expect(stage).toHaveAttribute('data-state', 'dead', { timeout: 30000 });
     const crash = await waveState(game);
     expect(crash.section).toBeGreaterThanOrEqual(3);
-    await page.waitForTimeout(600);
-    await stage.click();
-    await expect.poll(async () => (await waveState(game)).attempt).toBe(2);
+    // No tap needed: practice respawns by itself.
+    await expect.poll(async () => (await waveState(game)).attempt, { timeout: 3000 }).toBe(2);
     const after = await waveState(game);
     // (The vehicle restarts a little before the checkpoint, so it may show the stretch before.)
     expect(after.level).toBe('finale');

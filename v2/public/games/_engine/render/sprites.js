@@ -186,8 +186,9 @@ export function portalColor(p) {
  * A portal: a tall ring across the joint's corridor with arrows for the new gravity.
  * @param {CanvasRenderingContext2D} ctx @param {number} x px @param {number} top px @param {number} bottom px
  * @param {number} cell px @param {{ kind: import('../level.js').PortalKind, on: boolean, mode?: string, speed?: string }} p @param {number} time @param {boolean} reduced
+ * @param {number} [near] 0 far … 1 the vehicle is at it
  */
-export function drawPortal(ctx, x, top, bottom, cell, p, time, reduced) {
+export function drawPortal(ctx, x, top, bottom, cell, p, time, reduced, near = 0) {
   if (p.kind === 'speed') {
     drawSpeedPortal(ctx, x, top, bottom, cell, p.speed ?? 'normal', time, reduced);
     return;
@@ -197,14 +198,15 @@ export function drawPortal(ctx, x, top, bottom, cell, p, time, reduced) {
   const ry = (bottom - top) / 2;
   const rx = cell * 0.55;
   ctx.save();
-  ctx.globalAlpha = 0.18;
+  ctx.globalAlpha = 0.18 + 0.17 * near;
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.ellipse(x, cy, rx, ry, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.globalAlpha = 0.3;
+  // The glow swells as the vehicle comes (stage q-rush: the change is read ahead of time).
+  ctx.globalAlpha = 0.3 + 0.35 * near;
   ctx.strokeStyle = color;
-  ctx.lineWidth = cell * 0.5;
+  ctx.lineWidth = cell * (0.5 + 0.35 * near);
   ctx.stroke();
   ctx.globalAlpha = 1;
   ctx.lineWidth = cell * 0.16;

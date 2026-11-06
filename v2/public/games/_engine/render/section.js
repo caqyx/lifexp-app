@@ -744,13 +744,34 @@ function paintDeco(ctx, g, th, m) {
  * @returns {Painted}
  */
 export function paintSection(g, th, v) {
+  const { width } = sectionSize(g, v);
+  return { canvas: paintSectionTile(g, th, v, 0, width), left: -PAD, top: STRIP_TOP };
+}
+
+/**
+ * The size in device pixels of a section's whole painting (it starts PAD cells before x = 0).
+ * @param {Geometry} g @param {View} v
+ */
+export function sectionSize(g, v) {
+  return { width: Math.ceil((g.length + PAD * 2) * v.cell), height: Math.ceil((STRIP_BOTTOM - STRIP_TOP) * v.cell) };
+}
+
+/**
+ * Paints one vertical slice of a section's painting: device pixels `x0` to `x0 + w` of it
+ * (stage q-rush: a section is painted a slice at a time as it scrolls in, so no single
+ * frame pays for a whole section). Everything is drawn in the whole painting's
+ * coordinates, so the slices meet exactly.
+ * @param {Geometry} g @param {Theme} th @param {View} v @param {number} x0 @param {number} w
+ * @returns {HTMLCanvasElement}
+ */
+export function paintSectionTile(g, th, v, x0, w) {
   const c = v.cell;
   const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil((g.length + PAD * 2) * c);
-  canvas.height = Math.ceil((STRIP_BOTTOM - STRIP_TOP) * c);
+  canvas.width = Math.max(1, Math.ceil(w));
+  canvas.height = sectionSize(g, v).height;
   const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d'));
   /** @type {Map} */
-  const m = { X: (x) => (x + PAD) * c, Y: (y) => (y - STRIP_TOP) * c, c };
+  const m = { X: (x) => (x + PAD) * c - x0, Y: (y) => (y - STRIP_TOP) * c, c };
   paintDeco(ctx, g, th, m);
   paintTerrain(ctx, g, th, m);
   for (const h of g.hazards) {
@@ -758,5 +779,5 @@ export function paintSection(g, th, v) {
     if (h.type === 'block' || h.type === 'pillar') paintBlock(ctx, h, th, m);
   }
   for (const h of g.hazards) if (h.shape === 'poly' && (h.type === 'spike' || h.type === 'halfSpike')) paintSpike(ctx, h, th, m);
-  return { canvas, left: -PAD, top: STRIP_TOP };
+  return canvas;
 }

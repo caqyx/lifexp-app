@@ -1,11 +1,14 @@
 // @ts-check
-// Strażnicy Doliny: drawing. The ground, the road and the build pads go onto a layer
+// Strażnicy Doliny: drawing. The ground, the road and the build pads go onto a canvas of
+// their own under the board (drawn once per size and map, never per frame); every frame
+// clears the board and draws towers, enemies, shots and effects, each moving thing
+// placed between its last two steps (interpolation, view.alpha). Previously: onto a layer
 // drawn once per size and map; every frame copies it and draws towers, enemies, shots
 // and effects on top. Rendering only reads the game (js/sim.js); the effects it starts
 // from the game's events live in js/effects.js. All art is drawn here — no image files.
 // Nothing here allocates per frame: colours are constants, points go through `pt`.
 
-import { ENEMIES, TOWERS } from './config.js';
+import { ENEMIES, ENEMY_TYPES, TOWERS, TOWER_TYPES } from './config.js';
 import { COLS, ROWS, pointAt, roadTiles } from './maps.js';
 import { mapTransform, toScreen } from './layout.js';
 import { EVENT_RING } from './sim.js';
@@ -18,7 +21,7 @@ import { addBurst, addFloat, addRing, plusLabel } from './effects.js';
 /** @typedef {import('./effects.js').Effects} Effects */
 /** @typedef {import('./config.js').TowerType} TowerType */
 /** @typedef {import('./config.js').EnemyType} EnemyType */
-/** @typedef {{ selectedPad: number, previewType: TowerType | null, clock: number, reduced: boolean }} View */
+/** @typedef {{ selectedPad: number, previewType: TowerType | null, clock: number, reduced: boolean, alpha: number }} View */
 
 export const TOWER_COLORS = /** @type {const} */ ({
   archer: '#6fd08c',
@@ -65,12 +68,14 @@ const pt = { x: 0, y: 0 };
 const SIDES = /** @type {const} */ ([-1, 1]);
 const ahead = { x: 0, y: 0 };
 
-/** @param {HTMLCanvasElement} canvas */
-export function createRenderer(canvas) {
+/**
+ * @param {HTMLCanvasElement} canvas the board (what moves)
+ * @param {HTMLCanvasElement} layer the ground under it (still)
+ */
+export function createRenderer(canvas, layer) {
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2d canvas missing');
-  const layer = document.createElement('canvas');
-  const layerCtx = layer.getContext('2d');
+  const layerCtx = layer.getContext('2d', { alpha: false });
   if (!layerCtx) throw new Error('2d canvas missing');
   return {
     canvas,
@@ -82,6 +87,15 @@ export function createRenderer(canvas) {
     lastSeq: 0,
     /** The floating numbers' font, sized with the tiles (set on resize, not per frame). */
     font: '700 12px system-ui, sans-serif',
+    /**
+     * Pre-drawn sprites, made on first use for this size and density: drawing a small
+     * picture is far cheaper for a phone than the paths it is made of (see spriteFor).
+     */
+    enemySprites: /** @type {(HTMLCanvasElement | null)[]} */ ([]),
+    towerSprites: /** @type {(HTMLCanvasElement | null)[]} */ ([]),
+    labels: /** @type {Map<string, HTMLCanvasElement>} */ (new Map()),
+    /** What happened since the last frame, for the page (one object, reused). */
+    news: { bossKilled: false, leaked: false, cleared: -1, wave: -1, boss: false },
   };
 }
 
@@ -99,6 +113,9 @@ export function resizeRenderer(r, layout, dpr, game) {
     c.height = Math.max(1, Math.round(layout.height * dpr));
   }
   r.font = `700 ${Math.max(12, Math.round(0.34 * layout.tile))}px system-ui, sans-serif`;
+  r.enemySprites = new Array(ENEMY_TYPES.length * HEADINGS * FRAMES).fill(null);
+  r.towerSprites = new Array(TOWER_TYPES.length * 3 * AIMS * 2).fill(null);
+  r.labels = new Map();
   renderGround(r.layerCtx, layout, dpr, game);
 }
 
@@ -127,6 +144,25 @@ function renderGround(ctx, layout, dpr, game) {
   renderRoad(ctx, game);
   renderPads(ctx, game);
   renderGate(ctx, game);
+  renderVignette(ctx, layout, dpr);
+}
+
+/**
+ * Soft light on the board: brighter in the middle, darker toward the edges (drawn once
+ * with the ground, so it costs nothing per frame).
+ * @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {number} dpr
+ */
+function renderVignette(ctx, layout, dpr) {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const cx = layout.ox + layout.mapWidth / 2;
+  const cy = layout.oy + layout.mapHeight / 2;
+  const radius = Math.hypot(layout.mapWidth, layout.mapHeight) / 2;
+  const light = ctx.createRadialGradient(cx, cy, radius * 0.25, cx, cy, radius);
+  light.addColorStop(0, 'rgba(255, 255, 255, 0.05)');
+  light.addColorStop(0.6, 'rgba(0, 0, 0, 0)');
+  light.addColorStop(1, 'rgba(0, 0, 0, 0.32)');
+  ctx.fillStyle = light;
+  ctx.fillRect(layout.ox, layout.oy, layout.mapWidth, layout.mapHeight);
 }
 
 /** @param {CanvasRenderingContext2D} ctx @param {Game['map']['theme']} theme */
@@ -279,6 +315,124 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// ── Sprites ─────────────────────────────────────────────────────────────────
+
+/** Directions an enemy faces (every 45°) and animation frames per cycle. */
+const HEADINGS = 8;
+const FRAMES = 4;
+/** Directions a tower aims (every 22.5°). */
+const AIMS = 16;
+const TAU = Math.PI * 2;
+/** Each enemy type's animation cycle (seconds of drawEnemy's clock); 0 = still. */
+const ENEMY_CYCLE = /** @type {const} */ ({
+  crawler: TAU / 9,
+  runner: 0,
+  shellback: 0,
+  moth: Math.PI / 12,
+  splitter: 0,
+  shard: 0,
+  colossus: TAU / 9 / 0.6,
+});
+
+/** @param {number} angle @param {number} steps */
+function stepOf(angle, steps) {
+  return ((Math.round((angle / TAU) * steps) % steps) + steps) % steps;
+}
+
+/** @param {number} clock @param {number} cycle */
+function frameOf(clock, cycle) {
+  if (cycle === 0) return 0;
+  const t = clock % cycle;
+  return Math.floor(((t < 0 ? t + cycle : t) / cycle) * FRAMES) % FRAMES;
+}
+
+/**
+ * A small canvas, `size` CSS pixels square at the renderer's density, with `draw`
+ * painting at its centre.
+ * @param {Renderer} r @param {number} size @param {(ctx: CanvasRenderingContext2D, c: number) => void} draw
+ */
+function makeSprite(r, size, draw) {
+  const canvas = document.createElement('canvas');
+  const px = Math.max(1, Math.ceil(size * r.dpr));
+  canvas.width = px;
+  canvas.height = px;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
+    draw(ctx, px / r.dpr / 2);
+  }
+  return canvas;
+}
+
+/**
+ * The picture of an enemy facing `heading` at `clock`, drawn once and kept.
+ * @param {Renderer} r @param {EnemyType} type @param {number} heading @param {number} clock
+ */
+function enemySprite(r, type, heading, clock) {
+  const t = ENEMY_TYPES.indexOf(type);
+  const h = stepOf(heading, HEADINGS);
+  const cycle = ENEMY_CYCLE[type];
+  const f = frameOf(clock, cycle);
+  const index = (t * HEADINGS + h) * FRAMES + f;
+  const cached = r.enemySprites[index];
+  if (cached) return cached;
+  const T = r.layout?.tile ?? 40;
+  const sprite = makeSprite(r, T * 1.4, (ctx, c) => drawEnemy(ctx, type, c, c, T, (h / HEADINGS) * TAU, ((f + 0.5) / FRAMES) * cycle, 0, false));
+  r.enemySprites[index] = sprite;
+  return sprite;
+}
+
+/**
+ * The picture of a tower: by level, aim (every 22.5°) and whether it has just fired;
+ * the banner by its flag's frame.
+ * @param {Renderer} r @param {TowerType} type @param {number} level @param {number} aim @param {number} fired @param {number} clock
+ */
+function towerSprite(r, type, level, aim, fired, clock) {
+  const t = TOWER_TYPES.indexOf(type);
+  const still = type === 'frost' || type === 'banner';
+  const a = type === 'banner' ? frameOf(clock, TAU / 4) : still ? 0 : stepOf(aim, AIMS);
+  const kick = fired > 0 ? 1 : 0;
+  const index = ((t * 3 + level - 1) * AIMS + a) * 2 + kick;
+  const cached = r.towerSprites[index];
+  if (cached) return cached;
+  const T = r.layout?.tile ?? 40;
+  const angle = (a / AIMS) * TAU;
+  const bannerClock = ((a + 0.5) / FRAMES) * (TAU / 4);
+  const sprite = makeSprite(r, T * 1.3, (ctx, c) => drawTower(ctx, type, level, c, c, T, angle, kick ? 0.12 : 0, type === 'banner' ? bannerClock : 0, 1));
+  r.towerSprites[index] = sprite;
+  return sprite;
+}
+
+/** Draws a sprite centred on (x, y) in CSS pixels. @param {CanvasRenderingContext2D} ctx @param {HTMLCanvasElement} sprite @param {number} x @param {number} y @param {number} dpr */
+function blitSprite(ctx, sprite, x, y, dpr) {
+  const w = sprite.width / dpr;
+  ctx.drawImage(sprite, x - w / 2, y - w / 2, w, w);
+}
+
+/**
+ * What changes too often to pre-draw: the white flash of a hit and the frost ring.
+ * @param {CanvasRenderingContext2D} ctx @param {Enemy} enemy @param {number} cx @param {number} cy @param {number} T
+ */
+function drawEnemyState(ctx, enemy, cx, cy, T) {
+  const r = enemy.radius * T;
+  const y = cy - (enemy.flying ? 0.28 * T : 0);
+  if (enemy.flash > 0) {
+    ctx.globalAlpha = Math.min(1, enemy.flash / 0.12) * 0.8;
+    ctx.fillStyle = WHITE;
+    ctx.beginPath();
+    ctx.arc(cx, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  if (enemy.slowLeft > 0) {
+    ctx.strokeStyle = SLOW_RING;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, y, r + 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
 // ── Every frame ─────────────────────────────────────────────────────────────
 
 /**
@@ -291,14 +445,13 @@ export function renderFrame(r, game, fx, view) {
   const ctx = r.ctx;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, r.canvas.width, r.canvas.height);
-  ctx.drawImage(r.layer, 0, 0);
   ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
   renderSelection(ctx, layout, game, view);
-  renderTowers(ctx, layout, game, view);
-  renderEnemies(ctx, layout, game, view, false);
-  renderProjectiles(ctx, layout, game);
-  renderEnemies(ctx, layout, game, view, true);
-  renderEffects(ctx, layout, fx, r.font);
+  renderTowers(r, ctx, layout, game, view);
+  renderEnemies(r, ctx, layout, game, view, false);
+  renderProjectiles(ctx, layout, game, view.alpha);
+  renderEnemies(r, ctx, layout, game, view, true);
+  renderEffects(r, ctx, layout, fx, r.font);
 }
 
 /** The chosen pad and the range of its tower (or of the tower being picked). @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {Game} game @param {View} view */
@@ -328,14 +481,37 @@ function renderSelection(ctx, layout, game, view) {
   if (!tower && view.previewType) drawTower(ctx, view.previewType, 1, pt.x, pt.y, T, -Math.PI / 2, 0, view.clock, 0.55);
 }
 
-/** @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {Game} game @param {View} view */
-function renderTowers(ctx, layout, game, view) {
+/** @param {Renderer} r @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {Game} game @param {View} view */
+function renderTowers(r, ctx, layout, game, view) {
   for (const tower of game.towers) {
     if (!tower) continue;
     toScreen(layout, tower.x, tower.y, pt);
     const aim = layout.rotated ? tower.aim - Math.PI / 2 : tower.aim;
-    drawTower(ctx, tower.type, tower.level, pt.x, pt.y, layout.tile, aim, tower.fired, view.reduced ? 0 : view.clock, 1);
+    blitSprite(ctx, towerSprite(r, tower.type, tower.level, aim, tower.fired, view.reduced ? 0 : view.clock), pt.x, pt.y, r.dpr);
+    if (tower.fired > 0.09 && (tower.type === 'archer' || tower.type === 'ballista' || tower.type === 'mortar')) {
+      drawMuzzle(ctx, pt.x, pt.y, layout.tile, aim, tower.type);
+    }
   }
+}
+
+/**
+ * A shot's flash at the tower's tip for a few frames: white core, the tower's colour round it.
+ * @param {CanvasRenderingContext2D} ctx @param {number} cx @param {number} cy @param {number} T @param {number} aim @param {TowerType} type
+ */
+function drawMuzzle(ctx, cx, cy, T, aim, type) {
+  const reach = (type === 'ballista' ? 0.36 : type === 'mortar' ? 0.12 : 0.26) * T;
+  const x = cx + Math.cos(aim) * reach;
+  const y = cy + Math.sin(aim) * reach;
+  ctx.fillStyle = TOWER_COLORS[type];
+  ctx.globalAlpha = 0.55;
+  ctx.beginPath();
+  ctx.arc(x, y, 0.14 * T, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = WHITE;
+  ctx.beginPath();
+  ctx.arc(x, y, 0.06 * T, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 /**
@@ -488,17 +664,19 @@ function drawLevelPips(ctx, cx, cy, s, level) {
 
 /**
  * Enemies on the ground first, fliers after the shots (they are above them).
- * @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {Game} game @param {View} view @param {boolean} fliers
+ * @param {Renderer} r @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {Game} game @param {View} view @param {boolean} fliers
  */
-function renderEnemies(ctx, layout, game, view, fliers) {
+function renderEnemies(r, ctx, layout, game, view, fliers) {
   const T = layout.tile;
   for (const enemy of game.enemies) {
     if (!enemy.alive || enemy.flying !== fliers) continue;
-    toScreen(layout, enemy.x, enemy.y, pt);
+    const a = view.alpha;
+    toScreen(layout, enemy.px + (enemy.x - enemy.px) * a, enemy.py + (enemy.y - enemy.py) * a, pt);
     pointAt(game.path, enemy.dist + 0.1, ahead);
     toScreen(layout, ahead.x, ahead.y, ahead);
     const heading = Math.atan2(ahead.y - pt.y, ahead.x - pt.x);
-    drawEnemy(ctx, enemy.type, pt.x, pt.y, T, heading, view.reduced ? 0 : view.clock + enemy.id, enemy.flash, enemy.slowLeft > 0);
+    blitSprite(ctx, enemySprite(r, enemy.type, heading, view.reduced ? 0 : view.clock + enemy.id), pt.x, pt.y, r.dpr);
+    if (enemy.flash > 0 || enemy.slowLeft > 0) drawEnemyState(ctx, enemy, pt.x, pt.y, T);
     if (enemy.hp < enemy.maxHp) drawHealth(ctx, enemy, pt.x, pt.y, T);
   }
 }
@@ -665,13 +843,13 @@ function drawHealth(ctx, enemy, cx, cy, T) {
   ctx.fillRect(cx - w / 2, y, w * share, h);
 }
 
-/** @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {Game} game */
-function renderProjectiles(ctx, layout, game) {
+/** @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {Game} game @param {number} a */
+function renderProjectiles(ctx, layout, game, a) {
   const T = layout.tile;
   ctx.lineCap = 'round';
   for (const p of game.projectiles) {
     if (!p.alive) continue;
-    toScreen(layout, p.x, p.y, pt);
+    toScreen(layout, p.px + (p.x - p.px) * a, p.py + (p.y - p.py) * a, pt);
     if (p.kind === 'shell') {
       const k = Math.min(1, p.t / p.flight);
       const height = Math.sin(Math.PI * k) * 0.7 * T;
@@ -703,8 +881,8 @@ function renderProjectiles(ctx, layout, game) {
   ctx.lineCap = 'butt';
 }
 
-/** @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {Effects} fx @param {string} font */
-function renderEffects(ctx, layout, fx, font) {
+/** @param {Renderer} r @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {Effects} fx @param {string} font */
+function renderEffects(r, ctx, layout, fx, font) {
   const T = layout.tile;
   for (const ring of fx.rings) {
     if (!ring.alive) continue;
@@ -726,19 +904,44 @@ function renderEffects(ctx, layout, fx, font) {
     const size = s.size * T;
     ctx.fillRect(pt.x - size / 2, pt.y - size / 2, size, size);
   }
-  ctx.font = font;
-  ctx.textAlign = 'center';
   for (const f of fx.floats) {
     if (!f.alive) continue;
     const k = 1 - f.life / f.max;
     toScreen(layout, f.x, f.y, pt);
     ctx.globalAlpha = 1 - k * k;
-    ctx.fillStyle = INK;
-    ctx.fillText(f.text, pt.x + 1, pt.y - k * 0.6 * T - 0.3 * T + 1);
-    ctx.fillStyle = f.color;
-    ctx.fillText(f.text, pt.x, pt.y - k * 0.6 * T - 0.3 * T);
+    const label = labelSprite(r, f.text, f.color, font);
+    ctx.drawImage(label, pt.x - label.width / r.dpr / 2, pt.y - k * 0.6 * T - 0.3 * T - label.height / r.dpr / 2, label.width / r.dpr, label.height / r.dpr);
   }
   ctx.globalAlpha = 1;
+}
+
+/**
+ * A floating label ("+4") pre-drawn with its shadow: text is slow to draw on a phone, and
+ * the same few labels come again and again.
+ * @param {Renderer} r @param {string} text @param {string} color @param {string} font
+ */
+function labelSprite(r, text, color, font) {
+  const cached = r.labels.get(text);
+  if (cached) return cached;
+  const canvas = document.createElement('canvas');
+  const size = Math.max(12, Math.round(0.34 * (r.layout?.tile ?? 40)));
+  canvas.width = Math.ceil(size * 3 * r.dpr);
+  canvas.height = Math.ceil(size * 1.6 * r.dpr);
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.setTransform(r.dpr, 0, 0, r.dpr, 0, 0);
+    ctx.font = font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const cx = canvas.width / r.dpr / 2;
+    const cy = canvas.height / r.dpr / 2;
+    ctx.fillStyle = INK;
+    ctx.fillText(text, cx + 1, cy + 1);
+    ctx.fillStyle = color;
+    ctx.fillText(text, cx, cy);
+  }
+  r.labels.set(text, canvas);
+  return canvas;
 }
 
 // ── Events → effects ────────────────────────────────────────────────────────
@@ -750,13 +953,23 @@ function renderEffects(ctx, layout, fx, font) {
  */
 export function consumeEvents(r, game, fx, reduced) {
   const from = Math.max(r.lastSeq, game.eventSeq - EVENT_RING);
+  const news = r.news;
+  news.bossKilled = false;
+  news.leaked = false;
+  news.cleared = -1;
+  news.wave = -1;
+  news.boss = false;
   for (let seq = from; seq < game.eventSeq; seq++) {
-    if (reduced) continue;
     const e = game.events[seq % EVENT_RING];
     if (!e) continue;
-    if (e.type === 'hit') addBurst(fx, e.x, e.y, 2, WHITE, 1.2);
+    noteNews(news, e);
+    if (reduced) continue;
+    if (e.type === 'hit') addBurst(fx, e.x, e.y, 1, WHITE, 1.2);
     else if (e.type === 'kill') {
-      addBurst(fx, e.x, e.y, 9, ENEMY_COLORS[/** @type {EnemyType} */ (e.kind)] ?? WHITE, 2.4);
+      const color = ENEMY_COLORS[/** @type {EnemyType} */ (e.kind)] ?? WHITE;
+      const boss = e.kind === 'colossus';
+      addBurst(fx, e.x, e.y, boss ? 40 : 9, color, boss ? 4 : 2.4);
+      addRing(fx, e.x, e.y, 0.1, boss ? 1.6 : 0.6, boss ? 0.6 : 0.3, color);
       addFloat(fx, e.x, e.y, plusLabel(e.value), GOLD_TEXT);
     } else if (e.type === 'blast') {
       addRing(fx, e.x, e.y, 0.15, e.value, 0.35, BLAST);
@@ -769,4 +982,20 @@ export function consumeEvents(r, game, fx, reduced) {
     else if (e.type === 'sell') addFloat(fx, e.x, e.y, plusLabel(e.value), GOLD_TEXT);
   }
   r.lastSeq = game.eventSeq;
+  return news;
+}
+
+/**
+ * What the page reacts to beyond the board: a Colossus down (a shake), a leak (a red
+ * edge), a wave started or cleared (a banner).
+ * @param {Renderer['news']} news @param {import('./sim.js').GameEvent} e
+ */
+function noteNews(news, e) {
+  if (e.type === 'kill' && e.kind === 'colossus') news.bossKilled = true;
+  else if (e.type === 'leak') news.leaked = true;
+  else if (e.type === 'cleared') news.cleared = e.value;
+  else if (e.type === 'wave') {
+    news.wave = e.value;
+    news.boss = e.kind === 'boss';
+  }
 }

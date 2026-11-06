@@ -14,7 +14,9 @@
  *     scripts/build-site.js składa to na stronę. Stara kopia jest najpierw kasowana.
  *  3. Nakłada łatki z listy gry. Każda łatka musi trafić dokładnie raz, więc zmiana
  *     w grze, po której łatka przestaje pasować, zatrzymuje kopiowanie zamiast po cichu
- *     przepuścić np. skrypt reklam.
+ *     przepuścić np. skrypt reklam. Łatka `add` dokłada plik LifeXP (scripts/vendor-patches/
+ *     <gra>/, np. lifexp-polish.css/.js) i odmawia, gdy gra ma już plik o tej nazwie.
+ *     Lista łatek i powody: docs/v2/VENDOR-PATCHES.md.
  *  4. Wpisuje do każdej strony HTML gry Content-Security-Policy, która pozwala tylko na
  *     ten origin: gra nie pobierze ani nie wyśle niczego gdzie indziej (grają dzieci).
  *  5. Odmawia, gdy w skopiowanych plikach zostaje adres zewnętrznego hosta (poza
@@ -73,7 +75,9 @@ const ALLOWED_URL = /^https?:\/\/www\.w3\.org\//;
 /**
  * Gry do skopiowania. `patches`: { file, why, find, replace } zastępuje dokładnie jedno
  * trafienie `find`; { file, why, expect } tylko sprawdza, że tekst jest (np. że reklamy
- * są wyłączone w stałej gry).
+ * są wyłączone w stałej gry); { file, why, add } kopiuje plik LifeXP `add` (ścieżka od
+ * katalogu repozytorium) do gry jako `file`. Łatki idą po kolei, więc `add` przed łatką,
+ * która wpina dodany plik w stronę.
  */
 export const GAMES = {
   wartime: {
@@ -86,6 +90,19 @@ export const GAMES = {
         find: /(\n {2}\.dropdown \{ position: fixed; top: auto; left: calc\(8px \+ var\(--sa-l\)\); right: calc\(8px \+ var\(--sa-r\)\); bottom: calc\(8px \+ var\(--sa-b\)\); min-width: 0; z-index: 75; padding: 6px;) \}/,
         replace:
           '$1\n    max-height: calc(100vh - 16px - var(--sa-t) - var(--sa-b)); max-height: calc(100dvh - 16px - var(--sa-t) - var(--sa-b));\n    overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }',
+      },
+      {
+        file: 'js/ui/render.js',
+        why: 'Nazwy państw na mapie: szerokość każdej nazwy mierzona raz (na 100 px, potem skalowana), a czcionka ustawiana tylko dla nazw, które się rysują. Wcześniej każda klatka przesuwania mapy ustawiała czcionkę i mierzyła wszystkie nazwy, także poza ekranem — największy koszt JS klatki na telefonie.',
+        find: /( {6})ctx\.font = '700 ' \+ px\.toFixed\(1\) \+ 'px ' \+ FONT_SANS;\n {6}setLetterSpacing\(track\);\n {6}var tw = ctx\.measureText\(L\.text\)\.width;\n {6}if \(tw > maxW && maxW > 0\) \{ px \*= maxW \/ tw; if \(px < 8\.5\) continue; track = px \* 0\.2; ctx\.font = '700 ' \+ px\.toFixed\(1\) \+ 'px ' \+ FONT_SANS; setLetterSpacing\(track\); tw = ctx\.measureText\(L\.text\)\.width; \}\n([\s\S]{0,400}?)( {6})placed\.push\(box\);\n/,
+        replace:
+          "$1// [lifexp] szerokość nazwy na 1 px czcionki, zmierzona raz (tekst z odstępem liter skaluje się liniowo)\n" +
+          "$1if (L.lxW === undefined) { ctx.font = '700 100px ' + FONT_SANS; setLetterSpacing(20); L.lxW = ctx.measureText(L.text).width / 100; }\n" +
+          '$1var tw = L.lxW * px;\n' +
+          '$1if (tw > maxW && maxW > 0) { px *= maxW / tw; if (px < 8.5) continue; track = px * 0.2; tw = L.lxW * px; }\n' +
+          '$2$3placed.push(box);\n' +
+          "$3ctx.font = '700 ' + px.toFixed(1) + 'px ' + FONT_SANS;\n" +
+          '$3setLetterSpacing(track);\n',
       },
     ],
   },
@@ -110,6 +127,35 @@ export const GAMES = {
         file: 'js/constants.js',
         why: 'Reklamy i nagrody za reklamy wyłączone w samej grze (ADS_ENABLED = false).',
         expect: /\bconst ADS_ENABLED = false;/,
+      },
+      {
+        file: 'lifexp-polish.css',
+        why: 'Szlif LifeXP (styl): ukryte ekrany bez animacji (mniej przeliczeń stylu w grze), płótno planszy w rozmiarze planszy, dotyk bez zaznaczania i zoomu, pierścień po skoku, błysk i wstrząs przy śmierci, ograniczony ruch przy prefers-reduced-motion.',
+        add: 'scripts/vendor-patches/gridlock/lifexp-polish.css',
+      },
+      {
+        file: 'lifexp-polish.js',
+        why: 'Szlif LifeXP (skrypt): ostra plansza na ekranach o dużej gęstości pikseli (do 2×), skok od razu przy dotknięciu zamiast przy puszczeniu palca, efekty pierścienia i trafienia.',
+        add: 'scripts/vendor-patches/gridlock/lifexp-polish.js',
+      },
+      {
+        file: 'index.html',
+        why: 'Wpina lifexp-polish.css po stylu gry.',
+        find: /<\/head>/,
+        replace: '<link rel="stylesheet" href="lifexp-polish.css">\n</head>',
+      },
+      {
+        file: 'index.html',
+        why: 'Wpina lifexp-polish.js przed skryptami gry (płótno ostre od pierwszej klatki).',
+        find: /<script src="js\/constants\.js[^"]*"><\/script>/,
+        replace: '<script src="lifexp-polish.js"></script>\n$&',
+      },
+      {
+        file: 'js/board-render.js',
+        why: 'Pamięć podręczna wyglądu kostki rysowana w gęstości ekranu (lifexpHiDpiCanvas z lifexp-polish.js), żeby kostka nie była rozmyta na telefonie.',
+        find: /skinCache = document\.createElement\('canvas'\);/,
+        replace:
+          "skinCache = window.lifexpHiDpiCanvas ? window.lifexpHiDpiCanvas(document.createElement('canvas')) : document.createElement('canvas'); // [lifexp]",
       },
     ],
   },
@@ -170,6 +216,14 @@ export function externalUrls(text) {
 function applyPatches(outDir, patches) {
   for (const patch of patches) {
     const file = path.join(outDir, patch.file);
+    if (patch.add) {
+      if (fs.existsSync(file)) fail(`łatka „${patch.why}”: gra ma już plik ${patch.file} — zmień nazwę pliku LifeXP`);
+      const from = path.join(ROOT, patch.add);
+      if (!fs.existsSync(from)) fail(`łatka „${patch.why}”: brak pliku LifeXP ${patch.add}`);
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.copyFileSync(from, file);
+      continue;
+    }
     if (!fs.existsSync(file)) fail(`łatka „${patch.why}”: brak pliku ${patch.file}`);
     const text = fs.readFileSync(file, 'utf8');
     const global = new RegExp(patch.find?.source ?? patch.expect.source, 'g');

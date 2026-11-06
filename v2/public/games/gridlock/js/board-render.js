@@ -239,7 +239,7 @@ function getSkinCanvas(t) {
 
   if (needRegen) {
     if (!skinCache || skinCache.width !== sz) {
-      skinCache = document.createElement('canvas');
+      skinCache = window.lifexpHiDpiCanvas ? window.lifexpHiDpiCanvas(document.createElement('canvas')) : document.createElement('canvas'); // [lifexp]
       skinCache.width = skinCache.height = sz;
     }
     const c2 = skinCache.getContext('2d');

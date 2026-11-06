@@ -943,3 +943,206 @@ button:focus-visible {
     margin-left: 0;
   }
 }
+
+/* ── Juice (q-own): floating glyphs, streak pips, tiers, callout, penalty, confetti ── */
+
+/* Math signs drifting slowly behind everything: compositor-only (transform), static with
+   reduced motion. */
+.glyphs {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.glyphs span {
+  position: absolute;
+  color: var(--color-accent-text);
+  font-size: 44px;
+  font-weight: 800;
+  opacity: 0.06;
+  animation: drift 26s linear infinite;
+}
+
+.glyphs span:nth-child(1) { left: 6%; top: 12%; animation-duration: 31s; }
+.glyphs span:nth-child(2) { left: 78%; top: 8%; font-size: 60px; animation-duration: 24s; animation-delay: -6s; }
+.glyphs span:nth-child(3) { left: 42%; top: 22%; font-size: 36px; animation-duration: 28s; animation-delay: -12s; }
+.glyphs span:nth-child(4) { left: 88%; top: 38%; animation-duration: 34s; animation-delay: -3s; }
+.glyphs span:nth-child(5) { left: 12%; top: 46%; font-size: 70px; animation-duration: 29s; animation-delay: -18s; }
+.glyphs span:nth-child(6) { left: 64%; top: 52%; font-size: 30px; animation-duration: 22s; animation-delay: -9s; }
+.glyphs span:nth-child(7) { left: 30%; top: 66%; font-size: 52px; animation-duration: 33s; animation-delay: -21s; }
+.glyphs span:nth-child(8) { left: 82%; top: 70%; animation-duration: 27s; animation-delay: -14s; }
+.glyphs span:nth-child(9) { left: 8%; top: 84%; font-size: 34px; animation-duration: 25s; animation-delay: -4s; }
+.glyphs span:nth-child(10) { left: 52%; top: 88%; font-size: 64px; animation-duration: 30s; animation-delay: -16s; }
+.glyphs span:nth-child(11) { left: 70%; top: 30%; font-size: 28px; animation-duration: 23s; animation-delay: -11s; }
+.glyphs span:nth-child(12) { left: 22%; top: 30%; font-size: 40px; animation-duration: 36s; animation-delay: -25s; }
+
+@keyframes drift {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(14px, -40px) rotate(12deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+/* During a round the signs fade away and stop: the eyes are on the card, and a hidden
+   layer costs the phone nothing per frame (body.is-playing, set by main.js). */
+.glyphs {
+  transition:
+    opacity var(--duration-enter) var(--ease-out),
+    visibility 0s;
+}
+
+body.is-playing .glyphs {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--duration-exit) var(--ease-in),
+    visibility 0s linear var(--duration-exit);
+}
+
+body.is-playing .glyphs span {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glyphs span {
+    animation: none;
+  }
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+}
+
+.fx {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  width: 100%;
+  height: 560px;
+  pointer-events: none;
+  /* Drawn at half resolution (fx.js): kept as crisp squares, not blurred. */
+  image-rendering: pixelated;
+}
+
+.hud {
+  position: relative;
+}
+
+/* Ten pips under the clock: the streak filling toward ×2 (3), ×3 (6) and ×4 (10). */
+.streak {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 4px;
+}
+
+.streak i {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+}
+
+.streak i:nth-child(3),
+.streak i:nth-child(6),
+.streak i:nth-child(10) {
+  box-shadow: 0 0 0 1px rgb(255 209 102 / 35%);
+}
+
+.streak i.is-on {
+  background: var(--color-warning);
+}
+
+.streak i.is-on:nth-child(-n + 2) {
+  background: var(--color-positive);
+}
+
+.app[data-mode='practice'] .streak {
+  margin-top: 4px;
+}
+
+/* The card's rim by multiplier: ×2 violet, ×3 gold, ×4 coral — solid rings, no blurred
+   shadows (cheap to paint while the card animates). */
+.card[data-tier='2'] {
+  border-color: rgb(143 136 255 / 60%);
+  box-shadow: 0 0 0 1px rgb(143 136 255 / 30%);
+}
+
+.card[data-tier='3'] {
+  border-color: rgb(255 209 102 / 70%);
+  box-shadow: 0 0 0 2px rgb(255 209 102 / 30%);
+}
+
+.card[data-tier='4'] {
+  border-color: rgb(255 140 105 / 80%);
+  box-shadow: 0 0 0 3px rgb(255 140 105 / 35%);
+}
+
+.callout {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  color: var(--color-warning);
+  font-size: 20px;
+  font-weight: 800;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.card {
+  overflow: visible;
+}
+
+.penalty-pop {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 2px);
+  color: var(--color-negative);
+  font-size: 15px;
+  font-weight: 800;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The end screen's parts come in one after another. */
+.screen--end .end-card > *,
+.screen--end .end__summary > *,
+.screen--end .end__details > * {
+  animation: rise var(--duration-enter) var(--ease-out) backwards;
+}
+
+.screen--end .end__score { animation-delay: 60ms; }
+.screen--end .badge { animation-delay: 140ms; }
+.screen--end .stats { animation-delay: 200ms; }
+.screen--end .end__records-title,
+.screen--end .records { animation-delay: 260ms; }
+.screen--end .end__actions { animation-delay: 320ms; }
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.app.is-low .timer__fill {
+  animation: low-pulse 1s var(--ease-in) infinite alternate;
+}
+
+@keyframes low-pulse {
+  to {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen--end .end-card > *,
+  .screen--end .end__summary > *,
+  .screen--end .end__details > *,
+  .app.is-low .timer__fill {
+    animation: none;
+  }
+}
