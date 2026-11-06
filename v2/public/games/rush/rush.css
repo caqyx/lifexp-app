@@ -59,7 +59,36 @@ body.picker-page {
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background-color var(--duration-exit) var(--ease-in);
+  /* Both ways eased (stage q-rush: the press used to snap back on release). */
+  transition:
+    background-color var(--duration-exit) var(--ease-in),
+    transform var(--duration-exit) var(--ease-out);
+  animation: mode-in var(--duration-enter) var(--ease-out) backwards;
+}
+
+/* The cards come in one after another (stage q-rush). */
+.modes > :nth-child(2) .mode {
+  animation-delay: calc(var(--duration-enter) * 0.2);
+}
+
+.modes > :nth-child(3) .mode {
+  animation-delay: calc(var(--duration-enter) * 0.4);
+}
+
+.modes > :nth-child(4) .mode {
+  animation-delay: calc(var(--duration-enter) * 0.6);
+}
+
+@keyframes mode-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .mode:hover {
@@ -68,7 +97,6 @@ body.picker-page {
 
 .mode:active {
   transform: scale(0.98);
-  transition: transform var(--duration-exit) var(--ease-in);
 }
 
 .mode:focus-visible {
