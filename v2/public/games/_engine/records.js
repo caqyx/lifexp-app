@@ -54,6 +54,20 @@ export function writeJson(storage, key, value) {
   }
 }
 
+/**
+ * The menu's "fewer effects" (stage q-rush), under the key the game gives (Rush: one for
+ * every mode); with no key, off.
+ * @param {GameStorage | null} storage @param {string | null} key
+ */
+export function readCalm(storage, key) {
+  return key !== null && readJson(storage, key) === true;
+}
+
+/** @param {GameStorage | null} storage @param {string | null} key @param {boolean} calm */
+export function saveCalm(storage, key, calm) {
+  if (key !== null) writeJson(storage, key, calm);
+}
+
 /** @param {unknown} value @returns {value is Result} */
 function isResult(value) {
   if (!value || typeof value !== 'object') return false;

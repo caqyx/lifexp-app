@@ -1,7 +1,9 @@
 // @ts-check
 // Feedback that is not gameplay (docs/v2/PLAN.md 9.1, stage w-1): a burst of shards and
 // a short shake and flash on a crash, a ring when a portal is passed. Kept short and
-// subtle, and all off with prefers-reduced-motion (main.js passes `reduced`).
+// subtle, and all off with prefers-reduced-motion or the menu's "fewer effects" (stage
+// q-rush). Stage q-rush adds a hit-stop before the burst, squash and stretch on landing and
+// take-off, and a gold shower for a new best.
 
 /** @typedef {{ alive: boolean, x: number, y: number, vx: number, vy: number, age: number, life: number, size: number, color: string }} Particle */
 
@@ -10,8 +12,16 @@ export const SHAKE_TIME = 0.3;
 export const SHAKE_CELLS = 0.22;
 export const FLASH_TIME = 0.25;
 export const RING_TIME = 0.45;
-const POOL_SIZE = 64;
-const BURST = 24;
+/** The crash holds still this long before the burst (hit-stop: the hit reads as a hit). */
+export const HIT_STOP = 0.07;
+/** Squash on landing, stretch on take-off: this long, eased back. */
+export const SQUASH_TIME = 0.14;
+const SQUASH = 0.2;
+const STRETCH = 0.14;
+/** The colours of a new best's shower. */
+export const GOLD = ['#ffd166', '#fff1c1', '#f3a73c'];
+const POOL_SIZE = 96;
+const BURST = 30;
 
 /** @param {number} t 0..1 */
 export const easeOutCubic = (t) => 1 - (1 - t) ** 3;
@@ -40,7 +50,7 @@ export function spawnBurst(pool, x, y, colors, rng) {
       vy: Math.sin(angle) * speed,
       age: 0,
       life: 0.35 + rng() * 0.35,
-      size: 0.08 + rng() * 0.16,
+      size: 0.1 + rng() * 0.2,
       color: colors[left % colors.length] ?? '#fff',
     });
     left -= 1;
@@ -84,4 +94,16 @@ export function flashAlpha(since) {
 export function ringProgress(since) {
   if (since < 0 || since >= RING_TIME) return null;
   return easeOutCubic(since / RING_TIME);
+}
+
+/**
+ * How the vehicle is squashed (< 0, just landed) or stretched (> 0, just took off), from the
+ * seconds since each; 0 at rest. The later of the two wins.
+ * @param {number} sinceLand @param {number} sinceJump
+ */
+export function squashOf(sinceLand, sinceJump) {
+  const landing = sinceLand >= 0 && sinceLand < SQUASH_TIME && (sinceJump < 0 || sinceLand <= sinceJump);
+  if (landing) return -SQUASH * (1 - easeOutCubic(sinceLand / SQUASH_TIME));
+  if (sinceJump >= 0 && sinceJump < SQUASH_TIME) return STRETCH * (1 - easeOutCubic(sinceJump / SQUASH_TIME));
+  return 0;
 }

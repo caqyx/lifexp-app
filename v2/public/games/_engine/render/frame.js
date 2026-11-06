@@ -30,7 +30,11 @@ import { screenX, screenY } from './view.js';
  *   trail: { x: number, y: number }[], skin: any, time: number, reduced: boolean,
  *   pulse: number, particles: import('../effects.js').Particle[], shake: { x: number, y: number },
  *   flash: number, ring: { x: number, color: string, progress: number } | null,
+ *   squash?: number, hit?: boolean, best?: number | null, crash?: { x: number, y: number, progress: number } | null,
  * }} Scene
+ *   squash: < 0 squashed on landing, > 0 stretched on take-off (stage q-rush); hit: the
+ *   crash's hit-stop, the vehicle drawn lit white; best: the record's x, marked in the world;
+ *   crash: the shock ring of a crash (0..1 of its growth).
  *   skin: the game's own skin type (its look draws it; the trail colour is `skin.trail`).
  * @typedef {{ time: number, pulse: number, reduced: boolean }} Clock
  * @typedef {{
@@ -395,7 +399,60 @@ function drawPlayer(ctx, s, camX, look) {
   const width = look.trailWidth(w);
   if (width > 0) drawTrail(ctx, points, v.cell * width, s.skin.trail);
   if (!w.alive) return;
-  look.drawVehicle(ctx, s, screenX(v, camX, w.x), screenY(v, w.y));
+  const x = screenX(v, camX, w.x);
+  const y = screenY(v, w.y);
+  const squash = s.squash ?? 0;
+  if (squash === 0) look.drawVehicle(ctx, s, x, y);
+  else drawSquashed(ctx, s, look, x, y, squash);
+  if (s.hit) drawHitFlash(ctx, x, y, v.cell);
+}
+
+/**
+ * The vehicle squashed or stretched about its feet (the side gravity pulls to); area kept.
+ * @param {CanvasRenderingContext2D} ctx @param {Scene} s @param {Look} look @param {number} x @param {number} y @param {number} squash
+ */
+function drawSquashed(ctx, s, look, x, y, squash) {
+  const feet = y + (s.wave.flipped ? -1 : 1) * s.view.cell * 0.45;
+  const sy = 1 + squash;
+  ctx.save();
+  ctx.translate(x, feet);
+  ctx.scale(1 / sy, sy);
+  ctx.translate(-x, -feet);
+  look.drawVehicle(ctx, s, x, y);
+  ctx.restore();
+}
+
+/** The crash's hit-stop: a white glow over the vehicle. @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} cell */
+function drawHitFlash(ctx, x, y, cell) {
+  const glow = ctx.createRadialGradient(x, y, 0, x, y, cell * 0.9);
+  glow.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+  glow.addColorStop(0.55, 'rgba(255, 255, 255, 0.6)');
+  glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(x - cell, y - cell, cell * 2, cell * 2);
+}
+
+/**
+ * The record's place: a thin gold line across the band with a small flag (stage q-rush), so
+ * a run can see the best coming.
+ * @param {CanvasRenderingContext2D} ctx @param {Scene} s @param {number} camX
+ */
+function drawBestMark(ctx, s, camX) {
+  const v = s.view;
+  if (s.best === null || s.best === undefined || s.best < camX - 1 || s.best > camX + v.cells + 1) return;
+  const x = Math.round(screenX(v, camX, s.best));
+  const top = screenY(v, STRIP_TOP);
+  const bottom = screenY(v, STRIP_BOTTOM);
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.strokeStyle = '#ffd166';
+  ctx.lineWidth = Math.max(1, v.cell * 0.06);
+  ctx.setLineDash([v.cell * 0.3, v.cell * 0.25]);
+  ctx.beginPath();
+  ctx.moveTo(x, top);
+  ctx.lineTo(x, bottom);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /** @param {CanvasRenderingContext2D} ctx @param {Scene} s @param {number} camX */
@@ -410,6 +467,10 @@ function drawEffects(ctx, s, camX) {
   }
   ctx.globalAlpha = 1;
   if (s.ring) {
+    // A portal's change flashes the screen in its colour, faintly and briefly.
+    ctx.globalAlpha = 0.16 * (1 - s.ring.progress) ** 2;
+    ctx.fillStyle = s.ring.color;
+    ctx.fillRect(0, 0, v.width, v.height);
     ctx.globalAlpha = 1 - s.ring.progress;
     ctx.strokeStyle = s.ring.color;
     ctx.lineWidth = v.cell * 0.2;
@@ -419,10 +480,26 @@ function drawEffects(ctx, s, camX) {
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
+  if (s.crash) drawShock(ctx, s, camX, s.crash);
   if (s.flash > 0) {
     ctx.fillStyle = `rgba(255, 255, 255, ${s.flash})`;
     ctx.fillRect(0, 0, v.width, v.height);
   }
+}
+
+/**
+ * A crash's shock ring: a white ring growing out of the crash point and fading.
+ * @param {CanvasRenderingContext2D} ctx @param {Scene} s @param {number} camX @param {{ x: number, y: number, progress: number }} c
+ */
+function drawShock(ctx, s, camX, c) {
+  const v = s.view;
+  ctx.globalAlpha = (1 - c.progress) * 0.85;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = v.cell * 0.18 * (1 - c.progress) + 1;
+  ctx.beginPath();
+  ctx.arc(screenX(v, camX, c.x), screenY(v, c.y), v.cell * (0.4 + 2.2 * c.progress), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
 }
 
 /**
@@ -445,6 +522,7 @@ export function renderFrame(ctx, r, s, look) {
   if (look.drawPieceItems) for (const piece of pieces) look.drawPieceItems(ctx, s, piece, camX);
   drawPortals(ctx, s, camX);
   drawCheckpoints(ctx, s, camX);
+  drawBestMark(ctx, s, camX);
   drawPlayer(ctx, s, camX, look);
   drawStretchEffects(ctx, s, camX);
   drawEffects(ctx, s, camX);

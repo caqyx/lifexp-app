@@ -640,8 +640,14 @@ body {
 
   .card--menu .finale {
     grid-column: 2;
-    grid-row: 4;
+    grid-row: 4 / span 2;
     margin-top: 10px;
+  }
+
+  /* The effects choice (stage q-rush) under the checkpoints' one. */
+  .card--menu .choice.choice--effects {
+    grid-row: 5;
+    margin-top: 8px;
   }
 
   .card--menu .choice {
@@ -692,4 +698,39 @@ body {
 .stage.is-practice[data-state='dead'] .panel--dead .card {
   visibility: hidden;
   pointer-events: none;
+}
+
+/* Stage q-rush: buttons and chips give under the finger; a new best pops in. */
+.button,
+.chip {
+  transition:
+    background-color var(--duration-exit) var(--ease-in),
+    transform var(--duration-exit) var(--ease-out);
+}
+
+.button:active:not(:disabled),
+.chip:active {
+  transform: scale(0.96);
+}
+
+.stage.is-new-best .badge {
+  animation: badge-pop var(--duration-enter) var(--ease-out) both;
+}
+
+@keyframes badge-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The crash reads first (hit-stop, shards, shake), then its card comes in: about when a tap
+   may restart (RESTART_LOCK). With reduced motion the tokens are 0 ms and it shows at once. */
+.stage[data-state='dead'] .panel--dead {
+  transition-delay: var(--duration-enter);
 }

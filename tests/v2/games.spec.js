@@ -885,6 +885,13 @@ test.describe('Rush, the mode picker', () => {
       expect(page.frames().some((f) => f.url().split('?')[0].endsWith(`/${mode}/index.html`))).toBe(true);
       // The mode's own progress, as before.
       if (name === 'Wave Rush') await expect(game.locator('#menu-best')).toContainText('57%');
+      // "Fewer effects" (stage q-rush), chosen in the first mode, holds for every mode.
+      const fewer = game.getByRole('group', { name: 'Efekty' }).getByRole('button', { name: 'Mniej' });
+      if (name === 'Wave Rush') {
+        await expect(fewer).toHaveAttribute('aria-pressed', 'false');
+        await fewer.click();
+      }
+      await expect(fewer).toHaveAttribute('aria-pressed', 'true');
       await game.getByRole('button', { name: '← Wszystkie tryby Rush' }).click();
       await expect(game.getByRole('heading', { name: 'Rush' })).toBeVisible();
     }
