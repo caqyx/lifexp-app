@@ -324,7 +324,9 @@ describe('texts and play', () => {
     expect(customSector({ ...emptyLevel(FLIP, 'x'), tier: 'insaneDemon' }, FLIP_SECTORS, null).theme).toBe('saws');
   });
 
-  test('the validator (CI, official sections) says roughly where a section fails: an open section passes, a wall fails with x', () => {
+  test('the validator (CI, official sections) says roughly where a section fails: an open section passes, a wall fails with x', { timeout: 60_000 }, () => {
+    // A full validator search (like the section proofs, which allow 300 s): a failing wall
+    // explores the whole search space, which takes over 5 s on a busy runner.
     const open = emptyLevel(FLIP, 'x').sections[0]!;
     const sector = { id: 1, key: 'custom', tier: 'hard', theme: '', groups: [[1]], portals: [] };
     expect(flipProblems({ ...open, id: 'ed-open', tier: 'hard' }, sector, 1)).toEqual([]);
