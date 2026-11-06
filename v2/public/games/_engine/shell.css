@@ -682,3 +682,14 @@ body {
 .editor-back[hidden] {
   display: none;
 }
+
+/* Practice shows no result card after a crash: the vehicle is back at the checkpoint in half
+   a second (stage q-rush), so only the burst and a light dim mark the crash. */
+.stage.is-practice[data-state='dead'] .panel--dead {
+  background: rgb(6 8 14 / 18%);
+}
+
+.stage.is-practice[data-state='dead'] .panel--dead .card {
+  visibility: hidden;
+  pointer-events: none;
+}

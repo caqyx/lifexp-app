@@ -6,7 +6,7 @@
 // or of the section) of the same run; no records. No DOM and no clock: the page feeds the
 // input and the fixed steps. Each game brings its levels and its vehicle's flight
 // (`GameRules`); everything else here is shared by Wave Rush and Ship Rush.
-import { JOINT, RESTART_LOCK } from './world.js';
+import { JOINT, PRACTICE_LOCK, RESTART_LOCK } from './world.js';
 import { checkpointX, invertedAt, jumpX, locate, pieceAt, progressAt, respawnX, speedAt, stateAt } from './level.js';
 import { keepsNormalCheckpoint } from './sectors.js';
 
@@ -263,7 +263,7 @@ export function stepGame(game, input, dt) {
     game.phaseTime = 0;
     events.push('start');
   } else if (game.phase === 'dead' || game.phase === 'finished') {
-    if (!input.tap || game.phaseTime < RESTART_LOCK) return events;
+    if (!input.tap || game.phaseTime < lockOf(game)) return events;
     restart(game);
     events.push('restart');
   }
@@ -273,5 +273,10 @@ export function stepGame(game, input, dt) {
 
 /** Is a tap now too early to restart? @param {Game} game */
 export function restartLocked(game) {
-  return (game.phase === 'dead' || game.phase === 'finished') && game.phaseTime < RESTART_LOCK;
+  return (game.phase === 'dead' || game.phase === 'finished') && game.phaseTime < lockOf(game);
+}
+
+/** How long taps are ignored after a crash: practice shows no result, so only a moment. @param {Game} game */
+function lockOf(game) {
+  return game.mode === 'practice' && game.phase === 'dead' ? PRACTICE_LOCK : RESTART_LOCK;
 }

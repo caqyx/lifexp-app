@@ -267,6 +267,15 @@ function drawSpinners(ctx, s, pieces, camX, look) {
   }
 }
 
+/** Cells ahead at which a portal starts to glow brighter. */
+const PORTAL_NOTICE = 7;
+
+/** 0 far or past, rising to 1 as the vehicle reaches the portal. @param {number} x @param {number} at */
+function portalNearness(x, at) {
+  const ahead = x - at;
+  return ahead < 0 || ahead > PORTAL_NOTICE ? 0 : 1 - ahead / PORTAL_NOTICE;
+}
+
 /** @param {CanvasRenderingContext2D} ctx @param {Scene} s @param {number} camX */
 function drawPortals(ctx, s, camX) {
   const v = s.view;
@@ -277,7 +286,7 @@ function drawPortals(ctx, s, camX) {
     const local = p.x - piece.x0;
     const top = p.y0 ?? profileY(piece.g.ceil, local, 'ceil');
     const bottom = p.y1 ?? profileY(piece.g.floor, local, 'floor');
-    drawPortal(ctx, screenX(v, camX, p.x), screenY(v, top + 0.25), screenY(v, bottom - 0.25), v.cell, p, s.time, s.reduced);
+    drawPortal(ctx, screenX(v, camX, p.x), screenY(v, top + 0.25), screenY(v, bottom - 0.25), v.cell, p, s.time, s.reduced, portalNearness(p.x, s.wave.x));
   }
 }
 

@@ -10,7 +10,7 @@
 // only) makes runs repeatable and exposes the state as data-debug-*; only with a seed,
 // ?sector=<n>&section=<m> starts there and ?autopilot=<k> lets the solver fly the first k
 // sections of the first attempt (then the vehicle is the player's again).
-import { MAX_FRAME, STEP } from './world.js';
+import { MAX_FRAME, PRACTICE_RESPAWN, STEP } from './world.js';
 import { advanceClock, isBuffered } from './clock.js';
 import { createParticles, flashAlpha, ringProgress, shakeOffset, spawnBurst, updateParticles } from './effects.js';
 import { createGame, keepsRecords, resultOf, stepGame } from './game.js';
@@ -631,21 +631,39 @@ export function runApp(def) {
   /** One fixed step: the input, the game, the shards. */
   function runStep() {
     const now = performance.now();
-    const tap = isBuffered(input.pressedAt, now);
+    const tap = isBuffered(input.pressedAt, now) || respawnsByItself(state.game);
     const holding = piloting() && autopilot ? autopilot.advise(state.game.run, state.game.wave) : input.down || tap;
     const events = stepGame(state.game, { holding, tap }, STEP);
     if (tap && (events.includes('start') || events.includes('restart'))) input.pressedAt = null;
     if (input.pressedAt !== null && !isBuffered(input.pressedAt, now)) input.pressedAt = null;
-    // A press shorter than a step still counts once. For tap vehicles (Flip Rush's ball and
-    // spider, which act only on the ground) a short tap is kept until it has acted or the
-    // buffer runs out, so a tap just before landing counts.
-    const w = state.game.wave;
-    // (An editor's level may bring the ball or the spider into any game: stage r-5.)
-    const waits = (def.holdTaps === true || customRules !== null) && (w.mode === 'ball' || w.mode === 'spider') && w.sinceAct !== 0;
-    if (!input.down && tap && state.game.phase === 'playing' && !waits) input.pressedAt = null;
+    // A press shorter than a step still counts once. For vehicles that act only on the
+    // ground a short tap is kept until it has acted or the buffer runs out, so a tap just
+    // before landing counts.
+    if (!input.down && tap && state.game.phase === 'playing' && !tapWaits(state.game.wave)) input.pressedAt = null;
     clock.time += STEP;
     reactToEvents(events);
     updateParticles(particles, STEP);
+  }
+
+  /**
+   * Does a short tap stay buffered after this step? Flip Rush's ball and spider act only on
+   * the ground (an editor's level may bring them into any game: stage r-5); so does the
+   * robot's jump (stage q-rush): a tap in the air waits for the landing, and once the robot
+   * has jumped (its thrusters burn) the tap is spent.
+   * @param {Vehicle} w
+   */
+  function tapWaits(w) {
+    if (w.mode === 'robot') return w.grounded !== true && (w.lift ?? 0) === 0;
+    return (def.holdTaps === true || customRules !== null) && (w.mode === 'ball' || w.mode === 'spider') && w.sinceAct !== 0;
+  }
+
+  /**
+   * Practice keeps the flow going: half a second after a crash the vehicle is back at the
+   * checkpoint without a tap (a tap earlier does it at once).
+   * @param {Game} game
+   */
+  function respawnsByItself(game) {
+    return game.mode === 'practice' && game.phase === 'dead' && game.phaseTime >= PRACTICE_RESPAWN;
   }
 
   /**
