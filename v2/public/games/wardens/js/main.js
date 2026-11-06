@@ -9,7 +9,7 @@
 // Query: ?lang=pl|en (from GameHost); ?test=1 with speed=, waves=, lives=, gold= for
 // the browser test only (js/i18n.js).
 
-import { DT, ENEMIES, LEVELS, MAX_STEPS_PER_FRAME, PRIORITIES, TOWERS, TOWER_TYPES } from './config.js';
+import { DT, LEVELS, MAX_STEPS_PER_FRAME, PRIORITIES, TOWERS, TOWER_TYPES } from './config.js';
 import { MAPS } from './maps.js';
 import { computeLayout, toScreen } from './layout.js';
 import { describeWave } from './waves.js';
@@ -29,7 +29,10 @@ import {
   upgradeTower,
 } from './sim.js';
 import { clearEffects, createEffects, updateEffects } from './effects.js';
-import { consumeEvents, createRenderer, drawEnemy, drawTower, renderFrame, resetRenderer, resizeRenderer } from './render.js';
+import { consumeEvents, createRenderer, enemyIcon, mapThumbnail, renderFrame, resetRenderer, resizeRenderer, towerIcon } from './render.js';
+import { createIcon, refreshIcons, refreshPixelTexts, setPixelText, setTextScale } from './pixelui.js';
+import { makeSprite } from './pixelart.js';
+import { ICONS } from './sprites.js';
 import { isUnlocked, readProgress, readSettings, saveEndless, saveSettings, saveWin } from './records.js';
 import { pickLang, testParams, translator } from './i18n.js';
 
@@ -87,6 +90,8 @@ function findElements() {
     towerMenu: byId('tower-menu'),
     towerLevel: byId('tower-level'),
     towerStats: byId('tower-stats'),
+    towerPreview: byId('tower-preview'),
+    ground: /** @type {HTMLCanvasElement} */ (byId('ground')),
     priority: byId('priority'),
     upgrade: /** @type {HTMLButtonElement} */ (byId('upgrade')),
     sell: /** @type {HTMLButtonElement} */ (byId('sell')),
@@ -139,27 +144,50 @@ const ui = {
   bannerTimer: 0,
   /** The bonus of the last early call, said in the next wave's banner. */
   earlyBonus: 0,
+  /** The map's name as said in the play screen's heading (and on the end screen). */
+  mapLabel: '',
   /** What the HUD shows now, so text is only written when it changes. */
   shown: { gold: -1, lives: -1, wave: '', status: '', call: '', previewWave: -1, phase: '' },
 };
 const clock = { last: /** @type {number | null} */ (null), acc: 0, frame: 0, time: 0 };
 const view = { selectedPad: -1, previewType: /** @type {TowerType | null} */ (null), clock: 0, reduced: false, alpha: 1 };
-/**
- * Rendering quality: the canvas starts at the screen's pixel density (at most 2×) and steps
- * down — 2 → 1.5 → 1.25 → 1, or straight to 1 when far behind — while frames keep running
- * long for ¾ s (a slow phone stays smooth instead of sharp). It never steps back up within
- * a visit.
- */
-const quality = { cap: 2, frameMs: 16.7, slowFor: 0 };
 const pt = { x: 0, y: 0 };
 
 /** @param {string} key */
 const tk = (key) => t(/** @type {TextKey} */ (key));
 
+/**
+ * Pixel text styles of the page: colour, shadow, size and wrapping by role (class).
+ * @param {HTMLElement} el @returns {import('./pixelui.js').TextStyle}
+ */
+function styleOf(el) {
+  if (el.classList.contains('start__title')) return { color: 'y', size: 2, wrap: true };
+  if (el.classList.contains('button--primary') || el.classList.contains('key')) return { color: 'w', shadow: 'u' };
+  if (el.closest('.start__intro, .start__hint, .hint, .panel__role')) return { color: 'G', wrap: true };
+  if (el.classList.contains('segmented__option')) return { color: 'w', size: 0 };
+  return { color: 'w' };
+}
+
+/**
+ * A text in pixel letters (pixelui.js) with the style of its role.
+ * @param {HTMLElement} el @param {string} text @param {import('./pixelui.js').TextStyle} [style]
+ */
+function say(el, text, style) {
+  setPixelText(el, text, style ?? styleOf(el));
+}
+
 function applyTexts() {
   document.documentElement.lang = lang;
   document.title = t('title');
-  for (const el of document.querySelectorAll('[data-t]')) el.textContent = tk(el.getAttribute('data-t') ?? '');
+  for (const el of document.querySelectorAll('[data-t]')) say(/** @type {HTMLElement} */ (el), tk(el.getAttribute('data-t') ?? ''));
+}
+
+/** The HUD's pixel icons (coin, heart, flag) and the pause and speed glyphs. */
+function placeIcons() {
+  for (const el of document.querySelectorAll('[data-icon]')) {
+    const name = /** @type {keyof typeof ICONS} */ (el.getAttribute('data-icon'));
+    if (ICONS[name]) el.replaceChildren(createIcon(makeSprite(ICONS[name])));
+  }
 }
 
 // ── Screens ──────────────────────────────────────────────────────────────────
@@ -170,25 +198,26 @@ function showScreen(screen, focus = null) {
   focus?.focus({ preventScroll: true });
 }
 
-/** "★★☆" for the eye (hidden from readers) and "Gwiazdki: 2/3" in words. @param {number} n */
-function createStars(n) {
+/** Three pixel stars for the eye (hidden from readers) and "Gwiazdki: 2/3" in words. @param {number} n @param {number} [times] */
+function createStars(n, times = 1) {
   const wrap = document.createElement('span');
   wrap.className = 'stars';
   const glyphs = document.createElement('span');
   glyphs.className = 'stars__glyphs';
   glyphs.setAttribute('aria-hidden', 'true');
-  glyphs.textContent = '★'.repeat(n) + '☆'.repeat(3 - n);
+  for (let i = 0; i < 3; i++) glyphs.append(createIcon(makeSprite(i < n ? ICONS.star : ICONS.starEmpty), times));
   const words = document.createElement('span');
-  words.textContent = t('stars', { n });
-  wrap.append(glyphs, ' ', words);
+  words.className = 'stars__words';
+  say(words, t('stars', { n }), { color: 'y' });
+  wrap.append(glyphs, words);
   return wrap;
 }
 
 /**
- * @param {string} name @param {string} desc @param {string} badge @param {(HTMLElement | string)[]} meta
- * @param {boolean} locked @param {() => void} onPick
+ * @param {string} name @param {string} desc @param {string} badge @param {HTMLElement[]} meta
+ * @param {boolean} locked @param {() => void} onPick @param {HTMLCanvasElement | null} thumb
  */
-function createMapButton(name, desc, badge, meta, locked, onPick) {
+function createMapButton(name, desc, badge, meta, locked, onPick, thumb) {
   const item = document.createElement('li');
   const button = document.createElement('button');
   button.type = 'button';
@@ -197,15 +226,16 @@ function createMapButton(name, desc, badge, meta, locked, onPick) {
   const badgeEl = document.createElement('span');
   badgeEl.className = 'map-card__badge';
   badgeEl.setAttribute('aria-hidden', 'true');
-  badgeEl.textContent = badge;
+  if (thumb) badgeEl.append(thumb);
+  else say(badgeEl, badge, { color: 'V', size: 2 });
   const text = document.createElement('span');
   text.className = 'map-card__text';
   const nameEl = document.createElement('span');
   nameEl.className = 'map-card__name';
-  nameEl.textContent = name;
+  say(nameEl, name, { color: 'y' });
   const descEl = document.createElement('span');
   descEl.className = 'map-card__desc';
-  descEl.textContent = desc;
+  say(descEl, desc, { color: 'G', wrap: true });
   const metaEl = document.createElement('span');
   metaEl.className = 'map-card__meta';
   metaEl.append(...meta);
@@ -216,20 +246,33 @@ function createMapButton(name, desc, badge, meta, locked, onPick) {
   return item;
 }
 
+/** A line of pixel text for a map card's meta row. @param {string} text @param {import('./pixelart.js').Colour} [color] */
+function metaText(text, color = 'G') {
+  const el = document.createElement('span');
+  el.className = 'map-card__line';
+  say(el, text, { color });
+  return el;
+}
+
+/** Each map's thumbnail, drawn once. */
+const thumbnails = MAPS.map((map) => mapThumbnail(map));
+
 function renderMapList() {
   const items = MAPS.map((map, i) => {
     const locked = !isUnlocked(progress, MAPS, i);
     const meta = locked
-      ? [t('locked', { map: tk(`map.${MAPS[i - 1]?.id}`) })]
-      : [t('waves', { n: map.waves }), ' · ', createStars(progress.stars[map.id] ?? 0)];
-    return createMapButton(tk(`map.${map.id}`), tk(`mapDesc.${map.id}`), String(i + 1), meta, locked, () => startGame(i, false));
+      ? [metaText(t('locked', { map: tk(`map.${MAPS[i - 1]?.id}`) }))]
+      : [metaText(t('waves', { n: map.waves })), createStars(progress.stars[map.id] ?? 0)];
+    const thumb = thumbnails[i];
+    const icon = thumb ? createIcon(thumb, 0.4) : null;
+    return createMapButton(tk(`map.${map.id}`), tk(`mapDesc.${map.id}`), String(i + 1), meta, locked, () => startGame(i, false), icon);
   });
   const last = MAPS.length - 1;
   const endlessLocked = (progress.stars[MAPS[last]?.id ?? ''] ?? 0) === 0;
   const endlessMeta = endlessLocked
-    ? [t('locked', { map: tk(`map.${MAPS[last]?.id}`) })]
-    : [progress.endlessBest > 0 ? t('bestWave', { n: progress.endlessBest }) : t('noBest')];
-  items.push(createMapButton(t('endless'), t('endlessDesc'), '∞', endlessMeta, endlessLocked, () => startGame(last, true)));
+    ? [metaText(t('locked', { map: tk(`map.${MAPS[last]?.id}`) }))]
+    : [metaText(progress.endlessBest > 0 ? t('bestWave', { n: progress.endlessBest }) : t('noBest'), progress.endlessBest > 0 ? 'y' : 'G')];
+  items.push(createMapButton(t('endless'), t('endlessDesc'), '∞', endlessMeta, endlessLocked, () => startGame(last, true), null));
   dom.mapList.replaceChildren(...items);
 }
 
@@ -254,6 +297,7 @@ function startGame(mapIndex, endless) {
   clearEffects(fx);
   resetRenderer(renderer, ui.game);
   dom.playMap.textContent = endless ? `${tk(`map.${map.id}`)} · ${t('endless')}` : tk(`map.${map.id}`);
+  ui.mapLabel = dom.playMap.textContent;
   dom.app.dataset.map = map.id;
   dom.hint.hidden = false;
   createPadButtons(ui.game);
@@ -296,10 +340,15 @@ function handleResize() {
   if (!game || dom.app.dataset.screen !== 'play') return;
   const box = dom.stage.getBoundingClientRect();
   if (box.width < 1 || box.height < 1) return;
-  const layout = computeLayout(box.width, box.height);
+  const layout = computeLayout(box.width, box.height, window.devicePixelRatio || 1);
   ui.layout = layout;
   dom.app.dataset.rotated = String(layout.rotated);
-  resizeRenderer(renderer, layout, Math.min(quality.cap, window.devicePixelRatio || 1), game);
+  resizeRenderer(renderer, layout, game);
+  // Both canvases: the art size times whole device pixels (crisp squares), from the top left.
+  for (const canvas of [dom.board, dom.ground]) {
+    canvas.style.width = `${layout.width * layout.px}px`;
+    canvas.style.height = `${layout.height * layout.px}px`;
+  }
   positionPads(game, layout);
   renderBoard();
 }
@@ -307,13 +356,13 @@ function handleResize() {
 /** @param {Game} game @param {Layout} layout */
 function positionPads(game, layout) {
   // At least 44 px to tap, even where a tile is smaller (a small window held sideways).
-  const size = Math.max(44, layout.tile);
+  const size = Math.max(44, layout.tile * layout.px);
   game.pads.forEach((pad, i) => {
     const button = ui.padButtons[i];
     if (!button) return;
     toScreen(layout, pad.x, pad.y, pt);
-    button.style.left = `${pt.x - size / 2}px`;
-    button.style.top = `${pt.y - size / 2}px`;
+    button.style.left = `${pt.x * layout.px - size / 2}px`;
+    button.style.top = `${pt.y * layout.px - size / 2}px`;
     button.style.width = `${size}px`;
     button.style.height = `${size}px`;
   });
@@ -381,13 +430,11 @@ function createTowerOptions() {
     button.className = 'option';
     button.setAttribute('role', 'radio');
     button.dataset.type = type;
-    const icon = document.createElement('canvas');
-    icon.className = 'option__icon';
-    icon.setAttribute('aria-hidden', 'true');
-    drawIcon(icon, 44, (ctx, s) => drawTower(ctx, type, 1, s / 2, s / 2, s * 0.95, -Math.PI / 2, 0, 0, 1));
+    const icon = createIcon(towerIcon(type), 0.6);
+    icon.classList.add('option__icon');
     const name = document.createElement('span');
     name.className = 'option__name';
-    name.textContent = tk(`tower.${type}`);
+    say(name, tk(`tower.${type}`), { color: 'w', size: 0 });
     const cost = document.createElement('span');
     cost.className = 'option__cost numeric';
     button.append(icon, name, cost);
@@ -398,15 +445,24 @@ function createTowerOptions() {
   }
 }
 
-/** @param {HTMLCanvasElement} canvas @param {number} size @param {(ctx: CanvasRenderingContext2D, size: number) => void} draw */
-function drawIcon(canvas, size, draw) {
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  canvas.width = size * dpr;
-  canvas.height = size * dpr;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  draw(ctx, size);
+
+/**
+ * The tower now and, under an arrow, at its next level (what an upgrade buys).
+ * @param {import('./sim.js').Tower} tower
+ */
+function renderTowerPreview(tower) {
+  const key = `${tower.type}${tower.level}`;
+  if (dom.towerPreview.dataset.key === key) return;
+  dom.towerPreview.dataset.key = key;
+  /** @type {HTMLElement[]} */
+  const parts = [createIcon(towerIcon(tower.type, tower.level), 0.6)];
+  if (tower.level < LEVELS) {
+    const arrow = document.createElement('span');
+    arrow.className = 'panel__arrow';
+    say(arrow, '→', { color: 'y' });
+    parts.push(arrow, createIcon(towerIcon(tower.type, tower.level + 1), 0.6));
+  }
+  dom.towerPreview.replaceChildren(...parts);
 }
 
 /** @param {TowerType} type */
@@ -436,30 +492,31 @@ function roleText(type) {
 
 /** @param {Game} game */
 function renderBuildMenu(game) {
-  dom.panelTitle.textContent = `${t('build')} · ${t('pad', { n: ui.selectedPad + 1 })}`;
+  say(dom.panelTitle, `${t('build')} · ${t('pad', { n: ui.selectedPad + 1 })}`, { color: 'y', wrap: true });
   for (const [type, button] of ui.optionButtons) {
     const cost = buildCost(type);
     button.setAttribute('aria-checked', String(ui.previewType === type));
     button.classList.toggle('is-short', game.gold < cost);
     const costEl = button.querySelector('.option__cost');
-    if (costEl) costEl.textContent = t('cost', { n: cost });
+    if (costEl) say(/** @type {HTMLElement} */ (costEl), t('cost', { n: cost }), { color: game.gold < cost ? 'R' : 'y', size: 0 });
   }
   const type = ui.previewType;
-  dom.optionRole.textContent = type ? roleText(type) : t('hint');
-  dom.optionStats.textContent = type ? statsText(type, 1) : '';
+  say(dom.optionRole, type ? roleText(type) : t('hint'), { color: 'w', wrap: true });
+  say(dom.optionStats, type ? statsText(type, 1) : '', { color: 'G', wrap: true });
   dom.build.hidden = !type;
   if (!type) return;
   const cost = buildCost(type);
   const short = cost - game.gold;
   dom.build.disabled = short > 0;
-  dom.build.textContent = short > 0 ? `${tk(`tower.${type}`)} · ${t('missing', { n: short })}` : `${t('build')} · ${t('cost', { n: cost })}`;
+  say(dom.build, short > 0 ? `${tk(`tower.${type}`)} · ${t('missing', { n: short })}` : `${t('build')} · ${t('cost', { n: cost })}`, { color: short > 0 ? 'G' : 'w', shadow: short > 0 ? 'k' : 'u', wrap: true, align: 'center' });
 }
 
 /** @param {Game} game @param {import('./sim.js').Tower} tower */
 function renderTowerMenu(game, tower) {
-  dom.panelTitle.textContent = `${tk(`tower.${tower.type}`)} · ${t('pad', { n: ui.selectedPad + 1 })}`;
-  dom.towerLevel.textContent = `${t('level', { n: tower.level })} · ${roleText(tower.type)}`;
-  dom.towerStats.textContent = statsText(tower.type, tower.level) + (tower.buff > 0 ? ` · ${t('statBuff', { n: Math.round(tower.buff * 100) })}` : '');
+  say(dom.panelTitle, `${tk(`tower.${tower.type}`)} · ${t('pad', { n: ui.selectedPad + 1 })}`, { color: 'y', wrap: true });
+  say(dom.towerLevel, `${t('level', { n: tower.level })} · ${roleText(tower.type)}`, { color: 'w', wrap: true });
+  say(dom.towerStats, statsText(tower.type, tower.level) + (tower.buff > 0 ? ` · ${t('statBuff', { n: Math.round(tower.buff * 100) })}` : ''), { color: 'G', wrap: true });
+  renderTowerPreview(tower);
   const aims = TOWERS[tower.type].attack !== 'pulse' && TOWERS[tower.type].attack !== 'aura';
   dom.priority.hidden = !aims;
   for (const el of dom.priority.querySelectorAll('[data-priority]')) {
@@ -468,12 +525,12 @@ function renderTowerMenu(game, tower) {
   const cost = upgradeCost(tower);
   if (cost === null || tower.level >= LEVELS) {
     dom.upgrade.disabled = true;
-    dom.upgrade.textContent = t('maxed');
+    say(dom.upgrade, t('maxed'), { color: 'G' });
   } else {
     dom.upgrade.disabled = game.gold < cost;
-    dom.upgrade.textContent = game.gold < cost ? `${t('upgrade', { n: cost })} · ${t('missing', { n: cost - game.gold })}` : t('upgrade', { n: cost });
+    say(dom.upgrade, game.gold < cost ? `${t('upgrade', { n: cost })} · ${t('missing', { n: cost - game.gold })}` : t('upgrade', { n: cost }), { color: game.gold < cost ? 'G' : 'w', shadow: game.gold < cost ? 'k' : 'u', wrap: true, align: 'center' });
   }
-  dom.sell.textContent = t('sell', { n: sellValue(tower) });
+  say(dom.sell, t('sell', { n: sellValue(tower) }), { color: 'w', wrap: true, align: 'center' });
 }
 
 function handleBuild() {
@@ -525,22 +582,25 @@ function updateHud(game) {
   const s = ui.shown;
   if (s.gold !== game.gold) {
     s.gold = game.gold;
-    dom.gold.textContent = String(game.gold);
+    say(dom.gold, String(game.gold), { color: 'y' });
     if (!dom.panel.hidden) renderPanel(game);
   }
   if (s.lives !== game.lives) {
     if (s.lives > game.lives) shakeLives();
     s.lives = game.lives;
-    dom.lives.textContent = String(game.lives);
+    say(dom.lives, String(game.lives), { color: game.lives <= LOW_LIVES ? 'R' : 'w' });
     dom.hudLives.classList.toggle('is-low', game.lives <= LOW_LIVES);
   }
   const wave = waveText(game);
-  if (s.wave !== wave) dom.wave.textContent = s.wave = wave;
+  if (s.wave !== wave) say(dom.wave, (s.wave = wave), { color: 'w' });
   const status = statusText(game);
-  if (s.status !== status) dom.waveStatus.textContent = s.status = status;
+  if (s.status !== status) say(dom.waveStatus, (s.status = status), { color: 'G' });
   const call = callText(game);
-  if (s.call !== call) dom.callWave.textContent = s.call = call;
-  dom.callWave.disabled = game.phase !== 'build';
+  const callable = game.phase === 'build';
+  if (s.call !== call || dom.callWave.disabled === callable) {
+    dom.callWave.disabled = !callable;
+    say(dom.callWave, (s.call = call), { color: callable ? 'w' : 'G', shadow: callable ? 'u' : 'k', wrap: true, align: 'center' });
+  }
   const next = game.nextWave;
   const previewWave = game.phase === 'wave' ? -1 : next?.number ?? -1;
   if (s.previewWave !== previewWave) {
@@ -577,18 +637,16 @@ function renderPreview(wave) {
   }
   const head = document.createElement('li');
   head.className = 'preview__head';
-  head.textContent = wave.boss ? `${t('nextWave', { n: wave.number })} ${t('bossWave')}` : t('nextWave', { n: wave.number });
+  say(head, wave.boss ? `${t('nextWave', { n: wave.number })} ${t('bossWave')}` : t('nextWave', { n: wave.number }), { color: wave.boss ? 'R' : 'G' });
   const rows = describeWave(wave).map(({ type, count }) => {
     const item = document.createElement('li');
     item.className = 'preview__item';
     item.dataset.enemy = type;
-    const icon = document.createElement('canvas');
-    icon.className = 'preview__icon';
-    icon.setAttribute('aria-hidden', 'true');
-    drawIcon(icon, 22, (ctx, s) => drawEnemy(ctx, type, s / 2, s / 2 + (ENEMIES[type].flying ? 2 : 0), s * 1.25, 0, 0, 0, false));
+    const icon = createIcon(enemyIcon(type), type === 'colossus' ? 0.4 : 0.6);
+    icon.classList.add('preview__icon');
     const text = document.createElement('span');
     const trait = ['runner', 'shellback', 'moth', 'splitter', 'colossus'].includes(type) ? ` (${tk(`trait.${type}`)})` : '';
-    text.textContent = `${count}× ${tk(`enemy.${type}`)}${trait}`;
+    say(text, `${count}× ${tk(`enemy.${type}`)}${trait}`, { color: 'w' });
     item.append(icon, text);
     return item;
   });
@@ -607,7 +665,7 @@ function handleCallWave() {
 
 /** @param {string} text */
 function showBanner(text) {
-  dom.banner.textContent = text;
+  say(dom.banner, text, { color: 'y', align: 'center' });
   dom.banner.classList.remove('is-shown');
   void dom.banner.offsetWidth;
   dom.banner.classList.add('is-shown');
@@ -654,10 +712,7 @@ function toggleSpeed() {
 
 function renderSpeed() {
   // "Tempo" is read out but not shown: held upright the bar has room for "2×" only.
-  const label = document.createElement('span');
-  label.className = 'visually-hidden';
-  label.textContent = `${t('speedLabel')} `;
-  dom.speedText.replaceChildren(label, t('speed', { n: settings.speed }));
+  say(dom.speedText, t('speed', { n: settings.speed }), { color: 'w', spoken: `${t('speedLabel')} ${t('speed', { n: settings.speed })}` });
   dom.speed.setAttribute('aria-pressed', String(settings.speed === 2));
 }
 
@@ -687,17 +742,17 @@ function saveResult(game) {
 /** @param {Game} game @param {{ stars: number, isNew: boolean, unlocked: string | null }} result */
 function showEnd(game, result) {
   const won = game.phase === 'won';
-  dom.endTitle.textContent = game.endless ? t('endlessOver', { n: game.wave }) : won ? t('won') : t('lost');
-  dom.endMap.textContent = dom.playMap.textContent;
-  dom.endStars.replaceChildren(...(won ? [createStars(result.stars)] : []));
+  dom.app.dataset.result = won ? 'won' : 'lost';
+  say(dom.endTitle, game.endless ? t('endlessOver', { n: game.wave }) : won ? t('won') : t('lost'), { color: won ? 'f' : 'R', size: 2, wrap: true, align: 'center' });
+  say(dom.endMap, ui.mapLabel, { color: 'G', align: 'center' });
+  dom.endStars.replaceChildren(...(won ? [createStars(result.stars, 2)] : []));
   dom.endBadge.hidden = !result.isNew && !result.unlocked;
-  dom.endBadge.textContent = result.unlocked ? `${result.isNew ? `${t('newBest')} ` : ''}${t('unlocked', { map: result.unlocked })}` : t('newBest');
-  dom.endLives.textContent = t('livesLeft', { n: game.lives });
-  dom.endWaves.textContent = t('wavesCleared', { n: game.cleared });
-  dom.endKills.textContent = t('kills', { n: game.stats.kills });
+  say(dom.endBadge, result.unlocked ? `${result.isNew ? `${t('newBest')} ` : ''}${t('unlocked', { map: result.unlocked })}` : t('newBest'), { color: 'k', shadow: null, wrap: true, align: 'center' });
+  say(dom.endLives, t('livesLeft', { n: game.lives }), { color: 'w', align: 'center' });
+  say(dom.endWaves, t('wavesCleared', { n: game.cleared }), { color: 'w', align: 'center' });
+  say(dom.endKills, t('kills', { n: game.stats.kills }), { color: 'w', align: 'center' });
   const hasNext = won && !game.endless && MAPS[ui.mapIndex + 1] !== undefined;
   dom.nextMap.hidden = !hasNext;
-  dom.app.dataset.result = won ? 'won' : 'lost';
   renderMapList();
   showScreen('end', hasNext ? dom.nextMap : dom.again);
 }
@@ -715,7 +770,6 @@ function loop(now) {
   const elapsed = clock.last === null ? 0 : Math.min(MAX_FRAME, (now - clock.last) / 1000);
   clock.last = now;
   if (!game || dom.app.dataset.screen !== 'play') return;
-  checkQuality(elapsed);
   const running = !game.paused && game.phase !== 'won' && game.phase !== 'lost';
   if (running || game.phase === 'won' || game.phase === 'lost') stepGame(game, elapsed * speedFactor());
   clock.time += running ? elapsed : 0;
@@ -750,23 +804,6 @@ function renderBoard() {
   reactToNews(news);
 }
 
-/**
- * Steps the canvas's pixel density down when frames run long for a second (see `quality`).
- * @param {number} elapsed
- */
-function checkQuality(elapsed) {
-  const ms = elapsed * 1000;
-  if (ms <= 0 || ms > 200) return;
-  quality.frameMs += (ms - quality.frameMs) * 0.1;
-  quality.slowFor = quality.frameMs > 19 ? quality.slowFor + elapsed : 0;
-  if (quality.slowFor < 0.75 || quality.cap <= 1) return;
-  // Far behind (under ~40 fps): straight to 1×; a little behind: one step.
-  quality.cap = quality.frameMs > 24 ? 1 : quality.cap > 1.5 ? 1.5 : quality.cap > 1.25 ? 1.25 : 1;
-  quality.slowFor = 0;
-  quality.frameMs = 16.7;
-  handleResize();
-  if (test.on) dom.stage.dataset.quality = String(quality.cap);
-}
 
 /**
  * Banners for a wave's start and end, a shake when a Colossus falls, a red edge on a leak.
@@ -834,6 +871,12 @@ function bindControls() {
     if (document.visibilityState === 'hidden' && ui.game && dom.app.dataset.screen === 'play') showPause(true);
   });
   new ResizeObserver(handleResize).observe(dom.stage);
+  // The pixel text's scale follows the screen (a window moved to another display, a zoom).
+  addEventListener('resize', () => {
+    setTextScale(window.devicePixelRatio || 1);
+    refreshPixelTexts();
+    refreshIcons();
+  });
 }
 
 function backToMaps() {
@@ -843,7 +886,9 @@ function backToMaps() {
   showScreen('start', /** @type {HTMLElement | null} */ (dom.mapList.querySelector('button:not(:disabled)')));
 }
 
+setTextScale(window.devicePixelRatio || 1);
 applyTexts();
+placeIcons();
 createTowerOptions();
 renderSpeed();
 renderMapList();

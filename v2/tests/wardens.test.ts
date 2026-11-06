@@ -28,7 +28,7 @@ import {
   waveBonus,
   type Game,
 } from '../public/games/wardens/js/sim.js';
-import { computeLayout, mapTransform, toMap, toScreen } from '../public/games/wardens/js/layout.js';
+import { computeLayout, mapTransform, toMap, toMapCell, toScreen } from '../public/games/wardens/js/layout.js';
 import {
   PROGRESS_KEY,
   SETTINGS_KEY,
@@ -377,20 +377,26 @@ describe('economy and actions', () => {
 });
 
 describe('layout', () => {
-  test('upright on a tall stage, turned on a wide one; tiles as big as fit', () => {
-    const tall = computeLayout(412, 700);
-    expect(tall.rotated).toBe(false);
-    expect(tall.tile).toBeCloseTo(412 / 9, 1);
-    expect(tall.mapHeight).toBeLessThanOrEqual(700);
-    const wide = computeLayout(640, 380);
-    expect(wide.rotated).toBe(true);
-    expect(wide.mapWidth).toBeLessThanOrEqual(640);
-    expect(wide.mapHeight).toBeLessThanOrEqual(380);
-    expect(wide.tile).toBeCloseTo(380 / 9, 1);
+  test('pixel art: 16-pixel tiles, a whole number of device pixels per art pixel, the art covering the stage', () => {
+    // A Pixel 7 held upright (the stage under the HUD) and sideways, and a desktop window.
+    for (const [w, h, dpr, rotated] of [[396, 700, 2.625, false], [600, 380, 2.625, true], [1000, 640, 1, true]] as const) {
+      const layout = computeLayout(w, h, dpr);
+      expect(layout.rotated).toBe(rotated);
+      expect(layout.tile).toBe(16);
+      expect(Number.isInteger(layout.k)).toBe(true);
+      expect(layout.mapWidth).toBe((rotated ? 15 : 9) * 16);
+      expect(layout.width * layout.k).toBeGreaterThanOrEqual(Math.round(w * dpr));
+      expect(layout.height * layout.k).toBeGreaterThanOrEqual(Math.round(h * dpr));
+      expect(layout.ox).toBeGreaterThanOrEqual(0);
+      expect(layout.oy).toBeGreaterThanOrEqual(0);
+      expect(layout.px).toBeCloseTo(layout.k / dpr);
+    }
+    // Pixel 7 upright: 7 device pixels per art pixel, a tile ≈ 43 CSS pixels.
+    expect(computeLayout(396, 700, 2.625).k).toBe(7);
   });
 
   test('a point goes to the screen and back; the canvas transform agrees', () => {
-    for (const layout of [computeLayout(412, 700), computeLayout(800, 360)]) {
+    for (const layout of [computeLayout(412, 700, 2), computeLayout(800, 360, 3)]) {
       const s = { x: 0, y: 0 };
       const m = { x: 0, y: 0 };
       toScreen(layout, 2.5, 7.25, s);
@@ -404,10 +410,13 @@ describe('layout', () => {
   });
 
   test('turned, the road enters on the left', () => {
-    const layout = computeLayout(800, 360);
+    const layout = computeLayout(800, 360, 2);
     const s = { x: 0, y: 0 };
     toScreen(layout, 4.5, 0, s);
     expect(s.x).toBe(layout.ox);
+    const cell = { c: 0, r: 0 };
+    toMapCell(layout, s.x + 1, s.y - 1, cell);
+    expect(cell).toEqual({ c: 4, r: 0 });
   });
 });
 
@@ -519,5 +528,69 @@ describe('smooth drawing and the perf switch (q-own)', () => {
     callWave(game);
     expect(game.wave).toBe(18);
     expect(createGame(marsh, { endless: true, start: 24 }).nextWave?.number).toBe(24);
+  });
+});
+
+// ── Pixel art (td-2): the font covers every text, every sprite is a clean rectangle ──
+describe('pixel art', async () => {
+  const { FONT_HEIGHT, GLYPHS, PALETTE, isRectangular, measureText, wrapText } = await import('../public/games/wardens/js/pixelart.js');
+  const { ENEMY_FRAMES, ICONS, TOWER_TOPS } = await import('../public/games/wardens/js/sprites.js');
+  const { roadCells } = await import('../public/games/wardens/js/terrain.js');
+  const { textScaleFor } = await import('../public/games/wardens/js/pixelui.js');
+
+  test('the bitmap font has a glyph for every character of every text in both languages, Polish letters included', () => {
+    const values = { n: '0123456789', total: '20', s: '25', k: '18', gold: '15', map: 'Łąka', name: 'Łucznik', level: '2', p: '25' };
+    const missing = new Set<string>();
+    for (const lang of ['pl', 'en'] as const) {
+      const t = translator(lang);
+      for (const key of TEXT_KEYS[lang]) for (const ch of t(key as Parameters<typeof t>[0], values)) if (!GLYPHS.has(ch)) missing.add(ch);
+    }
+    for (const ch of 'ąćęłńóśźżĄĆĘŁŃÓŚŹŻ×·→∞+') if (!GLYPHS.has(ch)) missing.add(ch);
+    expect([...missing]).toEqual([]);
+    for (const [, glyph] of GLYPHS) {
+      expect(glyph).toHaveLength(FONT_HEIGHT);
+      expect(isRectangular(glyph)).toBe(true);
+    }
+  });
+
+  test('accents sit above the letter and the ogonek below it', () => {
+    const z = GLYPHS.get('ż')!;
+    const zz = GLYPHS.get('z')!;
+    expect(z.slice(4)).toEqual(zz.slice(4));
+    expect(z.slice(0, 4).join('')).toContain('#');
+    const a = GLYPHS.get('ą')!;
+    expect(a.slice(9).join('')).toContain('#');
+    expect(GLYPHS.get('Ż')![1]).toContain('#');
+  });
+
+  test('measuring and wrapping text', () => {
+    expect(measureText('')).toBe(0);
+    expect(measureText('II')).toBe(7);
+    expect(wrapText('Stuknij jasne pole przy drodze', 60).length).toBeGreaterThan(1);
+    expect(wrapText('Fala', 60)).toEqual(['Fala']);
+  });
+
+  test('every sprite frame is a rectangle of palette colours; tower tops are 12 wide; the Colossus is bigger', () => {
+    const colours = new Set([...Object.keys(PALETTE), '.']);
+    const all: (readonly string[])[] = [...Object.values(ENEMY_FRAMES).flat(), ...Object.values(TOWER_TOPS).flat(), ...Object.values(ICONS)];
+    for (const rows of all) {
+      expect(isRectangular(rows)).toBe(true);
+      for (const row of rows) for (const ch of row) expect(colours.has(ch)).toBe(true);
+    }
+    for (const frames of Object.values(TOWER_TOPS)) for (const f of frames) expect(f[0]!.length).toBe(12);
+    expect(ENEMY_FRAMES.colossus[0]!.length).toBeGreaterThan(ENEMY_FRAMES.crawler[0]!.length * 1.8);
+    expect(Object.keys(PALETTE)).toHaveLength(32);
+  });
+
+  test('the road runs on past both edges of the map (into the cave and out through the gate)', () => {
+    const cells = roadCells(meadow);
+    expect(cells.has('4,-3')).toBe(true);
+    expect(cells.has('4,17')).toBe(true);
+  });
+
+  test('text scale: a whole number of device pixels per font pixel, at least 2', () => {
+    expect(textScaleFor(1)).toBe(2);
+    expect(textScaleFor(2.625)).toBe(5);
+    expect(textScaleFor(3)).toBe(6);
   });
 });
