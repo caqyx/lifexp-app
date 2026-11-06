@@ -4,6 +4,7 @@
 // rules, sectors, records, skins, texts and look. Finishing the whole run (the Demon
 // included) is the achievement that unlocks the last hull and the finale.
 import { runApp } from '../../_engine/app.js';
+import { CALM_KEY } from '../../rush/js/settings.js';
 import { paintSkin } from './preview.js';
 import { WAVE } from '../../_engine/wave.js';
 import { SECTORS } from './config.js';
@@ -34,4 +35,6 @@ runApp({
   demon: true,
   finale: true,
   paintSkin,
+  // "Fewer effects": one choice for every Rush mode (stage q-rush).
+  calmKey: CALM_KEY,
 });

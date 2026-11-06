@@ -12,9 +12,9 @@
 // sections of the first attempt (then the vehicle is the player's again).
 import { MAX_FRAME, PRACTICE_RESPAWN, STEP } from './world.js';
 import { advanceClock, isBuffered } from './clock.js';
-import { createParticles, flashAlpha, ringProgress, shakeOffset, spawnBurst, updateParticles } from './effects.js';
+import { createParticles, flashAlpha, GOLD, HIT_STOP, ringProgress, shakeOffset, spawnBurst, squashOf, updateParticles } from './effects.js';
 import { createGame, keepsRecords, resultOf, stepGame } from './game.js';
-import { pieceAt, progressAt } from './level.js';
+import { jumpX, pieceAt, progressAt } from './level.js';
 import { beatPulse } from './render/backdrop.js';
 import { portalColor } from './render/sprites.js';
 import { easeAngle, targetAngle } from './render/turn.js';
@@ -22,7 +22,7 @@ import { computeView } from './render/view.js';
 import { createRng, parseSwitches } from './rng.js';
 import { readPlay, verifiedWord } from './editor/play.js';
 import { mixedRules } from './editor/vehicles.js';
-import { writeJson } from './records.js';
+import { readCalm, saveCalm, writeJson } from './records.js';
 import { isUnlocked, resolveSkin } from './skins.js';
 
 /**
@@ -43,7 +43,7 @@ import { isUnlocked, resolveSkin } from './skins.js';
  *   paintSkin: (ctx: CanvasRenderingContext2D, skin: any) => void,
  *   slopeOf: (vehicle: Vehicle) => number,
  *   loadAutopilot: () => Promise<{ advise: (run: Run, vehicle: Vehicle) => boolean }>,
- *   demon: boolean, finale: boolean, holdTaps?: boolean,
+ *   demon: boolean, finale: boolean, holdTaps?: boolean, calmKey?: string,
  *   palette?: import('./editor/format.js').Palette, buildCustom?: (level: import('./editor/format.js').Level) => Run,
  * }} AppDef
  *   t: the game's translator (every key of APP_TEXT_KEYS, plus sector1..n and the Demon
@@ -52,6 +52,8 @@ import { isUnlocked, resolveSkin } from './skins.js';
  *   sector (finishing it is the achievement that unlocks the last skin and the finale);
  *   finale: the game has its finale level (its box on the menu); holdTaps: a short tap is
  *   held down until the ball or the spider has acted on it (or INPUT_BUFFER_MS passes);
+ *   calmKey: where the menu's "fewer effects" is kept (stage q-rush; Rush: one key for
+ *   every mode, rush/js/settings.js);
  *   palette, buildCustom: the level editor (stage r-3): the page opened with ?editor=1
  *   plays the level the editor left for it (editor/play.js), in practice, and offers the
  *   way back to the editor.
@@ -75,7 +77,7 @@ export const APP_TEXT_KEYS = [
   'attempt', 'result', 'tapRespawn', 'tapRestart', 'finaleResult', 'finaleDoneTitle', 'finishedTitle', 'finaleDoneBody',
   'finishedBody', 'achFinale', 'achDemon', 'achFinaleBody', 'achDemonBody', 'unlockSkin', 'unlockFinale', 'gravityFlip',
   'gravityBack', 'shipOn', 'waveOn', 'ballOn', 'spiderOn', 'robotOn', 'finaleName', 'selected', 'locked', 'checkpoint', 'tapSector', 'editor', 'editorLevel', 'editorBack', 'modes',
-  'editorVerify', 'editorDoneTitle', 'editorDoneBody', 'verifyDoneTitle', 'verifyDoneBody',
+  'editorVerify', 'editorDoneTitle', 'editorDoneBody', 'verifyDoneTitle', 'verifyDoneBody', 'effects', 'fxFull', 'fxCalm',
 ];
 
 /**
@@ -142,6 +144,40 @@ export function runApp(def) {
     };
   }
 
+  /**
+   * The menu's effects choice (stage q-rush), made beside the checkpoints' choice: full, or
+   * fewer (no shake, flash, shards or squash, as with prefers-reduced-motion).
+   */
+  function buildEffectsChoice() {
+    const after = dom.cpSector.closest('.choice');
+    const box = document.createElement('div');
+    box.className = 'choice choice--effects';
+    box.setAttribute('role', 'group');
+    box.setAttribute('aria-labelledby', 'fx-title');
+    const title = document.createElement('p');
+    title.id = 'fx-title';
+    title.className = 'choice__title';
+    title.dataset.t = 'effects';
+    const options = document.createElement('div');
+    options.className = 'choice__options';
+    /** @param {string} id @param {string} key */
+    const chip = (id, key) => {
+      const b = document.createElement('button');
+      b.id = id;
+      b.className = 'chip';
+      b.type = 'button';
+      b.dataset.t = key;
+      b.setAttribute('aria-pressed', 'false');
+      options.append(b);
+      return b;
+    };
+    const full = chip('fx-full', 'fxFull');
+    const calm = chip('fx-calm', 'fxCalm');
+    box.append(title, options);
+    after?.after(box);
+    return { full, calm };
+  }
+
   function applyTexts() {
     document.documentElement.lang = lang;
     for (const el of document.querySelectorAll('[data-t]')) el.textContent = t(el.getAttribute('data-t') ?? '');
@@ -169,6 +205,7 @@ export function runApp(def) {
   const storage = deviceStorage();
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const dom = findElements();
+  const effectChips = buildEffectsChoice();
   const renderer = def.createRenderer();
   // The background's own canvas under the game's (stage q-rush; render/frame.js `layer`).
   renderer.layer = backdropLayer(dom.board);
@@ -195,10 +232,21 @@ export function runApp(def) {
     skin: resolveSkin(def.skins, records.readSkin(storage), records.readProgress(storage)),
     checkpointBy: records.readCheckpointBy(storage),
     newBest: false,
+    /** The menu's "fewer effects" (stage q-rush): as prefers-reduced-motion, for every Rush mode. */
+    calm: readCalm(storage, def.calmKey ?? null),
+    /** The record of the game's run (normal play only), marked in the world. */
+    best: /** @type {import('./game.js').Result | null} */ (null),
   };
   const input = { down: false, pressedAt: /** @type {number | null} */ (null) };
   const particles = createParticles();
-  const fx = { deathAt: -10, ring: /** @type {{ x: number, color: string, at: number } | null} */ (null) };
+  const fx = {
+    deathAt: -10,
+    /** The crash's burst waits for the hit-stop to end. */
+    burstDue: false,
+    landAt: -10,
+    jumpAt: -10,
+    ring: /** @type {{ x: number, color: string, at: number } | null} */ (null),
+  };
   const clock = { accumulator: 0, last: /** @type {number | null} */ (null), time: 0, frame: 0, running: false, alpha: 1 };
   let view = computeView(innerWidth, innerHeight, Math.min(devicePixelRatio || 1, MAX_PIXEL_RATIO));
   let toastTimer = 0;
@@ -247,6 +295,8 @@ export function runApp(def) {
     dom.menuAttempts.textContent = String(records.readAttempts(storage));
     dom.cpSector.setAttribute('aria-pressed', String(state.checkpointBy === 'sector'));
     dom.cpSection.setAttribute('aria-pressed', String(state.checkpointBy === 'section'));
+    effectChips.full.setAttribute('aria-pressed', String(!state.calm));
+    effectChips.calm.setAttribute('aria-pressed', String(state.calm));
   }
 
   /** @param {'normal' | 'practice'} mode @param {'run' | 'finale'} [level] */
@@ -259,6 +309,7 @@ export function runApp(def) {
         ? createGame(customRules, { rng: gameRng, mode: 'normal', level: 'finale' })
         : createGame(customRules, { rng: gameRng, mode: 'practice', level: 'finale', checkpointBy: 'section', jump: custom.from > 1 ? { sector: 1, section: custom.from } : null });
       state.newBest = false;
+      state.best = null;
       dom.stage.classList.toggle('is-practice', !custom.verify);
       input.pressedAt = null;
       updateHud();
@@ -269,6 +320,7 @@ export function runApp(def) {
     const jump = level === 'finale' ? (switches.finale ? { sector: 1, section: switches.finale } : null) : switches.jump;
     state.game = createGame(def.rules, { rng: gameRng, mode, level, checkpointBy: state.checkpointBy, jump });
     state.newBest = false;
+    state.best = mode === 'normal' && level === 'run' ? records.readBest(storage) : null;
     dom.stage.classList.toggle('is-practice', mode === 'practice');
     input.pressedAt = null;
     updateHud();
@@ -441,11 +493,18 @@ export function runApp(def) {
         updateMenu();
       });
     }
+    for (const [button, calm] of /** @type {const} */ ([[effectChips.full, false], [effectChips.calm, true]])) {
+      button.addEventListener('click', () => {
+        state.calm = calm;
+        saveCalm(storage, def.calmKey ?? null, calm);
+        updateMenu();
+      });
+    }
   }
 
   // ── Feedback and HUD ─────────────────────────────────────────────────────────
 
-  const reduced = () => reducedMotion.matches;
+  const reduced = () => reducedMotion.matches || state.calm;
 
   /** @param {GameEvent[]} events */
   function reactToEvents(events) {
@@ -478,9 +537,10 @@ export function runApp(def) {
   function handleDeath() {
     const game = state.game;
     fx.deathAt = clock.time;
-    if (!reduced()) spawnBurst(particles, game.wave.x, game.wave.y, [state.skin.body, state.skin.accent, state.skin.trail], effectRng);
+    fx.burstDue = !reduced();
     const result = game.result ?? resultOf(game);
     if (keepsRecords(game) && !customRules) state.newBest = records.saveBest(storage, result).isNew;
+    if (state.newBest && state.best !== null) state.best = result;
     dom.deadResult.textContent = t('result', result);
     dom.deadHint.textContent = t(game.mode === 'practice' ? 'tapRespawn' : game.sectorStart !== null ? 'tapSector' : 'tapRestart');
     dom.stage.classList.toggle('is-new-best', state.newBest);
@@ -633,7 +693,9 @@ export function runApp(def) {
     const now = performance.now();
     const tap = isBuffered(input.pressedAt, now) || respawnsByItself(state.game);
     const holding = piloting() && autopilot ? autopilot.advise(state.game.run, state.game.wave) : input.down || tap;
+    const wasGrounded = state.game.wave.grounded === true;
     const events = stepGame(state.game, { holding, tap }, STEP);
+    trackGround(wasGrounded, state.game.wave.grounded === true);
     if (tap && (events.includes('start') || events.includes('restart'))) input.pressedAt = null;
     if (input.pressedAt !== null && !isBuffered(input.pressedAt, now)) input.pressedAt = null;
     // A press shorter than a step still counts once. For vehicles that act only on the
@@ -642,7 +704,27 @@ export function runApp(def) {
     if (!input.down && tap && state.game.phase === 'playing' && !tapWaits(state.game.wave)) input.pressedAt = null;
     clock.time += STEP;
     reactToEvents(events);
-    updateParticles(particles, STEP);
+    if (fx.burstDue && clock.time - fx.deathAt >= HIT_STOP) burstCrash();
+    // The hit-stop: the shards hold still with the world.
+    if (clock.time - fx.deathAt >= HIT_STOP) updateParticles(particles, STEP);
+  }
+
+  /** The crash's shards, once the hit-stop is over; a new best adds a gold shower. */
+  function burstCrash() {
+    const w = state.game.wave;
+    fx.burstDue = false;
+    spawnBurst(particles, w.x, w.y, [state.skin.body, state.skin.accent, state.skin.trail], effectRng);
+    if (state.newBest) spawnBurst(particles, w.x, w.y - 1, GOLD, effectRng);
+  }
+
+  /**
+   * Landing and take-off times, for squash and stretch (stage q-rush).
+   * @param {boolean} was grounded before the step @param {boolean} now grounded after it
+   */
+  function trackGround(was, now) {
+    if (state.game.phase !== 'playing') return;
+    if (!was && now) fx.landAt = clock.time;
+    if (was && !now) fx.jumpAt = clock.time;
   }
 
   /**
@@ -699,7 +781,7 @@ export function runApp(def) {
         y: moving ? game.previous.y + (w.y - game.previous.y) * alpha : w.y,
         dir: w.dir,
         mini: w.mini,
-        alive: game.phase !== 'dead',
+        alive: game.phase !== 'dead' || since < HIT_STOP,
         flipped: w.gravity === -1,
         ship: w.ship,
         angle,
@@ -720,10 +802,25 @@ export function runApp(def) {
       reduced: calm,
       pulse: beatPulse(clock.time),
       particles,
-      shake: calm || game.phase !== 'dead' ? { x: 0, y: 0 } : shakeOffset(since, effectRng),
+      shake: calm || game.phase !== 'dead' ? { x: 0, y: 0 } : shakeOffset(since - HIT_STOP, effectRng),
       flash: calm || game.phase !== 'dead' ? 0 : flashAlpha(since),
       ring: ring !== null && fx.ring ? { x: fx.ring.x, color: fx.ring.color, progress: ring } : null,
+      squash: calm || !moving ? 0 : squashOf(clock.time - fx.landAt, clock.time - fx.jumpAt),
+      hit: !calm && game.phase === 'dead' && since < HIT_STOP,
+      crash: crashRing(calm, since),
+      best: state.best && game.mode === 'normal' ? jumpX(game.run, state.best.sector, state.best.section) : null,
     });
+  }
+
+  /**
+   * The crash's shock ring once the hit-stop is over, or null.
+   * @param {boolean} calm @param {number} since seconds since the crash
+   */
+  function crashRing(calm, since) {
+    const game = state.game;
+    if (calm || game.phase !== 'dead') return null;
+    const progress = ringProgress(since - HIT_STOP);
+    return progress === null ? null : { x: game.wave.x, y: game.wave.y, progress };
   }
 
   /** @param {number} now */
