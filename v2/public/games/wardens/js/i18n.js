@@ -37,6 +37,8 @@ const TEXTS = {
     nextWave: 'Fala {n}:',
     inProgress: 'Fala {n} trwa · wrogów: {k}',
     bossWave: 'Kolos!',
+    waveCleared: 'Fala {n} odparta! +{gold} złota',
+    earlyBonus: '+{gold} złota za pośpiech',
     hint: 'Stuknij jasne pole przy drodze, by postawić wieżę.',
     'tower.archer': 'Łucznik',
     'tower.mortar': 'Moździerz',
@@ -126,6 +128,8 @@ const TEXTS = {
     nextWave: 'Wave {n}:',
     inProgress: 'Wave {n} · enemies: {k}',
     bossWave: 'Colossus!',
+    waveCleared: 'Wave {n} held! +{gold} gold',
+    earlyBonus: '+{gold} gold for the early call',
     hint: 'Tap a light spot by the road to build a tower.',
     'tower.archer': 'Archer',
     'tower.mortar': 'Mortar',
@@ -213,7 +217,8 @@ function intParam(params, name, min, max) {
 
 /**
  * The query's test switches, all only with ?test=1: speed=<n> (the clock runs n times
- * faster, up to 60), waves=<n> (a map ends after n waves), lives=<n>, gold=<n>. With
+ * faster, up to 60), waves=<n> (a map ends after n waves), lives=<n>, gold=<n>,
+ * start=<n> (the first wave is wave n: the heavy late waves at once, for the perf check). With
  * ?test=1 the stage also carries its state in data-debug-* for the test to read.
  * @param {string} search
  */
@@ -226,5 +231,6 @@ export function testParams(search) {
     waves: on ? intParam(params, 'waves', 1, 20) : null,
     lives: on ? intParam(params, 'lives', 1, 99) : null,
     gold: on ? intParam(params, 'gold', 0, 99999) : null,
+    start: on ? intParam(params, 'start', 1, 200) : null,
   };
 }

@@ -377,6 +377,16 @@ button:focus-visible {
   inset: 0;
 }
 
+/* A red edge round the board when an enemy gets through (opacity only). */
+.edge {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 4px rgb(255 107 107 / 85%), inset 0 0 28px rgb(255 107 107 / 45%);
+  opacity: 0;
+  pointer-events: none;
+}
+
 .pad {
   position: absolute;
   padding: 0;

@@ -43,7 +43,9 @@
     </header>
 
     <div id="stage" class="stage">
+      <canvas id="ground" class="board board--ground" aria-hidden="true"></canvas>
       <canvas id="board" class="board" aria-hidden="true"></canvas>
+      <div class="edge" aria-hidden="true"></div>
       <div id="pads" class="pads" role="group" aria-labelledby="play-map"></div>
       <p id="hint" class="hint" data-t="hint"></p>
       <p id="banner" class="banner" role="status" aria-live="polite"></p>
