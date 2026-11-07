@@ -176,7 +176,9 @@ export function LibraryPage({ navigate }: { navigate: Navigate }) {
             ) : (
               <ul class="reader-lib__books">
                 {(books ?? []).map((book) => {
-                  const pct = percentRead(book.pos, book.total);
+                  // Without the book's own table of contents when the reader skips it (domain/reader/toc).
+                  const shown = book.progress ?? { pos: book.pos, total: book.total };
+                  const pct = percentRead(shown.pos, shown.total);
                   const sure = armed === book.id;
                   return (
                     <li key={book.id} class="reader-lib__book">
@@ -189,7 +191,7 @@ export function LibraryPage({ navigate }: { navigate: Navigate }) {
                           <span class="reader-lib__meta">
                             {t('reader.library.meta', {
                               format: book.format,
-                              sentences: t('reader.library.sentences', { count: book.total, n: fmt(book.total) }),
+                              sentences: t('reader.library.sentences', { count: shown.total, n: fmt(shown.total) }),
                               pct,
                             })}
                           </span>

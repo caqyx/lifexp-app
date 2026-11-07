@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampWpm, defaultReaderSettings, normalizeReaderSettings, wordDelay, wordsOf } from './settings';
+import { clampWpm, defaultReaderSettings, normalizeReaderSettings, wordAt, wordDelay, wordRanges, wordsOf } from './settings';
 
 describe('normalizeReaderSettings', () => {
   it('starts from the defaults, a size up on a wide screen', () => {
@@ -64,5 +64,24 @@ describe('wordDelay', () => {
 describe('wordsOf', () => {
   it('splits at spaces, no empty words', () => {
     expect(wordsOf('Ala  ma kota.')).toEqual(['Ala', 'ma', 'kota.']);
+  });
+});
+
+describe('wordRanges / wordAt', () => {
+  it('each word\'s place in the sentence, as wordsOf counts them', () => {
+    const t = 'Ala  ma kota.';
+    expect(wordRanges(t)).toEqual([
+      { start: 0, end: 3 },
+      { start: 5, end: 7 },
+      { start: 8, end: 13 },
+    ]);
+    expect(wordRanges(t).map((r) => t.slice(r.start, r.end))).toEqual(wordsOf(t));
+  });
+
+  it('the word under a character', () => {
+    expect(wordAt('Ala ma kota.', 0)).toBe(0);
+    expect(wordAt('Ala ma kota.', 3)).toBe(0);
+    expect(wordAt('Ala ma kota.', 5)).toBe(1);
+    expect(wordAt('Ala ma kota.', 99)).toBe(2);
   });
 });

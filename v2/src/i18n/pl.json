@@ -1791,10 +1791,16 @@
       "paper": "Papier",
       "night": "Noc",
       "smallerShort": "A−",
-      "biggerShort": "A+"
+      "biggerShort": "A+",
+      "zoom": "Przybliżaj do zdania",
+      "zoomHint": "W poziomie strzałki idą o jedno zdanie i powiększają je; wyłączone — przewracają całe strony.",
+      "swap": "Zamień strony przycisków",
+      "skipToc": "Pomijaj spis treści",
+      "skipTocHint": "Spis treści książki nie wlicza się do czytania ani do procentów."
     },
     "close": "Zamknij",
     "slowerShort": "−",
-    "fasterShort": "+"
+    "fasterShort": "+",
+    "bookToc": "Spis treści książki"
   }
 }

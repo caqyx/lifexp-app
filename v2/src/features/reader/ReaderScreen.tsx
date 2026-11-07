@@ -1,7 +1,8 @@
 // #/reader/:id: loads the book and the reader's settings from the device, then reads.
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { BookContent, BookMeta } from '@/domain/reader/book';
 import type { ReaderSettings } from '@/domain/reader/settings';
+import { detectToc } from '@/domain/reader/toc';
 import { t } from '@/i18n';
 import type { Navigate } from '@/lib/route-match';
 import { loadReaderSettings, openBook } from '@/services/reader';
@@ -51,7 +52,12 @@ export function ReaderScreen({ id, navigate }: { id: string; navigate: Navigate 
       </div>
     );
   }
-  return <Reader meta={state.meta} content={state.content} initialSettings={state.settings} onBack={back} />;
+  return <ReadyReader meta={state.meta} content={state.content} settings={state.settings} onBack={back} />;
+}
+
+function ReadyReader({ meta, content, settings, onBack }: { meta: BookMeta; content: BookContent; settings: ReaderSettings; onBack: () => void }) {
+  const marks = useMemo(() => detectToc(content.sections), [content]);
+  return <Reader meta={meta} content={content} marks={marks} initialSettings={settings} onBack={onBack} />;
 }
 
 function flatEmpty(content: BookContent): boolean {

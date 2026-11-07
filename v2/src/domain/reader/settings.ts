@@ -89,3 +89,20 @@ export function wordDelay(text: string, wpm: number): number {
 export function wordsOf(sentence: string): string[] {
   return sentence.split(' ').filter(Boolean);
 }
+
+/** Where each of wordsOf(sentence)'s words starts and ends in the sentence (character offsets). */
+export function wordRanges(sentence: string): { start: number; end: number }[] {
+  const out: { start: number; end: number }[] = [];
+  for (const m of sentence.matchAll(/[^ ]+/g)) out.push({ start: m.index, end: m.index + m[0].length });
+  return out;
+}
+
+/** The word holding character `offset` of the sentence (the nearest one before it on a space). */
+export function wordAt(sentence: string, offset: number): number {
+  const ranges = wordRanges(sentence);
+  let found = 0;
+  ranges.forEach((r, i) => {
+    if (r.start <= offset) found = i;
+  });
+  return found;
+}

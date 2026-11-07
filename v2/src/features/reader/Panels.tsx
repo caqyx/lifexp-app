@@ -3,7 +3,7 @@
 // out (transform and opacity); a tap on the dimmed text or Escape closes it.
 import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import type { Section } from '@/domain/reader/book';
+import type { Para, Section } from '@/domain/reader/book';
 import { EASY_SIZES, type EasyView, type ReaderSettings, type ReaderTheme } from '@/domain/reader/settings';
 import { t } from '@/i18n';
 import { cssDurationMs } from '@/ui/motion';
@@ -33,7 +33,7 @@ function usePresence(open: boolean): { mounted: boolean; leaving: boolean } {
 interface LayerProps {
   open: boolean;
   onClose: () => void;
-  kind: 'settings' | 'toc';
+  kind: 'settings' | 'toc' | 'booktoc';
   label: string;
   children: ComponentChildren;
 }
@@ -86,17 +86,37 @@ function Seg<T extends string | number>({
   );
 }
 
+/** An on/off row: a switch named by its label. */
+function Toggle({ label, hint, value, onChange }: { label: string; hint?: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div class="reader__row">
+      <span class="reader__row-label">
+        {label}
+        {hint && <span class="reader__row-hint">{hint}</span>}
+      </span>
+      <button type="button" role="switch" aria-checked={value} aria-label={label} class="reader__switch" onClick={() => onChange(!value)}>
+        <span class="reader__switch-thumb" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+export type ToggleSetting = 'zoom' | 'swapButtons' | 'skipToc';
+
 interface SettingsPanelProps {
   open: boolean;
   onClose: () => void;
   settings: ReaderSettings;
+  /** The two-page spread is shown: its settings instead of Prosta's view and sentences per screen. */
+  landscape: boolean;
   onResize: (delta: number) => void;
   onView: (view: EasyView) => void;
   onPer: (per: 1 | 2) => void;
   onTheme: (theme: ReaderTheme) => void;
+  onToggle: (key: ToggleSetting, value: boolean) => void;
 }
 
-export function SettingsPanel({ open, onClose, settings, onResize, onView, onPer, onTheme }: SettingsPanelProps) {
+export function SettingsPanel({ open, onClose, settings, landscape, onResize, onView, onPer, onTheme, onToggle }: SettingsPanelProps) {
   return (
     <Layer open={open} onClose={onClose} kind="settings" label={t('reader.settings.title')}>
       <div class="reader__row">
@@ -116,7 +136,18 @@ export function SettingsPanel({ open, onClose, settings, onResize, onView, onPer
           </button>
         </span>
       </div>
-      {settings.mode === 'easy' && (
+      {landscape && (
+        <>
+          <Toggle
+            label={t('reader.settings.zoom')}
+            hint={t('reader.settings.zoomHint')}
+            value={settings.zoom}
+            onChange={(v) => onToggle('zoom', v)}
+          />
+          <Toggle label={t('reader.settings.swap')} value={settings.swapButtons} onChange={(v) => onToggle('swapButtons', v)} />
+        </>
+      )}
+      {settings.mode === 'easy' && !landscape && (
         <>
           <div class="reader__row">
             <span class="reader__row-label">{t('reader.settings.view')}</span>
@@ -156,6 +187,12 @@ export function SettingsPanel({ open, onClose, settings, onResize, onView, onPer
           ]}
         />
       </div>
+      <Toggle
+        label={t('reader.settings.skipToc')}
+        hint={t('reader.settings.skipTocHint')}
+        value={settings.skipToc}
+        onChange={(v) => onToggle('skipToc', v)}
+      />
     </Layer>
   );
 }
@@ -167,10 +204,13 @@ interface TocPanelProps {
   secStart: readonly number[];
   total: number;
   current: number;
+  /** The book has its own table of contents (domain/reader/toc): an entry opens it. */
+  hasBookToc: boolean;
+  onBookToc: () => void;
   onPick: (sentence: number) => void;
 }
 
-export function TocPanel({ open, onClose, sections, secStart, total, current, onPick }: TocPanelProps) {
+export function TocPanel({ open, onClose, sections, secStart, total, current, hasBookToc, onBookToc, onPick }: TocPanelProps) {
   return (
     <Layer open={open} onClose={onClose} kind="toc" label={t('reader.tocTitle')}>
       <div class="reader__toc-head">
@@ -180,6 +220,11 @@ export function TocPanel({ open, onClose, sections, secStart, total, current, on
         </button>
       </div>
       <div class="reader__toc-list">
+        {hasBookToc && (
+          <button type="button" class="reader__toc-book" onClick={onBookToc}>
+            {t('reader.bookToc')}
+          </button>
+        )}
         {sections.map((sec, si) => {
           const from = secStart[si] ?? 0;
           if ((secStart[si + 1] ?? total) <= from) return null;
@@ -195,6 +240,27 @@ export function TocPanel({ open, onClose, sections, secStart, total, current, on
             </button>
           );
         })}
+      </div>
+    </Layer>
+  );
+}
+
+/** "Spis treści książki": the book's own table of contents, as found in it (left out of reading). */
+export function BookTocPanel({ open, onClose, blocks }: { open: boolean; onClose: () => void; blocks: readonly Para[][] }) {
+  return (
+    <Layer open={open} onClose={onClose} kind="booktoc" label={t('reader.bookToc')}>
+      <div class="reader__toc-head">
+        <h2>{t('reader.bookToc')}</h2>
+        <button type="button" class="reader__icon-btn" onClick={onClose}>
+          {t('reader.close')}
+        </button>
+      </div>
+      <div class="reader__booktoc reader__full">
+        {blocks.map((block, bi) => (
+          <section key={bi} class="reader__booktoc-block">
+            {block.map((p, pi) => (p.h ? <h3 key={pi}>{p.t}</h3> : <p key={pi}>{p.t}</p>))}
+          </section>
+        ))}
       </div>
     </Layer>
   );

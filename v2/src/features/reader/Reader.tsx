@@ -4,6 +4,12 @@
 // - Auto: a light walks word by word at a set pace, longer at punctuation and long
 //   words; a tap on a word moves it there; it goes on to the next section by itself.
 // - Normalny: plain scrolling of the whole book; the position follows the scroll.
+// A phone held sideways shows the book as an open two-page spread instead (SpreadView,
+// row r-2): Prosta steps a sentence at a time and zooms onto it (or turns whole
+// spreads with the zoom off), Auto's light walks the pages and the zoom follows it,
+// Normalny turns spreads. The book's own table of contents is left out of reading and
+// of the counts (domain/reader/toc) unless the setting keeps it; positions are saved
+// as sentences of the whole book, so that choice never moves anyone.
 // The position is saved on the device a moment after each move, and at once when the
 // page hides or the reader closes. Nothing here touches points or statistics.
 import { ArrowLeft, ArrowRight, ListTree, Pause, Play } from 'lucide-preact';
@@ -19,6 +25,7 @@ import {
   type ReaderMode,
   type ReaderSettings,
 } from '@/domain/reader/settings';
+import { firstContentSentence, fromFull, hasToc, readingView, tocBlocks, type TocMarks } from '@/domain/reader/toc';
 import { t } from '@/i18n';
 import { saveReaderSettings, saveReadingPosition } from '@/services/reader';
 import { showToast } from '@/ui/toast';
@@ -26,12 +33,16 @@ import { AutoView } from './AutoView';
 import { EasyText } from './EasyText';
 import { NormalView } from './NormalView';
 import { PageView } from './PageView';
-import { SettingsPanel, TocPanel } from './Panels';
+import { BookTocPanel, SettingsPanel, TocPanel } from './Panels';
+import { SpreadView, type SpreadControl } from './SpreadView';
 import { crumbText, fmt } from './texts';
+import { useLandscape } from './useLandscape';
 
 interface ReaderProps {
   meta: BookMeta;
   content: BookContent;
+  /** The book's own table of contents (domain/reader/toc detectToc). */
+  marks: TocMarks;
   initialSettings: ReaderSettings;
   onBack: () => void;
 }
@@ -45,40 +56,55 @@ export type Jump = { s: number; n: number };
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
-export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) {
-  const sections = content.sections;
-  const { sents, secStart } = useMemo(() => flatten(sections), [sections]);
-  const last = sents.length - 1;
+type Panel = 'settings' | 'toc' | 'bookToc' | null;
+
+export function Reader({ meta, content, marks, initialSettings, onBack }: ReaderProps) {
+  const full = useMemo(() => flatten(content.sections), [content]);
   const [settings, setSettings] = useState(initialSettings);
+  const landscape = useLandscape();
+  const view = useMemo(() => readingView(content.sections, full, marks, settings.skipToc), [content, full, marks, settings.skipToc]);
+  const sections = view.sections;
+  const { sents, secStart } = useMemo(() => flatten(sections), [sections]);
+  const last = Math.max(0, sents.length - 1);
   const groups = useMemo(() => buildGroups(sents, settings.per), [sents, settings.per]);
-  const [sIdx, setSIdx] = useState(() => {
-    const at = clamp(meta.pos || 0, 0, last);
-    return initialSettings.mode === 'easy' ? (groups[groupIndexOf(groups, at)] ?? 0) : at;
+
+  // The position as a sentence of the whole book: the same place whether the table of contents is skipped or not.
+  const [fullPos, setFullPos] = useState(() => {
+    // A book opened for the first time starts after its table of contents (chapter 1).
+    const firstOpen = meta.opened === 0 && meta.pos === 0;
+    return firstOpen && initialSettings.skipToc ? firstContentSentence(full, marks) : meta.pos || 0;
   });
+  const sIdx = clamp(fromFull(view, fullPos), 0, last);
+  const setSIdx = (s: number) => setFullPos(view.toFull[clamp(s, 0, last)] ?? 0);
+
   const [jump, setJump] = useState<Jump>({ s: sIdx, n: 0 });
   const [easyAnim, setEasyAnim] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [panel, setPanel] = useState<'settings' | 'toc' | null>(null);
+  const [panel, setPanel] = useState<Panel>(null);
   const endNoted = useRef(false);
+  const spread = useRef<SpreadControl | null>(null);
 
   const mode = settings.mode;
   const gi = groupIndexOf(groups, sIdx);
-  const pos = mode === 'easy' ? (groups[gi] ?? 0) : sIdx;
+  // Portrait Prosta shows whole groups; the spread steps sentence by sentence.
+  const groupMode = mode === 'easy' && !landscape;
+  const pos = groupMode ? (groups[gi] ?? 0) : sIdx;
   const groupEnd = groups[gi + 1] ?? sents.length;
   const current = sents[pos];
 
   // ── Saving ────────────────────────────────────────────────────────────────
   const metaRef = useRef(meta);
-  const posRef = useRef(pos);
-  posRef.current = pos;
+  const saved = useRef({ full: view.toFull[pos] ?? 0, progress: { pos, total: sents.length } });
+  saved.current = { full: view.toFull[pos] ?? 0, progress: { pos, total: sents.length } };
   const saveTimer = useRef(0);
   const saveWarned = useRef(false);
   const flushSave = () => {
     clearTimeout(saveTimer.current);
     saveTimer.current = 0;
-    const next = { ...metaRef.current, pos: posRef.current, opened: Date.now() };
+    const { full: at, progress } = saved.current;
+    const next = { ...metaRef.current, pos: at, opened: Date.now(), progress };
     metaRef.current = next;
-    saveReadingPosition(next, next.pos).catch(() => {
+    saveReadingPosition(next, at, progress).catch(() => {
       if (saveWarned.current) return;
       saveWarned.current = true;
       showToast({ message: t('reader.errors.saveFailed'), tone: 'negative' });
@@ -92,7 +118,7 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
     }
     clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(flushSave, SAVE_DELAY_MS);
-  }, [pos]);
+  }, [pos, view]);
 
   useEffect(() => {
     const onVisibility = () => {
@@ -123,14 +149,22 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
   const update = (patch: Partial<ReaderSettings>) => setSettings((s) => ({ ...s, ...patch }));
 
   // ── Moving ────────────────────────────────────────────────────────────────
+  const noteEnd = () => {
+    if (endNoted.current) return;
+    endNoted.current = true;
+    showToast({ message: t('reader.end') });
+  };
+
   const go = (delta: number) => {
+    if (landscape) {
+      if (delta > 0) spread.current?.next();
+      else spread.current?.prev();
+      return;
+    }
     if (mode !== 'easy') return;
     const ni = clamp(gi + delta, 0, groups.length - 1);
     if (ni === gi) {
-      if (delta > 0 && !endNoted.current) {
-        endNoted.current = true;
-        showToast({ message: t('reader.end') });
-      }
+      if (delta > 0) noteEnd();
       return;
     }
     endNoted.current = false;
@@ -140,32 +174,32 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
 
   const jumpTo = (idx: number) => {
     const s = clamp(idx, 0, last);
-    if (mode === 'easy') {
+    if (groupMode) {
       setSIdx(groups[groupIndexOf(groups, s)] ?? 0);
       setEasyAnim((n) => n + 1);
       return;
     }
-    if (mode === 'normal') setSIdx(s);
+    if (mode !== 'auto' || landscape) setSIdx(s);
     setJump((j) => ({ s, n: j.n + 1 }));
   };
 
   const setMode = (next: ReaderMode) => {
     if (next === mode) return;
     setPlaying(false);
-    if (next === 'easy') setSIdx(groups[groupIndexOf(groups, sIdx)] ?? 0);
+    if (next === 'easy' && !landscape) setSIdx(groups[groupIndexOf(groups, sIdx)] ?? 0);
     update({ mode: next });
   };
 
-  const setView = (view: EasyView) => {
-    if (view === settings.view) return;
+  const setView = (v: EasyView) => {
+    if (v === settings.view) return;
     setPlaying(false);
-    update({ view });
+    update({ view: v });
   };
 
   const setPer = (per: 1 | 2) => {
     if (per === settings.per) return;
     const nextGroups = buildGroups(sents, per);
-    if (mode === 'easy') setSIdx(nextGroups[groupIndexOf(nextGroups, pos)] ?? 0);
+    if (groupMode) setSIdx(nextGroups[groupIndexOf(nextGroups, pos)] ?? 0);
     update({ per });
   };
 
@@ -174,7 +208,7 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
 
   const onSeek = (value: number) => {
     if (mode === 'normal') {
-      setSIdx(clamp(value, 0, last));
+      setSIdx(value);
       setJump((j) => ({ s: value, n: j.n + 1 }));
     } else {
       setSIdx(groups[clamp(value, 0, groups.length - 1)] ?? 0);
@@ -192,30 +226,35 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
     if (panel !== null) return;
     const target = e.target instanceof Element ? e.target : null;
     const onButton = !!target?.closest('button');
-    if (mode === 'easy') {
-      if (e.key === 'ArrowRight' || e.key === 'PageDown' || (e.key === ' ' && !onButton)) {
-        e.preventDefault();
-        go(1);
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        e.preventDefault();
-        go(-1);
-      }
-    } else if (mode === 'auto' && !target?.classList.contains('reader__wpm')) {
+    if (mode === 'auto' && target?.classList.contains('reader__wpm')) return;
+    if (mode === 'auto') {
       if (e.key === ' ' && !onButton) {
         e.preventDefault();
         setPlaying((p) => !p);
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        jumpTo(sIdx + 1);
+        if (landscape) spread.current?.next();
+        else jumpTo(sIdx + 1);
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        jumpTo(sIdx - 1);
+        if (landscape) spread.current?.prev();
+        else jumpTo(sIdx - 1);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setWpm(settings.wpm + WPM_STEP);
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         setWpm(settings.wpm - WPM_STEP);
+      }
+      return;
+    }
+    if (mode === 'easy' || landscape) {
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || (e.key === ' ' && !onButton)) {
+        e.preventDefault();
+        go(1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        go(-1);
       }
     }
   };
@@ -242,21 +281,32 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
 
   // ── Rendering ─────────────────────────────────────────────────────────────
   const pct = percentRead(pos, sents.length);
+  const statusText = t('reader.status', { n: fmt(pos + 1), total: fmt(sents.length) });
   const status = (
     <div class="reader__status">
       <b>{pct}%</b>
       <br />
-      {t('reader.status', { n: fmt(pos + 1), total: fmt(sents.length) })}
+      {statusText}
     </div>
   );
   const secIndex = current?.sec ?? 0;
+  const bookToc = useMemo(() => tocBlocks(content.sections, marks), [content, marks]);
+  const fontPx = EASY_SIZES[settings.size] ?? 26;
+
+  const playButton = (
+    <button type="button" class="reader__arrow reader__arrow--primary reader__play" onClick={() => setPlaying((p) => !p)}>
+      {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
+      <span>{t(playing ? 'reader.pause' : 'reader.play')}</span>
+    </button>
+  );
 
   return (
     <div
       class="reader"
       data-theme={settings.theme}
       data-mode={mode}
-      style={{ '--reader-size': `${EASY_SIZES[settings.size] ?? 26}px` }}
+      data-layout={landscape ? 'spread' : 'column'}
+      style={{ '--reader-size': `${fontPx}px` }}
     >
       <header class="reader__top">
         <div class="reader__top-left">
@@ -294,16 +344,62 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
             ))}
           </div>
         </div>
+        {landscape && (
+          <div class="reader__top-status">
+            <span class="reader__status reader__status--line" data-testid="reader-status">
+              <b>{pct}%</b> · {statusText}
+            </span>
+            {mode === 'auto' && (
+              <div class="reader__top-auto">
+                <button type="button" class="reader__mini" aria-label={t('reader.slower')} onClick={() => setWpm(settings.wpm - WPM_STEP)}>
+                  {t('reader.slowerShort')}
+                </button>
+                <output class="reader__mini-out">
+                  <b>{settings.wpm}</b> {t('reader.wpm')}
+                </output>
+                <button type="button" class="reader__mini" aria-label={t('reader.faster')} onClick={() => setWpm(settings.wpm + WPM_STEP)}>
+                  {t('reader.fasterShort')}
+                </button>
+                {playButton}
+              </div>
+            )}
+          </div>
+        )}
       </header>
-      <div class="reader__crumb">{crumbText(meta.title, sections[secIndex], secIndex)}</div>
+      {!landscape && <div class="reader__crumb">{crumbText(meta.title, sections[secIndex], secIndex)}</div>}
 
-      <div class="reader__stage">
-        {mode === 'easy' && settings.view === 'sentences' && (
+      <div class="reader__stage" key={`${settings.skipToc}-${landscape}`}>
+        {landscape && (
+          <SpreadView
+            control={spread}
+            sents={sents}
+            sections={sections}
+            secStart={secStart}
+            mode={mode}
+            pos={pos}
+            jump={jump}
+            zoom={settings.zoom}
+            swap={settings.swapButtons}
+            playing={playing}
+            wpm={settings.wpm}
+            fontPx={fontPx}
+            onPosition={(s) => {
+              endNoted.current = false;
+              setSIdx(s);
+            }}
+            onEnd={() => {
+              setPlaying(false);
+              noteEnd();
+            }}
+            swipe={swipe}
+          />
+        )}
+        {!landscape && mode === 'easy' && settings.view === 'sentences' && (
           <div class="reader__easy" {...swipe}>
             <EasyText sents={sents} sections={sections} secStart={secStart} start={pos} end={groupEnd} anim={easyAnim} />
           </div>
         )}
-        {mode === 'easy' && settings.view === 'page' && (
+        {!landscape && mode === 'easy' && settings.view === 'page' && (
           <PageView
             sents={sents}
             sections={sections}
@@ -315,7 +411,7 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
             onPick={jumpTo}
           />
         )}
-        {mode === 'auto' && (
+        {!landscape && mode === 'auto' && (
           <AutoView
             sents={sents}
             sections={sections}
@@ -332,7 +428,7 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
             }}
           />
         )}
-        {mode === 'normal' && (
+        {!landscape && mode === 'normal' && (
           <NormalView
             sents={sents}
             sections={sections}
@@ -346,86 +442,87 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
         )}
       </div>
 
-      <footer class="reader__foot">
-        <div class="reader__foot-inner">
-          {mode !== 'auto' && (
-            <input
-              class="reader__seek"
-              type="range"
-              min={0}
-              max={mode === 'easy' ? groups.length - 1 : last}
-              value={mode === 'easy' ? gi : sIdx}
-              aria-label={t('reader.seek')}
-              onInput={(e) => onSeek(Number((e.currentTarget as HTMLInputElement).value))}
-            />
-          )}
-          {mode !== 'auto' ? (
-            <div class="reader__nav">
-              {mode === 'easy' && (
-                <button type="button" class="reader__arrow" title={t('reader.prevLabel')} disabled={gi === 0} onClick={() => go(-1)}>
-                  <ArrowLeft aria-hidden="true" />
-                  <span>{t('reader.prev')}</span>
-                </button>
-              )}
-              {status}
-              {mode === 'easy' && (
-                <button
-                  type="button"
-                  class="reader__arrow reader__arrow--primary"
-                  title={t('reader.nextLabel')}
-                  disabled={gi >= groups.length - 1}
-                  onClick={() => go(1)}
-                >
-                  <span>{t('reader.next')}</span>
-                  <ArrowRight aria-hidden="true" />
-                </button>
-              )}
-            </div>
-          ) : (
-            <div class="reader__auto">
-              <div class="reader__speed">
-                <button type="button" aria-label={t('reader.slower')} onClick={() => setWpm(settings.wpm - WPM_STEP)}>
-                  {t('reader.slowerShort')}
-                </button>
-                <div class="reader__speed-mid">
-                  <input
-                    class="reader__wpm"
-                    type="range"
-                    min={WPM_MIN}
-                    max={WPM_MAX}
-                    step={10}
-                    value={settings.wpm}
-                    aria-label={t('reader.speed')}
-                    onInput={(e) => setWpm(Number((e.currentTarget as HTMLInputElement).value))}
-                  />
-                  <output>
-                    <b>{settings.wpm}</b> {t('reader.wpm')}
-                  </output>
-                </div>
-                <button type="button" aria-label={t('reader.faster')} onClick={() => setWpm(settings.wpm + WPM_STEP)}>
-                  {t('reader.fasterShort')}
-                </button>
-              </div>
+      {!landscape && (
+        <footer class="reader__foot">
+          <div class="reader__foot-inner">
+            {mode !== 'auto' && (
+              <input
+                class="reader__seek"
+                type="range"
+                min={0}
+                max={mode === 'easy' ? groups.length - 1 : last}
+                value={mode === 'easy' ? gi : sIdx}
+                aria-label={t('reader.seek')}
+                onInput={(e) => onSeek(Number((e.currentTarget as HTMLInputElement).value))}
+              />
+            )}
+            {mode !== 'auto' ? (
               <div class="reader__nav">
+                {mode === 'easy' && (
+                  <button type="button" class="reader__arrow" title={t('reader.prevLabel')} disabled={gi === 0} onClick={() => go(-1)}>
+                    <ArrowLeft aria-hidden="true" />
+                    <span>{t('reader.prev')}</span>
+                  </button>
+                )}
                 {status}
-                <button type="button" class="reader__arrow reader__arrow--primary reader__play" onClick={() => setPlaying((p) => !p)}>
-                  {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
-                  <span>{t(playing ? 'reader.pause' : 'reader.play')}</span>
-                </button>
+                {mode === 'easy' && (
+                  <button
+                    type="button"
+                    class="reader__arrow reader__arrow--primary"
+                    title={t('reader.nextLabel')}
+                    disabled={gi >= groups.length - 1}
+                    onClick={() => go(1)}
+                  >
+                    <span>{t('reader.next')}</span>
+                    <ArrowRight aria-hidden="true" />
+                  </button>
+                )}
               </div>
-            </div>
-          )}
-        </div>
-      </footer>
+            ) : (
+              <div class="reader__auto">
+                <div class="reader__speed">
+                  <button type="button" aria-label={t('reader.slower')} onClick={() => setWpm(settings.wpm - WPM_STEP)}>
+                    {t('reader.slowerShort')}
+                  </button>
+                  <div class="reader__speed-mid">
+                    <input
+                      class="reader__wpm"
+                      type="range"
+                      min={WPM_MIN}
+                      max={WPM_MAX}
+                      step={10}
+                      value={settings.wpm}
+                      aria-label={t('reader.speed')}
+                      onInput={(e) => setWpm(Number((e.currentTarget as HTMLInputElement).value))}
+                    />
+                    <output>
+                      <b>{settings.wpm}</b> {t('reader.wpm')}
+                    </output>
+                  </div>
+                  <button type="button" aria-label={t('reader.faster')} onClick={() => setWpm(settings.wpm + WPM_STEP)}>
+                    {t('reader.fasterShort')}
+                  </button>
+                </div>
+                <div class="reader__nav">
+                  {status}
+                  {playButton}
+                </div>
+              </div>
+            )}
+          </div>
+        </footer>
+      )}
 
       <SettingsPanel
         open={panel === 'settings'}
         onClose={() => setPanel(null)}
         settings={settings}
+        landscape={landscape}
         onResize={resize}
         onView={setView}
         onPer={setPer}
         onTheme={(theme) => update({ theme })}
+        onToggle={(key, value) => update({ [key]: value })}
       />
       <TocPanel
         open={panel === 'toc'}
@@ -434,11 +531,14 @@ export function Reader({ meta, content, initialSettings, onBack }: ReaderProps) 
         secStart={secStart}
         total={sents.length}
         current={secIndex}
+        hasBookToc={hasToc(marks)}
+        onBookToc={() => setPanel('bookToc')}
         onPick={(s) => {
           setPanel(null);
           jumpTo(s);
         }}
       />
+      <BookTocPanel open={panel === 'bookToc'} onClose={() => setPanel(null)} blocks={bookToc} />
     </div>
   );
 }

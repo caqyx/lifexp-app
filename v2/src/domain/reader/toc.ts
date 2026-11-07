@@ -148,7 +148,9 @@ export interface ReadingView {
  */
 export function readingView(sections: readonly Section[], full: FlatBook, marks: TocMarks, skip: boolean): ReadingView {
   const fullTotal = full.sents.length;
-  if (!skip || !hasToc(marks)) {
+  const kept = full.sents.filter((s) => !marks[s.sec]?.[s.para]).length;
+  // Nothing would be left to read (the whole file looks like a list): read it all.
+  if (!skip || !hasToc(marks) || kept === 0) {
     return { sections: [...sections], toFull: full.sents.map((_, i) => i), fullTotal };
   }
   const out: Section[] = [];
