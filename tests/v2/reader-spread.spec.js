@@ -5,8 +5,11 @@
 // the text, a rotation keeping the place. The book (generated here) has a contents
 // list before chapter 1: it is skipped on the first open, left out of the counts and
 // reachable from the panel.
+const path = require('path');
 const { createUser } = require('../support/emulator');
 const { test, expect, openSignedIn } = require('../support/v2');
+// The reader's own EPUB library, from v2's dependencies: the root has no copy.
+const JSZip = require(path.join(__dirname, '..', '..', 'v2', 'node_modules', 'jszip'));
 
 const PIXEL7_LANDSCAPE = { viewport: { width: 915, height: 412 }, deviceScaleFactor: 2.625, isMobile: true, hasTouch: true };
 test.use({ ...PIXEL7_LANDSCAPE, serviceWorkers: 'block' });
@@ -272,4 +275,34 @@ test.describe('on a 851×393 phone (DPR 2.75)', () => {
     await page.locator('.reader-lib__open').click();
     await expect(status(page)).toHaveText(place);
   });
+});
+
+test('an EPUB\'s navigation document in the spine is its contents list: skipped and shown in the panel', async ({ page }) => {
+  const zip = new JSZip();
+  zip.file('mimetype', 'application/epub+zip');
+  zip.file(
+    'META-INF/container.xml',
+    '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>',
+  );
+  zip.file(
+    'OEBPS/content.opf',
+    '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Z nawigacją</dc:title></metadata>' +
+      '<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest>' +
+      '<spine><itemref idref="nav"/><itemref idref="c1"/></spine></package>',
+  );
+  const page_ = (body) => `<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>x</title></head><body>${body}</body></html>`;
+  zip.file('OEBPS/nav.xhtml', page_('<nav epub:type="toc"><h1>Contents</h1><ol><li><a href="c1.xhtml">Pierwszy rozdział</a></li></ol></nav>'));
+  zip.file('OEBPS/c1.xhtml', page_('<h1>Pierwszy rozdział</h1><p>Tekst rozdziału. Drugie zdanie.</p>'));
+  const epub = { name: 'nav.epub', mimeType: 'application/epub+zip', buffer: await zip.generateAsync({ type: 'nodebuffer' }) };
+
+  const account = await createUser({ tag: 'spread-nav', profile: { optInModules: ['reader'] } });
+  await openSignedIn(page, account, '#/reader');
+  await page.locator('input[type="file"]').setInputFiles([epub]);
+  await expect(page.locator('.reader-lib__open')).toContainText('EPUB · 3 zdania · 0%');
+  await page.locator('.reader-lib__open').click();
+  await expect(page.locator('.spread__sent.is-on')).toHaveText('Pierwszy rozdział');
+  await expect(page.getByTestId('reader-status')).toHaveText('0% · zdanie 1 z 3');
+  await page.getByRole('button', { name: 'Spis', exact: true }).click();
+  await page.getByRole('button', { name: 'Spis treści książki' }).click();
+  await expect(page.getByRole('dialog', { name: 'Spis treści książki' }).locator('p, h3')).toHaveText(['Contents', 'Pierwszy rozdział']);
 });
