@@ -673,6 +673,11 @@ button:focus-visible {
   grid-column: 1 / -1;
 }
 
+/* The words do not fit side by side (js/main.js fitPriority): one button per row. */
+.segmented--stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .segmented__option {
   display: grid;
   place-items: center;

@@ -2,7 +2,8 @@
 // and a small phone, upright and sideways, in Polish and English, every build card, the
 // title, the hint and Zamknij/Close sit wholly inside the panel and the viewport (on a
 // short screen the sheet's body scrolls to them, the head with Close stays), Close is at
-// least 44 px and closes the sheet; the upgrade sheet fits too. The game page
+// least 44 px and closes the sheet; the upgrade sheet fits too, its target buttons' words
+// wholly inside them. Computers too: Windows scaling 100–200 % and browser zoom. The game page
 // is opened on its own (built, v2/dist), the way GameHost's frame shows it; no account.
 const { test, expect } = require('@playwright/test');
 
@@ -15,6 +16,16 @@ const SCREENS = [
   { name: 'small phone sideways', viewport: { width: 640, height: 360 }, deviceScaleFactor: 2 },
   // A small phone sideways inside the app's frame (its bar takes some height).
   { name: 'small phone sideways in a frame', viewport: { width: 640, height: 300 }, deviceScaleFactor: 2 },
+  // Computers (mostly Windows): display scaling 100/125/150/200 % and browser zoom.
+  { name: 'desktop 1920×1080 at 100 %', viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1, desktop: true },
+  { name: 'desktop 1366×768 at 100 %', viewport: { width: 1366, height: 768 }, deviceScaleFactor: 1, desktop: true },
+  { name: 'desktop 1920×1080 at 125 %', viewport: { width: 1536, height: 864 }, deviceScaleFactor: 1.25, desktop: true },
+  { name: 'desktop 1920×1080 at 150 %', viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1.5, desktop: true },
+  { name: 'desktop 2560×1440 at 150 %', viewport: { width: 1707, height: 960 }, deviceScaleFactor: 1.5, desktop: true },
+  { name: 'desktop 2560×1440 at 200 %', viewport: { width: 1280, height: 720 }, deviceScaleFactor: 2, desktop: true },
+  { name: 'desktop zoom 90 %', viewport: { width: 2133, height: 1200 }, deviceScaleFactor: 0.9, desktop: true },
+  { name: 'desktop zoom 110 %', viewport: { width: 1745, height: 982 }, deviceScaleFactor: 1.1, desktop: true },
+  { name: 'desktop zoom 125 % at 125 %', viewport: { width: 1229, height: 691 }, deviceScaleFactor: 1.5625, desktop: true },
 ];
 
 const TEXT = {
@@ -65,7 +76,7 @@ async function expectSheetFits(page, viewport, elements, close) {
 for (const screen of SCREENS) {
   for (const lang of ['pl', 'en']) {
     test.describe(`${screen.name}, ${lang}`, () => {
-      test.use({ viewport: screen.viewport, deviceScaleFactor: screen.deviceScaleFactor, isMobile: true, hasTouch: true });
+      test.use({ viewport: screen.viewport, deviceScaleFactor: screen.deviceScaleFactor, isMobile: !screen.desktop, hasTouch: true });
 
       test('the build and upgrade sheets fit: every card, the title, the hint and Close; Close closes', async ({ page }) => {
         const t = TEXT[lang];
@@ -110,6 +121,20 @@ for (const screen of SCREENS) {
           ],
           close,
         );
+        // The target buttons: every word wholly inside its button (side by side when they
+        // fit, else one under another), each at least 44 px.
+        const targets = page.locator('#priority .segmented__option');
+        await expect(targets).toHaveCount(3);
+        for (let i = 0; i < 3; i++) {
+          const button = targets.nth(i);
+          await button.scrollIntoViewIfNeeded();
+          const outer = await button.boundingBox();
+          const words = await button.locator('.pt-canvas').boundingBox();
+          const name = await button.textContent();
+          expectInside(words, outer, `target "${name}" words`);
+          expect(outer.height, `target "${name}" height`).toBeGreaterThanOrEqual(44);
+          expect(outer.width, `target "${name}" width`).toBeGreaterThanOrEqual(44);
+        }
         // The actions fit across the panel (sideways it may scroll to them).
         const panel = await page.locator('#panel').boundingBox();
         for (const [what, el] of [['upgrade', upgrade], ['sell', page.getByRole('button', { name: t.sell })]]) {
