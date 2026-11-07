@@ -16,7 +16,7 @@ import { toScreen } from './layout.js';
 import { EVENT_RING } from './sim.js';
 import { addFloat, addRing, plusLabel } from './effects.js';
 import { PALETTE, createCanvas, drawText, measureText, silhouette } from './pixelart.js';
-import { TOWER_H, aimDir, enemyArt, towerArt } from './art.js';
+import { ENEMY_PAD, TOWER_H, TOWER_W, aimDir, enemyArt, towerArt } from './art.js';
 import { GROUND_TO_AIR, boom, corpse, createParticles, emit, renderAmbience, renderBooms, renderCorpses, renderDecals, renderParticles, scorch, setAmbience, updateParticles } from './particles.js';
 import { createTileset, renderTerrain } from './terrain.js';
 
@@ -442,7 +442,8 @@ function renderSelection(ctx, layout, game, view) {
   if (!tower && view.previewType) {
     ctx.globalAlpha = 0.6;
     const img = towerSprite(view.previewType, 1, 0, 0);
-    ctx.drawImage(img, cx - img.width / 2, cy + T / 2 - img.height);
+    towerAnchor(layout, pad.x, pad.y, anchor);
+    ctx.drawImage(img, anchor.left, anchor.top);
     ctx.globalAlpha = 1;
   }
 }
@@ -464,12 +465,30 @@ function renderDepth(r, ctx, layout, game, view) {
   for (const padIndex of r.padOrder) {
     const tower = game.towers[padIndex];
     if (!tower) continue;
-    toScreen(layout, tower.x, tower.y, pt);
-    const footY = Math.round(pt.y) + layout.tile / 2 - 1;
-    while (e < n && (r.orderY[e] ?? 0) < footY) drawEnemy(r, ctx, layout, game, view, r.order[e++] ?? 0);
-    drawTower(ctx, layout, tower, view, Math.round(pt.x), footY);
+    towerAnchor(layout, tower.x, tower.y, anchor);
+    while (e < n && (r.orderY[e] ?? 0) < anchor.foot) drawEnemy(r, ctx, layout, game, view, r.order[e++] ?? 0);
+    drawTower(ctx, layout, tower, view, anchor.x, anchor.foot);
   }
   while (e < n) drawEnemy(r, ctx, layout, game, view, r.order[e++] ?? 0);
+}
+
+const anchor = { x: 0, foot: 0, left: 0, top: 0 };
+
+/**
+ * Where a tower stands on the screen (art pixels): `x` the middle of its tile, `foot` the
+ * tile's last row but one, and `left`/`top` where its picture goes — so its foundation
+ * (16 wide, centred) covers its slab's tile exactly, upright or turned. The same for the
+ * build preview. Unit-tested for every pad of every map in both orientations.
+ * @param {Layout} layout @param {number} mx @param {number} my the pad's centre on the map
+ * @param {{ x: number, foot: number, left: number, top: number }} out
+ */
+export function towerAnchor(layout, mx, my, out) {
+  toScreen(layout, mx, my, pt);
+  out.x = Math.round(pt.x);
+  out.foot = Math.round(pt.y) + layout.tile / 2 - 1;
+  out.left = out.x - TOWER_W / 2;
+  out.top = out.foot - TOWER_H + 3;
+  return out;
 }
 
 /**
@@ -510,7 +529,7 @@ function drawTower(ctx, layout, tower, view, x, footY) {
   const img = towerSprite(tower.type, tower.level, still ? 0 : aimDir(screenAim), state);
   const sh = shadowOf(18 + tower.level * 2);
   ctx.drawImage(sh, x - sh.width / 2 + 2, footY - Math.ceil(sh.height / 2));
-  ctx.drawImage(img, x - img.width / 2, footY - TOWER_H + 1);
+  ctx.drawImage(img, x - TOWER_W / 2, footY - TOWER_H + 3);
 }
 
 /**
@@ -536,8 +555,8 @@ function drawEnemy(r, ctx, layout, game, view, i) {
   const foot = Math.round(pt.y) + 5;
   const lift = enemy.flying ? GROUND_TO_AIR + Math.round(Math.sin(view.clock * 3 + enemy.id) * (view.reduced ? 0 : 1.5)) : 0;
   const x = cx - Math.floor(img.width / 2);
-  const y = foot - img.height - lift;
-  const sh = shadowOf(enemy.boss ? 30 : Math.max(10, img.width - 6));
+  const y = foot - img.height + ENEMY_PAD - lift;
+  const sh = shadowOf(enemy.boss ? 30 : Math.max(10, img.width - ENEMY_PAD * 2 - 6));
   ctx.drawImage(sh, cx - sh.width / 2, foot - Math.ceil(sh.height / 2) - 1);
   ctx.drawImage(img, x, y);
   if (enemy.slowLeft > 0 && enemy.flash <= 0) {
@@ -545,7 +564,7 @@ function drawEnemy(r, ctx, layout, game, view, i) {
     ctx.drawImage(left ? pair.iceLeft : pair.iceRight, x, y);
     ctx.globalAlpha = 1;
   }
-  if (enemy.hp < enemy.maxHp) drawHealth(ctx, enemy, cx, y - 3);
+  if (enemy.hp < enemy.maxHp) drawHealth(ctx, enemy, cx, y + ENEMY_PAD - 3);
 }
 
 /** The fliers, after the shots (they are above them), sorted the same way. @param {Renderer} r @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {Game} game @param {View} view */
@@ -739,7 +758,7 @@ function startEffects(r, fx, e) {
     const boss = type === 'colossus';
     const frames = enemyFrames(type);
     const pair = frames[0];
-    if (pair) corpse(parts, x, y + 5, pair.right, pair.flashRight);
+    if (pair) corpse(parts, x, y + 5 + ENEMY_PAD, pair.right, pair.flashRight);
     const color = ENEMY_COLORS[type] ?? WHITE;
     emit(parts, 'debris', x, y - 4, boss ? 30 : 8, color, boss ? 70 : 45);
     emit(parts, 'smoke', x, y - 2, boss ? 10 : 3, PALETTE.G, 6);
