@@ -126,6 +126,41 @@ for (const screen of SCREENS) {
   }
 }
 
+/**
+ * In the game's page: every pad's slab on the ground canvas and, where a tower stands, its
+ * foundation covering exactly that tile on the board canvas. Returns what is wrong.
+ */
+const towersOffSlabs = () => {
+  const board = /** @type {HTMLCanvasElement} */ (document.getElementById('board'));
+  const ground = /** @type {HTMLCanvasElement} */ (document.getElementById('ground'));
+  const px = parseFloat(board.style.width) / board.width;
+  const bd = board.getContext('2d').getImageData(0, 0, board.width, board.height).data;
+  const gd = ground.getContext('2d').getImageData(0, 0, ground.width, ground.height).data;
+  const solid = (x, y) => x >= 0 && x < board.width && (bd[(y * board.width + x) * 4 + 3] ?? 0) > 200;
+  const slab = (x, y) => {
+    const i = (y * ground.width + x) * 4;
+    return `${gd[i]},${gd[i + 1]},${gd[i + 2]}` === '110,106,124';
+  };
+  const centres = [...document.querySelectorAll('.pad')].map((b) => {
+    const el = /** @type {HTMLElement} */ (b);
+    return [Math.round((parseFloat(el.style.left) + parseFloat(el.style.width) / 2) / px), Math.round((parseFloat(el.style.top) + parseFloat(el.style.height) / 2) / px), Boolean(el.dataset.tower)];
+  });
+  const has = (x, y) => centres.some(([a, b, built]) => built && a === x && b === y);
+  const out = [];
+  for (const [cx, cy, built] of centres) {
+    // The slab's stone, left and right of the middle (the tile is 16: cx - 8 .. cx + 7).
+    if (![[-5, -1], [4, -1], [-1, -5], [-1, 4]].every(([dx, dy]) => slab(cx + dx, cy + dy))) out.push(`${cx},${cy}: no slab`);
+    if (!built) continue;
+    // A column of the foundation's height (a mote of the map's air is a pixel or two).
+    const column = (x) => [1, 2, 3, 4, 5, 6].every((dy) => solid(x, cy + dy));
+    if (!column(cx - 8) || !column(cx + 7)) out.push(`${cx},${cy}: the foundation does not reach the tile's edges`);
+    // (A tower on the tile below and beside is drawn later and reaches up into this row.)
+    if (!has(cx - 16, cy) && !has(cx - 16, cy + 16) && column(cx - 10)) out.push(`${cx},${cy}: the foundation goes past the tile's left edge`);
+    if (!has(cx + 16, cy) && !has(cx + 16, cy + 16) && column(cx + 9)) out.push(`${cx},${cy}: the foundation goes past the tile's right edge`);
+  }
+  return out;
+};
+
 // Every tower stands on its own slab: towers built on every pad of every map, upright and
 // sideways; on the canvases, each pad has its slab on the ground (nothing drawn over it)
 // and a tower whose foundation covers exactly that tile (its edges at the tile's edges,
@@ -152,37 +187,60 @@ for (const screen of [SCREENS[0], SCREENS[1], SCREENS[3]]) {
         if (await page.locator('#panel').isVisible()) await page.getByRole('button', { name: 'Zamknij' }).tap();
         await expect(page.locator('#panel')).toBeHidden();
         await page.waitForTimeout(200);
-        const wrong = await page.evaluate(() => {
-          const board = /** @type {HTMLCanvasElement} */ (document.getElementById('board'));
-          const ground = /** @type {HTMLCanvasElement} */ (document.getElementById('ground'));
-          const px = parseFloat(board.style.width) / board.width;
-          const bd = board.getContext('2d').getImageData(0, 0, board.width, board.height).data;
-          const gd = ground.getContext('2d').getImageData(0, 0, ground.width, ground.height).data;
-          const solid = (x, y) => x >= 0 && x < board.width && (bd[(y * board.width + x) * 4 + 3] ?? 0) > 200;
-          const slab = (x, y) => {
-            const i = (y * ground.width + x) * 4;
-            return `${gd[i]},${gd[i + 1]},${gd[i + 2]}` === '110,106,124';
-          };
-          const centres = [...document.querySelectorAll('.pad')].map((b) => {
-            const el = /** @type {HTMLElement} */ (b);
-            return [Math.round((parseFloat(el.style.left) + parseFloat(el.style.width) / 2) / px), Math.round((parseFloat(el.style.top) + parseFloat(el.style.height) / 2) / px)];
-          });
-          const has = (x, y) => centres.some(([a, b]) => a === x && b === y);
-          const out = [];
-          for (const [cx, cy] of centres) {
-            // The slab's stone, left and right of the middle (the tile is 16: cx - 8 .. cx + 7).
-            if (![[-5, -1], [4, -1], [-1, -5], [-1, 4]].every(([dx, dy]) => slab(cx + dx, cy + dy))) out.push(`${cx},${cy}: no slab`);
-            // A column of the foundation's height (a mote of the map's air is a pixel or two).
-            const column = (x) => [1, 2, 3, 4, 5, 6].every((dy) => solid(x, cy + dy));
-            if (!column(cx - 8) || !column(cx + 7)) out.push(`${cx},${cy}: the foundation does not reach the tile's edges`);
-            // (A tower on the tile below and beside is drawn later and reaches up into this row.)
-            if (!has(cx - 16, cy) && !has(cx - 16, cy + 16) && column(cx - 10)) out.push(`${cx},${cy}: the foundation goes past the tile's left edge`);
-            if (!has(cx + 16, cy) && !has(cx + 16, cy + 16) && column(cx + 9)) out.push(`${cx},${cy}: the foundation goes past the tile's right edge`);
-          }
-          return out;
-        });
+        const wrong = await page.evaluate(towersOffSlabs);
         expect(wrong, map).toEqual([]);
       }
+    });
+  });
+}
+
+// The same with fractional device pixel ratios (Xiaomi/Redmi/POCO phones, Windows display
+// scaling and browser zoom): towers built upright, then the phone turned (or the window
+// resized) mid-game, and towers built again after the turn; the two canvases share one
+// whole-pixel scale (crisp) and one place.
+const TURNS = [
+  { name: 'Redmi 851×393 @2.75', dpr: 2.75, from: { width: 393, height: 851 }, to: { width: 851, height: 393 } },
+  { name: 'POCO 892×412 @3', dpr: 3, from: { width: 412, height: 892 }, to: { width: 892, height: 412 } },
+  { name: 'Xiaomi 800×360 @3', dpr: 3, from: { width: 360, height: 800 }, to: { width: 800, height: 360 } },
+  { name: 'phone 915×412 @2.625', dpr: 2.625, from: { width: 412, height: 915 }, to: { width: 915, height: 412 } },
+  { name: 'phone 851×393 @2.8125', dpr: 2.8125, from: { width: 393, height: 851 }, to: { width: 851, height: 393 } },
+  { name: 'Windows 125% 1536×864', dpr: 1.25, from: { width: 1536, height: 864 }, to: { width: 1100, height: 760 } },
+  { name: 'Windows 150% 1280×720', dpr: 1.5, from: { width: 1280, height: 720 }, to: { width: 900, height: 700 } },
+  { name: 'browser zoom 110% 1745×982', dpr: 1.1, from: { width: 1745, height: 982 }, to: { width: 1300, height: 800 } },
+];
+for (const turn of TURNS) {
+  test.describe(`${turn.name}: turned mid-game`, () => {
+    test.use({ viewport: turn.from, deviceScaleFactor: turn.dpr, reducedMotion: 'reduce' });
+
+    test('towers stay on their slabs after the turn, new ones land on theirs, both layers crisp and aligned', async ({ page }) => {
+      await page.goto(`${PAGE}?lang=pl&test=1&gold=99999`);
+      await page.getByRole('button', { name: /^Łąka/ }).click();
+      const build = async (n) => {
+        await page.getByRole('button', { name: `Pole budowy ${n}`, exact: true }).click();
+        await page.getByRole('radio', { name: /^Łucznik/ }).click();
+        await page.getByRole('button', { name: /^Zbuduj wieżę ·/ }).click();
+      };
+      for (const n of [1, 4, 8, 12]) await build(n);
+      await page.setViewportSize(turn.to);
+      await expect.poll(() => page.evaluate(() => document.getElementById('board').width)).toBeGreaterThan(0);
+      await page.waitForTimeout(300);
+      for (const n of [2, 6, 10, 14]) await build(n);
+      if (await page.locator('#panel').isVisible()) await page.getByRole('button', { name: 'Zamknij' }).click();
+      await expect(page.locator('#panel')).toBeHidden();
+      await page.waitForTimeout(200);
+      expect(await page.evaluate(towersOffSlabs)).toEqual([]);
+      const layers = await page.evaluate(() => {
+        const board = /** @type {HTMLCanvasElement} */ (document.getElementById('board'));
+        const ground = /** @type {HTMLCanvasElement} */ (document.getElementById('ground'));
+        const rb = board.getBoundingClientRect();
+        const rg = ground.getBoundingClientRect();
+        const k = (rb.width * devicePixelRatio) / board.width;
+        return {
+          crisp: Math.abs(k - Math.round(k)) < 0.02 && Math.abs((rb.height * devicePixelRatio) / board.height - Math.round(k)) < 0.02,
+          aligned: rb.left === rg.left && rb.top === rg.top && rb.width === rg.width && rb.height === rg.height && board.width === ground.width && board.height === ground.height,
+        };
+      });
+      expect(layers).toEqual({ crisp: true, aligned: true });
     });
   });
 }
