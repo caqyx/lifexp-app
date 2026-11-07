@@ -663,9 +663,9 @@
 }
 
 .reader__booktoc {
-  max-width: none;
   padding: 0 18px calc(24px + env(safe-area-inset-bottom));
   overflow-y: auto;
+  font-family: var(--r-serif);
   font-size: 16px;
   line-height: 1.55;
 }

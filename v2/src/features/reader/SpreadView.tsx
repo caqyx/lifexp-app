@@ -176,7 +176,7 @@ export function SpreadView(props: SpreadViewProps) {
   };
 
   // Laid out (again): spans, pages; the current sentence stays on screen.
-  useLayoutEffect(() => {
+  const readLayout = () => {
     const el = columns.current;
     if (!el || !size.w) return;
     spans.current = [];
@@ -186,7 +186,22 @@ export function SpreadView(props: SpreadViewProps) {
     spreadCache.current = new Map();
     setPages(pageCount(el.scrollWidth, layout));
     setLayoutRun((n) => n + 1);
-  }, [blocks, layout]);
+  };
+  useLayoutEffect(readLayout, [blocks, layout]);
+  // Literata arriving after the first layout moves every line: read the pages again.
+  const relayout = useRef(readLayout);
+  relayout.current = readLayout;
+  useEffect(() => {
+    const fonts = document.fonts;
+    let alive = true;
+    const again = () => alive && relayout.current();
+    void fonts.ready.then(again);
+    fonts.addEventListener('loadingdone', again);
+    return () => {
+      alive = false;
+      fonts.removeEventListener('loadingdone', again);
+    };
+  }, []);
 
   // ── Where the camera and the spread go ─────────────────────────────────────
   const ownMove = useRef<number | null>(null);

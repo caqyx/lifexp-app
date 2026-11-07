@@ -255,7 +255,7 @@ export function BookTocPanel({ open, onClose, blocks }: { open: boolean; onClose
           {t('reader.close')}
         </button>
       </div>
-      <div class="reader__booktoc reader__full">
+      <div class="reader__booktoc">
         {blocks.map((block, bi) => (
           <section key={bi} class="reader__booktoc-block">
             {block.map((p, pi) => (p.h ? <h3 key={pi}>{p.t}</h3> : <p key={pi}>{p.t}</p>))}
