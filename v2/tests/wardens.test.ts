@@ -613,8 +613,16 @@ function fakeDocument() {
       const ctx = {
         fillStyle: '#000000',
         imageSmoothingEnabled: false,
-        fillRect(x: number, y: number, w: number, h: number) {
+        tx: 0,
+        ty: 0,
+        translate(dx: number, dy: number) {
+          this.tx += dx;
+          this.ty += dy;
+        },
+        fillRect(x0: number, y0: number, w: number, h: number) {
           ensure();
+          const x = x0 + this.tx;
+          const y = y0 + this.ty;
           const c = parse(String(this.fillStyle));
           for (let yy = Math.max(0, y); yy < Math.min(canvas.height, y + h); yy++)
             for (let xx = Math.max(0, x); xx < Math.min(canvas.width, x + w); xx++) canvas.data.set(c, (yy * canvas.width + xx) * 4);
@@ -626,6 +634,9 @@ function fakeDocument() {
         putImageData: (img: { data: Uint8ClampedArray }) => {
           canvas.data = new Uint8ClampedArray(img.data);
         },
+        // Enough for the ground's tiles to be built (their pictures are not checked here).
+        drawImage: () => {},
+        clearRect: () => {},
       };
       return canvas;
     },
@@ -647,7 +658,7 @@ describe('characters (art.js)', async () => {
     return true;
   };
 
-  test('enemies are 14–40 px with 4–6 walk frames, all on the palette; the Colossus is the big one', () => {
+  test('enemies are 14–40 px (plus a clear margin) with 4–6 walk frames, all on the palette; the Colossus is the big one', () => {
     for (const type of ENEMY_TYPES) {
       const art = enemyArt(type);
       expect(art.frames).toBeGreaterThanOrEqual(4);
@@ -655,7 +666,7 @@ describe('characters (art.js)', async () => {
       for (let f = 0; f < art.frames; f++) {
         const pic = art.make(f) as unknown as Pic;
         expect(pic.width).toBeGreaterThanOrEqual(14);
-        expect(pic.width).toBeLessThanOrEqual(40);
+        expect(pic.width).toBeLessThanOrEqual(44);
         expect(onPalette(pic)).toBe(true);
       }
     }
@@ -685,6 +696,46 @@ describe('characters (art.js)', async () => {
     }
   });
 
+  /** Where a picture's drawn pixels touch its edge ('' when a clear pixel runs all round). */
+  const touching = (pic: Pic) => {
+    const solid = (x: number, y: number) => (pic.data[(y * pic.width + x) * 4 + 3] ?? 0) > 0;
+    const edges = new Set<string>();
+    for (let x = 0; x < pic.width; x++) {
+      if (solid(x, 0)) edges.add('top');
+      if (solid(x, pic.height - 1)) edges.add('bottom');
+    }
+    for (let y = 0; y < pic.height; y++) {
+      if (solid(0, y)) edges.add('left');
+      if (solid(pic.width - 1, y)) edges.add('right');
+    }
+    return [...edges].join(',');
+  };
+
+  test('nothing is cut off: every tower (type × level × 8 aims × idle/firing × frame) keeps a clear pixel round its outline', () => {
+    const clipped: string[] = [];
+    for (const type of TOWER_TYPES)
+      for (const level of [1, 2, 3])
+        for (let dir = 0; dir < 8; dir++)
+          for (const firing of [false, true])
+            for (let frame = 0; frame < 4; frame++) {
+              const edge = touching(towerArt(type, level, dir, firing, frame) as unknown as Pic);
+              if (edge) clipped.push(`${type} L${level} d${dir}${firing ? ' firing' : ''} f${frame}: ${edge}`);
+            }
+    expect(clipped).toEqual([]);
+  });
+
+  test('nothing is cut off: every enemy frame keeps a clear pixel round its outline', () => {
+    const clipped: string[] = [];
+    for (const type of ENEMY_TYPES) {
+      const art = enemyArt(type);
+      for (let f = 0; f < art.frames; f++) {
+        const edge = touching(art.make(f) as unknown as Pic);
+        if (edge) clipped.push(`${type} f${f}: ${edge}`);
+      }
+    }
+    expect(clipped).toEqual([]);
+  });
+
   test('aim: 0 right, clockwise in eighths', () => {
     expect(aimDir(0)).toBe(0);
     expect(aimDir(Math.PI / 2)).toBe(2);
@@ -692,5 +743,60 @@ describe('characters (art.js)', async () => {
     expect(aimDir(-Math.PI / 2)).toBe(6);
     expect(aimDir(-Math.PI / 4)).toBe(7);
     expect(aimDir(Math.PI * 2 + 0.1)).toBe(0);
+  });
+});
+
+// ── Towers stand on their slabs (td-3 fix): every pad, every map, upright and turned ──
+describe('tower placement', async () => {
+  (globalThis as unknown as { document: unknown }).document ??= fakeDocument();
+  const { towerAnchor } = await import('../public/games/wardens/js/render.js');
+  const { createTileset, renderTerrain, tileOrigin } = await import('../public/games/wardens/js/terrain.js');
+  const { TOWER_W, TOWER_H } = await import('../public/games/wardens/js/art.js');
+  const screens = [
+    [412, 800, 2.625],
+    [800, 412, 2.625],
+    [360, 640, 2],
+    [640, 300, 2],
+    [851, 337, 2.75],
+    [1280, 720, 1],
+  ] as const;
+
+  test('each tower picture is centred on its pad’s tile and its foot is on the slab, and the ground draws the slab there', () => {
+    const wrong: string[] = [];
+    for (const map of MAPS) {
+      const tiles = createTileset(map);
+      for (const [w, h, dpr] of screens) {
+        const layout = computeLayout(w, h, dpr);
+        // Where the ground puts its slabs: a recording context.
+        const slabs = new Set<string>();
+        const ctx = {
+          fillStyle: '',
+          fillRect: () => {},
+          drawImage: (img: unknown, x: number, y: number) => {
+            if (img === tiles.pad) slabs.add(`${x},${y}`);
+          },
+          save: () => {},
+          restore: () => {},
+          beginPath: () => {},
+          rect: () => {},
+          clip: () => {},
+        };
+        renderTerrain(ctx as unknown as CanvasRenderingContext2D, layout, map, tiles, 0);
+        const at = { x: 0, y: 0 };
+        const anchor = { x: 0, foot: 0, left: 0, top: 0 };
+        for (const [c, r] of map.pads) {
+          tileOrigin(layout, c, r, at);
+          towerAnchor(layout, c + 0.5, r + 0.5, anchor);
+          const where = `${map.id} ${w}×${h} pad ${c},${r}`;
+          if (!slabs.has(`${at.x},${at.y}`)) wrong.push(`${where}: no slab drawn at its tile`);
+          // The foundation (16 wide, centred in the picture) covers the tile exactly.
+          if (anchor.left + TOWER_W / 2 - 8 !== at.x) wrong.push(`${where}: foundation from x ${anchor.left + TOWER_W / 2 - 8}, tile ${at.x}`);
+          // The foot is the tile's last row but one; the picture's bottom margin hangs below.
+          if (anchor.foot !== at.y + 15) wrong.push(`${where}: foot at y ${anchor.foot}, tile ${at.y}..${at.y + 15}`);
+          if (anchor.top + TOWER_H - 3 !== anchor.foot) wrong.push(`${where}: picture not on its foot`);
+        }
+      }
+    }
+    expect(wrong).toEqual([]);
   });
 });

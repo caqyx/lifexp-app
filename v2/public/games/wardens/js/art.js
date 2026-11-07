@@ -138,6 +138,22 @@ export function build(w, h, draw) {
   return finish(canvas);
 }
 
+/** The clear margin round every enemy picture (room for the outline and a pixel more). */
+export const ENEMY_PAD = 2;
+
+/**
+ * An enemy picture: drawn as `w` × `h` but on a canvas ENEMY_PAD larger on every side, so
+ * a shape that reaches its box's edge still gets its outline and nothing is cut off. The
+ * renderer places it by its box (the foot is ENEMY_PAD above the picture's bottom).
+ * @param {number} w @param {number} h @param {(ctx: Ctx) => void} draw
+ */
+function sprite(w, h, draw) {
+  return build(w + ENEMY_PAD * 2, h + ENEMY_PAD * 2, (ctx) => {
+    ctx.translate(ENEMY_PAD, ENEMY_PAD);
+    draw(ctx);
+  });
+}
+
 // ── Enemies ─────────────────────────────────────────────────────────────────
 
 /** @param {Ctx} ctx @param {number} x @param {number} y @param {number} [look] */
@@ -153,7 +169,7 @@ function crawler(/** @type {number} */ f) {
   const t = (f / 6) * Math.PI * 2;
   const rx = 7 + Math.sin(t) * 1.2;
   const ry = 5.5 - Math.sin(t) * 1.2;
-  return build(20, 16, (ctx) => {
+  return sprite(20, 16, (ctx) => {
     disc(ctx, 'E', 10, 15 - ry, rx, ry);
     disc(ctx, 'f', 9, 14 - ry, rx - 2, ry - 1.5);
     px(ctx, 'F', 6, 12 - ry * 1.6, 2, 1);
@@ -165,7 +181,7 @@ function crawler(/** @type {number} */ f) {
 /** A lean yellow runner with ears and a tail, legs over 6 frames. 20 × 18 */
 function runner(/** @type {number} */ f) {
   const t = (f / 6) * Math.PI * 2;
-  return build(20, 18, (ctx) => {
+  return sprite(20, 18, (ctx) => {
     const bob = Math.round(Math.abs(Math.sin(t)) * 1);
     line(ctx, 'O', 2, 7 - bob, 6, 9 - bob, 2);
     disc(ctx, 'y', 9, 9 - bob, 5, 3);
@@ -185,7 +201,7 @@ function runner(/** @type {number} */ f) {
 /** An armoured shell walker: domed plates, small head, slow legs. 24 × 18 */
 function shellback(/** @type {number} */ f) {
   const t = (f / 4) * Math.PI * 2;
-  return build(24, 18, (ctx) => {
+  return sprite(24, 18, (ctx) => {
     for (let leg = 0; leg < 3; leg++) {
       const s = Math.sin(t + leg * 2) * 2;
       line(ctx, 'K', 6 + leg * 5, 11, 6 + leg * 5 + s, 16, 2);
@@ -202,7 +218,7 @@ function shellback(/** @type {number} */ f) {
 /** A pink moth, wings in 4 beats; it flies over the road. 22 × 18 */
 function moth(/** @type {number} */ f) {
   const lift = [0, -3, -5, -3][f % 4] ?? 0;
-  return build(22, 18, (ctx) => {
+  return sprite(22, 18, (ctx) => {
     disc(ctx, 'P', 6, 9 + lift / 2, 5, 4 + lift / 3);
     disc(ctx, 'P', 15, 9 + lift / 2, 5, 4 + lift / 3);
     disc(ctx, 'p', 6, 10 + lift / 2, 2, 2);
@@ -217,7 +233,7 @@ function moth(/** @type {number} */ f) {
 /** Two red blobs stuck together, wobbling out of step. 24 × 16 */
 function splitter(/** @type {number} */ f) {
   const t = (f / 4) * Math.PI * 2;
-  return build(24, 16, (ctx) => {
+  return sprite(24, 16, (ctx) => {
     disc(ctx, 'R', 7, 10 + Math.sin(t), 6, 5 - Math.sin(t) * 0.8);
     disc(ctx, 'R', 16, 10 - Math.sin(t), 6, 5 + Math.sin(t) * 0.8);
     disc(ctx, 'O', 6, 8 + Math.sin(t), 2, 1);
@@ -230,7 +246,7 @@ function splitter(/** @type {number} */ f) {
 /** A shard of red crystal, tumbling. 14 × 14 */
 function shard(/** @type {number} */ f) {
   const a = (f / 4) * Math.PI;
-  return build(14, 14, (ctx) => {
+  return sprite(14, 14, (ctx) => {
     const pts = [0, 1, 2, 3].map((i) => [7 + Math.cos(a + (i * Math.PI) / 2) * (i % 2 ? 3 : 5), 7 + Math.sin(a + (i * Math.PI) / 2) * (i % 2 ? 3 : 5)]);
     for (let i = 0; i < 4; i++) {
       const [x0, y0] = pts[i] ?? [7, 7];
@@ -246,7 +262,7 @@ function shard(/** @type {number} */ f) {
 function colossus(/** @type {number} */ f) {
   const t = (f / 6) * Math.PI * 2;
   const stomp = Math.round(Math.abs(Math.sin(t)) * 2);
-  return build(40, 42, (ctx) => {
+  return sprite(40, 42, (ctx) => {
     const y = 4 + stomp;
     for (let leg = 0; leg < 2; leg++) {
       const s = Math.sin(t + leg * Math.PI) * 3;
@@ -293,9 +309,13 @@ export function enemyArt(type) {
 
 // ── Towers ──────────────────────────────────────────────────────────────────
 
-/** Width of every tower picture; the foot is at the bottom centre. */
+/**
+ * Size of every tower picture; the foot is the third row from the bottom, centred.
+ * Room for the outline plus a clear pixel all round, so nothing is ever cut off at the
+ * picture's edge (a unit test checks every type, level, aim and frame).
+ */
 export const TOWER_W = 24;
-export const TOWER_H = 40;
+export const TOWER_H = 42;
 const CX = TOWER_W / 2;
 
 /**
@@ -304,7 +324,7 @@ const CX = TOWER_W / 2;
  * @param {Ctx} ctx @param {number} level
  */
 function foundation(ctx, level) {
-  const bottom = TOWER_H - 1;
+  const bottom = TOWER_H - 3;
   const l = CX - 8;
   const r = CX + 8;
   if (level === 1) {
@@ -320,7 +340,7 @@ function foundation(ctx, level) {
   px(ctx, 'g', l + 1 - wide, top + 3, 14 + wide * 2, bottom - top - 2);
   for (let y = top + 5; y < bottom; y += 3) {
     const shift = ((y - top) / 3) % 2 ? 0 : 2;
-    for (let x = l + 1 + shift; x < r; x += 4) px(ctx, 'K', x, y, 1, 3);
+    for (let x = l + 1 + shift; x < r; x += 4) px(ctx, 'K', x, y, 1, Math.min(3, bottom - y));
     px(ctx, 'K', l + 1 - wide, y, 14 + wide * 2, 1);
   }
   px(ctx, 'k', CX - 1, top + 7, 2, 4);
@@ -357,14 +377,30 @@ export function towerArt(type, level, dir, firing, frame = 0) {
 
 /** An archer on the tower: hood by level (green, blue, gold-trimmed), the bow toward the aim. @param {Ctx} ctx @param {number} top @param {number} level @param {number} ux @param {number} uy @param {boolean} firing */
 function archerTop(ctx, top, level, ux, uy, firing) {
-  const face = ux < 0 ? -1 : 1;
-  const hood = /** @type {Colour} */ (level === 1 ? 'E' : level === 2 ? 'U' : 'p');
   const y = top - 10;
+  // Aiming away (up the screen) the archer turns its back: the bow goes behind the hood,
+  // so the hood keeps its shape instead of being cut flat by the bow across it.
+  const away = uy < -0.3;
+  if (away) archerBow(ctx, y, ux, uy, firing);
+  archerBody(ctx, y, level, ux, away);
+  if (!away) archerBow(ctx, y, ux, uy, firing);
+}
+
+/** The archer's hooded body, the face toward the aim (none from behind). @param {Ctx} ctx @param {number} y @param {number} level @param {number} ux @param {boolean} away */
+function archerBody(ctx, y, level, ux, away) {
+  const face = ux < -0.3 ? -1 : 1;
+  const hood = /** @type {Colour} */ (level === 1 ? 'E' : level === 2 ? 'U' : 'p');
   px(ctx, hood, CX - 3, y + 4, 7, 7);
   disc(ctx, hood, CX, y + 3, 3, 3);
-  px(ctx, 'B', CX + (face > 0 ? 0 : -2), y + 2, 3, 3);
-  px(ctx, 'k', CX + (face > 0 ? 2 : -2), y + 3);
+  if (!away) {
+    px(ctx, 'B', CX + (face > 0 ? 0 : -2), y + 2, 3, 3);
+    px(ctx, 'k', CX + (face > 0 ? 2 : -2), y + 3);
+  }
   if (level === 3) px(ctx, 'y', CX - 3, y + 8, 7, 1);
+}
+
+/** The bow arm, bow and string toward the aim; drawn back unless just fired. @param {Ctx} ctx @param {number} y @param {number} ux @param {number} uy @param {boolean} firing */
+function archerBow(ctx, y, ux, uy, firing) {
   const hx = CX + ux * 4;
   const hy = y + 6 + uy * 3;
   line(ctx, 'B', CX, y + 6, hx, hy);
@@ -395,14 +431,14 @@ function mortarTop(ctx, top, level, ux, uy, firing) {
 function ballistaTop(ctx, top, level, ux, uy, firing) {
   const cy = top - 5;
   px(ctx, 'n', CX - 2, cy, 4, 5);
-  line(ctx, 'N', CX - ux * 8, cy - uy * 5, CX + ux * 8, cy + uy * 5, 3);
-  const ax = CX + ux * 4;
+  line(ctx, 'N', CX - ux * 7, cy - uy * 5, CX + ux * 7, cy + uy * 5, 3);
+  const ax = CX + ux * 3;
   const ay = cy + uy * 2.5;
-  const arm = 7 + level;
+  const arm = 5 + level;
   const back = firing ? 0 : 3;
   line(ctx, level === 3 ? 'y' : 'b', ax - uy * arm - ux * back, ay + ux * arm * 0.7 - uy * back, ax, ay, 2);
   line(ctx, level === 3 ? 'y' : 'b', ax + uy * arm - ux * back, ay - ux * arm * 0.7 - uy * back, ax, ay, 2);
-  if (!firing) line(ctx, 'G', CX - ux * 6, cy - uy * 4, CX + ux * 11, cy + uy * 7);
+  if (!firing) line(ctx, 'G', CX - ux * 6, cy - uy * 4, CX + ux * 9, cy + uy * 7);
 }
 
 /** A cluster of ice crystals floating over the tower; sparkles turn (4 frames), firing glows. @param {Ctx} ctx @param {number} top @param {number} level @param {number} frame @param {boolean} firing */
@@ -421,7 +457,8 @@ function frostTop(ctx, top, level, frame, firing) {
 
 /** A violet banner on a gilded pole, the flag waving (4 frames), larger by level. @param {Ctx} ctx @param {number} top @param {number} level @param {number} frame */
 function bannerTop(ctx, top, level, frame) {
-  const h = 16 + level * 2;
+  // Taller by level, but the gilded knob stays clear of the picture's top edge.
+  const h = Math.min(13 + level * 2, top - 4);
   line(ctx, 'G', CX - 4, top, CX - 4, top - h, 2);
   disc(ctx, 'y', CX - 4, top - h - 1, 1.5, 1.5);
   const w = 9 + level;

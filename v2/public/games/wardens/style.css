@@ -97,6 +97,13 @@ button:focus-visible {
   image-rendering: pixelated;
 }
 
+/* An icon keeps its shape when a narrow box makes it smaller (its width is set, its
+   height follows). */
+.pt-icon {
+  max-width: 100%;
+  height: auto;
+}
+
 /* ── Screens ─────────────────────────────────────────────────────────────── */
 
 .app {
@@ -518,10 +525,14 @@ button:focus-visible {
   bottom: max(10px, env(safe-area-inset-bottom));
   z-index: 2;
   display: grid;
+  /* One column as wide as the panel: pixel text and icons never widen it (they are
+     drawn to fit the width they are given, so a min-content track would feed back). */
+  grid-template-columns: minmax(0, 1fr);
+  /* The head (title and Close) stays put; only the body below it scrolls. */
+  grid-template-rows: auto minmax(0, 1fr);
   gap: calc(var(--upx) * 3);
   max-height: 64%;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   padding: calc(var(--upx) * 7);
   background: var(--panel);
   box-shadow:
@@ -557,6 +568,17 @@ button:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
+}
+
+.panel__title {
+  flex: 1 1 0;
+  overflow: hidden;
+}
+
+/* Close stays on screen at its full size, whatever the title's length. */
+.panel__head .chip {
+  flex: none;
 }
 
 .panel__title,
@@ -569,7 +591,12 @@ button:focus-visible {
 
 .panel__body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
   min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   gap: calc(var(--upx) * 3);
 }
 
@@ -592,15 +619,19 @@ button:focus-visible {
 
 .options {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* As many columns of at least 64 px as fit: five on a phone held upright, two to four
+     in the side column held sideways. */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 64px), 1fr));
   gap: calc(var(--upx) * 2);
   margin: 0;
-  padding: var(--upx);
+  /* Room for the chosen card's outer frame inside the scrolling body. */
+  padding: calc(var(--upx) * 2);
   list-style: none;
 }
 
 .option {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   align-content: center;
   gap: calc(var(--upx) * 2);
@@ -753,10 +784,6 @@ button:focus-visible {
     from {
       transform: translateX(calc(var(--upx) * -8));
     }
-  }
-
-  .options {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .option {

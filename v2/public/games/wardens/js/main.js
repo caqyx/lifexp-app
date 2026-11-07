@@ -430,7 +430,7 @@ function createTowerOptions() {
     button.className = 'option';
     button.setAttribute('role', 'radio');
     button.dataset.type = type;
-    const icon = createIcon(towerPortrait(type), 0.9);
+    const icon = createIcon(towerPortrait(type), portraitTimes);
     icon.classList.add('option__icon');
     const name = document.createElement('span');
     name.className = 'option__name';
@@ -483,6 +483,14 @@ function statsText(type, level) {
   parts.push(t('statRate', { n: (1 / (def.interval[i] ?? 1)).toLocaleString(lang, { maximumFractionDigits: 1 }) }));
   if (def.slow) parts.push(t('statSlow', { n: Math.round((def.slow[i] ?? 0) * 100) }));
   return parts.join(' · ');
+}
+
+/**
+ * The build cards' portraits: full size, but half on a short screen held sideways (a small
+ * phone, or the app's frame), so more of the sheet shows without scrolling.
+ */
+function portraitTimes() {
+  return window.innerWidth > window.innerHeight && window.innerHeight < 480 ? 0.5 : 0.9;
 }
 
 /** @param {TowerType} type */

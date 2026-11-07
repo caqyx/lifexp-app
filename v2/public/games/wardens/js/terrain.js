@@ -407,7 +407,7 @@ export function renderTerrain(ctx, layout, map, tiles, frame) {
     toMapCell(layout, sx + T / 2, sy + T / 2, cell);
     return road.has(`${cell.c},${cell.r}`);
   };
-  /** @type {{ x: number, y: number, img: HTMLCanvasElement }[]} */
+  /** @type {{ x: number, y: number, img: HTMLCanvasElement, outside: boolean }[]} */
   const standing = [];
   for (let j = 0; j < rows; j++) {
     for (let i = 0; i < cols; i++) {
@@ -428,24 +428,45 @@ export function renderTerrain(ctx, layout, map, tiles, frame) {
       trodden(ctx, th, x, y, { n: isRoadAt(x, y - T), s: isRoadAt(x, y + T), w: isRoadAt(x - T, y), e: isRoadAt(x + T, y) }, c * 31 + r);
       const n = noise(c, r, 11);
       if (!inside) {
-        if (n > 0.45) standing.push({ x: x - 2, y: y - 9, img: tiles.trees[n > 0.75 ? 1 : 0] ?? tiles.pad });
+        if (n > 0.45) standing.push({ x: x - 2, y: y - 9, img: tiles.trees[n > 0.75 ? 1 : 0] ?? tiles.pad, outside: true });
         continue;
       }
       if (pads.has(key)) ctx.drawImage(tiles.pad, x, y);
       else if (th.water && n > 0.84) ctx.drawImage(tiles.water[frame % 2] ?? tiles.pad, x, y);
-      else if (n > 0.76 && !besideRoad(road, c, r)) {
+      else if (n > 0.76 && !besideRoad(road, c, r) && !nearPad(pads, c, r)) {
         const img = tiles.props[Math.floor(noise(c, r, 13) * tiles.props.length)] ?? tiles.pad;
-        standing.push({ x: x + Math.round((T - img.width) / 2) + Math.round((noise(c, r, 14) - 0.5) * 3), y: y + T - 2 - img.height, img });
+        standing.push({ x: x + Math.round((T - img.width) / 2) + Math.round((noise(c, r, 14) - 0.5) * 3), y: y + T - 2 - img.height, img, outside: false });
       }
     }
   }
   standing.sort((a, b) => a.y + a.img.height - (b.y + b.img.height));
-  for (const s of standing) {
-    drawShadow(ctx, tiles, s.x + 2, s.y + s.img.height - 2, s.img.width);
-    ctx.drawImage(s.img, s.x, s.y);
-  }
+  // The trees round the map stand outside it: clipped to the land outside, so a crown
+  // never reaches over the edge onto a build slab or the road.
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, layout.width, layout.height);
+  ctx.rect(layout.ox, layout.oy, layout.mapWidth, layout.mapHeight);
+  ctx.clip('evenodd');
+  for (const s of standing) if (s.outside) drawStanding(ctx, tiles, s);
+  ctx.restore();
+  for (const s of standing) if (!s.outside) drawStanding(ctx, tiles, s);
   renderGateAndCave(ctx, layout, map, tiles);
   renderMapShade(ctx, layout);
+}
+
+/** @param {CanvasRenderingContext2D} ctx @param {Tileset} tiles @param {{ x: number, y: number, img: HTMLCanvasElement }} s */
+function drawStanding(ctx, tiles, s) {
+  drawShadow(ctx, tiles, s.x + 2, s.y + s.img.height - 2, s.img.width);
+  ctx.drawImage(s.img, s.x, s.y);
+}
+
+/**
+ * Whether a build pad is next to a cell, corners included (a prop there could reach over
+ * its slab, or stand where a tower's foot is). @param {Set<string>} pads @param {number} c @param {number} r
+ */
+function nearPad(pads, c, r) {
+  for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) if (pads.has(`${c + dc},${r + dr}`)) return true;
+  return false;
 }
 
 /**

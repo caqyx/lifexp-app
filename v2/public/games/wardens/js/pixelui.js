@@ -126,8 +126,9 @@ function sizeCanvas(canvas, w, h) {
 }
 
 /**
- * A sprite as an element-sized icon at the text's scale (HUD coins, hearts, stars).
- * @param {HTMLCanvasElement} sprite @param {number} [times]
+ * A sprite as an element-sized icon at the text's scale (HUD coins, hearts, stars). `times`
+ * may be a function, asked again at every resize (an icon smaller on a short screen).
+ * @param {HTMLCanvasElement} sprite @param {Times} [times]
  */
 export function createIcon(sprite, times = 1) {
   const canvas = document.createElement('canvas');
@@ -141,14 +142,15 @@ export function createIcon(sprite, times = 1) {
   return canvas;
 }
 
-/** @type {Set<{ canvas: HTMLCanvasElement, times: number }>} */
+/** @typedef {number | (() => number)} Times */
+
+/** @type {Set<{ canvas: HTMLCanvasElement, times: Times }>} */
 const icons = new Set();
 
-/** @param {HTMLCanvasElement} canvas @param {number} times */
+/** @param {HTMLCanvasElement} canvas @param {Times} times */
 function sizeIcon(canvas, times) {
-  const unit = Math.max(1, Math.round(scale.device * times));
+  const unit = Math.max(1, Math.round(scale.device * (typeof times === 'function' ? times() : times)));
   canvas.style.width = `${(canvas.width * unit) / scale.dpr}px`;
-  canvas.style.height = `${(canvas.height * unit) / scale.dpr}px`;
 }
 
 /** Re-sizes every icon to the current scale. */
