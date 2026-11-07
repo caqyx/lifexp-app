@@ -22,6 +22,11 @@
   --violet-dark: #3b33b5;
   --panel: #2a2236;
   --panel-light: #3b3446;
+  --wood: #8a5a35;
+  --wood-dark: #5a3a28;
+  --wood-light: #c9a46a;
+  --ribbon: #8c2a3b;
+  --ribbon-light: #d6505e;
   --duration-fast: 120ms;
   --duration-enter: 260ms;
   --duration-exit: 160ms;
@@ -238,11 +243,14 @@ button:focus-visible {
   gap: calc(var(--upx) * 5);
   width: 100%;
   min-height: 76px;
-  padding: calc(var(--upx) * 3);
+  padding: calc(var(--upx) * 6);
   background: var(--panel);
   text-align: left;
   box-shadow:
-    inset 0 0 0 var(--upx) var(--panel-light),
+    inset 0 var(--upx) 0 var(--wood-light),
+    inset 0 0 0 calc(var(--upx) * 3) var(--wood),
+    inset 0 0 0 calc(var(--upx) * 4) var(--wood-dark),
+    inset 0 0 0 calc(var(--upx) * 5) var(--ink),
     0 0 0 var(--upx) var(--ink),
     0 calc(var(--upx) * 2) 0 var(--upx) var(--ink);
 }
@@ -262,7 +270,10 @@ button:focus-visible {
   min-width: calc(var(--upx) * 18);
   min-height: calc(var(--upx) * 18);
   background: var(--ink);
-  box-shadow: 0 0 0 var(--upx) var(--stone-dark);
+  box-shadow:
+    0 0 0 var(--upx) var(--ink),
+    0 0 0 calc(var(--upx) * 2) var(--stone),
+    0 0 0 calc(var(--upx) * 3) var(--ink);
 }
 
 .map-card__text {
@@ -322,9 +333,10 @@ button:focus-visible {
   gap: calc(var(--upx) * 2);
   min-height: 40px;
   padding: calc(var(--upx) * 2) calc(var(--upx) * 3);
-  background: var(--panel);
+  background: var(--stone-dark);
   box-shadow:
-    inset 0 0 0 var(--upx) var(--panel-light),
+    inset var(--upx) var(--upx) 0 var(--stone),
+    inset calc(var(--upx) * -1) calc(var(--upx) * -2) 0 var(--ink),
     0 0 0 var(--upx) var(--ink);
   white-space: nowrap;
 }
@@ -398,6 +410,39 @@ button:focus-visible {
 
 .hint {
   bottom: 10px;
+}
+
+/* The wave's banner: a red ribbon with forked tails. */
+.banner {
+  overflow: visible;
+  background: var(--ribbon);
+  box-shadow:
+    inset 0 var(--upx) 0 var(--ribbon-light),
+    inset 0 calc(var(--upx) * -2) 0 #5e1a28,
+    0 0 0 var(--upx) var(--ink),
+    0 calc(var(--upx) * 3) 0 0 rgb(0 0 0 / 40%);
+}
+
+.banner::before,
+.banner::after {
+  position: absolute;
+  top: calc(var(--upx) * 3);
+  bottom: calc(var(--upx) * -3);
+  width: calc(var(--upx) * 6);
+  content: '';
+  background: #5e1a28;
+  box-shadow: 0 0 0 var(--upx) var(--ink);
+  z-index: -1;
+}
+
+.banner::before {
+  left: calc(var(--upx) * -6);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 45% 50%);
+}
+
+.banner::after {
+  right: calc(var(--upx) * -6);
+  clip-path: polygon(0 0, 100% 0, 55% 50%, 100% 100%, 0 100%);
 }
 
 .app[data-phase='wave'] .hint {
@@ -477,12 +522,15 @@ button:focus-visible {
   max-height: 64%;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: calc(var(--upx) * 4);
+  padding: calc(var(--upx) * 7);
   background: var(--panel);
   box-shadow:
-    inset 0 0 0 var(--upx) var(--panel-light),
+    inset 0 var(--upx) 0 var(--wood-light),
+    inset 0 0 0 calc(var(--upx) * 3) var(--wood),
+    inset 0 0 0 calc(var(--upx) * 4) var(--wood-dark),
+    inset 0 0 0 calc(var(--upx) * 5) var(--ink),
     0 0 0 var(--upx) var(--ink),
-    0 calc(var(--upx) * 3) 0 var(--upx) var(--ink);
+    0 calc(var(--upx) * 3) 0 var(--upx) rgb(0 0 0 / 55%);
   animation: sheet-in var(--duration-enter) steps(3, end);
 }
 
@@ -562,6 +610,7 @@ button:focus-visible {
   overflow: hidden;
   background: var(--panel-light);
   box-shadow:
+    inset 0 var(--upx) 0 var(--stone),
     inset 0 calc(var(--upx) * -2) 0 var(--ink),
     0 0 0 var(--upx) var(--ink);
 }
@@ -570,7 +619,9 @@ button:focus-visible {
   background: var(--violet-dark);
   box-shadow:
     inset 0 0 0 var(--upx) var(--gold),
-    0 0 0 var(--upx) var(--ink);
+    inset 0 0 0 calc(var(--upx) * 2) var(--ink),
+    0 0 0 var(--upx) var(--ink),
+    0 0 0 calc(var(--upx) * 2) var(--gold);
 }
 
 .option__name,

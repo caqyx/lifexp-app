@@ -29,7 +29,7 @@ import {
   upgradeTower,
 } from './sim.js';
 import { clearEffects, createEffects, updateEffects } from './effects.js';
-import { consumeEvents, createRenderer, enemyIcon, mapThumbnail, renderFrame, resetRenderer, resizeRenderer, towerIcon } from './render.js';
+import { consumeEvents, createRenderer, enemyIcon, mapThumbnail, renderFrame, resetRenderer, resizeRenderer, towerPortrait } from './render.js';
 import { createIcon, refreshIcons, refreshPixelTexts, setPixelText, setTextScale } from './pixelui.js';
 import { makeSprite } from './pixelart.js';
 import { ICONS } from './sprites.js';
@@ -430,7 +430,7 @@ function createTowerOptions() {
     button.className = 'option';
     button.setAttribute('role', 'radio');
     button.dataset.type = type;
-    const icon = createIcon(towerIcon(type), 0.6);
+    const icon = createIcon(towerPortrait(type), 0.9);
     icon.classList.add('option__icon');
     const name = document.createElement('span');
     name.className = 'option__name';
@@ -455,12 +455,12 @@ function renderTowerPreview(tower) {
   if (dom.towerPreview.dataset.key === key) return;
   dom.towerPreview.dataset.key = key;
   /** @type {HTMLElement[]} */
-  const parts = [createIcon(towerIcon(tower.type, tower.level), 0.6)];
+  const parts = [createIcon(towerPortrait(tower.type, tower.level), 0.5)];
   if (tower.level < LEVELS) {
     const arrow = document.createElement('span');
     arrow.className = 'panel__arrow';
     say(arrow, '→', { color: 'y' });
-    parts.push(arrow, createIcon(towerIcon(tower.type, tower.level + 1), 0.6));
+    parts.push(arrow, createIcon(towerPortrait(tower.type, tower.level + 1), 0.5));
   }
   dom.towerPreview.replaceChildren(...parts);
 }

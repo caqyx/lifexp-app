@@ -534,7 +534,7 @@ describe('smooth drawing and the perf switch (q-own)', () => {
 // ── Pixel art (td-2): the font covers every text, every sprite is a clean rectangle ──
 describe('pixel art', async () => {
   const { FONT_HEIGHT, GLYPHS, PALETTE, isRectangular, measureText, wrapText } = await import('../public/games/wardens/js/pixelart.js');
-  const { ENEMY_FRAMES, ICONS, TOWER_TOPS } = await import('../public/games/wardens/js/sprites.js');
+  const { ICONS } = await import('../public/games/wardens/js/sprites.js');
   const { roadCells } = await import('../public/games/wardens/js/terrain.js');
   const { textScaleFor } = await import('../public/games/wardens/js/pixelui.js');
 
@@ -570,15 +570,12 @@ describe('pixel art', async () => {
     expect(wrapText('Fala', 60)).toEqual(['Fala']);
   });
 
-  test('every sprite frame is a rectangle of palette colours; tower tops are 12 wide; the Colossus is bigger', () => {
+  test('every icon is a rectangle of palette colours', () => {
     const colours = new Set([...Object.keys(PALETTE), '.']);
-    const all: (readonly string[])[] = [...Object.values(ENEMY_FRAMES).flat(), ...Object.values(TOWER_TOPS).flat(), ...Object.values(ICONS)];
-    for (const rows of all) {
+    for (const rows of Object.values(ICONS)) {
       expect(isRectangular(rows)).toBe(true);
       for (const row of rows) for (const ch of row) expect(colours.has(ch)).toBe(true);
     }
-    for (const frames of Object.values(TOWER_TOPS)) for (const f of frames) expect(f[0]!.length).toBe(12);
-    expect(ENEMY_FRAMES.colossus[0]!.length).toBeGreaterThan(ENEMY_FRAMES.crawler[0]!.length * 1.8);
     expect(Object.keys(PALETTE)).toHaveLength(32);
   });
 
@@ -592,5 +589,108 @@ describe('pixel art', async () => {
     expect(textScaleFor(1)).toBe(2);
     expect(textScaleFor(2.625)).toBe(5);
     expect(textScaleFor(3)).toBe(6);
+  });
+});
+
+// ── Characters drawn in code (td-3): sizes, frames, aiming, palette-only pixels ──
+/** A tiny software canvas (fillRect, getImageData, putImageData), enough for art.js in Node. */
+function fakeDocument() {
+  const parse = (style: string): [number, number, number, number] => {
+    const n = Number.parseInt(style.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 255];
+  };
+  return {
+    createElement: () => {
+      const canvas = {
+        width: 1,
+        height: 1,
+        data: new Uint8ClampedArray(4),
+        getContext: () => ctx,
+      };
+      const ensure = () => {
+        if (canvas.data.length !== canvas.width * canvas.height * 4) canvas.data = new Uint8ClampedArray(canvas.width * canvas.height * 4);
+      };
+      const ctx = {
+        fillStyle: '#000000',
+        imageSmoothingEnabled: false,
+        fillRect(x: number, y: number, w: number, h: number) {
+          ensure();
+          const c = parse(String(this.fillStyle));
+          for (let yy = Math.max(0, y); yy < Math.min(canvas.height, y + h); yy++)
+            for (let xx = Math.max(0, x); xx < Math.min(canvas.width, x + w); xx++) canvas.data.set(c, (yy * canvas.width + xx) * 4);
+        },
+        getImageData: () => {
+          ensure();
+          return { data: new Uint8ClampedArray(canvas.data) };
+        },
+        putImageData: (img: { data: Uint8ClampedArray }) => {
+          canvas.data = new Uint8ClampedArray(img.data);
+        },
+      };
+      return canvas;
+    },
+  };
+}
+
+describe('characters (art.js)', async () => {
+  (globalThis as unknown as { document: unknown }).document ??= fakeDocument();
+  const { PALETTE } = await import('../public/games/wardens/js/pixelart.js');
+  const { TOWER_H, TOWER_W, aimDir, enemyArt, towerArt } = await import('../public/games/wardens/js/art.js');
+  type Pic = { width: number; height: number; data: Uint8ClampedArray };
+  const colours = new Set(Object.values(PALETTE).map((hex) => hex.toLowerCase()));
+  const onPalette = (pic: Pic) => {
+    for (let i = 0; i < pic.data.length; i += 4) {
+      if (pic.data[i + 3] === 0) continue;
+      const hex = `#${[0, 1, 2].map((k) => (pic.data[i + k] ?? 0).toString(16).padStart(2, '0')).join('')}`;
+      if (!colours.has(hex)) return false;
+    }
+    return true;
+  };
+
+  test('enemies are 14–40 px with 4–6 walk frames, all on the palette; the Colossus is the big one', () => {
+    for (const type of ENEMY_TYPES) {
+      const art = enemyArt(type);
+      expect(art.frames).toBeGreaterThanOrEqual(4);
+      expect(art.frames).toBeLessThanOrEqual(6);
+      for (let f = 0; f < art.frames; f++) {
+        const pic = art.make(f) as unknown as Pic;
+        expect(pic.width).toBeGreaterThanOrEqual(14);
+        expect(pic.width).toBeLessThanOrEqual(40);
+        expect(onPalette(pic)).toBe(true);
+      }
+    }
+    const colossus = enemyArt('colossus').make(0) as unknown as Pic;
+    const crawler = enemyArt('crawler').make(0) as unknown as Pic;
+    expect(colossus.width).toBeGreaterThanOrEqual(36);
+    expect(colossus.height).toBeGreaterThanOrEqual(36);
+    expect(colossus.width * colossus.height).toBeGreaterThan(crawler.width * crawler.height * 3);
+  });
+
+  test('towers: one size, every level, 8 aims and a firing frame, each level taller than the last', () => {
+    for (const type of TOWER_TYPES) {
+      const tops: number[] = [];
+      for (const level of [1, 2, 3]) {
+        for (let dir = 0; dir < 8; dir++) {
+          const pic = towerArt(type, level, dir, dir === 3) as unknown as Pic;
+          expect([pic.width, pic.height]).toEqual([TOWER_W, TOWER_H]);
+          expect(onPalette(pic)).toBe(true);
+        }
+        const pic = towerArt(type, level, 0, false) as unknown as Pic;
+        let top = 0;
+        while (top < pic.height && ![...Array(pic.width).keys()].some((x) => (pic.data[(top * pic.width + x) * 4 + 3] ?? 0) > 0)) top += 1;
+        tops.push(top);
+      }
+      expect(tops[1]).toBeLessThan(tops[0]!);
+      expect(tops[2]).toBeLessThan(tops[1]!);
+    }
+  });
+
+  test('aim: 0 right, clockwise in eighths', () => {
+    expect(aimDir(0)).toBe(0);
+    expect(aimDir(Math.PI / 2)).toBe(2);
+    expect(aimDir(Math.PI)).toBe(4);
+    expect(aimDir(-Math.PI / 2)).toBe(6);
+    expect(aimDir(-Math.PI / 4)).toBe(7);
+    expect(aimDir(Math.PI * 2 + 0.1)).toBe(0);
   });
 });
