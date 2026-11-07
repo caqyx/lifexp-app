@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blocksToParas, dirOf, epubSection, resolvePath, spineItems } from './parse-epub';
+import { blocksToParas, dirOf, epubSection, markToc, resolvePath, spineItems, tocPaths } from './parse-epub';
 
 describe('resolvePath', () => {
   it('resolves relative to the OPF folder, drops the fragment', () => {
@@ -73,5 +73,28 @@ describe('epubSection', () => {
   it('a file with (almost) no text is no section', () => {
     expect(epubSection([{ t: 'ab', h: 0 }], 0)).toBeNull();
     expect(epubSection([], 0)).toBeNull();
+  });
+});
+
+describe('tocPaths / markToc', () => {
+  it('the guide\'s and the landmarks\' "toc" references, resolved', () => {
+    expect(
+      tocPaths([
+        { type: 'toc', href: 'Text/toc.xhtml#x', base: 'OEBPS/' },
+        { type: 'cover', href: 'Text/cover.xhtml', base: 'OEBPS/' },
+        { type: 'bodymatter toc', href: '../Text/contents.xhtml', base: 'OEBPS/Nav/' },
+      ]),
+    ).toEqual(['OEBPS/Text/toc.xhtml', 'OEBPS/Text/contents.xhtml']);
+  });
+
+  it('marks, never drops', () => {
+    expect(markToc([{ t: 'A', h: 0 }])).toEqual([{ t: 'A', h: 0, toc: 1 }]);
+  });
+
+  it('blocks inside the file\'s <nav> are marked', () => {
+    expect(blocksToParas([{ tag: 'li', text: 'Rozdział 1', toc: true }, { tag: 'p', text: 'Tekst.' }], '')).toEqual([
+      { t: 'Rozdział 1', h: 0, toc: 1 },
+      { t: 'Tekst.', h: 0 },
+    ]);
   });
 });

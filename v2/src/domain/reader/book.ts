@@ -10,6 +10,8 @@ export type BookFormat = 'PDF' | 'EPUB' | 'TXT' | 'MD';
 export interface Para {
   t: string;
   h: 0 | 1;
+  /** The file itself says this is its table of contents (an EPUB nav or guide/landmarks "toc"). */
+  toc?: 1;
 }
 
 /**
@@ -48,6 +50,11 @@ export interface BookMeta {
   pos: number;
   /** Sentences in the book. */
   total: number;
+  /**
+   * Where reading is and how many sentences there are without the book's own table of
+   * contents (domain/reader/toc), as the library shows them; absent = pos / total.
+   */
+  progress?: { pos: number; total: number };
 }
 
 /** The text itself, stored apart from the meta (it can be megabytes). */

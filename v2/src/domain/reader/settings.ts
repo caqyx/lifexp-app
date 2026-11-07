@@ -18,6 +18,12 @@ export interface ReaderSettings {
   /** Auto mode's words per minute. */
   wpm: number;
   view: EasyView;
+  /** Landscape spread: each step moves one sentence and zooms to it (else it turns the spread). */
+  zoom: boolean;
+  /** Landscape spread: Back on the left and Next on the right (the owner's default is the other way round). */
+  swapButtons: boolean;
+  /** The book's own table of contents is left out of reading, the counts and the percentage. */
+  skipToc: boolean;
 }
 
 export const WPM_MIN = 60;
@@ -26,7 +32,17 @@ export const WPM_STEP = 20;
 
 /** First start: Paper, Easy with one sentence, 250 words a minute; a size up on a wide screen. */
 export function defaultReaderSettings(wide: boolean): ReaderSettings {
-  return { theme: 'paper', size: wide ? 3 : 2, per: 1, mode: 'easy', wpm: 250, view: 'sentences' };
+  return {
+    theme: 'paper',
+    size: wide ? 3 : 2,
+    per: 1,
+    mode: 'easy',
+    wpm: 250,
+    view: 'sentences',
+    zoom: true,
+    swapButtons: false,
+    skipToc: true,
+  };
 }
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
@@ -50,6 +66,9 @@ export function normalizeReaderSettings(stored: unknown, wide: boolean): ReaderS
     mode: mode === 'easy' || mode === 'auto' || mode === 'normal' ? mode : 'normal',
     wpm: clamp(wpm || 250, WPM_MIN, WPM_MAX),
     view: s.view === 'page' ? 'page' : 'sentences',
+    zoom: s.zoom !== false,
+    swapButtons: s.swapButtons === true,
+    skipToc: s.skipToc !== false,
   };
 }
 

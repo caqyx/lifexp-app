@@ -5,11 +5,21 @@ describe('normalizeReaderSettings', () => {
   it('starts from the defaults, a size up on a wide screen', () => {
     expect(normalizeReaderSettings(undefined, false)).toEqual(defaultReaderSettings(false));
     expect(normalizeReaderSettings(null, true).size).toBe(3);
-    expect(normalizeReaderSettings({}, false)).toEqual({ theme: 'paper', size: 2, per: 1, mode: 'easy', wpm: 250, view: 'sentences' });
+    expect(normalizeReaderSettings({}, false)).toEqual({
+      theme: 'paper',
+      size: 2,
+      per: 1,
+      mode: 'easy',
+      wpm: 250,
+      view: 'sentences',
+      zoom: true,
+      swapButtons: false,
+      skipToc: true,
+    });
   });
 
   it('keeps valid values', () => {
-    const s = { theme: 'night', size: 6, per: 2, mode: 'auto', wpm: 420, view: 'page' };
+    const s = { theme: 'night', size: 6, per: 2, mode: 'auto', wpm: 420, view: 'page', zoom: false, swapButtons: true, skipToc: false };
     expect(normalizeReaderSettings(s, false)).toEqual(s);
   });
 
@@ -21,6 +31,9 @@ describe('normalizeReaderSettings', () => {
       mode: 'normal',
       wpm: 900,
       view: 'sentences',
+      zoom: true,
+      swapButtons: false,
+      skipToc: true,
     });
     expect(normalizeReaderSettings({ size: -2, wpm: 10 }, false)).toMatchObject({ size: 0, wpm: 60 });
     expect(normalizeReaderSettings({ wpm: 'x' }, false).wpm).toBe(250);

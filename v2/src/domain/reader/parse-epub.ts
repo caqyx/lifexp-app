@@ -24,6 +24,8 @@ export interface ManifestItem {
   id: string;
   href: string;
   mediaType: string;
+  /** OPF properties, e.g. "nav" for the EPUB 3 navigation document. */
+  properties?: string;
 }
 
 /** The spine's documents in reading order: unknown ids and non-(X)HTML items left out. */
@@ -38,6 +40,8 @@ export function spineItems(manifest: readonly ManifestItem[], itemrefs: readonly
 export interface HtmlBlock {
   tag: string;
   text: string;
+  /** Inside the file's own navigation (<nav>: its table of contents, landmarks, page list). */
+  toc?: boolean;
 }
 
 /**
@@ -48,7 +52,7 @@ export function blocksToParas(blocks: readonly HtmlBlock[], bodyText: string): P
   const paras: Para[] = [];
   for (const b of blocks) {
     const t = normSpace(b.text);
-    if (t) paras.push({ t, h: /^h[1-6]$/i.test(b.tag) ? 1 : 0 });
+    if (t) paras.push(b.toc ? { t, h: /^h[1-6]$/i.test(b.tag) ? 1 : 0, toc: 1 } : { t, h: /^h[1-6]$/i.test(b.tag) ? 1 : 0 });
   }
   if (!paras.length) {
     for (const line of bodyText.split(/\n+/)) {
@@ -71,4 +75,23 @@ export function epubSection(paras: Para[], keptSoFar: number): Section | null {
   if (paras.reduce((n, p) => n + p.t.length, 0) < 3) return null;
   const head = paras.find((p) => p.h && p.t.length < 120);
   return head ? { title: head.t, label: null, paras } : { title: '', label: { kind: 'chapter', n: keptSoFar + 1 }, paras };
+}
+
+/** A reference to another file of the book: the OPF guide's, or the nav document's landmarks. */
+export interface EpubReference {
+  /** guide type="toc", or landmarks epub:type="toc" (a space-separated list). */
+  type: string;
+  href: string;
+  /** Folder the href is relative to (the OPF's or the nav document's). */
+  base: string;
+}
+
+/** Paths of the files the book itself calls its table of contents. */
+export function tocPaths(refs: readonly EpubReference[]): string[] {
+  return refs.filter((r) => r.type.toLowerCase().split(/\s+/).includes('toc')).map((r) => resolvePath(r.base, r.href));
+}
+
+/** Every paragraph of a file the book calls its table of contents is marked as such (domain/reader/toc). */
+export function markToc(paras: Para[]): Para[] {
+  return paras.map((p) => ({ ...p, toc: 1 }));
 }
