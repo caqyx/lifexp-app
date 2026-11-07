@@ -759,6 +759,14 @@ describe('tower placement', async () => {
     [640, 300, 2],
     [851, 337, 2.75],
     [1280, 720, 1],
+    // Fractional pixel ratios: Xiaomi/Redmi/POCO phones held sideways, Windows scaling, zoom.
+    [851, 393, 2.75],
+    [892, 412, 3],
+    [800, 360, 3],
+    [851, 393, 2.8125],
+    [1536, 864, 1.25],
+    [1280, 720, 1.5],
+    [1745, 982, 1.1],
   ] as const;
 
   test('each tower picture is centred on its pad’s tile and its foot is on the slab, and the ground draws the slab there', () => {

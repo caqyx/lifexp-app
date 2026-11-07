@@ -351,6 +351,7 @@ function handleResize() {
   }
   positionPads(game, layout);
   renderBoard();
+  fitPriority();
 }
 
 /** @param {Game} game @param {Layout} layout */
@@ -539,6 +540,26 @@ function renderTowerMenu(game, tower) {
     say(dom.upgrade, game.gold < cost ? `${t('upgrade', { n: cost })} · ${t('missing', { n: cost - game.gold })}` : t('upgrade', { n: cost }), { color: game.gold < cost ? 'G' : 'w', shadow: game.gold < cost ? 'k' : 'u', wrap: true, align: 'center' });
   }
   say(dom.sell, t('sell', { n: sellValue(tower) }), { color: 'w', wrap: true, align: 'center' });
+  fitPriority();
+}
+
+/**
+ * The three target buttons side by side when their words fit, else one under another (a
+ * narrow side column at a small pixel ratio): measured from the drawn words, so nothing is
+ * ever cut off, in any language.
+ */
+function fitPriority() {
+  const box = dom.priority;
+  if (box.hidden || !box.isConnected) return;
+  box.classList.remove('segmented--stacked');
+  const options = /** @type {HTMLElement[]} */ ([...box.querySelectorAll('.segmented__option')]);
+  const words = options.map((el) => el.querySelector('.pt-canvas')?.getBoundingClientRect().width ?? 0);
+  const fits = options.every((el, i) => {
+    const cs = getComputedStyle(el);
+    const room = el.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    return (words[i] ?? 0) <= room + 0.5;
+  });
+  box.classList.toggle('segmented--stacked', !fits);
 }
 
 function handleBuild() {
@@ -884,6 +905,7 @@ function bindControls() {
     setTextScale(window.devicePixelRatio || 1);
     refreshPixelTexts();
     refreshIcons();
+    fitPriority();
   });
 }
 

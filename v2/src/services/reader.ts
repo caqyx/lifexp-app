@@ -13,6 +13,7 @@ import {
   type ParsedBook,
 } from '@/domain/reader/book';
 import { decodeText, parseText } from '@/domain/reader/parse-text';
+import { detectToc, readingView } from '@/domain/reader/toc';
 import { normalizeReaderSettings, type ReaderSettings } from '@/domain/reader/settings';
 import {
   getBook,
@@ -62,10 +63,22 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 export async function importBook(file: File, onProgress?: (p: number) => void): Promise<BookMeta> {
   const parsed = await parseBookFile(file, onProgress);
   const sections = withText(parsed.sections);
-  const { sents } = flatten(sections);
+  const { sents, secStart } = flatten(sections);
   if (!sents.length) throw new ReaderImportError('empty');
   const id = newId();
-  const meta: BookMeta = { id, title: parsed.title, format: parsed.format, added: Date.now(), opened: 0, pos: 0, total: sents.length };
+  // What the library counts: the book without its own table of contents, unless the reader keeps it.
+  const { skipToc } = await loadReaderSettings(false);
+  const view = readingView(sections, { sents, secStart }, detectToc(sections), skipToc);
+  const meta: BookMeta = {
+    id,
+    title: parsed.title,
+    format: parsed.format,
+    added: Date.now(),
+    opened: 0,
+    pos: 0,
+    total: sents.length,
+    progress: { pos: 0, total: view.toFull.length },
+  };
   const content: BookContent = { id, sections };
   await putBook(meta, content);
   return meta;
@@ -76,8 +89,8 @@ export async function openBook(id: string): Promise<{ meta: BookMeta; content: B
 }
 
 /** Where reading stopped, and that the book was just read (it moves to the top of the library). */
-export function saveReadingPosition(meta: BookMeta, pos: number): Promise<void> {
-  return putBookMeta({ ...meta, pos, opened: Date.now() });
+export function saveReadingPosition(meta: BookMeta, pos: number, progress?: BookMeta['progress']): Promise<void> {
+  return putBookMeta({ ...meta, pos, opened: Date.now(), ...(progress ? { progress } : {}) });
 }
 
 export function deleteBook(id: string): Promise<void> {
