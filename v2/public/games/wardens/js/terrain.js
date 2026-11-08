@@ -282,7 +282,7 @@ function treeProp(th, v) {
 
 /** @param {MapDef} map */
 export function createTileset(map) {
-  const th = THEMES[map.id];
+  const th = THEMES[map.look ?? map.id];
   return {
     theme: th,
     ground: [0, 1].map((f) => [0, 1, 2].map((v) => groundTile(th.ground, th, v, f))),

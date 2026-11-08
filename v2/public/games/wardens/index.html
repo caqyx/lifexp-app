@@ -23,6 +23,96 @@
     <p class="start__hint" data-t="keysHint"></p>
   </section>
 
+  <section id="custom" class="screen screen--custom" aria-labelledby="custom-title">
+    <header class="custom__head">
+      <h1 id="custom-title" class="custom__title" data-t="customMode"></h1>
+      <button id="custom-back" class="chip" type="button" data-t="back"></button>
+    </header>
+    <p class="custom__note" data-t="customNote"></p>
+
+    <h2 class="custom__label" id="custom-map-label" data-t="map"></h2>
+    <div id="custom-maps" class="choices" role="radiogroup" aria-labelledby="custom-map-label"></div>
+    <div class="custom__row">
+      <button id="custom-new" class="button" type="button" data-t="newMap"></button>
+      <button id="custom-edit" class="button" type="button" data-t="editMap"></button>
+      <button id="custom-delete" class="button" type="button" data-t="deleteMap"></button>
+    </div>
+
+    <h2 class="custom__label" id="custom-gold-label" data-t="goldMode"></h2>
+    <div id="custom-gold" class="segmented segmented--plain" role="radiogroup" aria-labelledby="custom-gold-label">
+      <button class="segmented__option" type="button" role="radio" data-gold="default" data-t="goldDefault"></button>
+      <button class="segmented__option" type="button" role="radio" data-gold="infinite" data-t="goldInfinite"></button>
+      <button class="segmented__option" type="button" role="radio" data-gold="custom" data-t="goldCustom"></button>
+    </div>
+    <div id="custom-amount" class="stepper" role="group" aria-labelledby="custom-gold-label">
+      <button class="chip" type="button" data-step="-100" aria-label="-100">-100</button>
+      <button class="chip" type="button" data-step="-10" aria-label="-10">-10</button>
+      <output id="custom-amount-value" class="stepper__value numeric" aria-live="polite"></output>
+      <button class="chip" type="button" data-step="10" aria-label="+10">+10</button>
+      <button class="chip" type="button" data-step="100" aria-label="+100">+100</button>
+    </div>
+
+    <h2 class="custom__label" id="custom-enemy-label" data-t="enemiesMode"></h2>
+    <div id="custom-enemies-mode" class="segmented segmented--plain segmented--two" role="radiogroup" aria-labelledby="custom-enemy-label">
+      <button class="segmented__option" type="button" role="radio" data-enemies="default" data-t="enemiesDefault"></button>
+      <button class="segmented__option" type="button" role="radio" data-enemies="pick" data-t="enemiesPick"></button>
+    </div>
+    <div id="custom-pick" class="custom__pick">
+      <ul id="custom-kinds" class="kinds" aria-labelledby="custom-enemy-label"></ul>
+      <div class="custom__row custom__row--wrap">
+        <span class="custom__sub" id="custom-waves-label" data-t="wavesCount"></span>
+        <div class="stepper" role="group" aria-labelledby="custom-waves-label">
+          <button class="chip" type="button" data-waves="-5" aria-label="-5">-5</button>
+          <button class="chip" type="button" data-waves="-1" aria-label="-1">-1</button>
+          <output id="custom-waves-value" class="stepper__value numeric" aria-live="polite"></output>
+          <button class="chip" type="button" data-waves="1" aria-label="+1">+1</button>
+          <button class="chip" type="button" data-waves="5" aria-label="+5">+5</button>
+        </div>
+      </div>
+      <button id="custom-bosses" class="chip" type="button" aria-pressed="true" data-t="bosses"></button>
+      <div id="custom-difficulty" class="segmented segmented--plain" role="radiogroup" aria-labelledby="custom-diff-label">
+        <span id="custom-diff-label" class="segmented__label" data-t="difficulty"></span>
+        <button class="segmented__option" type="button" role="radio" data-difficulty="0.75" data-t="diffEasy"></button>
+        <button class="segmented__option" type="button" role="radio" data-difficulty="1" data-t="diffNormal"></button>
+        <button class="segmented__option" type="button" role="radio" data-difficulty="1.5" data-t="diffHard"></button>
+      </div>
+    </div>
+
+    <p id="custom-problem" class="custom__problem" role="status"></p>
+    <button id="custom-play" class="button button--primary custom__play" type="button" data-t="play"></button>
+  </section>
+
+  <section id="editor" class="screen screen--editor" aria-labelledby="editor-title">
+    <header class="custom__head">
+      <h1 id="editor-title" class="custom__title" data-t="editor"></h1>
+      <button id="editor-back" class="chip" type="button" data-t="back"></button>
+    </header>
+    <label class="editor__name">
+      <span class="custom__sub" data-t="mapName"></span>
+      <input id="editor-name" class="editor__input" type="text" maxlength="16" autocomplete="off" spellcheck="false">
+    </label>
+    <div id="editor-tool" class="segmented segmented--plain segmented--two" role="radiogroup" aria-labelledby="editor-tool-label">
+      <span id="editor-tool-label" class="segmented__label" data-t="tool"></span>
+      <button class="segmented__option" type="button" role="radio" data-tool="road" data-t="toolRoad"></button>
+      <button class="segmented__option" type="button" role="radio" data-tool="pads" data-t="toolPads"></button>
+    </div>
+    <div id="editor-look" class="segmented segmented--plain" role="radiogroup" aria-labelledby="editor-look-label">
+      <span id="editor-look-label" class="segmented__label" data-t="look"></span>
+      <button class="segmented__option" type="button" role="radio" data-look="meadow" data-t="map.meadow"></button>
+      <button class="segmented__option" type="button" role="radio" data-look="canyon" data-t="map.canyon"></button>
+      <button class="segmented__option" type="button" role="radio" data-look="marsh" data-t="map.marsh"></button>
+    </div>
+    <div class="editor__grid-wrap">
+      <canvas id="editor-grid" class="editor__grid" role="img" aria-labelledby="editor-status"></canvas>
+    </div>
+    <p id="editor-status" class="custom__problem" role="status"></p>
+    <div class="custom__row">
+      <button id="editor-undo" class="button" type="button" data-t="undo"></button>
+      <button id="editor-clear" class="button" type="button" data-t="clear"></button>
+      <button id="editor-save" class="button button--primary" type="button" data-t="save"></button>
+    </div>
+  </section>
+
   <section id="play" class="screen screen--play" aria-labelledby="play-map">
     <header class="hud">
       <h2 id="play-map" class="visually-hidden"></h2>
