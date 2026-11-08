@@ -991,3 +991,11 @@
   transition: transform var(--duration-fast) var(--ease-out);
   pointer-events: none;
 }
+
+/* A hidden copy of the page that measures how many pages earlier chunks fill (page numbers). */
+.spread__measure {
+  visibility: hidden;
+  pointer-events: none;
+  transform: none;
+  transition: none;
+}

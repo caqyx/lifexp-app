@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CHUNK_HARD,
+  chunkIndexOf,
+  chunkSentences,
   MAX_ZOOM,
   OVERVIEW,
   pageCount,
@@ -116,5 +119,47 @@ describe('unionBox', () => {
   it('spans a sentence\'s lines', () => {
     expect(unionBox([{ x: 50, y: 10, w: 200, h: 20 }, { x: 10, y: 30, w: 80, h: 20 }])).toEqual({ x: 10, y: 10, w: 240, h: 40 });
     expect(unionBox([])).toBeNull();
+  });
+});
+
+describe('chunkSentences', () => {
+  /** `paras` paragraphs of `per` sentences in each of the sections given by their paragraph counts. */
+  const book = (sections: number[], per: number) =>
+    sections.flatMap((paras, sec) => Array.from({ length: paras * per }, (_, i) => ({ sec, para: Math.floor(i / per) })));
+
+  it('the same text gives the same chunks, covering every sentence once, in order', () => {
+    const sents = book([50, 3, 80], 4);
+    const a = chunkSentences(sents);
+    expect(chunkSentences(sents)).toEqual(a);
+    expect(a[0]?.start).toBe(0);
+    expect(a[a.length - 1]?.end).toBe(sents.length);
+    for (let i = 1; i < a.length; i++) expect(a[i]?.start).toBe(a[i - 1]?.end);
+  });
+
+  it('ends a chunk at a paragraph past the soft limit, never past the hard one', () => {
+    const sents = book([100], 7);
+    const chunks = chunkSentences(sents);
+    for (const c of chunks) expect(c.end - c.start).toBeLessThanOrEqual(CHUNK_HARD);
+    for (const c of chunks.slice(1)) expect(sents[c.start]?.para).not.toBe(sents[c.start - 1]?.para);
+    const long = chunkSentences(book([1], 500));
+    expect(long.map((c) => c.end - c.start)).toEqual([CHUNK_HARD, CHUNK_HARD, 500 - 2 * CHUNK_HARD]);
+  });
+
+  it('a chapter starts a new chunk; small untitled sections (PDF pages) are grouped', () => {
+    const pages = book([2, 2, 2, 2, 2, 2, 2, 2], 3);
+    const grouped = chunkSentences(pages);
+    expect(grouped.length).toBeLessThan(8);
+    const chapters = chunkSentences(pages, (sec) => sec % 2 === 0);
+    expect(chapters.map((c) => pages[c.start]?.sec)).toEqual([0, 2, 4, 6]);
+  });
+
+  it('finds the chunk of a sentence', () => {
+    const chunks = [
+      { start: 0, end: 10 },
+      { start: 10, end: 25 },
+      { start: 25, end: 30 },
+    ];
+    expect([0, 9, 10, 24, 25, 29, 99].map((s) => chunkIndexOf(chunks, s))).toEqual([0, 0, 1, 1, 2, 2, 2]);
+    expect(chunkSentences([])).toEqual([]);
   });
 });
