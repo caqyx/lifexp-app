@@ -37,20 +37,24 @@ import { createSpawns, createWave } from './waves.js';
  *   flying: boolean, boss: boolean, radius: number, gold: number, lives: number,
  *   slowFactor: number, slowLeft: number, slowResist: number, flash: number,
  *   wave: number, px: number, py: number,
+ *   baseSpeed: number, shield: number, buried: boolean,
+ *   burnDps: number, burnLeft: number, poisonDps: number, poisonLeft: number,
+ *   shred: number, shredLeft: number, healCd: number, brood: number,
  * }} Enemy
  * @typedef {{
  *   type: TowerType, level: number, pad: number, x: number, y: number,
  *   cooldown: number, priority: Priority, spent: number, buff: number,
- *   aim: number, fired: number,
+ *   aim: number, fired: number, shots: number,
  * }} Tower
  * @typedef {{
- *   alive: boolean, kind: 'arrow' | 'shell' | 'bolt', x: number, y: number,
+ *   alive: boolean, kind: 'arrow' | 'shell' | 'bolt' | 'flask', x: number, y: number,
  *   sx: number, sy: number, tx: number, ty: number, targetSlot: number, targetId: number,
  *   speed: number, damage: number, pierce: boolean, radius: number, t: number, flight: number,
- *   px: number, py: number,
+ *   px: number, py: number, level: number,
  * }} Projectile
- * @typedef {'hit' | 'kill' | 'leak' | 'shot' | 'pulse' | 'blast' | 'build' | 'upgrade' | 'sell' | 'wave' | 'cleared' | 'early'} EventType
- * @typedef {{ type: EventType, x: number, y: number, value: number, kind: string }} GameEvent
+ * @typedef {'hit' | 'kill' | 'leak' | 'shot' | 'pulse' | 'blast' | 'build' | 'upgrade' | 'sell' | 'wave' | 'cleared' | 'early'
+ *   | 'flame' | 'chain' | 'snipe' | 'splash' | 'heal' | 'shieldBreak' | 'burrow' | 'surface' | 'brood'} EventType
+ * @typedef {{ type: EventType, x: number, y: number, value: number, kind: string, x2: number, y2: number }} GameEvent
  * @typedef {'build' | 'wave' | 'won' | 'lost'} Phase
  * @typedef {{ endless?: boolean, lives?: number, gold?: number, waves?: number, start?: number }} GameOptions
  */
@@ -74,6 +78,8 @@ function createEnemySlot() {
     alive: false, id: 0, type: 'crawler', hp: 0, maxHp: 0, dist: 0, x: 0, y: 0, speed: 0, armor: 0,
     flying: false, boss: false, radius: 0, gold: 0, lives: 0, slowFactor: 1, slowLeft: 0, slowResist: 0,
     flash: 0, wave: 0, px: 0, py: 0,
+    baseSpeed: 0, shield: 0, buried: false, burnDps: 0, burnLeft: 0, poisonDps: 0, poisonLeft: 0,
+    shred: 0, shredLeft: 0, healCd: 0, brood: 0,
   };
 }
 
@@ -81,13 +87,13 @@ function createEnemySlot() {
 function createProjectileSlot() {
   return {
     alive: false, kind: 'arrow', x: 0, y: 0, sx: 0, sy: 0, tx: 0, ty: 0, targetSlot: -1, targetId: 0,
-    speed: 0, damage: 0, pierce: false, radius: 0, t: 0, flight: 0, px: 0, py: 0,
+    speed: 0, damage: 0, pierce: false, radius: 0, t: 0, flight: 0, px: 0, py: 0, level: 1,
   };
 }
 
 /** @returns {GameEvent} */
 function createEventSlot() {
-  return { type: 'hit', x: 0, y: 0, value: 0, kind: '' };
+  return { type: 'hit', x: 0, y: 0, value: 0, kind: '', x2: 0, y2: 0 };
 }
 
 /**
@@ -134,14 +140,16 @@ export function createGame(map, options = {}) {
 
 // ── Events (read by the renderer, never by the rules) ───────────────────────
 
-/** @param {Game} game @param {EventType} type @param {number} x @param {number} y @param {number} value @param {string} kind */
-function emit(game, type, x, y, value, kind) {
+/** @param {Game} game @param {EventType} type @param {number} x @param {number} y @param {number} value @param {string} kind @param {number} [x2] @param {number} [y2] */
+function emit(game, type, x, y, value, kind, x2 = 0, y2 = 0) {
   const event = /** @type {GameEvent} */ (game.events[game.eventSeq % EVENT_RING]);
   event.type = type;
   event.x = x;
   event.y = y;
   event.value = value;
   event.kind = kind;
+  event.x2 = x2;
+  event.y2 = y2;
   game.eventSeq += 1;
 }
 
@@ -219,7 +227,13 @@ export function spawnEnemy(game, type, dist, wave) {
   enemy.type = type;
   enemy.maxHp = enemy.hp = enemyHp(game, type, wave);
   enemy.dist = Math.max(0, dist);
-  enemy.speed = def.speed;
+  enemy.speed = enemy.baseSpeed = def.speed;
+  enemy.shield = def.shield ?? 0;
+  enemy.buried = false;
+  enemy.burnDps = enemy.burnLeft = enemy.poisonDps = enemy.poisonLeft = 0;
+  enemy.shred = enemy.shredLeft = 0;
+  enemy.healCd = def.heal ? def.heal.every : 0;
+  enemy.brood = 0;
   enemy.armor = def.armor;
   enemy.flying = def.flying === true;
   enemy.boss = def.boss === true;
@@ -245,13 +259,76 @@ function updateEnemies(game, dt) {
     enemy.py = enemy.y;
     updateSlow(enemy, dt);
     if (enemy.flash > 0) enemy.flash = Math.max(0, enemy.flash - dt);
+    const def = ENEMIES[enemy.type];
+    if (def.rage) enemy.speed = enemy.baseSpeed * (1 + def.rage * (1 - Math.max(0, enemy.hp) / enemy.maxHp));
     enemy.dist += enemy.speed * enemy.slowFactor * dt;
     if (enemy.dist >= game.path.total) {
       leakEnemy(game, enemy);
       continue;
     }
     pointAt(game.path, enemy.dist, enemy);
+    if (def.burrow) updateBurrow(game, enemy, def.burrow);
+    if (def.heal) updateHeal(game, enemy, def.heal, dt);
+    if (!updateEffects(game, enemy, dt)) continue;
   }
+}
+
+/**
+ * A burrower is under the road between two shares of the road's length: nothing can hit it.
+ * @param {Game} game @param {Enemy} enemy @param {readonly [number, number]} span
+ */
+function updateBurrow(game, enemy, span) {
+  const under = enemy.dist >= span[0] * game.path.total && enemy.dist < span[1] * game.path.total;
+  if (under === enemy.buried) return;
+  enemy.buried = under;
+  emit(game, under ? 'burrow' : 'surface', enemy.x, enemy.y, 0, enemy.type);
+}
+
+/**
+ * A healer mends everyone near it (itself too) every few seconds; the poisoned are not
+ * mended. @param {Game} game @param {Enemy} healer @param {{ every: number, share: number, range: number }} heal @param {number} dt
+ */
+function updateHeal(game, healer, heal, dt) {
+  healer.healCd -= dt;
+  if (healer.healCd > 0) return;
+  healer.healCd = heal.every;
+  const r2 = heal.range * heal.range;
+  let mended = 0;
+  for (const other of game.enemies) {
+    if (!other.alive || other.poisonLeft > 0 || other.hp >= other.maxHp) continue;
+    if ((other.x - healer.x) ** 2 + (other.y - healer.y) ** 2 > r2) continue;
+    other.hp = Math.min(other.maxHp, other.hp + other.maxHp * heal.share);
+    mended += 1;
+  }
+  if (mended > 0) emit(game, 'heal', healer.x, healer.y, heal.range, healer.type);
+}
+
+/**
+ * Burning and poison (both through armor) and the acid on its armor wearing off. Returns
+ * false when the enemy died of them. @param {Game} game @param {Enemy} enemy @param {number} dt
+ */
+function updateEffects(game, enemy, dt) {
+  if (enemy.shredLeft > 0) {
+    enemy.shredLeft -= dt;
+    if (enemy.shredLeft <= 0) enemy.shred = enemy.shredLeft = 0;
+  }
+  let dot = 0;
+  if (enemy.burnLeft > 0) {
+    dot += enemy.burnDps * Math.min(dt, enemy.burnLeft);
+    enemy.burnLeft -= dt;
+  }
+  if (enemy.poisonLeft > 0) {
+    dot += enemy.poisonDps * Math.min(dt, enemy.poisonLeft);
+    enemy.poisonLeft -= dt;
+  }
+  if (dot <= 0) return true;
+  enemy.hp -= dot;
+  if (enemy.hp > 0) {
+    afterHurt(game, enemy);
+    return true;
+  }
+  killEnemy(game, enemy);
+  return false;
 }
 
 /** @param {Enemy} enemy @param {number} dt */
@@ -293,6 +370,7 @@ function updateTowers(game, dt) {
  * @param {import('./config.js').TowerDef} def @param {Enemy} enemy
  */
 export function canHit(def, enemy) {
+  if (enemy.buried) return false;
   return enemy.flying ? def.hitsAir : def.hitsGround;
 }
 
@@ -332,10 +410,18 @@ function fireTower(game, tower) {
   const target = /** @type {Enemy} */ (game.enemies[slot]);
   tower.aim = Math.atan2(target.y - tower.y, target.x - tower.x);
   tower.fired = 0.15;
-  if (def.attack === 'shell') {
+  tower.shots += 1;
+  if (def.attack === 'flame') fireFlame(game, tower, damage);
+  else if (def.attack === 'chain') fireChain(game, tower, slot, damage);
+  else if (def.attack === 'snipe') {
+    const crit = def.critEvery !== undefined && tower.shots % def.critEvery === 0;
+    const amount = crit ? damage * (def.critMultiplier ?? 1) : damage;
+    emit(game, 'snipe', target.x, target.y, crit ? 1 : 0, tower.type, tower.x, tower.y);
+    applyDamage(game, target, amount, false, 'snipe');
+  } else if (def.attack === 'shell' || def.attack === 'flask') {
     const flight = def.flight ?? 0.7;
     pointAt(game.path, Math.min(game.path.total, target.dist + target.speed * target.slowFactor * flight), scratch);
-    launchProjectile(game, 'shell', tower, scratch.x, scratch.y, -1, 0, damage, false, def.radius?.[lvl] ?? 1, flight, 0);
+    launchProjectile(game, def.attack, tower, scratch.x, scratch.y, -1, 0, damage, false, def.radius?.[lvl] ?? 1, flight, 0);
   } else {
     const kind = def.attack === 'bolt' ? 'bolt' : 'arrow';
     launchProjectile(game, kind, tower, target.x, target.y, slot, target.id, damage, def.pierceArmor === true, 0, 0, def.projectileSpeed ?? 12);
@@ -343,6 +429,70 @@ function fireTower(game, tower) {
   emit(game, 'shot', tower.x, tower.y, tower.aim, tower.type);
   return true;
 }
+
+/**
+ * The flamer: everything on the ground in a cone toward the aim, within range, is hit and
+ * set burning. @param {Game} game @param {Tower} tower @param {number} damage
+ */
+function fireFlame(game, tower, damage) {
+  const def = TOWERS[tower.type];
+  const lvl = tower.level - 1;
+  const range = def.range[lvl] ?? 0;
+  const cos = Math.cos(def.cone ?? 0.5);
+  const ax = Math.cos(tower.aim);
+  const ay = Math.sin(tower.aim);
+  const burn = (def.burnDps?.[lvl] ?? 0) * (1 + tower.buff);
+  for (const enemy of game.enemies) {
+    if (!enemy.alive || !canHit(def, enemy)) continue;
+    const dx = enemy.x - tower.x;
+    const dy = enemy.y - tower.y;
+    const d = Math.hypot(dx, dy);
+    if (d > range + enemy.radius || (d > 0.3 && (dx * ax + dy * ay) / d < cos)) continue;
+    enemy.burnDps = Math.max(enemy.burnDps, burn);
+    enemy.burnLeft = Math.max(enemy.burnLeft, def.burnTime ?? 0);
+    applyDamage(game, enemy, damage, false, 'flame');
+  }
+  emit(game, 'flame', tower.x, tower.y, tower.aim, tower.type, range, 0);
+}
+
+/**
+ * The tesla: lightning hits the target and jumps on to the nearest enemy not yet hit,
+ * weaker at each jump. @param {Game} game @param {Tower} tower @param {number} slot @param {number} damage
+ */
+function fireChain(game, tower, slot, damage) {
+  const def = TOWERS[tower.type];
+  const jumps = def.jumps?.[tower.level - 1] ?? 0;
+  const r2 = (def.jumpRange ?? 1) ** 2;
+  let current = /** @type {Enemy} */ (game.enemies[slot]);
+  let fromX = tower.x;
+  let fromY = tower.y;
+  let amount = damage;
+  const hitIds = chainHit;
+  hitIds.length = 0;
+  for (let j = 0; j <= jumps; j++) {
+    hitIds.push(current.id);
+    emit(game, 'chain', current.x, current.y, j, tower.type, fromX, fromY);
+    fromX = current.x;
+    fromY = current.y;
+    applyDamage(game, current, amount, false, 'chain');
+    amount *= def.jumpFalloff ?? 1;
+    let next = null;
+    let best = Infinity;
+    for (const enemy of game.enemies) {
+      if (!enemy.alive || !canHit(def, enemy) || hitIds.includes(enemy.id)) continue;
+      const d2 = (enemy.x - fromX) ** 2 + (enemy.y - fromY) ** 2;
+      if (d2 <= r2 && d2 < best) {
+        best = d2;
+        next = enemy;
+      }
+    }
+    if (!next) break;
+    current = next;
+  }
+}
+
+/** The ids hit by one chain of lightning (reused: no allocation per shot). */
+const chainHit = /** @type {number[]} */ ([]);
 
 /** @param {Game} game @param {Tower} tower @param {number} damage */
 function firePulse(game, tower, damage) {
@@ -357,7 +507,7 @@ function firePulse(game, tower, damage) {
     if ((enemy.x - tower.x) ** 2 + (enemy.y - tower.y) ** 2 > range * range) continue;
     hit = true;
     applySlow(enemy, slow, slowTime);
-    applyDamage(game, enemy, damage, false);
+    applyDamage(game, enemy, damage, false, 'pulse');
   }
   if (hit) {
     tower.fired = 0.3;
@@ -385,13 +535,48 @@ export function damageAfterArmor(raw, armor, pierce) {
   return pierce ? raw : Math.max(1, raw - armor);
 }
 
-/** @param {Game} game @param {Enemy} enemy @param {number} raw @param {boolean} pierce */
-function applyDamage(game, enemy, raw, pierce) {
-  const amount = damageAfterArmor(raw, enemy.armor, pierce);
+/** Attacks that a shield swallows (until it breaks), and those that break it at once. */
+const SHIELD_BLOCKS = new Set(['arrow', 'bolt', 'snipe']);
+const SHIELD_BREAKS = new Set(['shell', 'flame', 'chain', 'flask']);
+
+/**
+ * One hit: a shield first (it swallows arrows, bolts and shots; a blast, fire, lightning
+ * or a flask breaks it), then armor (less any acid on it), at least 1 gets through.
+ * @param {Game} game @param {Enemy} enemy @param {number} raw @param {boolean} pierce @param {string} kind
+ */
+function applyDamage(game, enemy, raw, pierce, kind) {
+  if (enemy.shield > 0) {
+    if (SHIELD_BREAKS.has(kind)) {
+      enemy.shield = 0;
+      emit(game, 'shieldBreak', enemy.x, enemy.y, 0, enemy.type);
+    } else if (SHIELD_BLOCKS.has(kind)) {
+      enemy.shield = Math.max(0, enemy.shield - raw);
+      enemy.flash = FLASH_TIME;
+      emit(game, enemy.shield > 0 ? 'hit' : 'shieldBreak', enemy.x, enemy.y, 0, enemy.type);
+      return;
+    }
+  }
+  const amount = damageAfterArmor(raw, Math.max(0, enemy.armor - enemy.shred), pierce);
   enemy.hp -= amount;
   enemy.flash = FLASH_TIME;
   emit(game, 'hit', enemy.x, enemy.y, amount, enemy.type);
   if (enemy.hp <= 0) killEnemy(game, enemy);
+  else afterHurt(game, enemy);
+}
+
+/**
+ * What an enemy does when it loses health: a brood mother drops her young each time she
+ * loses another share of it. @param {Game} game @param {Enemy} enemy
+ */
+function afterHurt(game, enemy) {
+  const brood = ENEMIES[enemy.type].brood;
+  if (!brood) return;
+  const reached = Math.floor((1 - enemy.hp / enemy.maxHp) * brood.steps);
+  while (enemy.brood < reached && enemy.brood < brood.steps - 1) {
+    enemy.brood += 1;
+    for (let i = 0; i < brood.count; i++) spawnEnemy(game, brood.type, enemy.dist - 0.25 * (i + 1), enemy.wave);
+    emit(game, 'brood', enemy.x, enemy.y, brood.count, enemy.type);
+  }
 }
 
 /** @param {Game} game @param {Enemy} enemy */
@@ -431,6 +616,7 @@ function launchProjectile(game, kind, from, tx, ty, slot, id, damage, pierce, ra
   p.flight = flight;
   p.speed = speed;
   p.t = 0;
+  p.level = from.level;
 }
 
 /** @param {Game} game @param {number} dt */
@@ -439,7 +625,7 @@ function updateProjectiles(game, dt) {
     if (!p.alive) continue;
     p.px = p.x;
     p.py = p.y;
-    if (p.kind === 'shell') updateShell(game, p, dt);
+    if (p.kind === 'shell' || p.kind === 'flask') updateShell(game, p, dt);
     else updateHoming(game, p, dt);
   }
 }
@@ -453,11 +639,21 @@ function updateShell(game, p, dt) {
   if (k < 1) return;
   p.alive = false;
   const r2 = p.radius * p.radius;
+  const flask = p.kind === 'flask';
+  const def = TOWERS.alchemist;
+  const lvl = p.level - 1;
   for (const enemy of game.enemies) {
-    if (!enemy.alive || enemy.flying) continue;
-    if ((enemy.x - p.x) ** 2 + (enemy.y - p.y) ** 2 <= r2) applyDamage(game, enemy, p.damage, false);
+    if (!enemy.alive || enemy.flying || enemy.buried) continue;
+    if ((enemy.x - p.x) ** 2 + (enemy.y - p.y) ** 2 > r2) continue;
+    if (flask) {
+      enemy.poisonDps = Math.max(enemy.poisonDps, def.poisonDps?.[lvl] ?? 0);
+      enemy.poisonLeft = Math.max(enemy.poisonLeft, def.poisonTime ?? 0);
+      enemy.shred = Math.max(enemy.shred, def.shred?.[lvl] ?? 0);
+      enemy.shredLeft = Math.max(enemy.shredLeft, def.shredTime ?? 0);
+    }
+    applyDamage(game, enemy, p.damage, false, p.kind);
   }
-  emit(game, 'blast', p.x, p.y, p.radius, 'mortar');
+  emit(game, flask ? 'splash' : 'blast', p.x, p.y, p.radius, flask ? 'alchemist' : 'mortar');
 }
 
 /** Arrows and bolts follow their target; if it is gone, they fly on to where it was. @param {Game} game @param {Projectile} p @param {number} dt */
@@ -478,7 +674,7 @@ function updateHoming(game, p, dt) {
     return;
   }
   p.alive = false;
-  if (tracking) applyDamage(game, target, p.damage, p.pierce);
+  if (tracking && !target.buried) applyDamage(game, target, p.damage, p.pierce, p.kind);
 }
 
 // ── Waves ───────────────────────────────────────────────────────────────────
@@ -494,7 +690,7 @@ function startWave(game) {
   game.countdown = -1;
   game.phase = 'wave';
   game.nextWave = game.wave < game.totalWaves ? createWave(game.map, game.wave + 1) : null;
-  emit(game, 'wave', 0, 0, game.wave, wave.boss ? 'boss' : '');
+  emit(game, 'wave', 0, 0, game.wave, wave.boss ? (wave.groups.some((g) => g.type === 'broodmother') ? 'brood' : 'boss') : '');
 }
 
 /** Gold for clearing wave `n`. @param {number} n */
@@ -587,7 +783,7 @@ export function buildTower(game, pad, type) {
   if (!spot || game.towers[pad] || game.gold < cost || game.phase === 'won' || game.phase === 'lost') return false;
   game.gold -= cost;
   game.stats.spent += cost;
-  game.towers[pad] = { type, level: 1, pad, x: spot.x, y: spot.y, cooldown: 0, priority: 'first', spent: cost, buff: 0, aim: -Math.PI / 2, fired: 0 };
+  game.towers[pad] = { type, level: 1, pad, x: spot.x, y: spot.y, cooldown: 0, priority: 'first', spent: cost, buff: 0, aim: -Math.PI / 2, fired: 0, shots: 0 };
   updateBuffs(game);
   emit(game, 'build', spot.x, spot.y, cost, type);
   return true;

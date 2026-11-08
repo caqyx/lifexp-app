@@ -90,9 +90,9 @@ test.describe('on a Pixel 7 held upright', () => {
       expect(box.y + box.height).toBeLessThanOrEqual(frameBox.y + frameBox.height + 1);
     }
 
-    // Build: the sheet shows the five towers with prices; too dear ones say what is missing.
+    // Build: the sheet shows the nine towers with prices; too dear ones say what is missing.
     await game.getByRole('button', { name: 'Pole budowy 1', exact: true }).tap();
-    await expect(game.getByRole('radio')).toHaveCount(5);
+    await expect(game.getByRole('radio')).toHaveCount(9);
     await game.getByRole('radio', { name: /^Balista/ }).tap();
     await expect(game.getByText('Daleki, ciężki strzał przez pancerz.')).toBeVisible();
     await expect(game.getByRole('button', { name: 'Zbuduj wieżę · 95 złota' })).toBeEnabled();

@@ -39,7 +39,22 @@ export const ENEMY_COLORS = /** @type {const} */ ({
   splitter: PALETTE.R,
   shard: PALETTE.O,
   colossus: PALETTE.R,
+  ironclad: PALETTE.g,
+  shieldbearer: PALETTE.f,
+  shaman: PALETTE.P,
+  bat: PALETTE.U,
+  burrower: PALETTE.N,
+  berserker: PALETTE.R,
+  broodmother: PALETTE.V,
 });
+
+/** Towers whose picture does not turn to aim (they animate by frame instead). @param {TowerType} type */
+export function isStill(type) {
+  return type === 'frost' || type === 'banner' || type === 'tesla';
+}
+
+/** Lightning and tracers: short-lived lines between two art points (a fixed pool). */
+const ZAPS = 48;
 
 const WHITE = PALETTE.w;
 const GOLD = PALETTE.y;
@@ -78,7 +93,7 @@ function enemyFrames(type) {
   let frames = enemySheets.get(type);
   if (!frames) {
     const art = enemyArt(type);
-    frames = Array.from({ length: art.frames }, (_, f) => facingPair(art.make(f)));
+    frames = Array.from({ length: art.frames * (art.variants ?? 1) }, (_, f) => facingPair(art.make(f)));
     enemySheets.set(type, frames);
   }
   return frames;
@@ -93,7 +108,7 @@ function towerSprite(type, level, dir, state) {
   const key = ((TOWER_TYPES.indexOf(type) * 3 + level - 1) * 8 + dir) * 4 + state;
   let img = towerSheet.get(key);
   if (!img) {
-    const still = type === 'frost' || type === 'banner';
+    const still = isStill(type);
     img = towerArt(type, level, still ? 0 : dir, !still && state === 1, state);
     towerSheet.set(key, img);
   }
@@ -107,7 +122,7 @@ function towerSprite(type, level, dir, state) {
 function prewarmSprites() {
   if (towerSheet.size > 0) return;
   for (const type of TOWER_TYPES) {
-    const still = type === 'frost' || type === 'banner';
+    const still = isStill(type);
     for (const level of [1, 2, 3]) {
       if (still) for (let state = 0; state < 4; state++) towerSprite(type, level, 0, state);
       else for (let dir = 0; dir < 8; dir++) for (const state of [0, 1]) towerSprite(type, level, dir, state);
@@ -230,6 +245,10 @@ export function createRenderer(canvas, layer) {
     labels: /** @type {Map<string, HTMLCanvasElement>} */ (new Map()),
     /** Pixel particles, scorch marks, falling enemies and the map's air (particles.js). */
     parts: createParticles(),
+    /** Lightning and tracer lines: art points, the time left, and how they look. */
+    zaps: Array.from({ length: ZAPS }, () => ({ alive: false, x1: 0, y1: 0, x2: 0, y2: 0, life: 0, max: 1, kind: 'chain', seed: 0 })),
+    zapCursor: 0,
+    zapClock: 0,
     /** The clock of the last frame (particles move by the difference). */
     lastClock: 0,
     /** The light over the board, made once per size: a dithered vignette and the map's tint. */
@@ -239,7 +258,7 @@ export function createRenderer(canvas, layer) {
     order: new Int16Array(512),
     orderY: new Float32Array(512),
     /** What happened since the last frame, for the page (one object, reused). */
-    news: { bossKilled: false, leaked: false, cleared: -1, wave: -1, boss: false },
+    news: { bossKilled: false, leaked: false, cleared: -1, wave: -1, boss: false, brood: false },
   };
 }
 
@@ -327,6 +346,88 @@ export function resetRenderer(r, game) {
   for (const d of r.parts.decals) d.alive = false;
   for (const c of r.parts.corpses) c.alive = false;
   for (const b of r.parts.booms) b.alive = false;
+  for (const z of r.zaps) z.alive = false;
+}
+
+/**
+ * Starts a line from (x1, y1) to (x2, y2) in art pixels: lightning (jagged, flickering)
+ * or a tracer (straight, gold on a crit). @param {Renderer} r @param {string} kind
+ * @param {number} x1 @param {number} y1 @param {number} x2 @param {number} y2 @param {number} life
+ */
+function addZap(r, kind, x1, y1, x2, y2, life) {
+  const z = r.zaps[r.zapCursor];
+  r.zapCursor = (r.zapCursor + 1) % r.zaps.length;
+  if (!z) return;
+  z.alive = true;
+  z.kind = kind;
+  z.x1 = x1;
+  z.y1 = y1;
+  z.x2 = x2;
+  z.y2 = y2;
+  z.life = z.max = life;
+  z.seed = (r.zapCursor * 7919) % 97;
+}
+
+/** @param {Renderer} r @param {CanvasRenderingContext2D} ctx @param {View} view */
+function renderZaps(r, ctx, view) {
+  const dt = Math.max(0, Math.min(0.1, view.clock - r.zapClock));
+  r.zapClock = view.clock;
+  for (const z of r.zaps) {
+    if (!z.alive) continue;
+    z.life -= dt;
+    if (z.life <= 0) {
+      z.alive = false;
+      continue;
+    }
+    const len = Math.hypot(z.x2 - z.x1, z.y2 - z.y1);
+    const steps = Math.max(2, Math.round(len / 3));
+    if (z.kind === 'chain') {
+      // A jagged line: each point jittered sideways (by a fixed pattern, it flickers by frame).
+      const flick = Math.floor(view.clock * 30);
+      let ox = z.x1;
+      let oy = z.y1;
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const j = i === steps ? 0 : (((i * 37 + z.seed + flick * 13) % 7) - 3) * 0.7;
+        const nx = z.x1 + (z.x2 - z.x1) * t - ((z.y2 - z.y1) / (len || 1)) * j;
+        const ny = z.y1 + (z.y2 - z.y1) * t + ((z.x2 - z.x1) / (len || 1)) * j;
+        drawLine(ctx, ox, oy, nx, ny, z.life / z.max > 0.5 ? PALETTE.w : PALETTE.V);
+        ox = nx;
+        oy = ny;
+      }
+    } else {
+      ctx.globalAlpha = Math.min(1, (z.life / z.max) * 1.5);
+      drawLine(ctx, z.x1, z.y1, z.x2, z.y2, z.kind === 'crit' ? PALETTE.y : PALETTE.Y);
+      ctx.globalAlpha = 1;
+    }
+  }
+}
+
+/** A one-pixel line (Bresenham) in a colour. @param {CanvasRenderingContext2D} ctx @param {number} x0 @param {number} y0 @param {number} x1 @param {number} y1 @param {string} color */
+function drawLine(ctx, x0, y0, x1, y1, color) {
+  ctx.fillStyle = color;
+  let x = Math.round(x0);
+  let y = Math.round(y0);
+  const xe = Math.round(x1);
+  const ye = Math.round(y1);
+  const dx = Math.abs(xe - x);
+  const dy = -Math.abs(ye - y);
+  const sx = x < xe ? 1 : -1;
+  const sy = y < ye ? 1 : -1;
+  let err = dx + dy;
+  for (let i = 0; i < 400; i++) {
+    ctx.fillRect(x, y, 1, 1);
+    if (x === xe && y === ye) break;
+    const e2 = 2 * err;
+    if (e2 >= dy) {
+      err += dy;
+      x += sx;
+    }
+    if (e2 <= dx) {
+      err += dx;
+      y += sy;
+    }
+  }
 }
 
 /**
@@ -366,6 +467,7 @@ export function renderFrame(r, game, fx, view) {
   renderDepth(r, ctx, layout, game, view);
   renderCorpses(ctx, r.parts);
   renderProjectiles(r, ctx, layout, game, view);
+  renderZaps(r, ctx, view);
   renderFliers(r, ctx, layout, game, view);
   renderBooms(ctx, r.parts);
   renderParticles(ctx, r.parts);
@@ -523,7 +625,7 @@ function collectEnemies(r, layout, game, view, fliers) {
  */
 function drawTower(ctx, layout, tower, view, x, footY) {
   const screenAim = layout.rotated ? tower.aim - Math.PI / 2 : tower.aim;
-  const still = tower.type === 'frost' || tower.type === 'banner';
+  const still = isStill(tower.type);
   const frame = view.reduced ? 0 : Math.floor(view.clock * 4 + tower.pad) % 4;
   const state = still ? frame : tower.fired > 0.04 ? 1 : 0;
   const img = towerSprite(tower.type, tower.level, still ? 0 : aimDir(screenAim), state);
@@ -546,7 +648,9 @@ function drawEnemy(r, ctx, layout, game, view, i) {
   if (Math.abs(dx) > 0.001 && i < r.facing.length) r.facing[i] = dx < 0 ? -1 : 1;
   const frames = enemyFrames(enemy.type);
   const art = enemyArt(enemy.type);
-  const step = view.reduced ? 0 : Math.floor(view.clock * art.fps + enemy.id) % frames.length;
+  // The second set of frames: a shield-bearer without its shield, a burrower's mound.
+  const variant = (enemy.type === 'shieldbearer' && enemy.shield <= 0) || enemy.buried ? art.frames : 0;
+  const step = (view.reduced ? 0 : Math.floor(view.clock * art.fps + enemy.id) % art.frames) + variant;
   const pair = frames[step] ?? frames[0];
   if (!pair) return;
   const left = (r.facing[i] ?? 1) < 0;
@@ -556,15 +660,22 @@ function drawEnemy(r, ctx, layout, game, view, i) {
   const lift = enemy.flying ? GROUND_TO_AIR + Math.round(Math.sin(view.clock * 3 + enemy.id) * (view.reduced ? 0 : 1.5)) : 0;
   const x = cx - Math.floor(img.width / 2);
   const y = foot - img.height + ENEMY_PAD - lift;
-  const sh = shadowOf(enemy.boss ? 30 : Math.max(10, img.width - ENEMY_PAD * 2 - 6));
-  ctx.drawImage(sh, cx - sh.width / 2, foot - Math.ceil(sh.height / 2) - 1);
+  if (!enemy.buried) {
+    const sh = shadowOf(enemy.boss ? 30 : Math.max(10, img.width - ENEMY_PAD * 2 - 6));
+    ctx.drawImage(sh, cx - sh.width / 2, foot - Math.ceil(sh.height / 2) - 1);
+  }
   ctx.drawImage(img, x, y);
-  if (enemy.slowLeft > 0 && enemy.flash <= 0) {
+  if (enemy.slowLeft > 0 && enemy.flash <= 0 && !enemy.buried) {
     ctx.globalAlpha = 0.45;
     ctx.drawImage(left ? pair.iceLeft : pair.iceRight, x, y);
     ctx.globalAlpha = 1;
   }
-  if (enemy.hp < enemy.maxHp) drawHealth(ctx, enemy, cx, y + ENEMY_PAD - 3);
+  // Burning and poisoned: an ember or a bubble now and then (a few a second, by the clock).
+  if (!view.reduced && (enemy.burnLeft > 0 || enemy.poisonLeft > 0) && (Math.floor(view.clock * 60) + enemy.id) % 8 === 0) {
+    if (enemy.burnLeft > 0) emit(r.parts, 'ember', cx, y + ENEMY_PAD + 4, 1, PALETTE.O, 12);
+    if (enemy.poisonLeft > 0) emit(r.parts, 'smoke', cx, y + ENEMY_PAD + 2, 1, PALETTE.f, 6);
+  }
+  if (enemy.hp < enemy.maxHp && !enemy.buried) drawHealth(ctx, enemy, cx, y + ENEMY_PAD - 3);
 }
 
 /** The fliers, after the shots (they are above them), sorted the same way. @param {Renderer} r @param {CanvasRenderingContext2D} ctx @param {Layout} layout @param {Game} game @param {View} view */
@@ -596,6 +707,19 @@ function renderProjectiles(r, ctx, layout, game, view) {
     toScreen(layout, p.px + (p.x - p.px) * a, p.py + (p.y - p.py) * a, pt);
     const x = Math.round(pt.x);
     const y = Math.round(pt.y) - 6;
+    if (p.kind === 'flask') {
+      const k = Math.min(1, p.t / p.flight);
+      const height = Math.round(Math.sin(Math.PI * k) * 14);
+      ctx.fillStyle = SHADOW;
+      ctx.fillRect(x - 1, y + 6, 3, 1);
+      ctx.fillStyle = PALETTE.k;
+      ctx.fillRect(x - 1, y - height - 1, 3, 4);
+      ctx.fillStyle = PALETTE.f;
+      ctx.fillRect(x, y - height, 1, 2);
+      ctx.fillStyle = PALETTE.w;
+      ctx.fillRect(x, y - height - 2, 1, 1);
+      continue;
+    }
     if (p.kind === 'shell') {
       const k = Math.min(1, p.t / p.flight);
       const height = Math.round(Math.sin(Math.PI * k) * 18);
@@ -728,6 +852,7 @@ export function consumeEvents(r, game, fx, reduced) {
   news.cleared = -1;
   news.wave = -1;
   news.boss = false;
+  news.brood = false;
   for (let seq = from; seq < game.eventSeq; seq++) {
     const e = game.events[seq % EVENT_RING];
     if (!e) continue;
@@ -755,7 +880,7 @@ function startEffects(r, fx, e) {
   if (e.type === 'hit') emit(parts, 'spark', x, y - 6, 2, PALETTE.Y, 30);
   else if (e.type === 'kill') {
     const type = /** @type {EnemyType} */ (e.kind);
-    const boss = type === 'colossus';
+    const boss = type === 'colossus' || type === 'broodmother';
     const frames = enemyFrames(type);
     const pair = frames[0];
     if (pair) corpse(parts, x, y + 5 + ENEMY_PAD, pair.right, pair.flashRight);
@@ -784,6 +909,38 @@ function startEffects(r, fx, e) {
     addFloat(fx, e.x, e.y, plusLabel(e.value), GOLD);
     emit(parts, 'smoke', x, y + 2, 8, PALETTE.G, 10);
   } else if (e.type === 'shot' && e.kind === 'mortar') emit(parts, 'smoke', x, y - 14, 3, PALETTE.G, 6);
+  else if (e.type === 'flame') {
+    // A cone of fire: embers thrown along the aim (a screen angle from the map's).
+    toScreen(layout, e.x + Math.cos(e.value) * e.x2 * 0.6, e.y + Math.sin(e.value) * e.x2 * 0.6, prev);
+    const fx2 = prev.x;
+    const fy2 = prev.y;
+    for (let i = 0; i < 3; i++) {
+      const t = (i + 1) / 3;
+      emit(parts, 'ember', x + (fx2 - x) * t, y - 12 + (fy2 - y) * t, 2, i === 2 ? PALETTE.R : i === 1 ? PALETTE.O : PALETTE.y, 14);
+    }
+    emit(parts, 'smoke', fx2, fy2 - 6, 1, PALETTE.K, 6);
+  } else if (e.type === 'chain') {
+    toScreen(layout, e.x2, e.y2, prev);
+    addZap(r, 'chain', prev.x, prev.y - (e.value === 0 ? 18 : 6), x, y - 6, 0.18);
+    emit(parts, 'spark', x, y - 6, 3, PALETTE.V, 30);
+  } else if (e.type === 'snipe') {
+    toScreen(layout, e.x2, e.y2, prev);
+    addZap(r, e.value ? 'crit' : 'tracer', prev.x, prev.y - 16, x, y - 6, 0.12);
+    emit(parts, 'spark', x, y - 6, e.value ? 8 : 3, e.value ? PALETTE.y : PALETTE.Y, e.value ? 50 : 30);
+    if (e.value) addFloat(fx, e.x, e.y - 0.3, '!', GOLD);
+  } else if (e.type === 'splash') {
+    addRing(fx, e.x, e.y, 0.15, e.value, 0.35, PALETTE.f);
+    emit(parts, 'debris', x, y - 2, 6, PALETTE.f, 35);
+    emit(parts, 'smoke', x, y - 2, 4, PALETTE.E, 6);
+  } else if (e.type === 'heal') {
+    addRing(fx, e.x, e.y, 0.1, e.value, 0.5, PALETTE.F);
+    emit(parts, 'snow', x, y - 8, 6, PALETTE.F, 16);
+  } else if (e.type === 'shieldBreak') emit(parts, 'debris', x, y - 6, 8, PALETTE.N, 45);
+  else if (e.type === 'burrow' || e.type === 'surface') emit(parts, 'debris', x, y, 7, PALETTE.n, 35);
+  else if (e.type === 'brood') {
+    emit(parts, 'debris', x, y - 8, 10, PALETTE.V, 50);
+    addRing(fx, e.x, e.y, 0.2, 1, 0.4, PALETTE.V);
+  }
 }
 
 /**
@@ -792,12 +949,13 @@ function startEffects(r, fx, e) {
  * @param {Renderer['news']} news @param {import('./sim.js').GameEvent} e
  */
 function noteNews(news, e) {
-  if (e.type === 'kill' && e.kind === 'colossus') news.bossKilled = true;
+  if (e.type === 'kill' && (e.kind === 'colossus' || e.kind === 'broodmother')) news.bossKilled = true;
   else if (e.type === 'leak') news.leaked = true;
   else if (e.type === 'cleared') news.cleared = e.value;
   else if (e.type === 'wave') {
     news.wave = e.value;
-    news.boss = e.kind === 'boss';
+    news.boss = e.kind === 'boss' || e.kind === 'brood';
+    news.brood = e.kind === 'brood';
   }
 }
 

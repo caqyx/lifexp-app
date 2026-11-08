@@ -808,3 +808,202 @@ describe('tower placement', async () => {
     expect(wrong).toEqual([]);
   });
 });
+
+// ── td-4: the new enemies and towers ─────────────────────────────────────────
+/** How far along the road the point nearest a pad is. */
+function distNear(game: Game, pad: number): number {
+  const spot = game.pads[pad]!;
+  const at = { x: 0, y: 0 };
+  let best = 0;
+  let bestD = Infinity;
+  for (let d = 0; d < game.path.total; d += 0.05) {
+    pointAt(game.path, d, at);
+    const dd = Math.hypot(at.x - spot.x, at.y - spot.y);
+    if (dd < bestD) {
+      bestD = dd;
+      best = d;
+    }
+  }
+  return best;
+}
+
+/** Holds an enemy where it is (it stops walking). */
+function hold<T extends { speed: number; baseSpeed: number }>(enemy: T): T {
+  enemy.speed = enemy.baseSpeed = 0;
+  return enemy;
+}
+
+/** The live enemy of a kind (the first one). */
+const find = (game: Game, type: string) => game.enemies.find((e) => e.alive && e.type === type)!;
+
+describe('new enemies (td-4)', () => {
+  test('a shield swallows arrows until it breaks; a blast breaks it at once', () => {
+    const game = waveGame();
+    buildTower(game, 4, 'archer');
+    spawnEnemy(game, 'shieldbearer', distNear(game, 4), 1);
+    const enemy = hold(find(game, 'shieldbearer'));
+    run(game, 1.5);
+    expect(enemy.hp).toBe(enemy.maxHp);
+    expect(enemy.shield).toBeLessThan(ENEMIES.shieldbearer.shield!);
+    const game2 = waveGame();
+    buildTower(game2, 4, 'flamer');
+    spawnEnemy(game2, 'shieldbearer', distNear(game2, 4), 1);
+    const e2 = hold(find(game2, 'shieldbearer'));
+    run(game2, 0.5);
+    expect(e2.shield).toBe(0);
+    expect(e2.hp).toBeLessThan(e2.maxHp);
+  });
+
+  test('a burrower cannot be hit while it is under the road, and comes up after the stretch', () => {
+    const game = waveGame();
+    const span = ENEMIES.burrower.burrow!;
+    spawnEnemy(game, 'burrower', game.path.total * (span[0] + 0.05), 1);
+    const enemy = find(game, 'burrower');
+    run(game, DT);
+    expect(enemy.buried).toBe(true);
+    for (const type of TOWER_TYPES) expect(canHit(TOWERS[type], enemy)).toBe(false);
+    enemy.dist = game.path.total * (span[1] + 0.01);
+    run(game, DT);
+    expect(enemy.buried).toBe(false);
+    expect(canHit(TOWERS.archer, enemy)).toBe(true);
+  });
+
+  test('a shaman heals those around it, but not the poisoned', () => {
+    const game = waveGame();
+    spawnEnemy(game, 'shaman', 6, 1);
+    spawnEnemy(game, 'crawler', 6.3, 1);
+    spawnEnemy(game, 'crawler', 6.6, 1);
+    const [a, b] = game.enemies.filter((e) => e.alive && e.type === 'crawler');
+    for (const e of game.enemies) if (e.alive) e.speed = e.baseSpeed = 0;
+    a!.hp = b!.hp = 10;
+    b!.poisonLeft = 10;
+    b!.poisonDps = 0;
+    run(game, ENEMIES.shaman.heal!.every + 0.1);
+    expect(a!.hp).toBeGreaterThan(10);
+    expect(b!.hp).toBe(10);
+  });
+
+  test('a berserker runs faster the more it is hurt (up to twice as fast)', () => {
+    const game = waveGame();
+    spawnEnemy(game, 'berserker', 2, 1);
+    const enemy = find(game, 'berserker');
+    run(game, DT);
+    expect(enemy.speed).toBeCloseTo(ENEMIES.berserker.speed);
+    enemy.hp = enemy.maxHp / 2;
+    run(game, DT);
+    expect(enemy.speed).toBeCloseTo(ENEMIES.berserker.speed * 1.5);
+  });
+
+  test('the brood mother drops three crawlers each time she loses another quarter (three times at most)', () => {
+    const game = waveGame();
+    spawnEnemy(game, 'broodmother', 8, 1);
+    const mother = find(game, 'broodmother');
+    const crawlers = () => game.enemies.filter((e) => e.alive && e.type === 'crawler').length;
+    mother.poisonDps = mother.maxHp * 0.3;
+    mother.poisonLeft = 1;
+    run(game, 1);
+    expect(crawlers()).toBe(3);
+    mother.poisonDps = mother.maxHp * 0.6;
+    mother.poisonLeft = 1;
+    run(game, 1);
+    expect(crawlers()).toBe(9);
+  });
+
+  test('bats fly; the burrower, ironclad, shield-bearer, shaman and berserker walk', () => {
+    expect(ENEMIES.bat.flying).toBe(true);
+    for (const type of ['burrower', 'ironclad', 'shieldbearer', 'shaman', 'berserker'] as const) expect(ENEMIES[type].flying).toBeUndefined();
+  });
+});
+
+describe('new towers (td-4)', () => {
+  test('the tesla hits its target and jumps to others nearby, weaker each time, fliers too', () => {
+    const game = waveGame();
+    buildTower(game, 4, 'tesla');
+    const near = distNear(game, 4);
+    const kinds = ['crawler', 'bat', 'crawler'] as const;
+    kinds.forEach((type, k) => spawnEnemy(game, type, near + (k - 1) * 0.6, 1));
+    const hit = game.enemies.filter((e) => e.alive).map(hold);
+    run(game, DT);
+    const lost = hit.map((e) => e.maxHp - e.hp);
+    expect(lost.every((v) => v > 0)).toBe(true);
+    const first = Math.max(...lost);
+    expect(Math.min(...lost)).toBeLessThan(first);
+    expect(first).toBe(TOWERS.tesla.damage[0]);
+  });
+
+  test('the sniper reaches far, and every third shot is critical', () => {
+    const def = TOWERS.sniper;
+    expect(def.range[2]).toBeGreaterThan(TOWERS.ballista.range[2]!);
+    const game = waveGame();
+    buildTower(game, 4, 'sniper');
+    spawnEnemy(game, 'colossus', distNear(game, 4), 1);
+    const boss = hold(game.enemies.find((e) => e.alive)!);
+    const tower = game.towers[4]!;
+    const damage = def.damage[0]!;
+    const hits: number[] = [];
+    let seq = game.eventSeq;
+    for (let shot = 0; shot < 3; shot++) {
+      tower.cooldown = 0;
+      run(game, DT);
+      for (; seq < game.eventSeq; seq++) {
+        const e = game.events[seq % game.events.length]!;
+        if (e.type === 'hit') hits.push(e.value);
+      }
+    }
+    expect(hits).toEqual([damage - boss.armor, damage - boss.armor, damage * def.critMultiplier! - boss.armor]);
+  });
+
+  test('the alchemist’s flask poisons (through armor) and eats armor for a while', () => {
+    const game = waveGame();
+    buildTower(game, 4, 'alchemist');
+    spawnEnemy(game, 'ironclad', 1, 1);
+    const enemy = game.enemies.find((e) => e.alive)!;
+    let shredded = false;
+    for (let i = 0; i < 60 * 8 && enemy.alive; i++) {
+      updateGame(game, DT);
+      if (enemy.shred > 0 && enemy.poisonLeft > 0) shredded = true;
+    }
+    expect(shredded).toBe(true);
+    expect(damageAfterArmor(20, Math.max(0, ENEMIES.ironclad.armor - TOWERS.alchemist.shred![0]!), false)).toBe(20 - 8);
+  });
+
+  test('the flamer sets everything in its cone burning, ground only', () => {
+    expect(TOWERS.flamer.hitsAir).toBe(false);
+    const game = waveGame();
+    buildTower(game, 8, 'flamer');
+    for (let i = 0; i < 3; i++) spawnEnemy(game, 'crawler', 0.4 * i, 1);
+    let burning = 0;
+    for (let i = 0; i < 60 * 30 && burning < 2; i++) {
+      updateGame(game, DT);
+      burning = Math.max(burning, game.enemies.filter((e) => e.alive && e.burnLeft > 0).length);
+    }
+    expect(burning).toBeGreaterThanOrEqual(2);
+  });
+
+  test('every new tower has three levels, costs and a counter role in the texts', () => {
+    const t = translator('pl');
+    for (const type of ['flamer', 'tesla', 'sniper', 'alchemist'] as const) {
+      expect(TOWERS[type].cost).toHaveLength(3);
+      expect(t(`role.${type}` as Parameters<typeof t>[0]).length).toBeGreaterThan(10);
+    }
+  });
+});
+
+describe('waves with the new kinds', () => {
+  test('each map brings its new kinds only after its first waves; endless brings them all', () => {
+    for (const map of MAPS) {
+      const early = [1, 2, 3, 4, 5].flatMap((n) => describeWave(createWave(map, n)).map((r) => r.type));
+      for (const type of ['ironclad', 'shieldbearer', 'shaman', 'bat', 'burrower', 'berserker', 'broodmother']) expect(early).not.toContain(type);
+    }
+    const endless = [21, 22, 23, 24, 25, 26].flatMap((n) => describeWave(createWave(marsh, n)).map((r) => r.type));
+    for (const type of ['ironclad', 'shieldbearer', 'shaman', 'bat', 'burrower', 'berserker']) expect(endless).toContain(type);
+  });
+
+  test('the marsh’s middle boss is the brood mother, its last the Colossus pair; endless bosses take turns', () => {
+    const bosses = (n: number) => describeWave(createWave(marsh, n)).filter((r) => ENEMIES[r.type].boss);
+    expect(bosses(12)).toEqual([{ type: 'broodmother', count: 1 }]);
+    expect(bosses(20)).toEqual([{ type: 'colossus', count: 2 }]);
+    expect(bosses(25)[0]!.type).toBe('broodmother');
+    expect(bosses(30)[0]!.type).toBe('colossus');
+  });
+});

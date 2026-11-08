@@ -291,8 +291,161 @@ function colossus(/** @type {number} */ f) {
   });
 }
 
+/** A plated slime: grey helmet with a slit, riveted plates on its back, heavy squash. 22 × 18 */
+function ironclad(/** @type {number} */ f) {
+  const t = (f / 6) * Math.PI * 2;
+  const rx = 8 + Math.sin(t) * 0.8;
+  const ry = 6 - Math.sin(t) * 0.8;
+  return sprite(22, 18, (ctx) => {
+    disc(ctx, 'T', 11, 17 - ry, rx, ry);
+    disc(ctx, 'm', 10, 16 - ry, rx - 2, ry - 1.5);
+    // Back plates.
+    for (let i = 0; i < 3; i++) disc(ctx, 'g', 5 + i * 4, 15 - ry - (i === 1 ? 1 : 0), 2.5, 2);
+    for (let i = 0; i < 3; i++) px(ctx, 'G', 4 + i * 4, 14 - ry);
+    // Helmet with a slit and a crest.
+    disc(ctx, 'g', 14, 13 - ry, 4.5, 3.5);
+    px(ctx, 'G', 12, 11 - ry, 4, 1);
+    px(ctx, 'k', 13, 14 - ry, 5, 1);
+    px(ctx, 'Y', 16, 14 - ry);
+    line(ctx, 'R', 11, 10 - ry, 15, 9 - ry, 1);
+    px(ctx, 'K', 4, 16, 14, 1);
+  });
+}
+
+/**
+ * A slime behind a round wooden shield (studded, gold boss); frames 4–7 are the same
+ * without it (broken). 22 × 18
+ */
+function shieldbearer(/** @type {number} */ f) {
+  const t = ((f % 4) / 4) * Math.PI * 2;
+  const shielded = f < 4;
+  return sprite(22, 18, (ctx) => {
+    const ry = 5.5 - Math.sin(t) * 1;
+    disc(ctx, 'E', 9, 17 - ry, 7, ry);
+    disc(ctx, 'f', 8, 16 - ry, 5, ry - 1.5);
+    eyes(ctx, 8, 14 - ry);
+    if (shielded) {
+      disc(ctx, 'N', 16, 10, 4.5, 6.5);
+      disc(ctx, 'b', 15, 9, 3, 5);
+      line(ctx, 'n', 13, 4, 13, 16);
+      disc(ctx, 'y', 16, 10, 1.5, 1.5);
+      px(ctx, 'G', 15, 5);
+      px(ctx, 'G', 15, 15);
+    } else {
+      line(ctx, 'n', 16, 15, 19, 12, 1);
+    }
+  });
+}
+
+/** A hooded shaman slime with a staff topped by a glowing green stone. 18 × 22 */
+function shaman(/** @type {number} */ f) {
+  const t = (f / 4) * Math.PI * 2;
+  const bob = Math.round(Math.sin(t));
+  return sprite(18, 22, (ctx) => {
+    line(ctx, 'n', 15, 6 + bob, 15, 21, 1);
+    disc(ctx, 'f', 15, 4 + bob, 2, 2);
+    px(ctx, 'F', 14, 3 + bob);
+    disc(ctx, 'p', 8, 15, 6.5, 6);
+    disc(ctx, 'P', 7, 14, 4, 4);
+    disc(ctx, 'p', 8, 8 + bob, 4, 4);
+    px(ctx, 'k', 7, 8 + bob, 4, 3);
+    px(ctx, 'F', 8, 9 + bob);
+    px(ctx, 'F', 10, 9 + bob);
+    px(ctx, 'y', 4, 17, 8, 1);
+  });
+}
+
+/** A small dark bat, wings in 4 beats. 16 × 12 */
+function bat(/** @type {number} */ f) {
+  const up = [0, -3, -4, -2][f % 4] ?? 0;
+  return sprite(16, 12, (ctx) => {
+    line(ctx, 'u', 7, 6, 1, 6 + up, 2);
+    line(ctx, 'u', 9, 6, 14, 6 + up, 2);
+    px(ctx, 'U', 2, 7 + up, 3, 1);
+    px(ctx, 'U', 11, 7 + up, 3, 1);
+    disc(ctx, 'p', 8, 7, 2.5, 3);
+    px(ctx, 'R', 7, 6);
+    px(ctx, 'R', 9, 6);
+    px(ctx, 'p', 6, 3, 1, 2);
+    px(ctx, 'p', 10, 3, 1, 2);
+  });
+}
+
+/**
+ * A brown mole-like digger with big claws (frames 0–3); frames 4–7 are the mound of dirt
+ * it pushes along under the road. 20 × 16
+ */
+function burrower(/** @type {number} */ f) {
+  const t = ((f % 4) / 4) * Math.PI * 2;
+  if (f >= 4) {
+    return sprite(20, 16, (ctx) => {
+      disc(ctx, 'n', 10, 12, 8, 3 + Math.sin(t) * 0.5);
+      disc(ctx, 'N', 9, 12, 5, 2);
+      px(ctx, 'b', 4 + Math.round(Math.sin(t) * 2), 9, 2, 1);
+      px(ctx, 'b', 13 - Math.round(Math.sin(t) * 2), 10, 2, 1);
+    });
+  }
+  return sprite(20, 16, (ctx) => {
+    disc(ctx, 'N', 9, 10, 7, 5);
+    disc(ctx, 'b', 8, 9, 4, 3);
+    disc(ctx, 'N', 15, 10, 3.5, 3);
+    px(ctx, 'P', 18, 10, 2, 1);
+    px(ctx, 'k', 15, 9);
+    for (let c = 0; c < 2; c++) {
+      const s = Math.sin(t + c * Math.PI) * 2;
+      line(ctx, 'B', 11 + c * 4, 13, 12 + c * 4 + s, 15, 1);
+    }
+  });
+}
+
+/** A red-orange horned brute slime with angry brows; leans forward as it runs. 20 × 18 */
+function berserker(/** @type {number} */ f) {
+  const t = (f / 6) * Math.PI * 2;
+  const ry = 5 - Math.sin(t) * 1;
+  return sprite(20, 18, (ctx) => {
+    const top = 17 - ry * 2;
+    disc(ctx, 'r', 10, 17 - ry, 8, ry);
+    disc(ctx, 'R', 10, 16 - ry, 6, ry - 1.5);
+    line(ctx, 'w', 5, top + 2, 3, top - 1, 1);
+    line(ctx, 'w', 15, top + 2, 17, top - 1, 1);
+    px(ctx, 'w', 9, 14 - ry, 2, 2);
+    px(ctx, 'w', 13, 14 - ry, 2, 2);
+    px(ctx, 'k', 10, 15 - ry);
+    px(ctx, 'k', 14, 15 - ry);
+    line(ctx, 'k', 8, 13 - ry, 11, 14 - ry, 1);
+    line(ctx, 'k', 16, 13 - ry, 13, 14 - ry, 1);
+    px(ctx, 'O', 6, 16 - ry, 2, 1);
+  });
+}
+
+/** The brood mother (a boss): a huge violet slime with spikes and little ones riding on her. 40 × 36 */
+function broodmother(/** @type {number} */ f) {
+  const t = (f / 6) * Math.PI * 2;
+  const rx = 18 + Math.sin(t) * 1.5;
+  const ry = 13 - Math.sin(t) * 1.5;
+  return sprite(40, 36, (ctx) => {
+    disc(ctx, 'p', 20, 35 - ry, rx, ry);
+    disc(ctx, 'V', 18, 33 - ry, rx - 4, ry - 3);
+    for (let i = 0; i < 5; i++) {
+      const sx = 8 + i * 6;
+      line(ctx, 'y', sx, 24 - ry, sx + 1, 19 - ry - (i % 2) * 2, 2);
+    }
+    for (let i = 0; i < 3; i++) {
+      const bx = 10 + i * 9;
+      disc(ctx, 'f', bx, 28 - ry - (i === 1 ? 2 : 0), 3, 2.5);
+      px(ctx, 'k', bx, 28 - ry - (i === 1 ? 2 : 0));
+    }
+    px(ctx, 'w', 24, 31 - ry, 4, 3);
+    px(ctx, 'w', 31, 31 - ry, 4, 3);
+    px(ctx, 'k', 26, 32 - ry, 2, 2);
+    px(ctx, 'k', 33, 32 - ry, 2, 2);
+    px(ctx, 'k', 25, 37 - ry, 10, 1);
+    px(ctx, 'P', 10, 30 - ry, 3, 1);
+  });
+}
+
 /** Frames per kind and how fast they go round (frames a second). */
-const ENEMY_ART = /** @type {Record<EnemyType, { make: (f: number) => HTMLCanvasElement, frames: number, fps: number }>} */ ({
+const ENEMY_ART = /** @type {Record<EnemyType, { make: (f: number) => HTMLCanvasElement, frames: number, fps: number, variants?: number }>} */ ({
   crawler: { make: crawler, frames: 6, fps: 8 },
   runner: { make: runner, frames: 6, fps: 14 },
   shellback: { make: shellback, frames: 4, fps: 5 },
@@ -300,6 +453,13 @@ const ENEMY_ART = /** @type {Record<EnemyType, { make: (f: number) => HTMLCanvas
   splitter: { make: splitter, frames: 4, fps: 6 },
   shard: { make: shard, frames: 4, fps: 8 },
   colossus: { make: colossus, frames: 6, fps: 4 },
+  ironclad: { make: ironclad, frames: 6, fps: 5 },
+  shieldbearer: { make: shieldbearer, frames: 4, fps: 6, variants: 2 },
+  shaman: { make: shaman, frames: 4, fps: 5 },
+  bat: { make: bat, frames: 4, fps: 16 },
+  burrower: { make: burrower, frames: 4, fps: 9, variants: 2 },
+  berserker: { make: berserker, frames: 6, fps: 10 },
+  broodmother: { make: broodmother, frames: 6, fps: 4 },
 });
 
 /** @param {EnemyType} type */
@@ -371,6 +531,10 @@ export function towerArt(type, level, dir, firing, frame = 0) {
     else if (type === 'mortar') mortarTop(ctx, top, level, ux, uy, firing);
     else if (type === 'ballista') ballistaTop(ctx, top, level, ux, uy, firing);
     else if (type === 'frost') frostTop(ctx, top, level, frame, firing);
+    else if (type === 'flamer') flamerTop(ctx, top, level, ux, uy, firing);
+    else if (type === 'tesla') teslaTop(ctx, top, level, frame, firing);
+    else if (type === 'sniper') sniperTop(ctx, top, level, ux, uy, firing);
+    else if (type === 'alchemist') alchemistTop(ctx, top, level, ux, uy, firing);
     else bannerTop(ctx, top, level, frame);
   });
 }
@@ -468,6 +632,95 @@ function bannerTop(ctx, top, level, frame) {
     if (x > 1 && x < w - 2) px(ctx, 'V', CX - 2 + x, top - h + 3 + wave, 1, 1);
   }
   if (level === 3) px(ctx, 'y', CX - 1, top - h + 5, 3, 1);
+}
+
+/** An iron fire drum with a nozzle toward the aim; firing, a tongue of flame. Bands by level. @param {Ctx} ctx @param {number} top @param {number} level @param {number} ux @param {number} uy @param {boolean} firing */
+function flamerTop(ctx, top, level, ux, uy, firing) {
+  const cy = top - 5;
+  const away = uy < -0.3;
+  const nozzle = () => {
+    const nx = CX + ux * 5;
+    const ny = cy + uy * 4;
+    line(ctx, 'K', CX, cy, nx, ny, 3);
+    if (firing) {
+      disc(ctx, 'O', nx + ux * 2, ny + uy * 2, 1.5, 1.5);
+      px(ctx, 'y', Math.round(nx + ux * 2), Math.round(ny + uy * 2));
+    }
+  };
+  if (away) nozzle();
+  // A copper fire drum: iron bands, a glowing grate and a chimney.
+  px(ctx, 'N', CX - 5, cy - 4, 10, 9);
+  px(ctx, 'o', CX - 4, cy - 4, 3, 9);
+  px(ctx, 'K', CX - 5, cy - 4, 10, 1);
+  px(ctx, level === 3 ? 'y' : 'K', CX - 5, cy + 4, 10, 1);
+  if (level >= 2) px(ctx, level === 3 ? 'y' : 'K', CX - 5, cy, 10, 1);
+  px(ctx, 'k', CX - 2, cy + 1, 4, 2);
+  px(ctx, firing ? 'Y' : 'O', CX - 1, cy + 1, 2, 1);
+  px(ctx, 'R', CX - 2, cy + 2, 4, 1);
+  px(ctx, 'K', CX + 2, cy - 8, 2, 4);
+  if (!away) nozzle();
+}
+
+/** A tesla coil: a mast with copper rings and a glowing ball; sparks run round (4 frames), brighter when firing. @param {Ctx} ctx @param {number} top @param {number} level @param {number} frame @param {boolean} firing */
+function teslaTop(ctx, top, level, frame, firing) {
+  const h = Math.min(9 + level * 2, top - 9);
+  line(ctx, 'K', CX, top, CX, top - h, 2);
+  for (let i = 0; i < 2 + level; i++) px(ctx, i % 2 ? 'o' : 'O', CX - 3, top - 2 - i * 3, 7, 1);
+  disc(ctx, firing ? 'w' : 'C', CX, top - h - 2, 2.5, 2.5);
+  px(ctx, 'V', CX - 1, top - h - 3);
+  const spark = [[-4, -1], [3, -2], [-3, -3], [4, 0]][frame % 4] ?? [0, 0];
+  px(ctx, firing ? 'y' : 'V', CX + (spark[0] ?? 0), top - h - 2 + (spark[1] ?? 0));
+  if (level === 3) px(ctx, 'y', CX - 2, top - 1, 5, 1);
+}
+
+/** A crow's nest with a marksman: a long gun toward the aim, a muzzle flash when firing. @param {Ctx} ctx @param {number} top @param {number} level @param {number} ux @param {number} uy @param {boolean} firing */
+function sniperTop(ctx, top, level, ux, uy, firing) {
+  const y = top - 8;
+  const away = uy < -0.3;
+  const gun = () => {
+    const len = Math.min(6 + level, 8);
+    const ex = CX + ux * len;
+    const ey = y + 4 + uy * (len * 0.6);
+    line(ctx, 'G', CX, y + 4, ex, ey, 1);
+    px(ctx, 'n', Math.round(CX - ux * 2), Math.round(y + 4 - uy * 1), 2, 2);
+    if (firing) px(ctx, 'Y', Math.round(ex + ux), Math.round(ey + uy));
+  };
+  // The nest's railing.
+  px(ctx, 'N', CX - 6, top - 3, 12, 3);
+  px(ctx, 'n', CX - 6, top - 1, 12, 1);
+  if (away) gun();
+  disc(ctx, 'e', CX, y + 3, 3, 3);
+  disc(ctx, 'E', CX, y, 2.5, 2.5);
+  px(ctx, level === 3 ? 'y' : 'e', CX - 3, y - 1, 7, 1);
+  if (!away) {
+    px(ctx, 'B', CX + (ux < -0.3 ? -2 : 0), y + 1, 3, 2);
+    gun();
+  }
+}
+
+/** A bubbling cauldron with a flask in a raised arm toward the aim; firing, the arm is thrown forward. @param {Ctx} ctx @param {number} top @param {number} level @param {number} ux @param {number} uy @param {boolean} firing */
+function alchemistTop(ctx, top, level, ux, uy, firing) {
+  const cy = top - 4;
+  const reach = firing ? 7 : 4;
+  const arm = () => {
+    const hx = CX + ux * reach;
+    const hy = cy - 6 + uy * 2;
+    line(ctx, 'b', CX, cy - 4, hx, hy, 1);
+    disc(ctx, 'f', hx, hy - 1, 1.5, 1.5);
+    px(ctx, 'w', Math.round(hx), Math.round(hy - 3));
+  };
+  if (uy < -0.3) arm();
+  disc(ctx, 'k', CX, cy, 6, 4);
+  disc(ctx, 'K', CX, cy + 1, 5, 3);
+  disc(ctx, 'f', CX, cy - 2, 4.5, 1.5);
+  px(ctx, 'F', CX - 2, cy - 3);
+  px(ctx, 'F', CX + 2, cy - 4);
+  px(ctx, level === 3 ? 'y' : 'g', CX - 6, cy, 12, 1);
+  if (level >= 2) {
+    px(ctx, 'E', CX - 9, top - 4, 2, 3);
+    px(ctx, 'P', CX + 7, top - 4, 2, 3);
+  }
+  if (uy >= -0.3) arm();
 }
 
 /** Directions on the screen for an aim (radians, screen space): 0 right, clockwise. @param {number} angle */

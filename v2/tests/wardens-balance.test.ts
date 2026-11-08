@@ -3,13 +3,15 @@
 // randomness), so these runs are exactly what a player with the same build would see.
 //
 // The scripted build is what a careful player does: a few archers and a mortar where
-// the road bends, frost and a ballista next, then a banner, then every pad filled and
-// everything upgraded, buying each step as soon as the gold is there and letting every
-// wave after the first start by itself (no early calls). With the numbers in config.js
-// and maps.js it ends (lives left of 20):
-//   Łąka 19 (3 stars) · Kanion 13 (2 stars) · Mokradła 9 (1 star) · endless: 24 waves.
+// the road bends, frost and a ballista next, then a banner (on the marsh an alchemist
+// against its armor and healers), then every other pad filled with the td-4 towers (tesla,
+// alchemist, flamer, sniper in turn) and everything upgraded, buying each step as soon as
+// the gold is there and letting every wave after the first start by itself (no early
+// calls). With the numbers in config.js, maps.js and waves.js it ends (lives left of 20):
+//   Łąka 19 (3 stars) · Kanion 13 (2 stars) · Mokradła 12 (2 stars) · endless: 23 waves.
 // Doing nothing loses every map by wave 3; a build that stops investing after its first
-// 24 steps still wins Łąka and Kanion but loses Mokradła; archers alone lose Mokradła.
+// 24 steps wins Łąka only (the td-4 kinds in Kanion's and Mokradła's late waves need more);
+// archers alone lose every map. Each td-4 enemy has a counter (the last describe).
 import { describe, expect, test, vi } from 'vitest';
 import { DT } from '../public/games/wardens/js/config.js';
 import { MAPS, type MapDef } from '../public/games/wardens/js/maps.js';
@@ -24,7 +26,7 @@ import {
   upgradeTower,
   type GameOptions,
 } from '../public/games/wardens/js/sim.js';
-import type { Priority, TowerType } from '../public/games/wardens/js/config.js';
+import type { EnemyType, Priority, TowerType } from '../public/games/wardens/js/config.js';
 
 type Step = ['build', number, TowerType] | ['upgrade', number] | ['aim', number, Priority];
 
@@ -47,15 +49,15 @@ const OPENINGS: Record<MapDef['id'], Step[]> = {
   marsh: [
     ['build', 10, 'archer'], ['build', 5, 'archer'], ['build', 2, 'mortar'], ['build', 7, 'frost'], ['upgrade', 10],
     ['build', 3, 'ballista'], ['upgrade', 5], ['build', 8, 'mortar'], ['upgrade', 2], ['build', 0, 'archer'],
-    ['build', 6, 'banner'], ['upgrade', 3], ['upgrade', 8], ['upgrade', 7], ['upgrade', 10], ['upgrade', 5],
+    ['build', 6, 'alchemist'], ['upgrade', 3], ['upgrade', 8], ['upgrade', 7], ['upgrade', 10], ['upgrade', 5],
     ['build', 13, 'ballista'], ['upgrade', 3], ['upgrade', 2], ['upgrade', 8], ['upgrade', 13], ['upgrade', 0],
     ['upgrade', 13], ['upgrade', 0],
   ],
 };
 
-const FILLERS: TowerType[] = ['ballista', 'archer', 'mortar', 'archer'];
+const FILLERS: TowerType[] = ['tesla', 'alchemist', 'flamer', 'sniper'];
 
-/** The opening, then every other pad (ballista, archer, mortar, archer in turn), then every tower to level 3. */
+/** The opening, then every other pad (tesla, alchemist, flamer, sniper in turn), then every tower to level 3. */
 function fullBuild(map: MapDef): Step[] {
   const steps = [...OPENINGS[map.id]];
   const used = steps.filter((s) => s[0] === 'build').map((s) => s[1]);
@@ -98,7 +100,7 @@ describe('a careful build wins every map', () => {
   const expected: Record<MapDef['id'], { lives: number; stars: number }> = {
     meadow: { lives: 19, stars: 3 },
     canyon: { lives: 13, stars: 2 },
-    marsh: { lives: 9, stars: 1 },
+    marsh: { lives: 12, stars: 2 },
   };
   for (const map of MAPS) {
     test(`${map.id}: won with lives to spare`, () => {
@@ -115,6 +117,18 @@ describe('a careful build wins every map', () => {
     expect(lives[0]).toBeGreaterThan(lives[1] ?? 0);
     expect(lives[1]).toBeGreaterThan(lives[2] ?? 0);
   });
+
+  test('with only the first five towers, the same build loses the marsh: the new kinds need the new towers', () => {
+    const map = byId('marsh');
+    const opening = OPENINGS.marsh.map((s): Step => (s[0] === 'build' && s[2] === 'alchemist' ? ['build', s[1], 'banner'] : s));
+    const steps = [...opening];
+    const used = steps.filter((s) => s[0] === 'build').map((s) => s[1]);
+    const rest = map.pads.map((_, i) => i).filter((i) => !used.includes(i));
+    const old: TowerType[] = ['ballista', 'archer', 'mortar', 'archer'];
+    rest.forEach((pad, k) => steps.push(['build', pad, old[k % old.length] ?? 'archer']));
+    for (const pad of [...used, ...rest]) steps.push(['upgrade', pad], ['upgrade', pad]);
+    expect(play(map, steps).phase).toBe('lost');
+  });
 });
 
 describe('a weak defence loses', () => {
@@ -127,20 +141,23 @@ describe('a weak defence loses', () => {
     });
   }
 
-  test('stopping after the opening still wins the first two maps, not the marsh', () => {
+  test('stopping after the opening wins the meadow only; the canyon and the marsh are lost late', () => {
     expect(play(byId('meadow'), OPENINGS.meadow).phase).toBe('won');
-    expect(play(byId('canyon'), OPENINGS.canyon).phase).toBe('won');
+    const canyon = play(byId('canyon'), OPENINGS.canyon);
+    expect(canyon.phase).toBe('lost');
+    expect(canyon.cleared).toBeGreaterThan(12);
     const marsh = play(byId('marsh'), OPENINGS.marsh);
     expect(marsh.phase).toBe('lost');
     expect(marsh.cleared).toBeGreaterThan(10);
   });
 
-  test('archers alone, even upgraded, lose the marsh', () => {
-    const map = byId('marsh');
-    const steps: Step[] = map.pads.map((_, i) => ['build', i, 'archer'] as Step);
-    for (let i = 0; i < map.pads.length; i++) steps.push(['upgrade', i], ['upgrade', i]);
-    expect(play(map, steps).phase).toBe('lost');
-  });
+  for (const map of MAPS) {
+    test(`${map.id}: archers alone, even upgraded, lose`, () => {
+      const steps: Step[] = map.pads.map((_, i) => ['build', i, 'archer'] as Step);
+      for (let i = 0; i < map.pads.length; i++) steps.push(['upgrade', i], ['upgrade', i]);
+      expect(play(map, steps).phase).toBe('lost');
+    });
+  }
 });
 
 describe('endless play', () => {
@@ -148,7 +165,7 @@ describe('endless play', () => {
     const map = byId('marsh');
     const game = play(map, fullBuild(map), { endless: true });
     expect(game.phase).toBe('lost');
-    expect(game.cleared).toBe(24);
+    expect(game.cleared).toBe(23);
   });
 });
 
@@ -157,4 +174,82 @@ test('the same build plays out the same every time (no randomness, fixed step)',
   const a = play(map, fullBuild(map));
   const b = play(map, fullBuild(map));
   expect([a.lives, a.gold, a.stats.kills, a.time]).toEqual([b.lives, b.gold, b.stats.kills, b.time]);
+});
+
+// ── Each td-4 enemy has a counter ──────────────────────────────────────────────
+// A group walks the meadow's road past four level-2 towers on the pads at its first bends
+// (wave-10 health, or 12 for the boss); what gets through is counted. The counter lets
+// (almost) nothing through where an ordinary choice lets many through.
+type Spawn = { at: number; type: EnemyType };
+
+function fight(spawns: Spawn[], towers: [number, TowerType][], wave = 10): number {
+  const game = createGame(byId('meadow'), { gold: 99_999 });
+  for (const [pad, type] of towers) {
+    buildTower(game, pad, type);
+    upgradeTower(game, pad);
+  }
+  game.phase = 'wave';
+  game.wave = wave;
+  game.totalWaves = 99;
+  game.spawns = spawns;
+  game.spawnCursor = 0;
+  game.waveTime = 0;
+  for (let i = 0; i < 60 * 300 && (game.spawnCursor < game.spawns.length || game.aliveCount > 0); i++) updateGame(game, DT);
+  return game.stats.leaked;
+}
+
+const PADS = [4, 2, 8, 5];
+const four = (type: TowerType): [number, TowerType][] => PADS.map((pad) => [pad, type]);
+const row = (type: EnemyType, count: number, gap: number, from = 0): Spawn[] => Array.from({ length: count }, (_, i) => ({ at: from + i * gap, type }));
+
+describe('each new enemy has a counter', () => {
+  test('ironclad (armor 12): ballistas and snipers stop all eight; archers none', () => {
+    const group = row('ironclad', 8, 1.2);
+    expect(fight(group, four('ballista'))).toBe(0);
+    expect(fight(group, four('sniper'))).toBe(0);
+    expect(fight(group, four('archer'))).toBe(8);
+  });
+
+  test('shieldbearer: a blast, fire or lightning breaks the shield; arrows feed it', () => {
+    const group = row('shieldbearer', 8, 1.2);
+    for (const counter of ['mortar', 'flamer', 'tesla'] as const) expect(fight(group, four(counter)), counter).toBe(0);
+    expect(fight(group, four('archer'))).toBeGreaterThanOrEqual(4);
+  });
+
+  test('shaman heals the column (more get through); a sniper picks the healers off', () => {
+    const shells = row('shellback', 8, 1);
+    const column = [...shells, ...row('shaman', 3, 2, 0.5)].sort((a, b) => a.at - b.at);
+    const archers = four('archer');
+    expect(fight(column, archers)).toBeGreaterThan(fight(shells, archers));
+    const withSniper: [number, TowerType][] = [[4, 'archer'], [2, 'archer'], [8, 'sniper'], [5, 'archer']];
+    expect(fight(column, withSniper)).toBeLessThanOrEqual(2);
+  });
+
+  test('bats (fast fliers in a flock): lightning and arrows stop them; mortars cannot reach them', () => {
+    const flock = row('bat', 8, 0.28);
+    expect(fight(flock, four('tesla'))).toBe(0);
+    expect(fight(flock, four('archer'))).toBe(0);
+    expect(fight(flock, four('mortar'))).toBe(8);
+  });
+
+  test('burrower (under the road for a stretch): reach and lightning get it; archers on the dug stretch do not', () => {
+    const group = row('burrower', 8, 1.2);
+    expect(fight(group, four('sniper'))).toBe(0);
+    expect(fight(group, four('tesla'))).toBe(0);
+    expect(fight(group, four('archer'))).toBeGreaterThanOrEqual(6);
+  });
+
+  test('berserker (faster when hurt): heavy single hits kill it before it rages; arrows let it run', () => {
+    const group = row('berserker', 6, 1.5);
+    expect(fight(group, four('ballista'))).toBe(0);
+    expect(fight(group, four('sniper'))).toBe(0);
+    expect(fight(group, four('archer'))).toBeGreaterThanOrEqual(3);
+  });
+
+  test('brood mother (boss, drops crawlers): heavy hits for her and splash or fire for her brood', () => {
+    const boss = [{ at: 0, type: 'broodmother' as const }];
+    expect(fight(boss, [[4, 'ballista'], [2, 'mortar'], [8, 'ballista'], [5, 'mortar']], 12)).toBe(0);
+    expect(fight(boss, [[4, 'sniper'], [2, 'flamer'], [8, 'sniper'], [5, 'flamer']], 12)).toBe(0);
+    expect(fight(boss, four('archer'), 12)).toBeGreaterThanOrEqual(3);
+  });
 });
