@@ -453,7 +453,7 @@ test.describe('the page turn', () => {
     await expect(leaf).toHaveClass(/spread__leaf--prev/);
     await expect(leaf).toHaveCount(0);
     await expect(page.getByTestId('folio-left')).toHaveText('1');
-    expect(await turnsSeen(page)).toEqual([expect.stringContaining('--next'), expect.stringContaining('--prev')]);
+    await expect.poll(() => turnsSeen(page)).toEqual([expect.stringContaining('--next'), expect.stringContaining('--prev')]);
   });
 
   test('two quick taps turn two spreads: the place and the pages stay right', async ({ page }) => {
@@ -494,7 +494,10 @@ test.describe('the page turn', () => {
       if ((await page.getByTestId('folio-left').textContent()) === '3') break;
     }
     await expect(page.getByTestId('folio-left')).toHaveText('3');
-    expect(await turnsSeen(page)).toEqual([expect.stringContaining('--next')]);
+    // The turn starts on the frame after the spread changes: on a slow runner that frame
+    // can come after this check, so wait for it (CI read the recorder too early).
+    await expect.poll(() => turnsSeen(page)).toEqual([expect.stringContaining('--next')]);
+    await turnDone(page);
     await expect(page.getByTestId('page-turn')).toHaveCount(0);
     expect(await settledScale(page)).toBeGreaterThan(1.2);
   });
@@ -509,6 +512,8 @@ test.describe('the page turn', () => {
     await expect(page.getByTestId('folio-left')).toHaveText('3');
     await page.getByRole('button', { name: 'Wstecz' }).click();
     await expect(page.getByTestId('folio-left')).toHaveText('1');
+    // Frames after the change, when a turn would have started.
+    await turnDone(page);
     expect(await turnsSeen(page)).toEqual([]);
   });
 });
