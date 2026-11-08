@@ -406,3 +406,114 @@ test.describe('turning a phone that started upright (393×851, DPR 2.75)', () =>
     await expect(page.getByTestId('folio-left')).toHaveText(String(before - 2));
   });
 });
+
+/** Records whether a page turn (the rotating leaf) ever appears from now on. */
+function watchTurns(page) {
+  return page.evaluate(() => {
+    window.__turns = [];
+    new MutationObserver((records) => {
+      for (const r of records)
+        for (const n of r.addedNodes) if (n instanceof HTMLElement && n.dataset.testid === 'page-turn') window.__turns.push(n.className);
+    }).observe(document.body, { childList: true, subtree: true });
+  });
+}
+/** A turn starts on the frame after the spread changes: wait for that frame, then for the turn to end. */
+async function turnDone(page) {
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  await expect.poll(() => page.locator('.spread__turn').evaluate((el) => el.childElementCount)).toBe(0);
+}
+const turnsSeen = (page) => page.evaluate(() => window.__turns);
+
+async function zoomOff(page) {
+  await page.getByRole('button', { name: 'Ustawienia tekstu' }).click();
+  await page.getByRole('switch', { name: 'Przybliżaj do zdania' }).click();
+  await page.keyboard.press('Escape');
+}
+
+test.describe('the page turn', () => {
+  test('a new spread arrives by a page turning over the spine: right page forward, left page back', async ({ page }) => {
+    const account = await createUser({ tag: 'turn', profile: { optInModules: ['reader'] } });
+    await openBook(page, account);
+    await zoomOff(page);
+    await watchTurns(page);
+
+    await page.getByRole('button', { name: 'Dalej' }).click();
+    const leaf = page.getByTestId('page-turn');
+    await expect(leaf).toHaveClass(/spread__leaf--next/);
+    // It moves: a 3D rotation about the spine while it runs, with the front and back faces.
+    await expect.poll(() => leaf.evaluate((el) => el.getAnimations()[0]?.playState)).toBe('running');
+    await expect.poll(() => leaf.evaluate((el) => getComputedStyle(el).transform)).not.toBe('none');
+    await expect(leaf.locator('.spread__face--front')).toHaveCount(1);
+    await expect(leaf.locator('.spread__face--back')).toHaveCount(1);
+    // …then it is gone and the next spread is there.
+    await expect(leaf).toHaveCount(0);
+    await expect(page.getByTestId('folio-left')).toHaveText('3');
+
+    await page.getByRole('button', { name: 'Wstecz' }).click();
+    await expect(leaf).toHaveClass(/spread__leaf--prev/);
+    await expect(leaf).toHaveCount(0);
+    await expect(page.getByTestId('folio-left')).toHaveText('1');
+    await expect.poll(() => turnsSeen(page)).toEqual([expect.stringContaining('--next'), expect.stringContaining('--prev')]);
+  });
+
+  test('two quick taps turn two spreads: the place and the pages stay right', async ({ page }) => {
+    const account = await createUser({ tag: 'turn-fast', profile: { optInModules: ['reader'] } });
+    await openBook(page, account);
+    await zoomOff(page);
+    // The place two careful turns lead to.
+    await page.getByRole('button', { name: 'Dalej' }).click();
+    await turnDone(page);
+    await page.getByRole('button', { name: 'Dalej' }).click();
+    await turnDone(page);
+    await expect(page.getByTestId('folio-left')).toHaveText('5');
+    const careful = await status(page).textContent();
+    await page.getByRole('button', { name: 'Wstecz' }).click();
+    await turnDone(page);
+    await page.getByRole('button', { name: 'Wstecz' }).click();
+    await turnDone(page);
+    await expect(page.getByTestId('folio-left')).toHaveText('1');
+
+    // Now two taps without waiting: the first turn is finished at once, the second one runs.
+    const next = page.getByRole('button', { name: 'Dalej' });
+    await next.click();
+    await next.click({ delay: 0 });
+    await expect(page.getByTestId('folio-left')).toHaveText('5');
+    // Nothing of a turn is left over the pages, and the place is the careful one.
+    await turnDone(page);
+    await expect(status(page)).toHaveText(careful);
+    await expect(page.getByTestId('folio-left')).toHaveText('5');
+  });
+
+  test('stepping sentence by sentence onto the next spread turns the page, then zooms in again', async ({ page }) => {
+    const account = await createUser({ tag: 'turn-zoom', profile: { optInModules: ['reader'] } });
+    await openBook(page, account);
+    await watchTurns(page);
+    const next = page.getByRole('button', { name: 'Dalej' });
+    for (let i = 0; i < 40; i++) {
+      await next.click();
+      if ((await page.getByTestId('folio-left').textContent()) === '3') break;
+    }
+    await expect(page.getByTestId('folio-left')).toHaveText('3');
+    // The turn starts on the frame after the spread changes: on a slow runner that frame
+    // can come after this check, so wait for it (CI read the recorder too early).
+    await expect.poll(() => turnsSeen(page)).toEqual([expect.stringContaining('--next')]);
+    await turnDone(page);
+    await expect(page.getByTestId('page-turn')).toHaveCount(0);
+    expect(await settledScale(page)).toBeGreaterThan(1.2);
+  });
+
+  test('with reduced motion the spread just changes: no 3D turn', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const account = await createUser({ tag: 'turn-reduced', profile: { optInModules: ['reader'] } });
+    await openBook(page, account);
+    await zoomOff(page);
+    await watchTurns(page);
+    await page.getByRole('button', { name: 'Dalej' }).click();
+    await expect(page.getByTestId('folio-left')).toHaveText('3');
+    await page.getByRole('button', { name: 'Wstecz' }).click();
+    await expect(page.getByTestId('folio-left')).toHaveText('1');
+    // Frames after the change, when a turn would have started.
+    await turnDone(page);
+    expect(await turnsSeen(page)).toEqual([]);
+  });
+});

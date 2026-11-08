@@ -843,6 +843,10 @@
 
 .spread__page--left {
   left: 0;
+}
+
+.spread__page--left,
+.spread__face--paper-left {
   /* The page bends into the binding: lighter at the outer edge, shaded toward the gutter. */
   background:
     linear-gradient(to right, rgb(255 255 255 / 0%) 0%, rgb(255 255 255 / 0%) 70%, rgb(0 0 0 / 4%) 88%, rgb(0 0 0 / 16%) 100%),
@@ -852,19 +856,25 @@
 
 .spread__page--right {
   right: 0;
+}
+
+.spread__page--right,
+.spread__face--paper-right {
   background:
     linear-gradient(to left, rgb(255 255 255 / 0%) 0%, rgb(255 255 255 / 0%) 70%, rgb(0 0 0 / 4%) 88%, rgb(0 0 0 / 16%) 100%),
     linear-gradient(to left, rgb(0 0 0 / 5%) 0%, rgb(0 0 0 / 0%) 4%),
     var(--r-surface);
 }
 
-.reader[data-theme='night'] .spread__page--left {
+.reader[data-theme='night'] .spread__page--left,
+.reader[data-theme='night'] .spread__face--paper-left {
   background:
     linear-gradient(to right, rgb(0 0 0 / 0%) 0%, rgb(0 0 0 / 0%) 66%, rgb(0 0 0 / 22%) 88%, rgb(0 0 0 / 55%) 100%),
     var(--r-surface);
 }
 
-.reader[data-theme='night'] .spread__page--right {
+.reader[data-theme='night'] .spread__page--right,
+.reader[data-theme='night'] .spread__face--paper-right {
   background:
     linear-gradient(to left, rgb(0 0 0 / 0%) 0%, rgb(0 0 0 / 0%) 66%, rgb(0 0 0 / 22%) 88%, rgb(0 0 0 / 55%) 100%),
     var(--r-surface);
@@ -928,8 +938,8 @@
   hyphens: auto;
   overflow-wrap: break-word;
   text-align: justify;
+  /* No slide: a new spread arrives by a page turn (pageTurn.ts) or a short crossfade. */
   transform: translateX(var(--col-shift, 0));
-  transition: transform var(--duration-enter) var(--ease-out);
 }
 
 .spread__columns p {
@@ -998,4 +1008,101 @@
   pointer-events: none;
   transform: none;
   transition: none;
+}
+
+/* ---------- The page turn (pageTurn.ts) ---------- */
+
+.spread__turn {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  perspective: 1600px;
+  pointer-events: none;
+}
+
+.spread__face {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  overflow: hidden;
+}
+
+.spread__face--left {
+  left: 0;
+}
+
+.spread__face--right {
+  left: 50%;
+}
+
+/* A copy of the columns inside a face: the same text, no motion of its own. */
+.spread__face > .spread__columns {
+  transition: none;
+}
+
+.spread__leaf {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.spread__leaf--next {
+  left: 50%;
+  transform-origin: left center;
+}
+
+.spread__leaf--prev {
+  left: 0;
+  transform-origin: right center;
+}
+
+.spread__leaf > .spread__face {
+  left: 0;
+  width: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.spread__leaf > .spread__face--back {
+  transform: rotateY(180deg);
+}
+
+/* Shading: the lifted page darkens toward the fold, the page below lies in its shadow. */
+.spread__shade {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.spread__leaf--next .spread__face--front .spread__shade,
+.spread__leaf--prev .spread__face--back .spread__shade,
+.spread__cast--next {
+  background: linear-gradient(to right, rgb(0 0 0 / 45%), rgb(0 0 0 / 10%) 60%, rgb(0 0 0 / 0%));
+}
+
+.spread__leaf--next .spread__face--back .spread__shade,
+.spread__leaf--prev .spread__face--front .spread__shade,
+.spread__cast--prev {
+  background: linear-gradient(to left, rgb(0 0 0 / 45%), rgb(0 0 0 / 10%) 60%, rgb(0 0 0 / 0%));
+}
+
+.spread__cast {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  opacity: 0;
+}
+
+.spread__cast--next {
+  left: 50%;
+}
+
+.spread__cast--prev {
+  left: 0;
 }
