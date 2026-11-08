@@ -684,7 +684,7 @@
 
 .reader[data-layout='spread'] .reader__top {
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 4px;
   padding: calc(4px + env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 4px max(10px, env(safe-area-inset-left));
 }
 
@@ -718,10 +718,20 @@
 }
 
 .reader__status--line {
-  overflow: hidden;
+  display: flex;
   flex: 0 1 auto;
   min-width: 0;
-  white-space: nowrap;
+  white-space: pre;
+}
+
+/* With little room (Auto's controls) the percentage stays, the sentence count gives way. */
+.reader__status--line b {
+  flex: none;
+}
+
+.reader__status-rest {
+  overflow: hidden;
+  min-width: 0;
   text-overflow: ellipsis;
 }
 
@@ -737,8 +747,8 @@
 }
 
 .reader__mini {
-  min-width: 36px;
-  min-height: 36px;
+  min-width: 34px;
+  min-height: 40px;
   border: 1.5px solid var(--r-line);
   border-radius: 10px;
   background: var(--r-surface);
@@ -747,11 +757,19 @@
 }
 
 .reader__mini-out {
-  min-width: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 44px;
   color: var(--r-muted);
-  font-size: 12px;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
+  line-height: 1.1;
   text-align: center;
+}
+
+.reader__mini-out b {
+  font-size: 13px;
 }
 
 .reader__mini-out b {
@@ -1105,4 +1123,49 @@
 
 .spread__cast--prev {
   left: 0;
+}
+
+/* ---------- Full screen: the book and its arrows only (fullscreen.ts) ---------- */
+
+/* Small and see-through, but a full 44 px target, in the top corner. */
+.reader__fs-exit {
+  position: absolute;
+  top: max(4px, env(safe-area-inset-top));
+  right: max(4px, env(safe-area-inset-right));
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: var(--r-ink);
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.45;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+.reader__fs-exit:hover,
+.reader__fs-exit:focus-visible {
+  opacity: 1;
+}
+
+.reader__fs-exit svg {
+  width: 16px;
+  height: 16px;
+}
+
+.reader[data-fullscreen='true'] .spread {
+  padding-top: max(6px, env(safe-area-inset-top));
+}
+
+/* The side buttons start below the exit button, so the two never overlap. */
+.reader[data-fullscreen='true'] .spread__side {
+  padding-top: 48px;
+}
+
+.reader[data-fullscreen='true'][data-layout='column'] .reader__stage {
+  padding-top: 44px;
 }

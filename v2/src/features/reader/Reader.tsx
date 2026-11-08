@@ -12,7 +12,7 @@
 // as sentences of the whole book, so that choice never moves anyone.
 // The position is saved on the device a moment after each move, and at once when the
 // page hides or the reader closes. Nothing here touches points or statistics.
-import { ArrowLeft, ArrowRight, ListTree, Pause, Play } from 'lucide-preact';
+import { ArrowLeft, ArrowRight, ListTree, Maximize2, Minimize2, Pause, Play } from 'lucide-preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { buildGroups, flatten, groupIndexOf, percentRead, type BookContent, type BookMeta } from '@/domain/reader/book';
 import {
@@ -36,6 +36,7 @@ import { PageView } from './PageView';
 import { BookTocPanel, SettingsPanel, TocPanel } from './Panels';
 import { SpreadView, type SpreadControl } from './SpreadView';
 import { crumbText, fmt } from './texts';
+import { fullscreenRemembered, leaveSystemFullscreen, rememberFullscreen, requestSystemFullscreen } from './fullscreen';
 import { useLandscape } from './useLandscape';
 
 interface ReaderProps {
@@ -81,6 +82,43 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
   const [easyAnim, setEasyAnim] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
+
+  // ── Full screen: only the book and its arrows (fullscreen.ts) ──────────────
+  const [fullscreen, setFullscreen] = useState(fullscreenRemembered);
+  /** The browser's own full screen is on because the reader asked for it. */
+  const systemFullscreen = useRef(false);
+  const enterFullscreen = () => {
+    setPanel(null);
+    setFullscreen(true);
+    rememberFullscreen(true);
+    void requestSystemFullscreen().then((granted) => {
+      systemFullscreen.current = granted;
+    });
+  };
+  const exitFullscreen = () => {
+    setFullscreen(false);
+    rememberFullscreen(false);
+    systemFullscreen.current = false;
+    leaveSystemFullscreen();
+  };
+  useEffect(() => {
+    // Left by the system (Back, Esc, a gesture): the reader leaves it too.
+    const onChange = () => {
+      if (document.fullscreenElement) systemFullscreen.current = true;
+      else if (systemFullscreen.current) {
+        systemFullscreen.current = false;
+        setFullscreen(false);
+        rememberFullscreen(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onChange);
+      // Closing the book leaves the browser's full screen (the library has its own controls).
+      if (systemFullscreen.current) leaveSystemFullscreen();
+    };
+  }, []);
+  const togglePlay = () => setPlaying((p) => !p);
   const endNoted = useRef(false);
   const spread = useRef<SpreadControl | null>(null);
 
@@ -220,6 +258,7 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
   keys.current = (e: KeyboardEvent) => {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
     if (e.key === 'Escape') {
+      if (panel === null && fullscreen) exitFullscreen();
       setPanel(null);
       return;
     }
@@ -306,8 +345,10 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
       data-theme={settings.theme}
       data-mode={mode}
       data-layout={landscape ? 'spread' : 'column'}
+      data-fullscreen={fullscreen ? 'true' : 'false'}
       style={{ '--reader-size': `${fontPx}px` }}
     >
+      {!fullscreen && (
       <header class="reader__top">
         <div class="reader__top-left">
           <button type="button" class="reader__icon-btn" title={t('reader.backLabel')} onClick={onBack}>
@@ -325,6 +366,10 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
           </button>
         </div>
         <div class="reader__top-right">
+          <button type="button" class="reader__icon-btn" title={t('reader.fullscreenLabel')} onClick={enterFullscreen}>
+            <Maximize2 aria-hidden="true" />
+            <span>{t('reader.fullscreen')}</span>
+          </button>
           <button
             type="button"
             class="reader__icon-btn"
@@ -347,7 +392,8 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
         {landscape && (
           <div class="reader__top-status">
             <span class="reader__status reader__status--line" data-testid="reader-status">
-              <b>{pct}%</b> · {statusText}
+              <b>{pct}%</b>
+              <span class="reader__status-rest"> · {statusText}</span>
             </span>
             {mode === 'auto' && (
               <div class="reader__top-auto">
@@ -366,7 +412,14 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
           </div>
         )}
       </header>
-      {!landscape && <div class="reader__crumb">{crumbText(meta.title, sections[secIndex], secIndex)}</div>}
+      )}
+      {fullscreen && (
+        <button type="button" class="reader__fs-exit" aria-label={t('reader.fullscreenExitLabel')} onClick={exitFullscreen}>
+          <Minimize2 aria-hidden="true" />
+          <span>{t('reader.fullscreenExit')}</span>
+        </button>
+      )}
+      {!landscape && !fullscreen && <div class="reader__crumb">{crumbText(meta.title, sections[secIndex], secIndex)}</div>}
 
       <div class="reader__stage" key={`${settings.skipToc}-${landscape}`}>
         {landscape && (
@@ -391,6 +444,7 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
               setPlaying(false);
               noteEnd();
             }}
+            onTapPage={fullscreen ? togglePlay : undefined}
             swipe={swipe}
           />
         )}
@@ -426,6 +480,7 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
               setPlaying(false);
               showToast({ message: t('reader.end') });
             }}
+            onTapPage={fullscreen ? togglePlay : undefined}
           />
         )}
         {!landscape && mode === 'normal' && (
@@ -442,10 +497,10 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
         )}
       </div>
 
-      {!landscape && (
+      {!landscape && (!fullscreen || mode === 'easy') && (
         <footer class="reader__foot">
           <div class="reader__foot-inner">
-            {mode !== 'auto' && (
+            {mode !== 'auto' && !fullscreen && (
               <input
                 class="reader__seek"
                 type="range"
@@ -464,7 +519,8 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
                     <span>{t('reader.prev')}</span>
                   </button>
                 )}
-                {status}
+                {!fullscreen && status}
+                {fullscreen && <div class="reader__status" />}
                 {mode === 'easy' && (
                   <button
                     type="button"

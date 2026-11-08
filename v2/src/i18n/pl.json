@@ -1793,7 +1793,7 @@
       "smallerShort": "A−",
       "biggerShort": "A+",
       "zoom": "Przybliżaj do zdania",
-      "zoomHint": "W poziomie strzałki idą o jedno zdanie i powiększają je; wyłączone — przewracają całe strony.",
+      "zoomHint": "W poziomie strzałki idą o jedno zdanie (podświetlone); włączone — powiększają je, wyłączone — cała rozkładówka zostaje widoczna.",
       "swap": "Zamień strony przycisków",
       "skipToc": "Pomijaj spis treści",
       "skipTocHint": "Spis treści książki nie wlicza się do czytania ani do procentów."
@@ -1801,6 +1801,10 @@
     "close": "Zamknij",
     "slowerShort": "−",
     "fasterShort": "+",
-    "bookToc": "Spis treści książki"
+    "bookToc": "Spis treści książki",
+    "fullscreen": "Pełny ekran",
+    "fullscreenLabel": "Pełny ekran: tylko książka i strzałki",
+    "fullscreenExit": "Wyjdź",
+    "fullscreenExitLabel": "Wyjdź z pełnego ekranu"
   }
 }

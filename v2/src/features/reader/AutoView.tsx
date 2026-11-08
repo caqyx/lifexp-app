@@ -24,6 +24,8 @@ interface AutoViewProps {
   onSentence: (sentence: number) => void;
   /** The light passed the book's last word. */
   onEnd: () => void;
+  /** Full screen: a tap on the text plays or pauses (instead of moving the light). */
+  onTapPage?: () => void;
 }
 
 interface SectionWords {
@@ -180,6 +182,7 @@ export function AutoView(props: AutoViewProps) {
       ref={view}
       class="reader__scroller reader__scroller--auto"
       onClick={(e) => {
+        if (props.onTapPage) return props.onTapPage();
         const w = (e.target as Element).closest<HTMLElement>('.reader__w');
         if (!w) return;
         setWord(Number(w.dataset.k), false);

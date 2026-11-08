@@ -128,14 +128,11 @@ test('two pages with a gutter; the left button goes forward, the right one back;
   await expect(page.locator('.spread__sent.is-on')).toHaveText('Akapit 1.');
 });
 
-test('with the zoom off the arrows turn whole spreads; the swap setting puts Wstecz on the left', async ({ page }) => {
+test('Normalny turns whole spreads; the swap setting puts Wstecz on the left', async ({ page }) => {
   const account = await createUser({ tag: 'spread-off', profile: { optInModules: ['reader'] } });
   await openBook(page, account);
-  await page.getByRole('button', { name: 'Ustawienia tekstu' }).click();
+  await page.getByRole('button', { name: 'Normalny' }).click();
   const settings = page.getByRole('dialog', { name: 'Ustawienia' });
-  await settings.getByRole('switch', { name: 'Przybliżaj do zdania' }).click();
-  await expect(settings.getByRole('switch', { name: 'Przybliżaj do zdania' })).toHaveAttribute('aria-checked', 'false');
-  await page.keyboard.press('Escape');
   await expect(page.locator('.spread__sent.is-on')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Dalej' }).click();
@@ -173,16 +170,11 @@ test('with the zoom off the arrows turn whole spreads; the swap setting puts Wst
 test('Auto: the light walks the words, the zoom follows its sentence, and the spread turns by itself', async ({ page }) => {
   const account = await createUser({ tag: 'spread-auto', profile: { optInModules: ['reader'] } });
   await openBook(page, account);
-  // To the last sentence that starts on the first spread: turn with the zoom off, then step back one.
-  await page.getByRole('button', { name: 'Ustawienia tekstu' }).click();
-  const settings = page.getByRole('dialog', { name: 'Ustawienia' });
-  await settings.getByRole('switch', { name: 'Przybliżaj do zdania' }).click();
-  await page.keyboard.press('Escape');
+  // To the last sentence that starts on the first spread: turn a spread in Normalny, then step back one in Prosta.
+  await page.getByRole('button', { name: 'Normalny' }).click();
   await page.getByRole('button', { name: 'Dalej' }).click();
   await expect(page.getByTestId('folio-left')).toHaveText('3');
-  await page.getByRole('button', { name: 'Ustawienia tekstu' }).click();
-  await settings.getByRole('switch', { name: 'Przybliżaj do zdania' }).click();
-  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Prosta' }).click();
   await page.getByRole('button', { name: 'Wstecz' }).click();
   await expect(page.getByTestId('folio-left')).toHaveText('1');
 
@@ -392,9 +384,7 @@ test.describe('turning a phone that started upright (393×851, DPR 2.75)', () =>
     expect(await page.locator('.spread__columns:not(.spread__measure) .spread__sent').count()).toBeLessThan(200);
     // Pages are numbered over the whole book: past the first chunk the numbers go on.
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-    await page.getByRole('button', { name: 'Ustawienia tekstu' }).click();
-    await page.getByRole('switch', { name: 'Przybliżaj do zdania' }).click();
-    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Normalny' }).click();
     let folio = 1;
     for (let i = 0; i < 40 && folio < 30; i++) {
       await page.getByRole('button', { name: 'Dalej' }).click();
@@ -424,17 +414,16 @@ async function turnDone(page) {
 }
 const turnsSeen = (page) => page.evaluate(() => window.__turns);
 
-async function zoomOff(page) {
-  await page.getByRole('button', { name: 'Ustawienia tekstu' }).click();
-  await page.getByRole('switch', { name: 'Przybliżaj do zdania' }).click();
-  await page.keyboard.press('Escape');
+/** Normalny: the arrows turn whole spreads. */
+async function bySpreads(page) {
+  await page.getByRole('button', { name: 'Normalny' }).click();
 }
 
 test.describe('the page turn', () => {
   test('a new spread arrives by a page turning over the spine: right page forward, left page back', async ({ page }) => {
     const account = await createUser({ tag: 'turn', profile: { optInModules: ['reader'] } });
     await openBook(page, account);
-    await zoomOff(page);
+    await bySpreads(page);
     await watchTurns(page);
 
     await page.getByRole('button', { name: 'Dalej' }).click();
@@ -459,7 +448,7 @@ test.describe('the page turn', () => {
   test('two quick taps turn two spreads: the place and the pages stay right', async ({ page }) => {
     const account = await createUser({ tag: 'turn-fast', profile: { optInModules: ['reader'] } });
     await openBook(page, account);
-    await zoomOff(page);
+    await bySpreads(page);
     // The place two careful turns lead to.
     await page.getByRole('button', { name: 'Dalej' }).click();
     await turnDone(page);
@@ -506,7 +495,7 @@ test.describe('the page turn', () => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const account = await createUser({ tag: 'turn-reduced', profile: { optInModules: ['reader'] } });
     await openBook(page, account);
-    await zoomOff(page);
+    await bySpreads(page);
     await watchTurns(page);
     await page.getByRole('button', { name: 'Dalej' }).click();
     await expect(page.getByTestId('folio-left')).toHaveText('3');
@@ -516,4 +505,45 @@ test.describe('the page turn', () => {
     await turnDone(page);
     expect(await turnsSeen(page)).toEqual([]);
   });
+});
+
+test('with the zoom off the arrows still go one sentence, lit on the whole spread; the page turns exactly at the spread\'s end', async ({ page }) => {
+  const account = await createUser({ tag: 'spread-lit', profile: { optInModules: ['reader'] } });
+  await openBook(page, account);
+  await page.getByRole('button', { name: 'Ustawienia tekstu' }).click();
+  await page.getByRole('switch', { name: 'Przybliżaj do zdania' }).click();
+  await expect(page.getByRole('switch', { name: 'Przybliżaj do zdania' })).toHaveAttribute('aria-checked', 'false');
+  await page.keyboard.press('Escape');
+  await watchTurns(page);
+  const frame = await page.locator('.spread__frame').boundingBox();
+  const lit = page.locator('.spread__sent.is-on');
+  await expect(lit).toHaveText('Rozdział 1.');
+  /** The lit sentence starts inside the spread on screen. */
+  const litOnScreen = async () => {
+    const r = await lit.evaluate((el) => {
+      const first = el.getClientRects()[0];
+      return { x: first.left, y: first.top };
+    });
+    return r.x >= frame.x && r.x <= frame.x + frame.width && r.y >= frame.y && r.y <= frame.y + frame.height;
+  };
+  let n = 2;
+  for (let i = 0; i < 40; i++) {
+    await page.getByRole('button', { name: 'Dalej' }).click();
+    n++;
+    // One sentence a tap, lit, and never zoomed.
+    await expect(status(page)).toContainText(`zdanie ${n} z`);
+    await expect(lit).toHaveCount(1);
+    await turnDone(page);
+    expect(await settledScale(page)).toBe(1);
+    expect(await litOnScreen()).toBe(true);
+    if ((await page.getByTestId('folio-left').textContent()) === '3') break;
+  }
+  await expect(page.getByTestId('folio-left')).toHaveText('3');
+  // The page turned once, when the lit sentence moved onto the next spread.
+  await expect.poll(() => turnsSeen(page)).toEqual([expect.stringContaining('--next')]);
+  // And back: one sentence back is on the previous spread again.
+  await page.getByRole('button', { name: 'Wstecz' }).click();
+  await turnDone(page);
+  await expect(page.getByTestId('folio-left')).toHaveText('1');
+  expect(await litOnScreen()).toBe(true);
 });
