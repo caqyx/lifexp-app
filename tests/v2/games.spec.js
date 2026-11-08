@@ -830,6 +830,25 @@ async function recordStates(frame) {
 }
 
 /**
+ * Notes, inside the frame, the stage's state at the first drawn frame whose x is past `x`
+ * (window.__past: { x, state, mode, pieceMode }); every frame is seen, however slow the
+ * test's polling.
+ */
+async function notePast(frame, x) {
+  await frame.evaluate((limit) => {
+    const stage = document.getElementById('stage');
+    window.__past = null;
+    const observer = new MutationObserver(() => {
+      const d = stage.dataset;
+      if (Number(d.debugX) <= limit) return;
+      window.__past = { x: Number(d.debugX), state: d.state, mode: d.debugMode, pieceMode: d.debugPieceMode };
+      observer.disconnect();
+    });
+    observer.observe(stage, { attributes: true, attributeFilter: ['data-debug-x'] });
+  }, x);
+}
+
+/**
  * Reopens the game's frame with exactly these test switches (not added to earlier ones:
  * a query names each switch once).
  */
@@ -1492,12 +1511,15 @@ test.describe('Flip Rush, a plain run', () => {
         if ([2, 4, 6, 8].includes(first)) seed = k;
       }
       expect(seed).toBeGreaterThan(0);
+      // Hands off, the spider crashes some cells past the portal; a slow runner's poll could
+      // first look after that. So the frame itself notes the first drawn frame past x 1.5.
+      const played = page.frames().find((f) => f.url().endsWith(`?lang=${lang}&seed=${seed}`));
+      await notePast(played, 1.5);
       await game.locator('#play').click();
       await expect(stage).toHaveAttribute('data-state', 'ready');
       await stage.click();
-      await expect(stage).toHaveAttribute('data-state', 'playing');
-      await expect.poll(async () => (await waveState(game)).x, { timeout: 10000 }).toBeGreaterThan(1.5);
-      const w = await waveState(game);
+      await expect.poll(() => played.evaluate(() => window.__past), { timeout: 10000 }).toBeTruthy();
+      const w = await played.evaluate(() => window.__past);
       expect(w.state).toBe('playing');
       expect(w.pieceMode).toBe('spider');
       expect(w.mode).toBe('spider');
