@@ -483,6 +483,11 @@ function statsText(type, level) {
   const parts = [t('statDamage', { n: def.damage[i] ?? 0 }), t('statRange', { n: range })];
   parts.push(t('statRate', { n: (1 / (def.interval[i] ?? 1)).toLocaleString(lang, { maximumFractionDigits: 1 }) }));
   if (def.slow) parts.push(t('statSlow', { n: Math.round((def.slow[i] ?? 0) * 100) }));
+  if (def.burnDps) parts.push(t('statBurn', { n: def.burnDps[i] ?? 0 }));
+  if (def.jumps) parts.push(t('statJumps', { n: def.jumps[i] ?? 0 }));
+  if (def.critEvery) parts.push(t('statCrit', { n: def.critEvery }));
+  if (def.poisonDps) parts.push(t('statPoison', { n: def.poisonDps[i] ?? 0 }));
+  if (def.shred) parts.push(t('statShred', { n: def.shred[i] ?? 0 }));
   return parts.join(' · ');
 }
 
@@ -666,15 +671,16 @@ function renderPreview(wave) {
   }
   const head = document.createElement('li');
   head.className = 'preview__head';
-  say(head, wave.boss ? `${t('nextWave', { n: wave.number })} ${t('bossWave')}` : t('nextWave', { n: wave.number }), { color: wave.boss ? 'R' : 'G' });
+  const brood = wave.groups.some((g) => g.type === 'broodmother');
+  say(head, wave.boss ? `${t('nextWave', { n: wave.number })} ${t(brood ? 'bossBrood' : 'bossWave')}` : t('nextWave', { n: wave.number }), { color: wave.boss ? 'R' : 'G' });
   const rows = describeWave(wave).map(({ type, count }) => {
     const item = document.createElement('li');
     item.className = 'preview__item';
     item.dataset.enemy = type;
-    const icon = createIcon(enemyIcon(type), type === 'colossus' ? 0.4 : 0.6);
+    const icon = createIcon(enemyIcon(type), type === 'colossus' || type === 'broodmother' ? 0.4 : 0.6);
     icon.classList.add('preview__icon');
     const text = document.createElement('span');
-    const trait = ['runner', 'shellback', 'moth', 'splitter', 'colossus'].includes(type) ? ` (${tk(`trait.${type}`)})` : '';
+    const trait = type !== 'crawler' && type !== 'shard' ? ` (${tk(`trait.${type}`)})` : '';
     say(text, `${count}× ${tk(`enemy.${type}`)}${trait}`, { color: 'w' });
     item.append(icon, text);
     return item;
@@ -836,12 +842,12 @@ function renderBoard() {
 
 /**
  * Banners for a wave's start and end, a shake when a Colossus falls, a red edge on a leak.
- * @param {{ bossKilled: boolean, leaked: boolean, cleared: number, wave: number, boss: boolean }} news
+ * @param {{ bossKilled: boolean, leaked: boolean, cleared: number, wave: number, boss: boolean, brood: boolean }} news
  */
 function reactToNews(news) {
   if (news.wave > 0) {
     const early = ui.earlyBonus > 0 ? ` · ${t('earlyBonus', { gold: ui.earlyBonus })}` : '';
-    showBanner(`${t('wave')} ${news.wave}${news.boss ? ` · ${t('bossWave')}` : ''}${early}`);
+    showBanner(`${t('wave')} ${news.wave}${news.boss ? ` · ${t(news.brood ? 'bossBrood' : 'bossWave')}` : ''}${early}`);
     ui.earlyBonus = 0;
   } else if (news.cleared > 0 && ui.game && ui.game.phase === 'build') {
     showBanner(t('waveCleared', { n: ui.game.wave, gold: news.cleared }));

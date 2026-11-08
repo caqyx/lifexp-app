@@ -19,7 +19,7 @@ export const SELL_REFUND = 0.7;
 /** Lives left at the end that earn three and two stars (one star: any win). */
 export const STAR_LIVES = { three: 18, two: 10 };
 
-/** @typedef {'archer' | 'mortar' | 'frost' | 'ballista' | 'banner'} TowerType */
+/** @typedef {'archer' | 'mortar' | 'frost' | 'ballista' | 'banner' | 'flamer' | 'tesla' | 'sniper' | 'alchemist'} TowerType */
 /** @typedef {'first' | 'strongest' | 'closest'} Priority */
 /**
  * One tower type, by level (index 0 = level 1). Ranges and radii in tiles, times in seconds.
@@ -30,7 +30,7 @@ export const STAR_LIVES = { three: 18, two: 10 };
  *   damage: readonly number[],
  *   hitsGround: boolean,
  *   hitsAir: boolean,
- *   attack: 'arrow' | 'shell' | 'pulse' | 'bolt' | 'aura',
+ *   attack: 'arrow' | 'shell' | 'pulse' | 'bolt' | 'aura' | 'flame' | 'chain' | 'snipe' | 'flask',
  *   projectileSpeed?: number,
  *   flight?: number,
  *   radius?: readonly number[],
@@ -38,10 +38,22 @@ export const STAR_LIVES = { three: 18, two: 10 };
  *   slowTime?: readonly number[],
  *   pierceArmor?: boolean,
  *   buff?: readonly number[],
+ *   cone?: number,
+ *   burnDps?: readonly number[],
+ *   burnTime?: number,
+ *   jumps?: readonly number[],
+ *   jumpRange?: number,
+ *   jumpFalloff?: number,
+ *   critEvery?: number,
+ *   critMultiplier?: number,
+ *   poisonDps?: readonly number[],
+ *   poisonTime?: number,
+ *   shred?: readonly number[],
+ *   shredTime?: number,
  * }} TowerDef
  */
 
-export const TOWER_TYPES = /** @type {const} */ (['archer', 'mortar', 'frost', 'ballista', 'banner']);
+export const TOWER_TYPES = /** @type {const} */ (['archer', 'mortar', 'frost', 'ballista', 'banner', 'flamer', 'tesla', 'sniper', 'alchemist']);
 export const LEVELS = 3;
 export const PRIORITIES = /** @type {const} */ (['first', 'strongest', 'closest']);
 
@@ -105,9 +117,70 @@ export const TOWERS = {
     hitsAir: false,
     attack: 'aura',
   },
+  // A short cone of fire on the ground: everything in it burns for a while (the burn goes
+  // through armor) and shields catch fire and fall. Good against crowds and shields.
+  flamer: {
+    cost: [70, 60, 95],
+    range: [1.55, 1.7, 1.9],
+    interval: [0.35, 0.32, 0.28],
+    damage: [3, 5, 8],
+    cone: 0.6,
+    burnDps: [5, 8, 13],
+    burnTime: 2,
+    hitsGround: true,
+    hitsAir: false,
+    attack: 'flame',
+  },
+  // Lightning that jumps from enemy to enemy (fliers too), weaker at each jump; it
+  // breaks shields. Good against swarms of bats and shards.
+  tesla: {
+    cost: [90, 80, 125],
+    range: [2.3, 2.5, 2.7],
+    interval: [1.0, 0.9, 0.8],
+    damage: [14, 21, 32],
+    jumps: [3, 4, 6],
+    jumpRange: 1.4,
+    jumpFalloff: 0.8,
+    hitsGround: true,
+    hitsAir: true,
+    attack: 'chain',
+  },
+  // A nest with a long gun: very long range, hits at once, every third shot is critical.
+  // For healers far down the road and for bosses. Armor counts.
+  sniper: {
+    cost: [110, 90, 150],
+    range: [5.5, 6.2, 7.0],
+    interval: [2.4, 2.1, 1.8],
+    damage: [36, 56, 88],
+    critEvery: 3,
+    critMultiplier: 2.5,
+    hitsGround: true,
+    hitsAir: true,
+    attack: 'snipe',
+  },
+  // Lobs a flask: poison (through armor, and the poisoned cannot be healed) and acid that
+  // eats armor for a while. Against armored and healed enemies.
+  alchemist: {
+    cost: [80, 70, 110],
+    range: [2.6, 2.8, 3.1],
+    interval: [1.6, 1.45, 1.3],
+    damage: [6, 9, 14],
+    radius: [0.75, 0.85, 1.0],
+    poisonDps: [6, 10, 16],
+    poisonTime: 3,
+    shred: [4, 6, 9],
+    shredTime: 4,
+    hitsGround: true,
+    hitsAir: false,
+    attack: 'flask',
+    flight: 0.6,
+  },
 };
 
-/** @typedef {'crawler' | 'runner' | 'shellback' | 'moth' | 'splitter' | 'shard' | 'colossus'} EnemyType */
+/**
+ * @typedef {'crawler' | 'runner' | 'shellback' | 'moth' | 'splitter' | 'shard' | 'colossus'
+ *   | 'ironclad' | 'shieldbearer' | 'shaman' | 'bat' | 'burrower' | 'berserker' | 'broodmother'} EnemyType
+ */
 /**
  * One enemy type. Speed in tiles a second; armor is taken off every hit (at least 1 gets
  * through) unless the attack pierces it; `lives` is what it costs when it gets through.
@@ -122,10 +195,23 @@ export const TOWERS = {
  *   boss?: boolean,
  *   slowResist?: number,
  *   splits?: { type: EnemyType, count: number },
+ *   shield?: number,
+ *   heal?: { every: number, share: number, range: number },
+ *   burrow?: readonly [number, number],
+ *   rage?: number,
+ *   brood?: { type: EnemyType, count: number, steps: number },
  * }} EnemyDef
  */
 
-export const ENEMY_TYPES = /** @type {const} */ (['crawler', 'runner', 'shellback', 'moth', 'splitter', 'shard', 'colossus']);
+export const ENEMY_TYPES = /** @type {const} */ ([
+  'crawler', 'runner', 'shellback', 'moth', 'splitter', 'shard', 'colossus',
+  'ironclad', 'shieldbearer', 'shaman', 'bat', 'burrower', 'berserker', 'broodmother',
+]);
+/** The kinds added with td-4 (each has its counters; see PLAN.md 9.1 td-4). */
+export const NEW_ENEMY_TYPES = /** @type {const} */ (['ironclad', 'shieldbearer', 'shaman', 'bat', 'burrower', 'berserker', 'broodmother']);
+/** The kinds a player can pick for a custom game (shards come from splitters, bosses are a switch). */
+export const PICKABLE_ENEMIES = /** @type {const} */ (['crawler', 'runner', 'shellback', 'moth', 'splitter', 'ironclad', 'shieldbearer', 'shaman', 'bat', 'burrower', 'berserker']);
+export const BOSS_TYPES = /** @type {const} */ (['colossus', 'broodmother']);
 
 /** @type {Readonly<Record<EnemyType, EnemyDef>>} */
 export const ENEMIES = {
@@ -136,6 +222,26 @@ export const ENEMIES = {
   splitter: { hp: 48, speed: 0.9, armor: 0, gold: 4, lives: 1, radius: 0.3, splits: { type: 'shard', count: 2 } },
   shard: { hp: 16, speed: 1.45, armor: 0, gold: 2, lives: 1, radius: 0.18 },
   colossus: { hp: 420, speed: 0.42, armor: 4, gold: 60, lives: 5, radius: 0.46, boss: true, slowResist: 0.5 },
+  // Plated slime: very high armor, slow. Counters: ballista (through armor), alchemist
+  // (acid eats its armor), flamer and poison burns (through armor).
+  ironclad: { hp: 95, speed: 0.6, armor: 12, gold: 11, lives: 2, radius: 0.34 },
+  // Carries a shield that swallows arrows, bolts and shots until it breaks; a blast, fire,
+  // lightning or a flask breaks it at once. Counters: mortar, flamer, tesla, alchemist.
+  shieldbearer: { hp: 55, speed: 0.85, armor: 1, gold: 8, lives: 1, radius: 0.3, shield: 80 },
+  // Heals everyone near it every few seconds (not the poisoned). Counters: sniper (reaches
+  // it far down the road), alchemist (poison stops the healing), tesla.
+  shaman: { hp: 45, speed: 0.8, armor: 0, gold: 9, lives: 1, radius: 0.27, heal: { every: 2.5, share: 0.12, range: 1.6 } },
+  // Fast fliers in big flocks. Counters: tesla (jumps between them), frost, archers.
+  bat: { hp: 11, speed: 2.3, armor: 0, gold: 2, lives: 1, radius: 0.18, flying: true },
+  // Digs under the road for a stretch of it (nothing can hit it there). Counters: towers
+  // after the stretch, the sniper's reach, frost before it digs.
+  burrower: { hp: 60, speed: 1.15, armor: 2, gold: 7, lives: 1, radius: 0.27, burrow: [0.3, 0.55] },
+  // Runs faster the more it is hurt (up to twice as fast). Counters: frost, the sniper's
+  // and the ballista's single heavy hits (it dies before it rages).
+  berserker: { hp: 80, speed: 0.9, armor: 2, gold: 9, lives: 2, radius: 0.3, rage: 1.0 },
+  // A boss: a huge slime mother that drops crawlers each time it loses a quarter of its
+  // health. Counters: splash (mortar, flamer) for the brood, heavy hits for her.
+  broodmother: { hp: 520, speed: 0.38, armor: 3, gold: 70, lives: 5, radius: 0.48, boss: true, slowResist: 0.5, brood: { type: 'crawler', count: 3, steps: 4 } },
 };
 
 /** Enemy health grows with the wave: hp × (1 + HP_GROWTH × (wave − 1)) × the map's factor. */

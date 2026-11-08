@@ -91,12 +91,12 @@ for (const screen of SCREENS) {
           const close = page.getByRole('button', { name: t.close });
           await expect(close).toBeVisible();
           const cards = page.locator('#tower-options .option');
-          await expect(cards).toHaveCount(5);
+          await expect(cards).toHaveCount(9);
           const elements = [
             ['title', page.locator('#panel-title .pt-canvas')],
             ['hint', page.locator('#option-role .pt-canvas')],
           ];
-          for (let i = 0; i < 5; i++) elements.push([`card ${i + 1}`, cards.nth(i)]);
+          for (let i = 0; i < 9; i++) elements.push([`card ${i + 1}`, cards.nth(i)]);
           await expectSheetFits(page, screen.viewport, elements, close);
           await close.tap();
           await expect(page.locator('#panel')).toBeHidden();
