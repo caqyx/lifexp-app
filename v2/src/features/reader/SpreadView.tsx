@@ -36,6 +36,7 @@ import {
 } from '@/domain/reader/spread';
 import { t } from '@/i18n';
 import type { Jump } from './Reader';
+import { crossfade, runTurn, snapshotTurn, type RunningTurn, type TurnDir, type TurnSnapshot } from './pageTurn';
 import { sectionHeading } from './texts';
 import type { VNode } from 'preact';
 
@@ -83,6 +84,9 @@ export function SpreadView(props: SpreadViewProps) {
   const [pages, setPages] = useState(1);
   const [zoomed, setZoomed] = useState(false);
   const [camera, setCamera] = useState<Camera>(OVERVIEW);
+  /** A page turn is running: the camera shows the whole spread meanwhile. */
+  const [turning, setTurning] = useState(false);
+  const turnLayer = useRef<HTMLDivElement>(null);
   /** Bumps when the text is laid out anew (size, text size): positions must be read again. */
   const [layoutRun, setLayoutRun] = useState(0);
   const pageFont = Math.round(fontPx * 0.66 * 100) / 100;
@@ -279,9 +283,100 @@ export function SpreadView(props: SpreadViewProps) {
       span?.classList.add('is-on');
       highlighted.current = span ?? null;
     }
-    const box = zoomed && followsSentence ? spreadBox(pos, target) : null;
+    // While a page turns the whole spread is shown; the zoom comes back on the new page.
+    const box = zoomed && followsSentence && !turning ? spreadBox(pos, target) : null;
     setCamera(box ? zoomTo(box, { w: layout.pageW * 2, h: layout.pageH }) : OVERVIEW);
-  }, [pos, layoutRun, zoomed, followsSentence, sentenceStep]);
+  }, [pos, layoutRun, zoomed, followsSentence, sentenceStep, turning]);
+
+  // ── The page turn ──────────────────────────────────────────────────────────
+  const here = useRef({ ci, spread, chunk, pos });
+  here.current = { ci, spread, chunk, pos };
+  const pending = useRef<{ from: string; snap: TurnSnapshot | null } | null>(null);
+  const running = useRef<RunningTurn | null>(null);
+  const geometry = () => ({ pageW: layout.pageW, padOuter: layout.padOuter, keep: keepBlocks });
+
+  /** How many of the columns' children start on or before the spread shown at `shift` (binary search on the layout). */
+  const keepBlocks = (shift: number): number => {
+    const el = columns.current;
+    if (!el) return 0;
+    const children = [...el.children].filter((c) => !c.classList.contains('spread__lamp'));
+    const origin = el.getBoundingClientRect();
+    const k = scaleNow();
+    // The first page after the spread, as an x in column coordinates.
+    const limit = shift + 2 * (layout.colW + layout.gap) - layout.gap / 2;
+    const startX = (child: Element) => {
+      const r = child.getClientRects()[0];
+      return r ? (r.left - origin.left) / k : 0;
+    };
+    let lo = 0;
+    let hi = children.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (startX(children[mid] as Element) < limit) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+
+  /** Copies the pages before a move to another spread, so the new one arrives by a page turn. */
+  const prepareTurn = (dir: TurnDir) => {
+    running.current?.finish();
+    // A turn asked but not started yet is dropped: the new one starts from what is on screen.
+    if (scheduled.current) {
+      cancelAnimationFrame(scheduled.current);
+      scheduled.current = 0;
+    }
+    const el = columns.current;
+    const { ci: c, spread: k } = here.current;
+    pending.current = { from: `${c}:${k}`, snap: el ? snapshotTurn(el, spreadShift(k, layout), dir, geometry()) : null };
+  };
+
+  /** Which way sentence `s` lies from the spread shown: 0 = on it. */
+  const directionTo = (s: number): 0 | TurnDir => {
+    const { chunk: c, spread: k, pos: p } = here.current;
+    if (s < c.start || s >= c.end) return s > p ? 1 : -1;
+    const target = spreadOf(s);
+    return target === k ? 0 : target > k ? 1 : -1;
+  };
+
+  const lastKey = useRef(`${ci}:${spread}`);
+  const scheduled = useRef(0);
+  useLayoutEffect(() => {
+    const key = `${ci}:${spread}`;
+    if (key === lastKey.current) return;
+    lastKey.current = key;
+    if (!pending.current || pending.current.from === key) {
+      // A jump (contents, a new layout): a short crossfade, no turn.
+      if (!pending.current && !scheduled.current && columns.current) crossfade(columns.current);
+      return;
+    }
+    // The turn starts on the next frame, once the new spread has settled (moving back into
+    // the previous chunk takes a second render to find its last spread).
+    if (scheduled.current) return;
+    scheduled.current = requestAnimationFrame(() => {
+      scheduled.current = 0;
+      const wanted = pending.current;
+      pending.current = null;
+      const layer = turnLayer.current;
+      const el = columns.current;
+      if (!wanted?.snap || !layer || !el) return;
+      running.current?.finish();
+      setTurning(true);
+      const turn = runTurn(layer, el, spreadShift(here.current.spread, layout), wanted.snap, geometry(), () => {
+        if (running.current === turn) running.current = null;
+        setTurning(false);
+      });
+      running.current = turn;
+    });
+  }, [ci, spread]);
+
+  useEffect(
+    () => () => {
+      cancelAnimationFrame(scheduled.current);
+      running.current?.finish();
+    },
+    [],
+  );
 
   // ── Moving ─────────────────────────────────────────────────────────────────
   const turnTo = (k: number) => {
@@ -289,13 +384,16 @@ export function SpreadView(props: SpreadViewProps) {
     if (k > last) {
       // Past this chunk: the next one, from its first page.
       const next = chunks[ci + 1];
-      if (next) latest.current.onPosition(next.start);
-      else latest.current.onEnd();
+      if (next) {
+        prepareTurn(1);
+        latest.current.onPosition(next.start);
+      } else latest.current.onEnd();
       return;
     }
     if (k < 0) {
       const prev = chunks[ci - 1];
       if (prev) {
+        prepareTurn(-1);
         toLastSpread.current = true;
         latest.current.onPosition(prev.end - 1);
       }
@@ -303,6 +401,7 @@ export function SpreadView(props: SpreadViewProps) {
     }
     const target = clamp(k, 0, last);
     if (target === spread) return;
+    prepareTurn(target > spread ? 1 : -1);
     const s = spreadStart(target);
     ownMove.current = s;
     setSpread(target);
@@ -321,6 +420,8 @@ export function SpreadView(props: SpreadViewProps) {
       if (s >= sents.length) return latest.current.onEnd();
       if (s < 0) return;
       setZoomed(true);
+      const dir = directionTo(s);
+      if (dir) prepareTurn(dir);
       latest.current.onPosition(s);
       return;
     }
@@ -366,6 +467,8 @@ export function SpreadView(props: SpreadViewProps) {
   };
 
   const moveAuto = (s: number) => {
+    const dir = s === here.current.pos ? 0 : directionTo(s);
+    if (dir) prepareTurn(dir);
     auto.current.sentence = s;
     placeLamp();
     if (s !== latest.current.pos) latest.current.onPosition(s);
@@ -496,6 +599,7 @@ export function SpreadView(props: SpreadViewProps) {
             {mode === 'auto' && <div ref={lamp} class="spread__lamp" data-testid="spread-lamp" aria-hidden="true" />}
             {blocks}
           </div>
+          <div ref={turnLayer} class="spread__turn" aria-hidden="true" />
         </div>
       </div>
       <div class="spread__side spread__side--right">{swap ? forward : back}</div>

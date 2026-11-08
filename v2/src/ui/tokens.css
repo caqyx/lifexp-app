@@ -82,6 +82,11 @@
      the curve starts with speed to avoid a stall at release. */
   --duration-drawer-settle: 320ms;
   --ease-drawer-settle: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* The reader's page turn (features/reader/pageTurn.ts): a leaf rotating over the
+     spine is a larger move than a screen rising in, so it takes about twice
+     --duration-enter; it starts gently and settles (in-out), like a turned page. */
+  --duration-page-turn: 560ms;
+  --ease-page-turn: cubic-bezier(0.45, 0.05, 0.25, 1);
 
   /* Shell */
   --topbar-height: 56px;
@@ -100,6 +105,7 @@
     --duration-exit: 0ms;
     --duration-drawer: 0ms;
     --duration-drawer-settle: 0ms;
+    --duration-page-turn: 0ms;
   }
 }
 
