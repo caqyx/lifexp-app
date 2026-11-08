@@ -18,6 +18,8 @@ import type { Section, Sentence } from '@/domain/reader/book';
 import type { ReaderMode } from '@/domain/reader/settings';
 import { wordAt, wordDelay, wordRanges } from '@/domain/reader/settings';
 import {
+  chunkIndexOf,
+  chunkSentences,
   OVERVIEW,
   pageCount,
   pageOfX,
@@ -29,6 +31,7 @@ import {
   zoomTo,
   type Box,
   type Camera,
+  type Chunk,
   type SpreadLayout,
 } from '@/domain/reader/spread';
 import { t } from '@/i18n';
@@ -99,31 +102,56 @@ export function SpreadView(props: SpreadViewProps) {
     return () => observer.disconnect();
   }, []);
 
-  // The whole book, one span per sentence; built once per text.
-  const blocks = useMemo(() => {
-    const out: VNode[] = [];
-    let i = 0;
-    while (i < sents.length) {
-      const s = sents[i] as Sentence;
-      if (secStart[s.sec] === i) {
-        const heading = sectionHeading(sections[s.sec], s.sec);
-        if (heading) out.push(<h2 key={`h${s.sec}`}>{heading}</h2>);
-      }
-      const children: (VNode | string)[] = [];
-      const first = i;
-      while (i < sents.length && (sents[i] as Sentence).sec === s.sec && (sents[i] as Sentence).para === s.para) {
-        if (children.length) children.push(' ');
-        children.push(
-          <span key={i} class="spread__sent" data-i={i}>
-            {(sents[i] as Sentence).t}
-          </span>,
-        );
-        i++;
-      }
-      out.push(s.h ? <h3 key={first}>{children}</h3> : <p key={first}>{children}</p>);
+  // The book in chunks (chapters, or runs of up to CHUNK_SOFT sentences): only the chunk
+  // being read is laid out, so a long book stays responsive (domain/reader/spread).
+  const chunks = useMemo(() => chunkSentences(sents, (sec) => sectionHeading(sections[sec], sec) !== null), [sents, sections]);
+  const ci = chunkIndexOf(chunks, pos);
+  const chunk: Chunk = chunks[ci] ?? { start: 0, end: sents.length };
+  const blocks = useMemo(() => chunkBlocks(sents, sections, secStart, chunk), [sents, sections, secStart, chunk.start, chunk.end]);
+
+  // Page counts of the chunks for this page size (pages are numbered over the whole book).
+  const counts = useRef(new Map<string, Map<string, number>>());
+  const layoutKey = `${layout.colW}x${layout.colH}@${pageFont}`;
+  const pageCounts = () => {
+    let map = counts.current.get(layoutKey);
+    if (!map) {
+      map = new Map();
+      counts.current.set(layoutKey, map);
     }
-    return out;
-  }, [sents, sections, secStart]);
+    return map;
+  };
+  /** Pages before this chunk, once every earlier chunk was measured; null until then. */
+  const pageOffset = (() => {
+    const map = pageCounts();
+    let sum = 0;
+    for (let j = 0; j < ci; j++) {
+      const n = map.get(chunkKey(chunks[j] as Chunk));
+      if (n === undefined) return null;
+      sum += n;
+    }
+    return sum;
+  })();
+  // Earlier chunks are measured one at a time in a hidden copy of the page, between frames.
+  const [measuring, setMeasuring] = useState<number | null>(null);
+  const measurer = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (measuring !== null || pageOffset !== null || !size.w) return;
+    const map = pageCounts();
+    const j = chunks.findIndex((c, k) => k < ci && !map.has(chunkKey(c)));
+    if (j < 0) return;
+    const timer = setTimeout(() => setMeasuring(j), 30);
+    return () => clearTimeout(timer);
+  });
+  useLayoutEffect(() => {
+    if (measuring === null) return;
+    const c = chunks[measuring];
+    if (c && measurer.current) pageCounts().set(chunkKey(c), pageCount(measurer.current.scrollWidth, layout));
+    setMeasuring(null);
+  }, [measuring]);
+  const measureBlocks = useMemo(
+    () => (measuring === null || !chunks[measuring] ? null : chunkBlocks(sents, sections, secStart, chunks[measuring] as Chunk)),
+    [measuring],
+  );
 
   const spans = useRef<HTMLElement[]>([]);
   const spreadCache = useRef(new Map<number, number>());
@@ -164,7 +192,12 @@ export function SpreadView(props: SpreadViewProps) {
     return k;
   };
 
-  const lastSpread = () => spreadOfPage(pages - 1);
+  /** The chunk's last spread, read from the layout now (state may lag a chunk behind). */
+  const lastSpread = () => spreadOfPage(pageCount(columns.current?.scrollWidth ?? 0, layout) - 1);
+
+  /** Where reading stands with spread `k` of this chunk shown whole. */
+  const spreadStart = (k: number) =>
+    chunk.start + sentenceOfSpread(k, chunk.end - chunk.start, (i) => spreadOf(chunk.start + i));
 
   /** The sentence's box on the spread (spread px, as the camera sees it), its lines on that spread only. */
   const spreadBox = (s: number, k: number): Box | null => {
@@ -184,7 +217,9 @@ export function SpreadView(props: SpreadViewProps) {
       spans.current[Number(span.dataset.i)] = span;
     });
     spreadCache.current = new Map();
-    setPages(pageCount(el.scrollWidth, layout));
+    const count = pageCount(el.scrollWidth, layout);
+    pageCounts().set(chunkKey(chunk), count);
+    setPages(count);
     setLayoutRun((n) => n + 1);
   };
   useLayoutEffect(readLayout, [blocks, layout]);
@@ -194,7 +229,12 @@ export function SpreadView(props: SpreadViewProps) {
   useEffect(() => {
     const fonts = document.fonts;
     let alive = true;
-    const again = () => alive && relayout.current();
+    const again = () => {
+      if (!alive) return;
+      // Pages measured before the font arrived are wrong now.
+      counts.current.clear();
+      relayout.current();
+    };
     void fonts.ready.then(again);
     fonts.addEventListener('loadingdone', again);
     return () => {
@@ -205,6 +245,7 @@ export function SpreadView(props: SpreadViewProps) {
 
   // ── Where the camera and the spread go ─────────────────────────────────────
   const ownMove = useRef<number | null>(null);
+  const toLastSpread = useRef(false);
   const highlighted = useRef<HTMLElement | null>(null);
 
   const followsSentence = mode !== 'normal' && zoom;
@@ -214,8 +255,21 @@ export function SpreadView(props: SpreadViewProps) {
     if (!layoutRun) return;
     // A turn made here already chose the spread; anything else (a jump, a new layout,
     // a rotation, Auto moving on) shows the spread the sentence starts on.
-    const target = ownMove.current === pos ? spread : spreadOf(pos);
+    if (!spans.current[pos]) return;
+    let target = ownMove.current === pos ? spread : spreadOf(pos);
     ownMove.current = null;
+    if (toLastSpread.current) {
+      // Turned back from the next chunk: its last spread, read from its start.
+      toLastSpread.current = false;
+      target = lastSpread();
+      const s = spreadStart(target);
+      if (s !== pos) {
+        ownMove.current = s;
+        setSpread(target);
+        latest.current.onPosition(s);
+        return;
+      }
+    }
     if (target !== spread) setSpread(target);
     // The sentence lit in Prosta with the zoom on.
     highlighted.current?.classList.remove('is-on');
@@ -231,12 +285,25 @@ export function SpreadView(props: SpreadViewProps) {
 
   // ── Moving ─────────────────────────────────────────────────────────────────
   const turnTo = (k: number) => {
-    const target = clamp(k, 0, lastSpread());
-    if (target === spread) {
-      if (k > spread) latest.current.onEnd();
+    const last = lastSpread();
+    if (k > last) {
+      // Past this chunk: the next one, from its first page.
+      const next = chunks[ci + 1];
+      if (next) latest.current.onPosition(next.start);
+      else latest.current.onEnd();
       return;
     }
-    const s = sentenceOfSpread(target, sents.length, spreadOf);
+    if (k < 0) {
+      const prev = chunks[ci - 1];
+      if (prev) {
+        toLastSpread.current = true;
+        latest.current.onPosition(prev.end - 1);
+      }
+      return;
+    }
+    const target = clamp(k, 0, last);
+    if (target === spread) return;
+    const s = spreadStart(target);
     ownMove.current = s;
     setSpread(target);
     if (s === pos) ownMove.current = null;
@@ -381,8 +448,16 @@ export function SpreadView(props: SpreadViewProps) {
       <span>{t('reader.prev')}</span>
     </button>
   );
-  const leftPage = spread * 2 + 1;
-  const rightPage = spread * 2 + 2;
+  const leftPage = pageOffset === null ? null : pageOffset + spread * 2 + 1;
+  const rightPage = pageOffset === null || spread * 2 + 2 > pages ? null : pageOffset + spread * 2 + 2;
+  const columnVars = {
+    '--col-w': `${layout.colW}px`,
+    '--col-h': `${layout.colH}px`,
+    '--col-gap': `${layout.gap}px`,
+    '--col-left': `${layout.padOuter}px`,
+    '--col-top': `${layout.padTop}px`,
+    '--page-font': `${pageFont}px`,
+  };
 
   return (
     <div class="spread" data-zoomed={zoomed && followsSentence ? 'true' : 'false'}>
@@ -398,12 +473,14 @@ export function SpreadView(props: SpreadViewProps) {
           onClick={onClick}
         >
           <div class="spread__page spread__page--left" aria-hidden="true">
-            <span class="spread__folio" data-testid="folio-left">
-              {leftPage}
-            </span>
+            {leftPage !== null && (
+              <span class="spread__folio" data-testid="folio-left">
+                {leftPage}
+              </span>
+            )}
           </div>
           <div class="spread__page spread__page--right" aria-hidden="true">
-            {rightPage <= pages && (
+            {rightPage !== null && (
               <span class="spread__folio" data-testid="folio-right">
                 {rightPage}
               </span>
@@ -414,15 +491,7 @@ export function SpreadView(props: SpreadViewProps) {
             ref={columns}
             class="spread__columns"
             data-testid="spread-columns"
-            style={{
-              '--col-w': `${layout.colW}px`,
-              '--col-h': `${layout.colH}px`,
-              '--col-gap': `${layout.gap}px`,
-              '--col-left': `${layout.padOuter}px`,
-              '--col-top': `${layout.padTop}px`,
-              '--col-shift': `${-spreadShift(spread, layout)}px`,
-              '--page-font': `${pageFont}px`,
-            }}
+            style={{ ...columnVars, '--col-shift': `${-spreadShift(spread, layout)}px` }}
           >
             {mode === 'auto' && <div ref={lamp} class="spread__lamp" data-testid="spread-lamp" aria-hidden="true" />}
             {blocks}
@@ -430,6 +499,39 @@ export function SpreadView(props: SpreadViewProps) {
         </div>
       </div>
       <div class="spread__side spread__side--right">{swap ? forward : back}</div>
+      {measureBlocks && (
+        <div ref={measurer} class="spread__columns spread__measure" aria-hidden="true" style={{ ...columnVars }}>
+          {measureBlocks}
+        </div>
+      )}
     </div>
   );
+}
+
+const chunkKey = (c: Chunk) => `${c.start}-${c.end}`;
+
+/** One chunk's paragraphs and headings, one span per sentence. */
+function chunkBlocks(sents: readonly Sentence[], sections: readonly Section[], secStart: readonly number[], chunk: Chunk): VNode[] {
+  const out: VNode[] = [];
+  let i = chunk.start;
+  while (i < chunk.end) {
+    const s = sents[i] as Sentence;
+    if (secStart[s.sec] === i) {
+      const heading = sectionHeading(sections[s.sec], s.sec);
+      if (heading) out.push(<h2 key={`h${s.sec}`}>{heading}</h2>);
+    }
+    const children: (VNode | string)[] = [];
+    const first = i;
+    while (i < chunk.end && (sents[i] as Sentence).sec === s.sec && (sents[i] as Sentence).para === s.para) {
+      if (children.length) children.push(' ');
+      children.push(
+        <span key={i} class="spread__sent" data-i={i}>
+          {(sents[i] as Sentence).t}
+        </span>,
+      );
+      i++;
+    }
+    out.push(s.h ? <h3 key={first}>{children}</h3> : <p key={first}>{children}</p>);
+  }
+  return out;
 }

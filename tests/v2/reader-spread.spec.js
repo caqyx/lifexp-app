@@ -306,3 +306,103 @@ test('an EPUB\'s navigation document in the spine is its contents list: skipped 
   await page.getByRole('button', { name: 'Spis treści książki' }).click();
   await expect(page.getByRole('dialog', { name: 'Spis treści książki' }).locator('p, h3')).toHaveText(['Contents', 'Pierwszy rozdział']);
 });
+
+/** Two pages, the gutter between them and both buttons inside the screen, nothing wider than it. */
+async function expectSpreadFits(page, width, height) {
+  await expect(page.locator('.spread__frame')).toBeVisible();
+  const left = await page.locator('.spread__page--left').boundingBox();
+  const right = await page.locator('.spread__page--right').boundingBox();
+  const gutter = await page.locator('.spread__gutter').boundingBox();
+  expect(left.width).toBeGreaterThan(200);
+  expect(Math.abs(left.width - right.width)).toBeLessThan(2);
+  expect(gutter.x).toBeGreaterThan(left.x);
+  expect(gutter.x + gutter.width).toBeLessThan(right.x + right.width);
+  for (const name of ['Dalej', 'Wstecz']) {
+    const box = await page.getByRole('button', { name }).boundingBox();
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
+    expect(box.y + box.height).toBeLessThanOrEqual(height);
+  }
+  const reader = await page.locator('.reader').boundingBox();
+  expect(Math.round(reader.width)).toBe(width);
+  expect(Math.round(reader.height)).toBe(height);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+}
+
+test.describe('turning a phone that started upright (393×851, DPR 2.75)', () => {
+  test.use({ viewport: { width: 393, height: 851 }, deviceScaleFactor: 2.75 });
+
+  test('each mode: upright → sideways shows the spread with working buttons → upright again, at the same place', async ({ page }) => {
+    const account = await createUser({ tag: 'spread-live', profile: { optInModules: ['reader'] } });
+    await openSignedIn(page, account, '#/reader');
+    await page.locator('input[type="file"]').setInputFiles([BOOK]);
+    await page.locator('.reader-lib__open').click();
+    await expect(page.getByTestId('reader-easy-text')).toHaveText('Rozdział 1.');
+    const footStatus = page.locator('.reader__foot .reader__status');
+
+    for (const mode of ['Prosta', 'Auto', 'Normalny']) {
+      await page.getByRole('button', { name: mode, exact: true }).click();
+      await expect(page.getByRole('button', { name: mode, exact: true })).toHaveAttribute('aria-pressed', 'true');
+      const upright = await footStatus.textContent();
+      const n = Number(upright.match(/zdanie (\d+)/)[1]);
+
+      // Android fires resize around orientationchange; the layout follows the new size.
+      await page.setViewportSize({ width: 851, height: 393 });
+      await page.evaluate(() => dispatchEvent(new Event('orientationchange')));
+      await expectSpreadFits(page, 851, 393);
+      await expect(status(page)).toContainText(`zdanie ${n} z`);
+      await page.getByRole('button', { name: 'Dalej' }).click();
+      await expect(status(page)).not.toContainText(`zdanie ${n} z`);
+      const sideways = await status(page).textContent();
+      const m = Number(sideways.match(/zdanie (\d+)/)[1]);
+      expect(m).toBeGreaterThan(n);
+      await page.getByRole('button', { name: 'Wstecz' }).click();
+      await expect(status(page)).not.toContainText(`zdanie ${m} z`);
+      await page.getByRole('button', { name: 'Dalej' }).click();
+      await expect(status(page)).toContainText(`zdanie ${m} z`);
+
+      await page.setViewportSize({ width: 393, height: 851 });
+      await page.evaluate(() => dispatchEvent(new Event('orientationchange')));
+      await expect(page.locator('.spread')).toHaveCount(0);
+      const reader = await page.locator('.reader').boundingBox();
+      expect(Math.round(reader.width)).toBe(393);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(393);
+      await expect(footStatus).toContainText(`zdanie ${m} z`);
+    }
+  });
+
+  test('a long book (about 1 MB) turns sideways quickly on a slow phone: one chapter at a time is laid out', async ({ page }) => {
+    test.setTimeout(120000);
+    const long = Array.from({ length: 4000 }, (_, i) => prose(i + 1)).join('\n\n');
+    const account = await createUser({ tag: 'spread-long', profile: { optInModules: ['reader'] } });
+    await openSignedIn(page, account, '#/reader');
+    await page.locator('input[type="file"]').setInputFiles([{ name: 'Długa.txt', mimeType: 'text/plain', buffer: Buffer.from(long, 'utf8') }]);
+    await page.locator('.reader-lib__open').click({ timeout: 60000 });
+    await expect(page.getByTestId('reader-easy-text')).toBeVisible({ timeout: 30000 });
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    const started = Date.now();
+    await page.setViewportSize({ width: 851, height: 393 });
+    await expect(page.locator('.spread__frame')).toBeVisible({ timeout: 60000 });
+    await page.getByRole('button', { name: 'Dalej' }).click({ timeout: 60000 });
+    await expect(status(page)).toContainText('zdanie 2 z');
+    // Laying out the whole book in columns took ~24 s here before (the owner's frozen phone).
+    expect(Date.now() - started).toBeLessThan(8000);
+    // Only one chunk of the book is in the page.
+    expect(await page.locator('.spread__columns:not(.spread__measure) .spread__sent').count()).toBeLessThan(200);
+    // Pages are numbered over the whole book: past the first chunk the numbers go on.
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
+    await page.getByRole('button', { name: 'Ustawienia tekstu' }).click();
+    await page.getByRole('switch', { name: 'Przybliżaj do zdania' }).click();
+    await page.keyboard.press('Escape');
+    let folio = 1;
+    for (let i = 0; i < 40 && folio < 30; i++) {
+      await page.getByRole('button', { name: 'Dalej' }).click();
+      folio = Number(await page.getByTestId('folio-left').textContent());
+    }
+    expect(folio).toBeGreaterThan(20);
+    const before = folio;
+    await page.getByRole('button', { name: 'Wstecz' }).click();
+    await expect(page.getByTestId('folio-left')).toHaveText(String(before - 2));
+  });
+});

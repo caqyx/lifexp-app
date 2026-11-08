@@ -128,3 +128,57 @@ export function unionBox(boxes: readonly Box[]): Box | null {
   const y2 = Math.max(...boxes.map((b) => b.y + b.h));
   return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
 }
+
+/** A run of sentences laid out on its own pages (the spread never lays out the whole book at once). */
+export interface Chunk {
+  /** First sentence and one past the last. */
+  start: number;
+  end: number;
+}
+
+/** A chunk ends at a paragraph once it has this many sentences… */
+export const CHUNK_SOFT = 120;
+/** …and at any sentence at this many (a paragraph longer than that). */
+export const CHUNK_HARD = 180;
+/** A new section starts a new chunk once the current one has this many sentences (chapters start on a new page). */
+export const CHUNK_MIN_AT_SECTION = 24;
+
+/**
+ * The book cut into chunks, the same way for the same text (stable pages): at a new
+ * section with a heading-worthy title (`newPage(sec)`) or once long enough, at a
+ * paragraph past CHUNK_SOFT sentences, and anywhere at CHUNK_HARD. Laying out one
+ * chunk at a time keeps a phone responsive with a long book: the browser's column
+ * layout of a whole 1 MB book took 24 s on a throttled CPU.
+ */
+export function chunkSentences(
+  sents: readonly { sec: number; para: number }[],
+  newPage: (sec: number) => boolean = () => false,
+): Chunk[] {
+  const chunks: Chunk[] = [];
+  let start = 0;
+  for (let i = 1; i < sents.length; i++) {
+    const s = sents[i] as { sec: number; para: number };
+    const p = sents[i - 1] as { sec: number; para: number };
+    const n = i - start;
+    const newSection = s.sec !== p.sec;
+    const newPara = newSection || s.para !== p.para;
+    if ((newSection && (newPage(s.sec) || n >= CHUNK_MIN_AT_SECTION)) || (newPara && n >= CHUNK_SOFT) || n >= CHUNK_HARD) {
+      chunks.push({ start, end: i });
+      start = i;
+    }
+  }
+  if (sents.length) chunks.push({ start, end: sents.length });
+  return chunks;
+}
+
+/** The chunk holding sentence `s`. */
+export function chunkIndexOf(chunks: readonly Chunk[], s: number): number {
+  let lo = 0;
+  let hi = chunks.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if ((chunks[mid] as Chunk).start <= s) lo = mid;
+    else hi = mid - 1;
+  }
+  return Math.max(0, lo);
+}
