@@ -63,6 +63,8 @@ interface SpreadViewProps {
   fontPx: number;
   onPosition: (sentence: number) => void;
   onEnd: () => void;
+  /** Full screen in Auto: a tap on the pages plays or pauses (instead of moving the light). */
+  onTapPage?: () => void;
   swipe: { onTouchStart: (e: TouchEvent) => void; onTouchEnd: (e: TouchEvent) => void };
 }
 
@@ -252,8 +254,11 @@ export function SpreadView(props: SpreadViewProps) {
   const toLastSpread = useRef(false);
   const highlighted = useRef<HTMLElement | null>(null);
 
+  // Prosta steps sentence by sentence, lit on the page, zoomed onto it only with the zoom on;
+  // Auto lights its sentence too. Normalny turns whole spreads.
   const followsSentence = mode !== 'normal' && zoom;
-  const sentenceStep = mode === 'easy' && zoom;
+  const sentenceStep = mode === 'easy';
+  const litSentence = mode !== 'normal';
 
   useLayoutEffect(() => {
     if (!layoutRun) return;
@@ -275,10 +280,10 @@ export function SpreadView(props: SpreadViewProps) {
       }
     }
     if (target !== spread) setSpread(target);
-    // The sentence lit in Prosta with the zoom on.
+    // The current sentence is lit (Prosta, Auto), with the zoom on or off.
     highlighted.current?.classList.remove('is-on');
     highlighted.current = null;
-    if (sentenceStep) {
+    if (litSentence) {
       const span = spans.current[pos];
       span?.classList.add('is-on');
       highlighted.current = span ?? null;
@@ -286,7 +291,7 @@ export function SpreadView(props: SpreadViewProps) {
     // While a page turns the whole spread is shown; the zoom comes back on the new page.
     const box = zoomed && followsSentence && !turning ? spreadBox(pos, target) : null;
     setCamera(box ? zoomTo(box, { w: layout.pageW * 2, h: layout.pageH }) : OVERVIEW);
-  }, [pos, layoutRun, zoomed, followsSentence, sentenceStep, turning]);
+  }, [pos, layoutRun, zoomed, followsSentence, litSentence, turning]);
 
   // ── The page turn ──────────────────────────────────────────────────────────
   const here = useRef({ ci, spread, chunk, pos });
@@ -419,7 +424,7 @@ export function SpreadView(props: SpreadViewProps) {
       const s = pos + delta;
       if (s >= sents.length) return latest.current.onEnd();
       if (s < 0) return;
-      setZoomed(true);
+      if (zoom) setZoomed(true);
       const dir = directionTo(s);
       if (dir) prepareTurn(dir);
       latest.current.onPosition(s);
@@ -524,6 +529,11 @@ export function SpreadView(props: SpreadViewProps) {
   const down = useRef({ x: 0, y: 0 });
   const onClick = (e: MouseEvent) => {
     if (Math.abs(e.clientX - down.current.x) > TAP || Math.abs(e.clientY - down.current.y) > TAP) return;
+    // Full screen in Auto: no controls are shown, a tap starts or pauses the light.
+    if (mode === 'auto' && props.onTapPage) {
+      props.onTapPage();
+      return;
+    }
     if (mode === 'auto') {
       // A tap on a word moves the light there.
       const caret = document.caretRangeFromPoint?.(e.clientX, e.clientY);

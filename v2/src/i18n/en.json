@@ -1793,7 +1793,7 @@
       "smallerShort": "A−",
       "biggerShort": "A+",
       "zoom": "Zoom to the sentence",
-      "zoomHint": "Sideways, the arrows move one sentence and zoom in on it; off, they turn whole pages.",
+      "zoomHint": "Sideways the arrows move one sentence (highlighted); on, they zoom in on it; off, the whole spread stays in view.",
       "swap": "Swap the buttons",
       "skipToc": "Skip the table of contents",
       "skipTocHint": "The book’s own table of contents is left out of reading and the percentage."
@@ -1801,6 +1801,10 @@
     "close": "Close",
     "slowerShort": "−",
     "fasterShort": "+",
-    "bookToc": "The book’s table of contents"
+    "bookToc": "The book’s table of contents",
+    "fullscreen": "Full screen",
+    "fullscreenLabel": "Full screen: only the book and the arrows",
+    "fullscreenExit": "Exit",
+    "fullscreenExitLabel": "Exit full screen"
   }
 }
