@@ -300,6 +300,12 @@ button:focus-visible {
   gap: calc(var(--upx) * 2) calc(var(--upx) * 4);
 }
 
+/* A meta line that wraps takes the whole row (its width is the card's, not its words'). */
+.map-card__line--wide {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
 .stars {
   display: inline-flex;
   align-items: center;
@@ -890,5 +896,212 @@ button:focus-visible {
   .banner.is-shown,
   .overlay {
     animation: none;
+  }
+}
+
+/* ── Custom mode: setup and map editor (td-5) ─────────────────────────────── */
+
+.app[data-screen='custom'] .screen--custom,
+.app[data-screen='editor'] .screen--editor {
+  display: flex;
+}
+
+.screen--custom,
+.screen--editor {
+  flex-direction: column;
+  gap: calc(var(--upx) * 4);
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px 16px max(16px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+}
+
+.custom__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.custom__head .chip {
+  flex: none;
+}
+
+.custom__title,
+.custom__label,
+.custom__note,
+.custom__problem {
+  margin: 0;
+  min-width: 0;
+}
+
+.custom__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--upx) * 3);
+  padding: var(--upx);
+}
+
+.custom__row .button {
+  flex: 1 1 auto;
+}
+
+.custom__row--wrap {
+  align-items: center;
+}
+
+.custom__pick {
+  display: grid;
+  gap: calc(var(--upx) * 3);
+}
+
+.custom__play {
+  margin-top: calc(var(--upx) * 2);
+}
+
+.choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 120px), 1fr));
+  gap: calc(var(--upx) * 2);
+  padding: calc(var(--upx) * 2);
+}
+
+.choice,
+.kind {
+  display: grid;
+  min-width: 0;
+  min-height: 44px;
+  place-items: center;
+  padding: calc(var(--upx) * 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: var(--panel-light);
+  box-shadow:
+    inset 0 var(--upx) 0 var(--stone),
+    inset 0 calc(var(--upx) * -2) 0 var(--ink),
+    0 0 0 var(--upx) var(--ink);
+  cursor: pointer;
+}
+
+.choice[aria-checked='true'],
+.kind[aria-checked='true'] {
+  background: var(--violet-dark);
+  box-shadow:
+    inset 0 0 0 var(--upx) var(--gold),
+    inset 0 0 0 calc(var(--upx) * 2) var(--ink),
+    0 0 0 var(--upx) var(--ink),
+    0 0 0 calc(var(--upx) * 2) var(--gold);
+}
+
+.kinds {
+  display: grid;
+  /* At least as wide as the widest name (custom.js fitKinds sets --kind-min). */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--kind-min, 84px)), 1fr));
+  gap: calc(var(--upx) * 2);
+  margin: 0;
+  padding: calc(var(--upx) * 2);
+  list-style: none;
+}
+
+.kind {
+  gap: calc(var(--upx) * 2);
+  width: 100%;
+  min-height: 64px;
+}
+
+.segmented--plain {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.segmented--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--upx) * 2);
+  padding: var(--upx);
+}
+
+.stepper__value {
+  display: grid;
+  place-items: center;
+  min-width: 64px;
+  min-height: 44px;
+  padding: 0 calc(var(--upx) * 3);
+  background: var(--ink);
+  box-shadow: inset 0 0 0 var(--upx) var(--stone-dark);
+}
+
+.editor__name {
+  display: grid;
+  gap: calc(var(--upx) * 2);
+}
+
+.editor__input {
+  min-height: 44px;
+  padding: 0 calc(var(--upx) * 3);
+  border: 0;
+  border-radius: 0;
+  color: var(--white);
+  font: 600 16px ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  background: var(--ink);
+  box-shadow:
+    inset 0 0 0 var(--upx) var(--stone),
+    0 0 0 var(--upx) var(--ink);
+}
+
+.editor__input:focus-visible {
+  outline: calc(var(--upx) * 2) solid var(--gold);
+}
+
+.editor__grid-wrap {
+  display: grid;
+  place-items: center;
+  padding: calc(var(--upx) * 4) 0;
+}
+
+.editor__grid {
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+  image-rendering: crisp-edges;
+  image-rendering: pixelated;
+  box-shadow:
+    0 0 0 var(--upx) var(--ink),
+    0 0 0 calc(var(--upx) * 3) var(--wood),
+    0 0 0 calc(var(--upx) * 4) var(--ink);
+}
+
+/* The setup and the editor scroll as a whole: nothing in them shrinks to fit. */
+.screen--custom > *,
+.screen--editor > * {
+  flex-shrink: 0;
+}
+
+/* Sideways: the editor's controls on the left, the grid on the right at full height. */
+@media (min-aspect-ratio: 1/1) {
+  .app[data-screen='editor'] .screen--editor {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-auto-rows: min-content;
+    align-content: start;
+    max-width: 1100px;
+    column-gap: calc(var(--upx) * 8);
+  }
+
+  .screen--editor > * {
+    grid-column: 1;
+  }
+
+  .screen--editor > .editor__grid-wrap {
+    grid-column: 2;
+    grid-row: 1 / span 8;
+    align-self: start;
+    padding: 0;
   }
 }

@@ -17,6 +17,9 @@ export const ROWS = 15;
  *   road: readonly (readonly [number, number])[],
  *   pads: readonly (readonly [number, number])[],
  *   endless?: boolean,
+ *   look?: 'meadow' | 'canyon' | 'marsh',
+ *   custom?: string,
+ *   name?: string,
  * }} MapDef
  */
 

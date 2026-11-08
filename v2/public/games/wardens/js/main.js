@@ -17,6 +17,7 @@ import {
   buildCost,
   buildTower,
   callWave,
+  canPay,
   createGame,
   earlyBonus,
   sellTower,
@@ -33,7 +34,8 @@ import { consumeEvents, createRenderer, enemyIcon, mapThumbnail, renderFrame, re
 import { createIcon, refreshIcons, refreshPixelTexts, setPixelText, setTextScale } from './pixelui.js';
 import { makeSprite } from './pixelart.js';
 import { ICONS } from './sprites.js';
-import { isUnlocked, readProgress, readSettings, saveEndless, saveSettings, saveWin } from './records.js';
+import { isCustomUnlocked, isUnlocked, readProgress, readSettings, saveEndless, saveSettings, saveWin } from './records.js';
+import { createCustomMode } from './custom.js';
 import { pickLang, testParams, translator } from './i18n.js';
 
 /** @typedef {import('./sim.js').Game} Game */
@@ -133,6 +135,10 @@ const settings = readSettings(storage());
 const ui = {
   mapIndex: 0,
   endless: false,
+  /** A custom-mode game (no stars, no next map). */
+  customGame: false,
+  /** Starts the same game again (Jeszcze raz, Od nowa). */
+  replay: () => {},
   game: /** @type {Game | null} */ (null),
   layout: /** @type {Layout | null} */ (null),
   selectedPad: -1,
@@ -161,7 +167,9 @@ const tk = (key) => t(/** @type {TextKey} */ (key));
  * @param {HTMLElement} el @returns {import('./pixelui.js').TextStyle}
  */
 function styleOf(el) {
-  if (el.classList.contains('start__title')) return { color: 'y', size: 2, wrap: true };
+  if (el.classList.contains('start__title') || el.classList.contains('custom__title')) return { color: 'y', size: 2, wrap: true };
+  if (el.classList.contains('custom__note')) return { color: 'G', wrap: true };
+  if (el.classList.contains('custom__label')) return { color: 'y' };
   if (el.classList.contains('button--primary') || el.classList.contains('key')) return { color: 'w', shadow: 'u' };
   if (el.closest('.start__intro, .start__hint, .hint, .panel__role')) return { color: 'G', wrap: true };
   if (el.classList.contains('segmented__option')) return { color: 'w', size: 0 };
@@ -192,7 +200,7 @@ function placeIcons() {
 
 // ── Screens ──────────────────────────────────────────────────────────────────
 
-/** @param {'start' | 'play' | 'end'} screen @param {HTMLElement | null} [focus] */
+/** @param {'start' | 'play' | 'end' | 'custom' | 'editor'} screen @param {HTMLElement | null} [focus] */
 function showScreen(screen, focus = null) {
   dom.app.dataset.screen = screen;
   focus?.focus({ preventScroll: true });
@@ -246,11 +254,11 @@ function createMapButton(name, desc, badge, meta, locked, onPick, thumb) {
   return item;
 }
 
-/** A line of pixel text for a map card's meta row. @param {string} text @param {import('./pixelart.js').Colour} [color] */
-function metaText(text, color = 'G') {
+/** A line of pixel text for a map card's meta row. @param {string} text @param {import('./pixelart.js').Colour} [color] @param {boolean} [wrap] */
+function metaText(text, color = 'G', wrap = false) {
   const el = document.createElement('span');
-  el.className = 'map-card__line';
-  say(el, text, { color });
+  el.className = wrap ? 'map-card__line map-card__line--wide' : 'map-card__line';
+  say(el, text, { color, wrap });
   return el;
 }
 
@@ -273,6 +281,8 @@ function renderMapList() {
     ? [metaText(t('locked', { map: tk(`map.${MAPS[last]?.id}`) }))]
     : [metaText(progress.endlessBest > 0 ? t('bestWave', { n: progress.endlessBest }) : t('noBest'), progress.endlessBest > 0 ? 'y' : 'G')];
   items.push(createMapButton(t('endless'), t('endlessDesc'), '∞', endlessMeta, endlessLocked, () => startGame(last, true), null));
+  const customLocked = !isCustomUnlocked(progress, MAPS);
+  items.push(createMapButton(t('customMode'), t('customDesc'), '+', [metaText(customLocked ? t('customLocked') : t('customNote'), 'G', true)], customLocked, () => custom.open(), null));
   dom.mapList.replaceChildren(...items);
 }
 
@@ -284,11 +294,32 @@ function startGame(mapIndex, endless) {
   if (!map) return;
   ui.mapIndex = mapIndex;
   ui.endless = endless;
+  ui.customGame = false;
+  ui.replay = () => startGame(mapIndex, endless);
+  launch(map, { endless }, endless ? `${tk(`map.${map.id}`)} · ${t('endless')}` : tk(`map.${map.id}`));
+}
+
+/**
+ * A custom game (custom.js): any map, its own gold and waves; no stars.
+ * @param {import('./maps.js').MapDef} map @param {import('./sim.js').GameOptions} options @param {string} label
+ */
+function startCustom(map, options, label) {
+  ui.mapIndex = -1;
+  ui.endless = false;
+  ui.customGame = true;
+  ui.replay = () => startCustom(map, options, label);
+  launch(map, options, label);
+}
+
+/**
+ * @param {import('./maps.js').MapDef} map @param {import('./sim.js').GameOptions} options @param {string} label
+ */
+function launch(map, options, label) {
   ui.game = createGame(map, {
-    endless,
+    ...options,
     waves: test.waves ?? undefined,
     lives: test.lives ?? undefined,
-    gold: test.gold ?? undefined,
+    gold: test.gold ?? options.gold,
     start: test.start ?? undefined,
   });
   ui.ended = false;
@@ -296,9 +327,9 @@ function startGame(mapIndex, endless) {
   ui.shown = { gold: -1, lives: -1, wave: '', status: '', call: '', previewWave: -1, phase: '' };
   clearEffects(fx);
   resetRenderer(renderer, ui.game);
-  dom.playMap.textContent = endless ? `${tk(`map.${map.id}`)} · ${t('endless')}` : tk(`map.${map.id}`);
-  ui.mapLabel = dom.playMap.textContent;
-  dom.app.dataset.map = map.id;
+  dom.playMap.textContent = label;
+  ui.mapLabel = label;
+  dom.app.dataset.map = map.look ?? map.id;
   dom.hint.hidden = false;
   createPadButtons(ui.game);
   closePanel(false);
@@ -510,9 +541,9 @@ function renderBuildMenu(game) {
   for (const [type, button] of ui.optionButtons) {
     const cost = buildCost(type);
     button.setAttribute('aria-checked', String(ui.previewType === type));
-    button.classList.toggle('is-short', game.gold < cost);
+    button.classList.toggle('is-short', !canPay(game, cost));
     const costEl = button.querySelector('.option__cost');
-    if (costEl) say(/** @type {HTMLElement} */ (costEl), t('cost', { n: cost }), { color: game.gold < cost ? 'R' : 'y', size: 0 });
+    if (costEl) say(/** @type {HTMLElement} */ (costEl), t('cost', { n: cost }), { color: canPay(game, cost) ? 'y' : 'R', size: 0 });
   }
   const type = ui.previewType;
   say(dom.optionRole, type ? roleText(type) : t('hint'), { color: 'w', wrap: true });
@@ -520,7 +551,7 @@ function renderBuildMenu(game) {
   dom.build.hidden = !type;
   if (!type) return;
   const cost = buildCost(type);
-  const short = cost - game.gold;
+  const short = canPay(game, cost) ? 0 : cost - game.gold;
   dom.build.disabled = short > 0;
   say(dom.build, short > 0 ? `${tk(`tower.${type}`)} · ${t('missing', { n: short })}` : `${t('build')} · ${t('cost', { n: cost })}`, { color: short > 0 ? 'G' : 'w', shadow: short > 0 ? 'k' : 'u', wrap: true, align: 'center' });
 }
@@ -541,8 +572,9 @@ function renderTowerMenu(game, tower) {
     dom.upgrade.disabled = true;
     say(dom.upgrade, t('maxed'), { color: 'G' });
   } else {
-    dom.upgrade.disabled = game.gold < cost;
-    say(dom.upgrade, game.gold < cost ? `${t('upgrade', { n: cost })} · ${t('missing', { n: cost - game.gold })}` : t('upgrade', { n: cost }), { color: game.gold < cost ? 'G' : 'w', shadow: game.gold < cost ? 'k' : 'u', wrap: true, align: 'center' });
+    const short = !canPay(game, cost);
+    dom.upgrade.disabled = short;
+    say(dom.upgrade, short ? `${t('upgrade', { n: cost })} · ${t('missing', { n: cost - game.gold })}` : t('upgrade', { n: cost }), { color: short ? 'G' : 'w', shadow: short ? 'k' : 'u', wrap: true, align: 'center' });
   }
   say(dom.sell, t('sell', { n: sellValue(tower) }), { color: 'w', wrap: true, align: 'center' });
   fitPriority();
@@ -616,7 +648,7 @@ function updateHud(game) {
   const s = ui.shown;
   if (s.gold !== game.gold) {
     s.gold = game.gold;
-    say(dom.gold, String(game.gold), { color: 'y' });
+    say(dom.gold, game.infiniteGold ? '∞' : String(game.gold), { color: 'y', spoken: game.infiniteGold ? t('infinite') : String(game.gold) });
     if (!dom.panel.hidden) renderPanel(game);
   }
   if (s.lives !== game.lives) {
@@ -765,6 +797,7 @@ function checkEnd(game) {
 /** @param {Game} game @returns {{ stars: number, isNew: boolean, unlocked: string | null }} */
 function saveResult(game) {
   const map = game.map;
+  if (ui.customGame) return { stars: 0, isNew: false, unlocked: null };
   if (game.endless) return { stars: 0, isNew: saveEndless(storage(), progress, game.cleared), unlocked: null };
   if (game.phase !== 'won') return { stars: 0, isNew: false, unlocked: null };
   const stars = starsFor(game.lives, game.startLives);
@@ -780,13 +813,13 @@ function showEnd(game, result) {
   dom.app.dataset.result = won ? 'won' : 'lost';
   say(dom.endTitle, game.endless ? t('endlessOver', { n: game.wave }) : won ? t('won') : t('lost'), { color: won ? 'f' : 'R', size: 2, wrap: true, align: 'center' });
   say(dom.endMap, ui.mapLabel, { color: 'G', align: 'center' });
-  dom.endStars.replaceChildren(...(won ? [createStars(result.stars, 2)] : []));
+  dom.endStars.replaceChildren(...(won && !ui.customGame ? [createStars(result.stars, 2)] : []));
   dom.endBadge.hidden = !result.isNew && !result.unlocked;
   say(dom.endBadge, result.unlocked ? `${result.isNew ? `${t('newBest')} ` : ''}${t('unlocked', { map: result.unlocked })}` : t('newBest'), { color: 'k', shadow: null, wrap: true, align: 'center' });
   say(dom.endLives, t('livesLeft', { n: game.lives }), { color: 'w', align: 'center' });
   say(dom.endWaves, t('wavesCleared', { n: game.cleared }), { color: 'w', align: 'center' });
   say(dom.endKills, t('kills', { n: game.stats.kills }), { color: 'w', align: 'center' });
-  const hasNext = won && !game.endless && MAPS[ui.mapIndex + 1] !== undefined;
+  const hasNext = won && !game.endless && !ui.customGame && MAPS[ui.mapIndex + 1] !== undefined;
   dom.nextMap.hidden = !hasNext;
   renderMapList();
   showScreen('end', hasNext ? dom.nextMap : dom.again);
@@ -888,10 +921,10 @@ function bindControls() {
   dom.pause.addEventListener('click', () => showPause(!ui.game?.paused));
   dom.resume.addEventListener('click', () => showPause(false));
   dom.speed.addEventListener('click', toggleSpeed);
-  dom.restart.addEventListener('click', () => startGame(ui.mapIndex, ui.endless));
+  dom.restart.addEventListener('click', () => ui.replay());
   dom.toMaps.addEventListener('click', backToMaps);
   dom.endMaps.addEventListener('click', backToMaps);
-  dom.again.addEventListener('click', () => startGame(ui.mapIndex, ui.endless));
+  dom.again.addEventListener('click', () => ui.replay());
   dom.nextMap.addEventListener('click', () => startGame(ui.mapIndex + 1, false));
   dom.panelClose.addEventListener('click', () => closePanel(true));
   dom.build.addEventListener('click', handleBuild);
@@ -927,6 +960,15 @@ applyTexts();
 placeIcons();
 createTowerOptions();
 renderSpeed();
+const custom = createCustomMode({
+  t: (key, values) => t(/** @type {TextKey} */ (key), values),
+  say,
+  storage,
+  campaign: MAPS,
+  enemyIcon: (type) => createIcon(enemyIcon(type), type === 'colossus' || type === 'broodmother' ? 0.4 : 0.6),
+  show: (screen, focus) => (screen === 'start' ? backToMaps() : showScreen(screen, focus)),
+  play: startCustom,
+});
 renderMapList();
 bindControls();
 window.requestAnimationFrame(loop);

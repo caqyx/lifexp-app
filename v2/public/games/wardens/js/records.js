@@ -12,7 +12,7 @@ export const PROGRESS_KEY = 'lifexp-wardens-progress';
 export const SETTINGS_KEY = 'lifexp-wardens-settings';
 
 /** @param {RecordStorage | null} storage @param {string} key @returns {unknown} */
-function readJson(storage, key) {
+export function readJson(storage, key) {
   try {
     const raw = storage?.getItem(key);
     return raw ? JSON.parse(raw) : null;
@@ -22,7 +22,7 @@ function readJson(storage, key) {
 }
 
 /** @param {RecordStorage | null} storage @param {string} key @param {unknown} value */
-function writeJson(storage, key, value) {
+export function writeJson(storage, key, value) {
   try {
     storage?.setItem(key, JSON.stringify(value));
   } catch {
@@ -80,6 +80,15 @@ export function isUnlocked(progress, maps, index) {
   if (index <= 0) return true;
   const before = maps[index - 1];
   return before !== undefined && (progress.stars[before.id] ?? 0) > 0;
+}
+
+/**
+ * The custom mode opens when every campaign map has been won (any stars); old saves that
+ * already did so open it at once.
+ * @param {Progress} progress @param {readonly MapDef[]} maps
+ */
+export function isCustomUnlocked(progress, maps) {
+  return maps.every((map) => (progress.stars[map.id] ?? 0) > 0);
 }
 
 /** @param {RecordStorage | null} storage @returns {Settings} */

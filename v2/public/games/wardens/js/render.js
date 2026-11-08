@@ -277,9 +277,10 @@ export function resizeRenderer(r, layout, game) {
   r.ctx.imageSmoothingEnabled = false;
   r.layerCtx.imageSmoothingEnabled = false;
   prewarmSprites();
-  if (r.mapId !== game.map.id || !r.tiles) {
+  const mapKey = game.map.custom ?? game.map.id;
+  if (r.mapId !== mapKey || !r.tiles) {
     r.tiles = createTileset(game.map);
-    r.mapId = game.map.id;
+    r.mapId = mapKey;
   }
   const tiles = r.tiles;
   r.groundFrames = [0, 1].map((f) => {
@@ -289,8 +290,9 @@ export function resizeRenderer(r, layout, game) {
   });
   const first = r.groundFrames[r.waterFrame];
   if (first) r.layerCtx.drawImage(first, 0, 0);
-  r.shade = createShade(layout, game.map.id);
-  setAmbience(r.parts, game.map.id, layout.width, layout.height);
+  const look = game.map.look ?? game.map.id;
+  r.shade = createShade(layout, look);
+  setAmbience(r.parts, look, layout.width, layout.height);
   r.padOrder = game.pads.map((_, i) => i);
   const at = { x: 0, y: 0 };
   const yOf = (/** @type {number} */ i) => {
@@ -473,7 +475,7 @@ export function renderFrame(r, game, fx, view) {
   renderParticles(ctx, r.parts);
   renderEffects(r, ctx, layout, fx);
   renderAmbience(ctx, r.parts, view.reduced ? 0 : view.clock);
-  if (game.map.id === 'marsh') renderFog(ctx, layout, view);
+  if ((game.map.look ?? game.map.id) === 'marsh') renderFog(ctx, layout, view);
   renderTorches(ctx, layout, game, view);
   if (r.shade) ctx.drawImage(r.shade, 0, 0);
 }

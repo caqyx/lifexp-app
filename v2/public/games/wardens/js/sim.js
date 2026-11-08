@@ -20,7 +20,7 @@ import {
   WAVE_BONUS_STEP,
 } from './config.js';
 import { createPath, pointAt } from './maps.js';
-import { createSpawns, createWave } from './waves.js';
+import { createCustomWave, createSpawns, createWave } from './waves.js';
 
 /** @typedef {import('./config.js').TowerType} TowerType */
 /** @typedef {import('./config.js').EnemyType} EnemyType */
@@ -56,7 +56,13 @@ import { createSpawns, createWave } from './waves.js';
  *   | 'flame' | 'chain' | 'snipe' | 'splash' | 'heal' | 'shieldBreak' | 'burrow' | 'surface' | 'brood'} EventType
  * @typedef {{ type: EventType, x: number, y: number, value: number, kind: string, x2: number, y2: number }} GameEvent
  * @typedef {'build' | 'wave' | 'won' | 'lost'} Phase
- * @typedef {{ endless?: boolean, lives?: number, gold?: number, waves?: number, start?: number }} GameOptions
+ * @typedef {import('./waves.js').CustomWaves} CustomWaves
+ * @typedef {{
+ *   endless?: boolean, lives?: number, gold?: number, waves?: number, start?: number,
+ *   custom?: CustomWaves | null, infiniteGold?: boolean, difficulty?: number,
+ * }} GameOptions
+ * (custom: a custom game's own waves from the player's choice of kinds; infiniteGold: towers
+ * cost nothing; difficulty: enemy health × this.)
  */
 
 export const MAX_ENEMIES = 320;
@@ -101,13 +107,21 @@ function createEventSlot() {
  * @param {MapDef} map @param {GameOptions} [options]
  */
 export function createGame(map, options = {}) {
-  const endless = options.endless === true && map.endless === true;
-  const totalWaves = endless ? Infinity : Math.max(1, Math.min(map.waves, options.waves ?? map.waves));
+  const custom = options.custom ?? null;
+  const endless = !custom && options.endless === true && map.endless === true;
+  const ownWaves = custom ? custom.waves : map.waves;
+  const totalWaves = endless ? Infinity : Math.max(1, Math.min(ownWaves, options.waves ?? ownWaves));
   const skipped = Math.max(0, Math.min((options.start ?? 1) - 1, endless ? 199 : totalWaves - 1));
-  return {
+  const game = {
     map,
     path: createPath(map),
     endless,
+    /** A custom game's wave rules (null: the map's own waves). */
+    custom,
+    /** Towers cost nothing (custom mode). */
+    infiniteGold: options.infiniteGold === true,
+    /** Enemy health × this (custom mode). */
+    difficulty: options.difficulty ?? 1,
     totalWaves,
     phase: /** @type {Phase} */ ('build'),
     paused: false,
@@ -123,7 +137,7 @@ export function createGame(map, options = {}) {
     countdown: -1,
     spawns: /** @type {Spawn[]} */ ([]),
     spawnCursor: 0,
-    nextWave: /** @type {Wave | null} */ (createWave(map, skipped + 1)),
+    nextWave: /** @type {Wave | null} */ (null),
     enemies: Array.from({ length: MAX_ENEMIES }, createEnemySlot),
     aliveCount: 0,
     nextEnemyId: 1,
@@ -134,6 +148,16 @@ export function createGame(map, options = {}) {
     eventSeq: 0,
     stats: { kills: 0, leaked: 0, goldEarned: 0, spent: 0, bestWave: 0 },
   };
+  game.nextWave = waveFor(game, skipped + 1);
+  return game;
+}
+
+/**
+ * Wave `n` of a game: the map's own, or a custom game's from the chosen kinds.
+ * @param {{ map: MapDef, custom: CustomWaves | null }} game @param {number} n @returns {Wave}
+ */
+export function waveFor(game, n) {
+  return game.custom ? createCustomWave(game.custom, n) : createWave(game.map, n);
 }
 
 /** @typedef {ReturnType<typeof createGame>} Game */
@@ -211,7 +235,7 @@ function updateSpawns(game) {
 export function enemyHp(game, type, wave) {
   const linear = 1 + HP_GROWTH * (wave - 1);
   const endless = wave > game.map.waves ? ENDLESS_GROWTH ** (wave - game.map.waves) : 1;
-  return Math.round(ENEMIES[type].hp * linear * endless * game.map.hpFactor);
+  return Math.round(ENEMIES[type].hp * linear * endless * game.map.hpFactor * game.difficulty);
 }
 
 /**
@@ -683,13 +707,13 @@ function updateHoming(game, p, dt) {
 function startWave(game) {
   game.wave += 1;
   game.stats.bestWave = Math.max(game.stats.bestWave, game.wave);
-  const wave = createWave(game.map, game.wave);
+  const wave = waveFor(game, game.wave);
   game.spawns = createSpawns(wave);
   game.spawnCursor = 0;
   game.waveTime = 0;
   game.countdown = -1;
   game.phase = 'wave';
-  game.nextWave = game.wave < game.totalWaves ? createWave(game.map, game.wave + 1) : null;
+  game.nextWave = game.wave < game.totalWaves ? waveFor(game, game.wave + 1) : null;
   emit(game, 'wave', 0, 0, game.wave, wave.boss ? (wave.groups.some((g) => g.type === 'broodmother') ? 'brood' : 'boss') : '');
 }
 
@@ -761,6 +785,16 @@ export function starsFor(lives, startLives = START_LIVES) {
 
 // ── The player's actions ────────────────────────────────────────────────────
 
+/** Whether the player can pay a price (always, with infinite gold). @param {Game} game @param {number} cost */
+export function canPay(game, cost) {
+  return game.infiniteGold || game.gold >= cost;
+}
+
+/** @param {Game} game @param {number} cost */
+function pay(game, cost) {
+  if (!game.infiniteGold) game.gold -= cost;
+}
+
 /** @param {TowerType} type */
 export function buildCost(type) {
   return TOWERS[type].cost[0] ?? 0;
@@ -780,8 +814,8 @@ export function sellValue(tower) {
 export function buildTower(game, pad, type) {
   const spot = game.pads[pad];
   const cost = buildCost(type);
-  if (!spot || game.towers[pad] || game.gold < cost || game.phase === 'won' || game.phase === 'lost') return false;
-  game.gold -= cost;
+  if (!spot || game.towers[pad] || !canPay(game, cost) || game.phase === 'won' || game.phase === 'lost') return false;
+  pay(game, cost);
   game.stats.spent += cost;
   game.towers[pad] = { type, level: 1, pad, x: spot.x, y: spot.y, cooldown: 0, priority: 'first', spent: cost, buff: 0, aim: -Math.PI / 2, fired: 0, shots: 0 };
   updateBuffs(game);
@@ -793,8 +827,8 @@ export function buildTower(game, pad, type) {
 export function upgradeTower(game, pad) {
   const tower = game.towers[pad];
   const cost = tower ? upgradeCost(tower) : null;
-  if (!tower || cost === null || game.gold < cost || game.phase === 'won' || game.phase === 'lost') return false;
-  game.gold -= cost;
+  if (!tower || cost === null || !canPay(game, cost) || game.phase === 'won' || game.phase === 'lost') return false;
+  pay(game, cost);
   game.stats.spent += cost;
   tower.spent += cost;
   tower.level += 1;

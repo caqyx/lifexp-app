@@ -119,30 +119,37 @@ export function describeWave(wave) {
 
 /**
  * A custom game's wave `n` from the player's choice of kinds: deterministic (the same choice
- * always brings the same waves). The kinds join one by one in the order given (a new one
- * every two waves), counts grow with the wave, every fifth wave and the last bring a boss
- * when bosses are on, and the health factor is the game's (difficulty) business.
+ * always brings the same waves). The chosen kinds join from the easiest to the hardest (a
+ * new one every two waves); each wave has a budget that grows with it, shared among the
+ * kinds that have joined, a heavy kind counting for more; bosses (when on) come on every
+ * tenth wave and the last. Health grows with the wave as on the maps (and × difficulty).
  * @param {CustomWaves} custom @param {number} n @returns {Wave}
  */
 export function createCustomWave(custom, n) {
-  const types = custom.types.length > 0 ? custom.types : /** @type {readonly EnemyType[]} */ (['crawler']);
-  const boss = custom.bosses && (n % 5 === 0 || n === custom.waves);
+  const chosen = custom.types.length > 0 ? custom.types : /** @type {readonly EnemyType[]} */ (['crawler']);
+  const types = [...chosen].sort((a, b) => (CUSTOM_WEIGHT[a] ?? 1) - (CUSTOM_WEIGHT[b] ?? 1) || chosen.indexOf(a) - chosen.indexOf(b));
+  const boss = custom.bosses && n >= 5 && (n % 10 === 0 || n === custom.waves);
   /** @type {Group[]} */
   const groups = [];
   const joined = Math.min(types.length, 1 + Math.floor((n - 1) / 2));
+  const budget = 4 + n * 1.2;
   for (let i = 0; i < joined; i++) {
-    const type = /** @type {EnemyType} */ (types[(i + n - 1) % types.length]);
-    const age = n - 1 - i * 2;
-    const flock = type === 'bat';
-    const count = Math.min(flock ? 16 : 12, (flock ? 5 : 3) + Math.floor(age * (flock ? 1 : 0.7)));
-    groups.push({ type, count, gap: CUSTOM_GAP[type] ?? 1, delay: groups.length * GROUP_STAGGER });
+    const type = /** @type {EnemyType} */ (types[i]);
+    const share = budget / joined / (CUSTOM_WEIGHT[type] ?? 1);
+    groups.push({ type, count: Math.max(1, Math.min(18, Math.round(share))), gap: CUSTOM_GAP[type] ?? 1, delay: groups.length * GROUP_STAGGER });
   }
   if (boss) {
-    const kind = /** @type {EnemyType} */ (Math.floor(n / 5) % 2 === 1 ? 'colossus' : 'broodmother');
+    const kind = /** @type {EnemyType} */ (Math.floor(n / 10) % 2 === 1 || n < 10 ? 'colossus' : 'broodmother');
     groups.push({ type: kind, count: 1, gap: 6, delay: groups.length * GROUP_STAGGER });
   }
   return { number: n, groups, boss };
 }
+
+/** How much one of a kind counts against a custom wave's budget (and the order they join). */
+const CUSTOM_WEIGHT = /** @type {Partial<Record<EnemyType, number>>} */ ({
+  bat: 0.9, crawler: 1, runner: 1, moth: 1.2, splitter: 1.5, burrower: 1.6, shieldbearer: 2,
+  berserker: 2.2, shellback: 2.4, shaman: 2.6, ironclad: 3.2,
+});
 
 /** Seconds between two of a kind in a custom wave. */
 const CUSTOM_GAP = /** @type {Partial<Record<EnemyType, number>>} */ ({

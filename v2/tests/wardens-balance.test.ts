@@ -253,3 +253,35 @@ describe('each new enemy has a counter', () => {
     expect(fight(boss, four('archer'), 12)).toBeGreaterThanOrEqual(3);
   });
 });
+
+// ── Custom mode (td-5): a painted map with waves from the chosen kinds ──────────
+describe('custom games', async () => {
+  const { toMapDef } = await import('../public/games/wardens/js/mapedit.js');
+  const { PICKABLE_ENEMIES } = await import('../public/games/wardens/js/config.js');
+  const road: [number, number][] = [];
+  for (let r = 0; r <= 5; r++) road.push([2, r]);
+  for (let c = 3; c <= 6; c++) road.push([c, 5]);
+  for (let r = 6; r < 15; r++) road.push([6, r]);
+  const pads: [number, number][] = [[3, 2], [1, 4], [4, 6], [5, 8], [7, 10], [5, 12], [3, 4], [5, 4], [7, 6], [5, 10]];
+  const map = toMapDef({ id: 't', name: 't', look: 'meadow', path: road, pads });
+  const kinds: TowerType[] = ['archer', 'mortar', 'tesla', 'sniper', 'alchemist', 'flamer', 'frost', 'ballista', 'archer', 'mortar'];
+  const build: Step[] = pads.map((_, i) => ['build', i, kinds[i] ?? 'archer'] as Step);
+  for (let i = 0; i < pads.length; i++) build.push(['upgrade', i], ['upgrade', i]);
+  const every = { types: [...PICKABLE_ENEMIES], waves: 10, bosses: true, difficulty: 1 };
+
+  test('every kind chosen, 10 waves: doing nothing loses at once, a full build of the spots wins', () => {
+    expect(play(map, [], { custom: every }).phase).toBe('lost');
+    const game = play(map, build, { custom: every });
+    expect(game.phase).toBe('won');
+    expect(game.cleared).toBe(10);
+  });
+
+  test('the hard setting (health × 1.5) loses with the same build; infinite gold carries 20 waves', () => {
+    expect(play(map, build, { custom: { ...every, difficulty: 1.5 }, difficulty: 1.5 }).phase).toBe('lost');
+    expect(play(map, build, { custom: { ...every, waves: 20 }, infiniteGold: true }).phase).toBe('won');
+  });
+
+  test('the painted map with the campaign’s waves plays like the meadow: won with the full build', () => {
+    expect(play(map, build).phase).toBe('won');
+  });
+});

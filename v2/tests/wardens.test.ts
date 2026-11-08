@@ -1007,3 +1007,130 @@ describe('waves with the new kinds', () => {
     expect(bosses(30)[0]!.type).toBe('colossus');
   });
 });
+
+// ── td-5: custom mode — the map editor's rules, custom waves, infinite gold, the unlock ──
+describe('custom mode (td-5)', async () => {
+  const E = await import('../public/games/wardens/js/mapedit.js');
+  const { createCustomWave } = await import('../public/games/wardens/js/waves.js');
+  const { isCustomUnlocked } = await import('../public/games/wardens/js/records.js');
+  const { setupOptions, defaultSetup, GOLD_MAX, GOLD_MIN } = await import('../public/games/wardens/js/custom.js');
+  type Cell = [number, number];
+  /** A road: down column 2 to row 5, across to column 6, down to the bottom. */
+  const road: Cell[] = [];
+  for (let r = 0; r <= 5; r++) road.push([2, r]);
+  for (let c = 3; c <= 6; c++) road.push([c, 5]);
+  for (let r = 6; r < ROWS; r++) road.push([6, r]);
+  const pads: Cell[] = [[3, 2], [1, 4], [4, 6], [5, 8], [7, 10], [5, 12]];
+  const own = { id: 'm1', name: 'Test', look: 'canyon' as const, path: road, pads };
+
+  test('the road grows from the top row, a cell beside the last, never back onto or brushing past itself', () => {
+    expect(E.canExtend([], [3, 0])).toBe(true);
+    expect(E.canExtend([], [3, 1])).toBe(false);
+    expect(E.canExtend([[3, 0]], [3, 1])).toBe(true);
+    expect(E.canExtend([[3, 0]], [4, 1])).toBe(false);
+    expect(E.canExtend([[3, 0], [3, 1]], [3, 0])).toBe(false);
+    // A U-turn would run beside its own road.
+    expect(E.canExtend([[3, 0], [3, 1], [4, 1]], [4, 0])).toBe(false);
+    expect(E.canExtend([[3, 0], [3, 1], [3, 2], [4, 2]], [4, 1])).toBe(false);
+    expect(E.canExtend([[3, 0], [3, 1], [4, 1], [5, 1]], [5, 0])).toBe(true);
+  });
+
+  test('what is wrong with a road and a map, or nothing', () => {
+    expect(E.pathProblem([])).toBe('empty');
+    expect(E.pathProblem([[2, 1], [2, 2]])).toBe('start');
+    expect(E.pathProblem(road.slice(0, 8))).toBe('end');
+    expect(E.pathProblem([[2, 0], [2, 1], [2, 3]])).toBe('gap');
+    expect(E.pathProblem([[2, 0], [2, 1], [3, 1], [3, 0]])).toBe('touch');
+    expect(E.pathProblem(road)).toBe('');
+    expect(E.mapProblem({ path: road, pads: pads.slice(0, 2) })).toBe('pads');
+    expect(E.mapProblem({ path: road, pads: [...pads, [2, 3]] })).toBe('padOnRoad');
+    expect(E.mapProblem({ path: road, pads })).toBe('');
+  });
+
+  test('a painted road becomes corners that cover exactly its cells; the map plays like any other', () => {
+    const def = E.toMapDef(own);
+    expect(def.road[0]).toEqual([2, -1.2]);
+    expect(def.road.at(-1)).toEqual([6, ROWS + 0.2]);
+    expect([...roadTiles(def)].sort()).toEqual(road.map(([c, r]) => `${c},${r}`).sort());
+    expect(def.look).toBe('canyon');
+    const game = createGame(def, {});
+    callWave(game);
+    run(game, 60);
+    expect(game.stats.leaked).toBeGreaterThan(0);
+    expect(game.lives).toBeLessThan(START_LIVES);
+  });
+
+  test('saved maps: kept, replaced by id, deleted, at most 8; broken entries are dropped', () => {
+    const data = new Map<string, string>();
+    const store = { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v) };
+    let maps = E.readCustomMaps(store);
+    expect(maps).toEqual([]);
+    maps = E.saveCustomMap(store, maps, own)!;
+    expect(E.readCustomMaps(store)).toHaveLength(1);
+    maps = E.saveCustomMap(store, maps, { ...own, name: 'Renamed' })!;
+    expect(E.readCustomMaps(store).map((m) => m.name)).toEqual(['Renamed']);
+    expect(E.saveCustomMap(store, maps, { ...own, id: 'bad', path: road.slice(0, 3) })).toBeNull();
+    for (let i = 0; i < 10; i++) {
+      const next = E.saveCustomMap(store, maps, { ...own, id: E.newMapId(maps) });
+      if (next) maps = next;
+    }
+    expect(maps).toHaveLength(E.MAX_MAPS);
+    expect(E.deleteCustomMap(store, maps, 'm1')).toHaveLength(E.MAX_MAPS - 1);
+    expect(E.readCustomMaps(store)).toHaveLength(E.MAX_MAPS - 1);
+    data.set(E.CUSTOM_KEY, JSON.stringify({ maps: [{ id: 'x', name: 'x', look: 'meadow', path: [[0, 5]], pads: [] }, 'junk', own] }));
+    expect(E.readCustomMaps(store).map((m) => m.id)).toEqual(['m1']);
+    data.set(E.CUSTOM_KEY, '{not json');
+    expect(E.readCustomMaps(store)).toEqual([]);
+  });
+
+  test('the custom mode opens once every campaign map is won — old saves too', () => {
+    expect(isCustomUnlocked({ stars: {}, endlessBest: 0 }, MAPS)).toBe(false);
+    expect(isCustomUnlocked({ stars: { meadow: 3, canyon: 1 }, endlessBest: 0 }, MAPS)).toBe(false);
+    expect(isCustomUnlocked({ stars: { meadow: 3, canyon: 1, marsh: 1 }, endlessBest: 7 }, MAPS)).toBe(true);
+    const old = new Map([['lifexp-wardens-progress', '{"stars":{"meadow":2,"canyon":3,"marsh":1},"endlessBest":12}']]);
+    const progress = readProgress({ getItem: (k: string) => old.get(k) ?? null, setItem: () => {} });
+    expect(isCustomUnlocked(progress, MAPS)).toBe(true);
+  });
+
+  test('custom waves come only from the chosen kinds (bosses when asked), the same every time, growing', () => {
+    const custom = { types: ['bat', 'shieldbearer'] as const, waves: 25, bosses: true, difficulty: 1 };
+    const kinds = new Set<string>();
+    for (let n = 1; n <= 25; n++) for (const g of createCustomWave(custom as never, n).groups) kinds.add(g.type);
+    expect([...kinds].sort()).toEqual(['bat', 'broodmother', 'colossus', 'shieldbearer']);
+    expect(createCustomWave(custom as never, 7)).toEqual(createCustomWave(custom as never, 7));
+    const count = (n: number) => describeWave(createCustomWave(custom as never, n)).reduce((s, r) => s + r.count, 0);
+    expect(count(9)).toBeGreaterThan(count(1));
+    const quiet = { ...custom, bosses: false };
+    for (let n = 1; n <= 25; n++) expect(createCustomWave(quiet as never, n).boss).toBe(false);
+    expect(createCustomWave(custom as never, 25).boss).toBe(true);
+    expect(createCustomWave(custom as never, 10).boss).toBe(true);
+    expect(createCustomWave(custom as never, 4).boss).toBe(false);
+  });
+
+  test('a custom game: its own waves and length, harder health, and infinite gold that never runs out', () => {
+    const game = createGame(meadow, { custom: { types: ['ironclad'], waves: 6, bosses: false, difficulty: 1.5 }, infiniteGold: true, difficulty: 1.5 });
+    expect(game.totalWaves).toBe(6);
+    expect(describeWave(game.nextWave!).map((r) => r.type)).toEqual(['ironclad']);
+    expect(enemyHp(game, 'ironclad', 1)).toBe(Math.round(ENEMIES.ironclad.hp * meadow.hpFactor * 1.5));
+    const gold = game.gold;
+    for (let pad = 0; pad < meadow.pads.length; pad++) {
+      expect(buildTower(game, pad, 'sniper')).toBe(true);
+      expect(upgradeTower(game, pad)).toBe(true);
+    }
+    expect(game.gold).toBe(gold);
+  });
+
+  test('the setup: gold clamped to its range, no start without a chosen kind', () => {
+    const setup = defaultSetup();
+    setup.gold = 'custom';
+    setup.amount = 1_000_000;
+    expect(setupOptions(setup).options.gold).toBe(GOLD_MAX);
+    setup.amount = 1;
+    expect(setupOptions(setup).options.gold).toBe(GOLD_MIN);
+    setup.enemies = 'pick';
+    setup.kinds = [];
+    expect(setupOptions(setup).problem).toBe('pickOne');
+    setup.kinds = ['bat'];
+    expect(setupOptions(setup).options.custom?.types).toEqual(['bat']);
+  });
+});
