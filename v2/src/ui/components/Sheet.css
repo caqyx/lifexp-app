@@ -2,6 +2,8 @@
 
 .ui-sheet {
   --drag-offset: 0px;
+  /* Space under a floating sheet (liquid glass); it slides out by that much more. */
+  --sheet-gap: 0px;
   box-sizing: border-box;
   width: 100%;
   max-width: 100%;
@@ -56,13 +58,13 @@
 
 @keyframes ui-sheet-in {
   from {
-    transform: translateY(100%);
+    transform: translateY(calc(100% + var(--sheet-gap)));
   }
 }
 
 @keyframes ui-sheet-out {
   to {
-    transform: translateY(100%);
+    transform: translateY(calc(100% + var(--sheet-gap)));
   }
 }
 
@@ -133,7 +135,37 @@
   padding-bottom: var(--space-5);
 }
 
+/* Liquid glass (iOS theme, ui/glass/glass.css): an iOS 26 sheet floats inside the
+   screen edges with large corners, so its whole rim is glass. */
+:root[data-glass] .ui-sheet {
+  --sheet-gap: calc(var(--space-2) + env(safe-area-inset-bottom));
+  width: calc(100% - 2 * var(--space-2));
+  max-height: min(calc(100dvh - 48px - var(--sheet-gap)), calc(var(--visible-height, 100dvh) - 12px - var(--sheet-gap)));
+  margin: auto var(--space-2) calc(var(--keyboard-inset, 0px) + var(--sheet-gap));
+  border-radius: var(--glass-radius-panel);
+}
+
+:root[data-glass] .ui-sheet::backdrop {
+  background: var(--glass-scrim);
+}
+
+/* The gap under the sheet already clears the home indicator. */
+:root[data-glass] .ui-sheet__body {
+  padding-bottom: var(--space-5);
+}
+
+:root[data-glass] .ui-sheet__footer {
+  padding-bottom: var(--space-4);
+  background: transparent;
+}
+
 @media (min-width: 600px) {
+  :root[data-glass] .ui-sheet {
+    width: min(560px, calc(100% - 48px));
+    max-height: min(85dvh, calc(var(--visible-height, 100dvh) - 48px));
+    margin: auto;
+  }
+
   .ui-sheet {
     width: min(560px, calc(100% - 48px));
     max-height: min(85dvh, calc(var(--visible-height, 100dvh) - 48px));

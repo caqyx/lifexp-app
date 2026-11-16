@@ -3,8 +3,10 @@
 // bare glyph, with an accessible name. The other modules live in the menu it opens.
 import { Menu, Plus } from 'lucide-preact';
 import type { Ref } from 'preact';
+import { useRef } from 'preact/hooks';
 import type { ModuleChoice } from '@/domain/modules';
 import { t } from '@/i18n';
+import { useLiquidGlass } from '@/ui/glass/useLiquidGlass';
 import { isPlainClick } from './links';
 import { featureHref, featurePath, tabItems, type FeatureDef, type ModuleId } from './registry';
 
@@ -22,6 +24,9 @@ interface TabBarProps {
 
 export function TabBar({ activeId, modules, onSelect, onAdd, onMenu, menuOpen, menuButtonRef }: TabBarProps) {
   const tabs = tabItems(modules);
+  // Liquid glass (iOS theme): a floating capsule that bends the page at its rim.
+  const barRef = useRef<HTMLElement>(null);
+  useLiquidGlass(barRef, { chroma: 1.5 });
   const tab = (feature: FeatureDef) => {
     const Icon = feature.icon;
     return (
@@ -43,7 +48,7 @@ export function TabBar({ activeId, modules, onSelect, onAdd, onMenu, menuOpen, m
   };
 
   return (
-    <nav class="tabbar" aria-label={t('nav.tabBar')}>
+    <nav ref={barRef} class="tabbar ui-glass" aria-label={t('nav.tabBar')}>
       {tabs.slice(0, 2).map(tab)}
       <button type="button" class="tabbar__add" aria-label={t('nav.add')} onClick={onAdd}>
         <Plus aria-hidden="true" />

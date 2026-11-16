@@ -37,6 +37,14 @@
   animation: ui-fade-out var(--duration-base) ease-in forwards;
 }
 
+:root[data-glass] .ui-confirm {
+  border-radius: var(--glass-radius-panel);
+}
+
+:root[data-glass] .ui-confirm::backdrop {
+  background: var(--glass-scrim);
+}
+
 .ui-confirm__title {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);

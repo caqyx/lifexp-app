@@ -250,6 +250,76 @@
   transform: scale(0.94);
 }
 
+/* ── Liquid glass (iOS theme, ui/glass/glass.css) ─────────────────────────── */
+/* The material (tint, lens, rim) comes from .ui-glass; here only the iOS 26 shapes:
+   a top bar whose lower edge is the lens, and a tab bar floating as a capsule. */
+
+:root[data-glass] .topbar {
+  border-bottom: 0;
+}
+
+/* Two classes: above glass.css, whatever order the bundle puts them in. */
+:root[data-glass] .topbar.ui-glass {
+  --glass-fill: var(--glass-tint-bar);
+}
+
+:root[data-glass='solid'] .topbar.ui-glass {
+  --glass-fill: var(--glass-tint-solid);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-glass] .topbar.ui-glass {
+    --glass-fill: var(--glass-tint-solid);
+  }
+}
+
+@media (max-width: 839.98px) {
+  :root[data-glass] .shell {
+    /* The capsule floats var(--space-2) above the bottom edge. */
+    --bottom-bar-height: calc(var(--tabbar-height) + var(--space-2));
+  }
+
+  :root[data-glass] .tabbar {
+    bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+    gap: 2px;
+    min-height: var(--tabbar-height);
+    margin: 0 var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom));
+    padding: var(--space-1);
+    border-top: 0;
+    border-radius: var(--radius-pill);
+  }
+
+  /* iOS 26: unselected tabs in the label color, the selected one tinted on a lens. */
+  :root[data-glass] .tabbar__item {
+    min-height: calc(var(--tabbar-height) - 2 * var(--space-1));
+    border-radius: var(--radius-pill);
+    color: var(--color-text);
+    transition:
+      color var(--duration-fast) var(--ease-standard),
+      background-color var(--duration-fast) var(--ease-standard);
+  }
+
+  :root[data-glass] .tabbar__item[aria-current='page'] {
+    background: var(--glass-selected);
+    color: var(--color-accent-text);
+  }
+
+  /* "+" sits inside the capsule as tinted glass; a press magnifies it, as in iOS 26. */
+  :root[data-glass] .tabbar__add {
+    width: 52px;
+    height: 52px;
+    margin-top: 0;
+    background: var(--glass-sheen), var(--gradient-accent);
+    box-shadow:
+      var(--glass-rim),
+      0 6px 16px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  }
+
+  :root[data-glass] .tabbar__add:active {
+    transform: scale(1.08);
+  }
+}
+
 .add-sheet__intro {
   margin-bottom: var(--space-4);
   color: var(--color-text-secondary);

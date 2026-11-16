@@ -9,6 +9,7 @@ import { isModuleOn, type ModuleChoice } from '@/domain/modules';
 import { t } from '@/i18n';
 import { requestExusFocus } from '@/stores/exusFocus';
 import { ToastHost } from '@/ui/components/ToastHost';
+import { useLiquidGlass } from '@/ui/glass/useLiquidGlass';
 import { playEnter } from '@/ui/motion';
 import { dragProgress, releaseVelocity, settlesOpen, TAP_SLOP, type DragSample } from '@/lib/gesture';
 import { AddSheet } from './AddSheet';
@@ -36,6 +37,8 @@ type Motion = 'tap' | 'settle';
 
 /** Opening the drawer adds a history entry, so the system Back closes it (PLAN.md 4.7). */
 const DRAWER_STATE_KEY = 'lifexpDrawer';
+
+const TOPBAR_GLASS_EDGES = { top: false, right: false, bottom: true, left: false };
 
 function drawerEntryOnTop(): boolean {
   const state: unknown = history.state;
@@ -95,6 +98,9 @@ export function AppShell({ title, activeId, path, account, modules, onSignOut, c
   const mainRef = useRef<HTMLElement>(null);
   const lastPath = useRef<string | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const topbarRef = useRef<HTMLElement>(null);
+  // Liquid glass (iOS theme): the top bar is glued to the top, so only its lower edge is a lens.
+  useLiquidGlass(topbarRef, { edges: TOPBAR_GLASS_EDGES, bezel: 14 });
 
   // The drawer position lives in one CSS variable, written directly (not through
   // render) so dragging does not re-render the page 60 times per second.
@@ -257,7 +263,7 @@ export function AppShell({ title, activeId, path, account, modules, onSignOut, c
       </nav>
 
       <div ref={contentRef} class="shell__content" inert={modal}>
-        <header class="topbar">
+        <header ref={topbarRef} class="topbar ui-glass">
           <h1 class="topbar__title">{title}</h1>
         </header>
         {offline && (

@@ -8,6 +8,7 @@ import { startLanguageSync } from '@/app/language';
 import { registerServiceWorker, reloadOnStaleChunk, watchForNewBuild } from '@/app/pwa';
 import { startRouter } from '@/app/router';
 import { startThemeSync } from '@/app/theme';
+import { GlassFilters } from '@/ui/glass/GlassFilters';
 import { initI18n, pickLanguage, V1_LANG_STORAGE_KEY } from '@/i18n';
 import { startSession } from '@/stores/session';
 
@@ -29,6 +30,12 @@ void startSession();
 
 const root = document.getElementById('app');
 if (!root) throw new Error('Missing #app root element');
-render(<App />, root);
+render(
+  <>
+    <App />
+    <GlassFilters />
+  </>,
+  root,
+);
 registerServiceWorker();
 watchForNewBuild();

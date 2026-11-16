@@ -1,7 +1,8 @@
 // Renders the toast queue. Two live regions, so errors are announced right away
 // and everything else politely. Tap the message to dismiss.
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { t } from '@/i18n';
+import { useLiquidGlass } from '../glass/useLiquidGlass';
 import { cssDurationMs } from '../motion';
 import { dismissToast, toastDuration, toasts, type Toast } from '../toast';
 import './Toast.css';
@@ -10,6 +11,8 @@ function ToastView({ toast }: { toast: Toast }) {
   // Leaving plays the exit animation first; the queue moves on when it has ended.
   const [leaving, setLeaving] = useState(false);
   const leave = () => setLeaving(true);
+  const ref = useRef<HTMLDivElement>(null);
+  useLiquidGlass(ref);
 
   useEffect(() => {
     const timer = setTimeout(leave, toastDuration(toast));
@@ -23,7 +26,7 @@ function ToastView({ toast }: { toast: Toast }) {
   }, [leaving]);
 
   return (
-    <div class={`ui-toast ui-toast--${toast.tone ?? 'default'}${leaving ? ' ui-toast--leaving' : ''}`}>
+    <div ref={ref} class={`ui-toast ui-glass ui-glass--panel ui-toast--${toast.tone ?? 'default'}${leaving ? ' ui-toast--leaving' : ''}`}>
       <button type="button" class="ui-toast__message" onClick={leave}>
         {toast.message}
         <span class="visually-hidden"> · {t('ui.close')}</span>
