@@ -33,6 +33,7 @@ import { AutoView } from './AutoView';
 import { EasyText } from './EasyText';
 import { ElementZoom, zoomedElement } from './ElementBlock';
 import { NormalView } from './NormalView';
+import { OriginalView, type OriginalControl } from './OriginalView';
 import { PageView } from './PageView';
 import { BookTocPanel, SettingsPanel, TocPanel } from './Panels';
 import { SpreadView, type SpreadControl } from './SpreadView';
@@ -122,11 +123,15 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
   const togglePlay = () => setPlaying((p) => !p);
   const endNoted = useRef(false);
   const spread = useRef<SpreadControl | null>(null);
+  const orig = useRef<OriginalControl | null>(null);
+  // Oryginał: a PDF's real pages, for books whose file is kept (row r-6).
+  const hasOriginal = meta.format === 'PDF' && !!meta.originalSize;
+  const original = hasOriginal && settings.original;
 
   const mode = settings.mode;
   const gi = groupIndexOf(groups, sIdx);
   // Portrait Prosta shows whole groups; the spread steps sentence by sentence.
-  const groupMode = mode === 'easy' && !landscape;
+  const groupMode = mode === 'easy' && !landscape && !original;
   const pos = groupMode ? (groups[gi] ?? 0) : sIdx;
   const groupEnd = groups[gi + 1] ?? sents.length;
   const current = sents[pos];
@@ -195,6 +200,11 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
   };
 
   const go = (delta: number) => {
+    if (original) {
+      if (delta > 0) orig.current?.next();
+      else orig.current?.prev();
+      return;
+    }
     if (landscape) {
       if (delta > 0) spread.current?.next();
       else spread.current?.prev();
@@ -218,7 +228,7 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
       setEasyAnim((n) => n + 1);
       return;
     }
-    if (mode !== 'auto' || landscape) setSIdx(s);
+    if (mode !== 'auto' || landscape || original) setSIdx(s);
     setJump((j) => ({ s, n: j.n + 1 }));
   };
 
@@ -227,6 +237,13 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
     setPlaying(false);
     if (next === 'easy' && !landscape) setSIdx(groups[groupIndexOf(groups, sIdx)] ?? 0);
     update({ mode: next });
+  };
+
+  const setOriginal = (on: boolean) => {
+    if (on === settings.original) return;
+    setPlaying(false);
+    // Prosta's groups are the text view's; Oryginał steps sentence by sentence from the same place.
+    update({ original: on });
   };
 
   const setView = (v: EasyView) => {
@@ -275,11 +292,13 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
         setPlaying((p) => !p);
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        if (landscape) spread.current?.next();
+        if (original) orig.current?.next();
+        else if (landscape) spread.current?.next();
         else jumpTo(sIdx + 1);
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        if (landscape) spread.current?.prev();
+        if (original) orig.current?.prev();
+        else if (landscape) spread.current?.prev();
         else jumpTo(sIdx - 1);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
@@ -290,7 +309,7 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
       }
       return;
     }
-    if (mode === 'easy' || landscape) {
+    if (mode === 'easy' || landscape || original) {
       if (e.key === 'ArrowRight' || e.key === 'PageDown' || (e.key === ' ' && !onButton)) {
         e.preventDefault();
         go(1);
@@ -393,6 +412,16 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
               </button>
             ))}
           </div>
+          {hasOriginal && (
+            <div class="reader__seg reader__seg--view" role="group" aria-label={t('reader.original.label')}>
+              <button type="button" aria-pressed={!original} onClick={() => setOriginal(false)}>
+                {t('reader.original.text')}
+              </button>
+              <button type="button" aria-pressed={original} onClick={() => setOriginal(true)}>
+                {t('reader.original.original')}
+              </button>
+            </div>
+          )}
         </div>
         {landscape && (
           <div class="reader__top-status">
@@ -426,8 +455,34 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
       )}
       {!landscape && !fullscreen && <div class="reader__crumb">{crumbText(meta.title, sections[secIndex], secIndex)}</div>}
 
-      <div class="reader__stage" key={`${settings.skipToc}-${landscape}`}>
-        {landscape && (
+      <div class="reader__stage" key={`${settings.skipToc}-${landscape}-${original}`}>
+        {original && (
+          <OriginalView
+            bookId={meta.id}
+            control={orig}
+            sents={sents}
+            sections={sections}
+            mode={mode}
+            landscape={landscape}
+            pos={pos}
+            jump={jump}
+            zoom={settings.zoom}
+            swap={settings.swapButtons}
+            playing={playing}
+            wpm={settings.wpm}
+            onPosition={(s) => {
+              endNoted.current = false;
+              setSIdx(s);
+            }}
+            onEnd={() => {
+              setPlaying(false);
+              noteEnd();
+            }}
+            onTapPage={fullscreen ? togglePlay : undefined}
+            swipe={swipe}
+          />
+        )}
+        {!original && landscape && (
           <SpreadView
             control={spread}
             sents={sents}
@@ -453,12 +508,12 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
             swipe={swipe}
           />
         )}
-        {!landscape && mode === 'easy' && settings.view === 'sentences' && (
+        {!original && !landscape && mode === 'easy' && settings.view === 'sentences' && (
           <div class="reader__easy" {...swipe}>
             <EasyText sents={sents} sections={sections} secStart={secStart} start={pos} end={groupEnd} anim={easyAnim} />
           </div>
         )}
-        {!landscape && mode === 'easy' && settings.view === 'page' && (
+        {!original && !landscape && mode === 'easy' && settings.view === 'page' && (
           <PageView
             sents={sents}
             sections={sections}
@@ -470,7 +525,7 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
             onPick={jumpTo}
           />
         )}
-        {!landscape && mode === 'auto' && (
+        {!original && !landscape && mode === 'auto' && (
           <AutoView
             sents={sents}
             sections={sections}
@@ -488,7 +543,7 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
             onTapPage={fullscreen ? togglePlay : undefined}
           />
         )}
-        {!landscape && mode === 'normal' && (
+        {!original && !landscape && mode === 'normal' && (
           <NormalView
             sents={sents}
             sections={sections}
@@ -502,7 +557,7 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
         )}
       </div>
 
-      {!landscape && (!fullscreen || mode === 'easy') && (
+      {!landscape && (!fullscreen || mode === 'easy' || (original && mode === 'normal')) && (
         <footer class="reader__foot">
           <div class="reader__foot-inner">
             {mode !== 'auto' && !fullscreen && (
@@ -518,20 +573,20 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
             )}
             {mode !== 'auto' ? (
               <div class="reader__nav">
-                {mode === 'easy' && (
-                  <button type="button" class="reader__arrow" title={t('reader.prevLabel')} disabled={gi === 0} onClick={() => go(-1)}>
+                {(mode === 'easy' || original) && (
+                  <button type="button" class="reader__arrow" title={t('reader.prevLabel')} disabled={original ? sIdx === 0 : gi === 0} onClick={() => go(-1)}>
                     <ArrowLeft aria-hidden="true" />
                     <span>{t('reader.prev')}</span>
                   </button>
                 )}
                 {!fullscreen && status}
                 {fullscreen && <div class="reader__status" />}
-                {mode === 'easy' && (
+                {(mode === 'easy' || original) && (
                   <button
                     type="button"
                     class="reader__arrow reader__arrow--primary"
                     title={t('reader.nextLabel')}
-                    disabled={gi >= groups.length - 1}
+                    disabled={original ? sIdx >= last : gi >= groups.length - 1}
                     onClick={() => go(1)}
                   >
                     <span>{t('reader.next')}</span>

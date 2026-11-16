@@ -90,10 +90,32 @@ export function runTurn(
   g: TurnGeometry,
   onDone: () => void,
 ): RunningTurn {
-  const duration = turnDuration();
-  const easing = getComputedStyle(layer).getPropertyValue('--ease-page-turn').trim() || 'ease-in-out';
   const next = snap.dir > 0;
   const back = face(columns, shift, next ? 'left' : 'right', g, 'spread__face--back', g.keep(shift));
+  return animateLeaf(layer, snap.dir, snap.still, snap.front, back, onDone);
+}
+
+/** A face box for page `page` holding `content` (a copy of what the page shows), with its shade. */
+export function faceBox(content: Node, page: 'left' | 'right', cls: string): HTMLElement {
+  const box = document.createElement('div');
+  box.className = `spread__face spread__face--paper-${page} ${cls}`;
+  box.append(content);
+  const shade = document.createElement('div');
+  shade.className = 'spread__shade';
+  box.append(shade);
+  return box;
+}
+
+/**
+ * The leaf over the spine: `still` (the old near page) stays until the leaf lands,
+ * `front` (the old far page) lifts, `back` (the new near page) lands. Any spread of
+ * two pages can turn with it (the text spread, Oryginał's real pages).
+ */
+export function animateLeaf(layer: HTMLElement, dir: TurnDir, still: HTMLElement, front: HTMLElement, back: HTMLElement, onDone: () => void): RunningTurn {
+  const duration = turnDuration();
+  const easing = getComputedStyle(layer).getPropertyValue('--ease-page-turn').trim() || 'ease-in-out';
+  const next = dir > 0;
+  const snap = { still, front };
   const leaf = document.createElement('div');
   leaf.className = `spread__leaf spread__leaf--${next ? 'next' : 'prev'}`;
   leaf.dataset.testid = 'page-turn';

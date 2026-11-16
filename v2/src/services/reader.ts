@@ -19,6 +19,8 @@ import {
   listBookMeta,
   openReaderLibrary,
   getAsset,
+  getOriginal,
+  putOriginal,
   putAssets,
   putBook,
   putBookMeta,
@@ -96,14 +98,26 @@ export async function importBook(file: File, onProgress?: (p: number) => void): 
     progress: { pos: 0, total: readTotal },
     parser: PARSER_VERSION,
   };
+  // A PDF keeps its file for Oryginał (the real pages); the size shows in the library.
+  if (parsed.format === 'PDF') {
+    await putOriginal(id, file);
+    meta.originalSize = file.size;
+  }
   const content: BookContent = { id, sections };
   await putBook(meta, content);
   return meta;
 }
 
+/** The book's original file (Oryginał), when it was kept. */
+export function originalFile(bookId: string): Promise<Blob | undefined> {
+  return getOriginal(bookId);
+}
+
 /** A book read before tables and pictures were (no original file is kept): read the same file again in its place. */
 export function needsReprocess(meta: BookMeta): boolean {
-  return (meta.format === 'PDF' || meta.format === 'EPUB') && (meta.parser ?? 1) < PARSER_VERSION;
+  if (meta.format === 'EPUB') return (meta.parser ?? 1) < PARSER_VERSION;
+  // A PDF also wants its file for Oryginał (kept for imports from r-6 on).
+  return meta.format === 'PDF' && ((meta.parser ?? 1) < PARSER_VERSION || !meta.originalSize);
 }
 
 /**
@@ -126,6 +140,11 @@ export async function reprocessBook(meta: BookMeta, file: File, onProgress?: (p:
     progress: { pos: Math.round(readShare * Math.max(0, readTotal - 1)), total: readTotal },
     parser: PARSER_VERSION,
   };
+  // The file chosen again is the original: a PDF read again gets Oryginał too.
+  if (meta.format === 'PDF') {
+    await putOriginal(meta.id, file);
+    next.originalSize = file.size;
+  }
   await putBook(next, { id: meta.id, sections });
   return next;
 }

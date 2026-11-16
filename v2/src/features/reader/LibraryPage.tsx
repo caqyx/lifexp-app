@@ -11,7 +11,7 @@ import { Button } from '@/ui/components/Button';
 import { EmptyState, IconTile, ProgressBar } from '@/ui/components/Display';
 import { Card, Page, Section, Stack } from '@/ui/components/Layout';
 import { markOpenedFromLibrary } from './history';
-import { fmt, importErrorMessage } from './texts';
+import { fmt, fmtMegabytes, importErrorMessage } from './texts';
 import './library.css';
 
 const ACCEPT = '.pdf,.epub,.txt,.md,.markdown,.text,application/pdf,application/epub+zip,text/plain,text/markdown';
@@ -240,12 +240,13 @@ export function LibraryPage({ navigate }: { navigate: Navigate }) {
                               pct,
                             })}
                           </span>
+                          {book.originalSize ? <span class="reader-lib__orig">{t('reader.library.originalSize', { mb: fmtMegabytes(book.originalSize) })}</span> : null}
                           <ProgressBar value={pct / 100} label={t('reader.library.progress', { pct })} />
                         </span>
                       </button>
                       {needsReprocess(book) && (
                         <div class="reader-lib__again">
-                          <p class="reader-lib__again-hint">{t('reader.library.reprocessHint')}</p>
+                          <p class="reader-lib__again-hint">{t(book.format === 'PDF' ? 'reader.library.reprocessHintPdf' : 'reader.library.reprocessHint')}</p>
                           <Button
                             aria-label={t('reader.library.reprocessLabel', { title: book.title })}
                             disabled={busy !== null}
