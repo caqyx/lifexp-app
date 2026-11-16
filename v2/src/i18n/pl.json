@@ -1734,7 +1734,14 @@
       "noStorage": "Zapis w przeglądarce niedostępny. Biblioteka działa tylko do odświeżenia.",
       "noStorageAdded": "Zapis w przeglądarce niedostępny. Książki znikną po odświeżeniu.",
       "notFound": "Nie znaleziono książki.",
-      "toLibrary": "Wróć do biblioteki"
+      "toLibrary": "Wróć do biblioteki",
+      "reprocess": "Przetwórz ponownie",
+      "reprocessLabel": "Przetwórz ponownie książkę {{title}}: wybierz ten sam plik",
+      "reprocessHint": "Ta książka nie ma jeszcze tabel ani ilustracji. Wybierz ten sam plik jeszcze raz, żeby je dodać; miejsce czytania zostanie.",
+      "reprocessing": "Przetwarzam: {{name}} ({{pct}}%)",
+      "reprocessed": "Dodano tabele i ilustracje do książki.",
+      "reprocessWrong": "To inny format niż książka. Wybierz ten sam plik.",
+      "importingPct": "Wczytuję: {{name}} ({{pct}}%)"
     },
     "errors": {
       "unsupported": "Nieobsługiwany format: .{{ext}} (obsługuję PDF, EPUB, TXT, MD).",
@@ -1805,6 +1812,14 @@
     "fullscreen": "Pełny ekran",
     "fullscreenLabel": "Pełny ekran: tylko książka i strzałki",
     "fullscreenExit": "Wyjdź",
-    "fullscreenExitLabel": "Wyjdź z pełnego ekranu"
+    "fullscreenExitLabel": "Wyjdź z pełnego ekranu",
+    "elements": {
+      "image": "Ilustracja",
+      "drawing": "Rysunek",
+      "table": "Tabela",
+      "formula": "Wzór",
+      "zoomed": "Element w pełnym ekranie",
+      "zoomHint": "Rozsuń palce, żeby powiększyć; przeciągnij, żeby przesunąć."
+    }
   }
 }

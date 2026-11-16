@@ -36,6 +36,7 @@ import {
 } from '@/domain/reader/spread';
 import { t } from '@/i18n';
 import type { Jump } from './Reader';
+import { elementsAfter, elementsBefore, frameClass } from './blocks';
 import { crossfade, runTurn, snapshotTurn, type RunningTurn, type TurnDir, type TurnSnapshot } from './pageTurn';
 import { sectionHeading } from './texts';
 import type { VNode } from 'preact';
@@ -634,6 +635,8 @@ function chunkBlocks(sents: readonly Sentence[], sections: readonly Section[], s
       const heading = sectionHeading(sections[s.sec], s.sec);
       if (heading) out.push(<h2 key={`h${s.sec}`}>{heading}</h2>);
     }
+    // Elements belong to the chunk that holds the paragraph after them (or the section's last sentence).
+    out.push(...elementsBefore(sents, sections, i));
     const children: (VNode | string)[] = [];
     const first = i;
     while (i < chunk.end && (sents[i] as Sentence).sec === s.sec && (sents[i] as Sentence).para === s.para) {
@@ -645,7 +648,19 @@ function chunkBlocks(sents: readonly Sentence[], sections: readonly Section[], s
       );
       i++;
     }
-    out.push(s.h ? <h3 key={first}>{children}</h3> : <p key={first}>{children}</p>);
+    const cls = frameClass(sections[s.sec], s.para).trim() || undefined;
+    out.push(
+      s.h ? (
+        <h3 key={first} class={cls}>
+          {children}
+        </h3>
+      ) : (
+        <p key={first} class={cls}>
+          {children}
+        </p>
+      ),
+    );
+    out.push(...elementsAfter(sents, sections, i - 1));
   }
   return out;
 }

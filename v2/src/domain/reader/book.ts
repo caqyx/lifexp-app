@@ -29,7 +29,10 @@ export interface ImageElement {
   /** Size in px of the stored picture (keeps the layout stable before it loads). */
   w: number;
   h: number;
+  /** The book's own description of the picture ('' = none: the reader names it by `role`). */
   alt: string;
+  /** What the picture shows when it was cut out of a PDF page. */
+  role?: 'image' | 'drawing' | 'table' | 'formula';
 }
 
 export interface TableCell {
@@ -83,6 +86,13 @@ export interface BookMeta {
   pos: number;
   /** Sentences in the book. */
   total: number;
+  /**
+   * How the file was read: 2 = with its tables and pictures (r-5). Absent = text only
+   * (imported before): "Przetwórz ponownie" reads the same file again.
+   */
+  parser?: number;
+  /** The original file is kept on the device (a PDF imported from r-6 on): its size in bytes. */
+  originalSize?: number;
   /**
    * Where reading is and how many sentences there are without the book's own table of
    * contents (domain/reader/toc), as the library shows them; absent = pos / total.

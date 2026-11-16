@@ -31,6 +31,7 @@ import { saveReaderSettings, saveReadingPosition } from '@/services/reader';
 import { showToast } from '@/ui/toast';
 import { AutoView } from './AutoView';
 import { EasyText } from './EasyText';
+import { ElementZoom, zoomedElement } from './ElementBlock';
 import { NormalView } from './NormalView';
 import { PageView } from './PageView';
 import { BookTocPanel, SettingsPanel, TocPanel } from './Panels';
@@ -257,6 +258,8 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
   const keys = useRef<(e: KeyboardEvent) => void>(() => undefined);
   keys.current = (e: KeyboardEvent) => {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
+    // A picture or a table on the whole screen takes the keys (Esc closes it).
+    if (zoomedElement.value) return;
     if (e.key === 'Escape') {
       if (panel === null && fullscreen) exitFullscreen();
       setPanel(null);
@@ -297,6 +300,8 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
       }
     }
   };
+  // Leaving the book closes a picture left on the whole screen.
+  useEffect(() => () => void (zoomedElement.value = null), []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => keys.current(e);
     document.addEventListener('keydown', onKey);
@@ -595,6 +600,7 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
         }}
       />
       <BookTocPanel open={panel === 'bookToc'} onClose={() => setPanel(null)} blocks={bookToc} />
+      <ElementZoom />
     </div>
   );
 }
