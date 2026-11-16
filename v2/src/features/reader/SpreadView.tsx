@@ -626,7 +626,7 @@ export function SpreadView(props: SpreadViewProps) {
 const chunkKey = (c: Chunk) => `${c.start}-${c.end}`;
 
 /** One chunk's paragraphs and headings, one span per sentence. */
-function chunkBlocks(sents: readonly Sentence[], sections: readonly Section[], secStart: readonly number[], chunk: Chunk): VNode[] {
+export function chunkBlocks(sents: readonly Sentence[], sections: readonly Section[], secStart: readonly number[], chunk: Chunk): VNode[] {
   const out: VNode[] = [];
   let i = chunk.start;
   while (i < chunk.end) {

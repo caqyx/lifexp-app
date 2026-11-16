@@ -1198,7 +1198,7 @@
 
 /* Noc: pictures keep their colours, a little dimmed so a white page does not glare. */
 .reader[data-theme='night'] .reader-el__img {
-  opacity: 0.86;
+  opacity: 0.9;
 }
 
 .reader-el--table {

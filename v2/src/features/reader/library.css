@@ -53,6 +53,7 @@
 
 .reader-lib__book {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   padding-right: var(--space-2);
@@ -139,4 +140,21 @@
     opacity: 0;
     transform: translateY(6px);
   }
+}
+
+/* A book added before r-5: its file chosen again adds tables and pictures. */
+.reader-lib__again {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 0 var(--space-3) calc(var(--space-3) + 44px);
+}
+
+.reader-lib__again-hint {
+  flex: 1 1 220px;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
 }

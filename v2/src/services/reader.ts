@@ -114,6 +114,7 @@ export async function reprocessBook(meta: BookMeta, file: File, onProgress?: (p:
   if (formatOf(file.name) !== meta.format) throw new ReaderImportError('unsupported', extensionOf(file.name));
   const parsed = await parseBookFile(file, onProgress);
   await removeBookAssets(meta.id);
+  forgetAssetUrls(meta.id);
   const { sections, total, readTotal } = await storeParsed(meta.id, parsed);
   const share = meta.total > 1 ? meta.pos / (meta.total - 1) : 0;
   const pos = Math.round(share * Math.max(0, total - 1));
@@ -131,6 +132,16 @@ export async function reprocessBook(meta: BookMeta, file: File, onProgress?: (p:
 
 /** A picture of a book's element, as a URL for <img> (made once per session). */
 const urls = new Map<string, Promise<string | null>>();
+
+/** Lets go of the URLs of a book's pictures (deleted, or read again). */
+function forgetAssetUrls(bookId: string): void {
+  for (const [key, url] of urls) {
+    if (!key.startsWith(`${bookId}:`)) continue;
+    urls.delete(key);
+    void url.then((u) => u && URL.revokeObjectURL(u));
+  }
+}
+
 export function assetUrl(key: string): Promise<string | null> {
   let url = urls.get(key);
   if (!url) {
@@ -152,6 +163,7 @@ export function saveReadingPosition(meta: BookMeta, pos: number, progress?: Book
 }
 
 export function deleteBook(id: string): Promise<void> {
+  forgetAssetUrls(id);
   return removeBook(id);
 }
 

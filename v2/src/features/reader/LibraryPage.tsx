@@ -1,11 +1,11 @@
 // The reader's library (#/reader): add books (file picker or drag and drop, several
 // at once), the books by last read with how far each is read, and a two-tap delete.
-import { BookOpen, FilePlus } from 'lucide-preact';
+import { BookOpen, FilePlus, RefreshCw } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { percentRead, type BookMeta } from '@/domain/reader/book';
+import { formatOf, percentRead, type BookMeta } from '@/domain/reader/book';
 import { t } from '@/i18n';
 import type { Navigate } from '@/lib/route-match';
-import { deleteBook, importBook, libraryPersistent, listLibrary } from '@/services/reader';
+import { deleteBook, importBook, libraryPersistent, listLibrary, needsReprocess, reprocessBook } from '@/services/reader';
 import { showToast } from '@/ui/toast';
 import { Button } from '@/ui/components/Button';
 import { EmptyState, IconTile, ProgressBar } from '@/ui/components/Display';
@@ -22,6 +22,8 @@ const ARM_MS = 3000;
 interface Busy {
   name: string;
   pct: number;
+  /** Reading a book's file again (Przetwórz ponownie), not adding one. */
+  again?: boolean;
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -34,6 +36,9 @@ export function LibraryPage({ navigate }: { navigate: Navigate }) {
   const [over, setOver] = useState(false);
   const [armed, setArmed] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const againInput = useRef<HTMLInputElement>(null);
+  /** The book whose file is being chosen again. */
+  const again = useRef<BookMeta | null>(null);
 
   const refresh = () =>
     listLibrary()
@@ -107,6 +112,34 @@ export function LibraryPage({ navigate }: { navigate: Navigate }) {
     if (files.length) void importFiles(files);
   };
 
+  // Books added before r-5 have no tables or pictures: the file is not kept, so the
+  // reader chooses it again and the book is read anew in place.
+  const reprocess = async (book: BookMeta, file: File) => {
+    if (busy) return;
+    if (formatOf(file.name) !== book.format) {
+      showToast({ message: t('reader.library.reprocessWrong'), tone: 'negative', durationMs: 5200 });
+      return;
+    }
+    try {
+      setBusy({ name: book.title, pct: 0, again: true });
+      await reprocessBook(book, file, (p) => setBusy({ name: book.title, pct: Math.round(p * 100), again: true }));
+      showToast({ message: t('reader.library.reprocessed'), tone: 'positive' });
+    } catch (err) {
+      showToast({ message: t('reader.library.fileError', { name: file.name, message: importErrorMessage(err) }), tone: 'negative', durationMs: 5200 });
+    }
+    setBusy(null);
+    await refresh();
+  };
+
+  const onPickAgain = () => {
+    const el = againInput.current;
+    const book = again.current;
+    const file = el?.files?.[0];
+    if (el) el.value = '';
+    again.current = null;
+    if (book && file) void reprocess(book, file);
+  };
+
   const remove = (book: BookMeta) => {
     if (armed !== book.id) return setArmed(book.id);
     setArmed(null);
@@ -143,8 +176,8 @@ export function LibraryPage({ navigate }: { navigate: Navigate }) {
           <Card>
             {busy ? (
               <div class="reader-lib__busy" role="status">
-                <p class="reader-lib__busy-name">{t('reader.library.importing', { name: busy.name })}</p>
-                <ProgressBar value={busy.pct / 100} label={t('reader.library.importing', { name: busy.name })} />
+                <p class="reader-lib__busy-name">{t(busy.again ? 'reader.library.reprocessing' : 'reader.library.importingPct', { name: busy.name, pct: busy.pct })}</p>
+                <ProgressBar value={busy.pct / 100} label={t(busy.again ? 'reader.library.reprocessing' : 'reader.library.importingPct', { name: busy.name, pct: busy.pct })} />
               </div>
             ) : (
               <div class="reader-lib__add">
@@ -168,6 +201,18 @@ export function LibraryPage({ navigate }: { navigate: Navigate }) {
           </Card>
         </div>
         <p class="reader-lib__local">{t('reader.library.local')}</p>
+        {books?.some(needsReprocess) && (
+          <input
+            ref={againInput}
+            class="visually-hidden"
+            type="file"
+            accept={ACCEPT}
+            tabIndex={-1}
+            aria-hidden="true"
+            data-testid="reader-reprocess-input"
+            onChange={onPickAgain}
+          />
+        )}
 
         <Section title={t('reader.library.shelf')}>
           <Card padding="none">
@@ -198,6 +243,22 @@ export function LibraryPage({ navigate }: { navigate: Navigate }) {
                           <ProgressBar value={pct / 100} label={t('reader.library.progress', { pct })} />
                         </span>
                       </button>
+                      {needsReprocess(book) && (
+                        <div class="reader-lib__again">
+                          <p class="reader-lib__again-hint">{t('reader.library.reprocessHint')}</p>
+                          <Button
+                            aria-label={t('reader.library.reprocessLabel', { title: book.title })}
+                            disabled={busy !== null}
+                            onClick={() => {
+                              again.current = book;
+                              againInput.current?.click();
+                            }}
+                          >
+                            <RefreshCw aria-hidden="true" />
+                            {t('reader.library.reprocess')}
+                          </Button>
+                        </div>
+                      )}
                       <button
                         type="button"
                         class={`reader-lib__delete${sure ? ' is-sure' : ''}`}
