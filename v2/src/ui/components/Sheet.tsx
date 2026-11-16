@@ -10,6 +10,7 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useId, useRef } from 'preact/hooks';
 import { t } from '@/i18n';
 import { releaseVelocity, settlesOpen, TAP_SLOP, type DragSample } from '@/lib/gesture';
+import { useLiquidGlass } from '../glass/useLiquidGlass';
 import { useModal } from './useModal';
 import './Sheet.css';
 
@@ -34,6 +35,8 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
   const ref = useModal(open, onClose);
   const titleId = useId();
   const drag = useRef<Drag | null>(null);
+  // Liquid glass (iOS theme): a big panel, so no chromatic edge (three passes per frame).
+  useLiquidGlass(ref, { bezel: 22, chroma: 0 });
 
   // Keep the sheet above the on-screen keyboard.
   useEffect(() => {
@@ -99,7 +102,7 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
   };
 
   return (
-    <dialog ref={ref} class="ui-sheet" aria-labelledby={titleId}>
+    <dialog ref={ref} class="ui-sheet ui-glass ui-glass--panel" aria-labelledby={titleId}>
       <div class="ui-sheet__panel">
         <header
           class="ui-sheet__header"

@@ -1,0 +1,63 @@
+/*
+ * Liquid glass material (iOS theme; <html data-glass="refract|blur|solid">, set by
+ * ui/glass/registry.ts). Only floating chrome carries the class "ui-glass": bars,
+ * sheets, dialogs, toasts. Without data-glass the class does nothing.
+ *
+ * refract: url(#filter) bends the backdrop at the rim (useLiquidGlass sets
+ *          --glass-refract), then blur + saturation.
+ * blur:    the same tint, sheen and specular rim over a stronger blur.
+ * solid:   Reduce transparency / Increase contrast: opaque, no backdrop filter.
+ */
+
+/* The filters' <svg>: no box, but not display:none (that disables the filters). */
+.ui-glass-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+:root[data-glass] .ui-glass {
+  --glass-fill: var(--glass-tint);
+  border-color: transparent;
+  background-color: var(--glass-fill);
+  background-image: var(--glass-sheen);
+  box-shadow: var(--glass-rim), var(--glass-shadow);
+}
+
+:root[data-glass] .ui-glass--panel {
+  --glass-fill: var(--glass-tint-panel);
+}
+
+:root[data-glass='refract'] .ui-glass,
+:root[data-glass='blur'] .ui-glass {
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  /* Empty fallback: without a lens the list starts at blur(). */
+  backdrop-filter: var(--glass-refract,) blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+:root[data-glass='solid'] .ui-glass {
+  --glass-fill: var(--glass-tint-solid);
+  background-image: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+:root[data-glass='solid'] .ui-glass--panel {
+  --glass-fill: var(--color-surface);
+}
+
+/* Also without the script's help (the setting changed before it noticed). */
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-glass] .ui-glass {
+    --glass-fill: var(--glass-tint-solid);
+    background-image: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  :root[data-glass] .ui-glass--panel {
+    --glass-fill: var(--color-surface);
+  }
+}

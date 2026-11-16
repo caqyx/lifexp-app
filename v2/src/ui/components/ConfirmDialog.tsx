@@ -3,6 +3,7 @@
 import { useId } from 'preact/hooks';
 import { t } from '@/i18n';
 import { Button } from './Button';
+import { useLiquidGlass } from '../glass/useLiquidGlass';
 import { useModal } from './useModal';
 import './ConfirmDialog.css';
 
@@ -19,12 +20,13 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({ open, title, body, confirmLabel, danger = false, onConfirm, onCancel }: ConfirmDialogProps) {
   const ref = useModal(open, onCancel);
+  useLiquidGlass(ref, { bezel: 20, chroma: 0 });
   const titleId = useId();
   const bodyId = useId();
   return (
     <dialog
       ref={ref}
-      class="ui-confirm"
+      class="ui-confirm ui-glass ui-glass--panel"
       role="alertdialog"
       aria-labelledby={titleId}
       aria-describedby={body ? bodyId : undefined}

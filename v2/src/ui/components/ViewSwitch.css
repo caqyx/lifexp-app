@@ -19,7 +19,7 @@
   left: 2px;
   width: calc((100% - 4px - (var(--segments) - 1) * 2px) / var(--segments));
   border-radius: calc(var(--field-radius) - 2px);
-  background: var(--color-surface);
+  background: var(--color-thumb);
   box-shadow: 0 1px 3px rgb(0 0 0 / 15%);
   transform: translateX(calc(var(--active) * (100% + 2px)));
   transition: transform var(--duration-slow) var(--ease-out);

@@ -27,6 +27,16 @@ export const FAMILY_MODES: Record<ThemeFamily, readonly [ModePreference, ...Mode
   gold: ['dark'],
 };
 
+/**
+ * Families whose floating chrome (bars, sheets, toasts) is liquid glass (ui/glass).
+ * Only iOS: the other themes keep their own surfaces.
+ */
+export const FAMILY_GLASS: Record<ThemeFamily, boolean> = {
+  lifexp: false,
+  ios: true,
+  gold: false,
+};
+
 export const DEFAULT_THEME: ThemePreference = { family: 'lifexp', mode: 'dark' };
 
 /** v2 keeps its own key; v1's `lifexp-theme` is only read once, as a starting point. */

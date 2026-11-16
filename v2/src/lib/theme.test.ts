@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   DEFAULT_THEME,
+  FAMILY_GLASS,
   fromV1Theme,
   normalizePreference,
   parseStoredPreference,
@@ -52,4 +53,8 @@ describe('resolving the mode', () => {
     expect(resolveTheme({ family: 'lifexp', mode: 'dark' }, false)).toEqual({ family: 'lifexp', mode: 'dark' });
     expect(resolveTheme({ family: 'lifexp', mode: 'light' }, true)).toEqual({ family: 'lifexp', mode: 'light' });
   });
+});
+
+test('only the iOS theme has liquid glass', () => {
+  expect(FAMILY_GLASS).toEqual({ lifexp: false, ios: true, gold: false });
 });
