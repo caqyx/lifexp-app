@@ -56,7 +56,7 @@ test('iOS in Chromium: tab bar, top bar, sheet and toast are refracting glass', 
   expect(await sheet.evaluate((el) => getComputedStyle(el).borderTopLeftRadius)).toBe('28px');
   await page.getByRole('button', { name: 'Zamknij', exact: true }).click();
   await expect(sheet).toHaveCount(0);
-  // A closed layer gives its filter back: one filter per distinct shape still on screen.
+  // A closed layer gives its filter back (a few stay mounted for the next opening).
   const shown = () =>
     page.evaluate(() => {
       const ids = [...document.querySelectorAll('.ui-glass')].map((el) => el.style.getPropertyValue('--glass-refract')).filter(Boolean);
@@ -64,7 +64,9 @@ test('iOS in Chromium: tab bar, top bar, sheet and toast are refracting glass', 
     });
   const closed = page.locator('dialog.ui-sheet', { hasText: 'Nowy wydatek' });
   await expect.poll(() => closed.evaluate((el) => el.style.getPropertyValue('--glass-refract'))).toBe('');
-  await expect.poll(async () => { const [used, mounted] = await shown(); return used === mounted; }).toBe(true);
+  const [used, mounted] = await shown();
+  expect(mounted).toBeGreaterThanOrEqual(used);
+  expect(mounted).toBeLessThanOrEqual(used + 4);
 });
 
 test('content cards stay solid; the tab bar floats as a capsule', async ({ page, account }) => {

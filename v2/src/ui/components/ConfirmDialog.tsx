@@ -20,7 +20,7 @@ interface ConfirmDialogProps {
 
 export function ConfirmDialog({ open, title, body, confirmLabel, danger = false, onConfirm, onCancel }: ConfirmDialogProps) {
   const ref = useModal(open, onCancel);
-  useLiquidGlass(ref, { bezel: 20, chroma: 0 });
+  useLiquidGlass(ref, { bezel: 20 });
   const titleId = useId();
   const bodyId = useId();
   return (

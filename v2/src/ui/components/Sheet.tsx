@@ -35,8 +35,8 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
   const ref = useModal(open, onClose);
   const titleId = useId();
   const drag = useRef<Drag | null>(null);
-  // Liquid glass (iOS theme): a big panel, so no chromatic edge (three passes per frame).
-  useLiquidGlass(ref, { bezel: 22, chroma: 0 });
+  // Liquid glass (iOS theme): the whole rim of the floating sheet is a lens.
+  useLiquidGlass(ref, { bezel: 22 });
 
   // Keep the sheet above the on-screen keyboard.
   useEffect(() => {

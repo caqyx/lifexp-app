@@ -24,6 +24,9 @@ export const glassModeSignal = signal<GlassMode>('off');
 export const glassFilters = signal<readonly GlassFilter[]>([]);
 
 const users = new Map<string, number>();
+/** Filters nobody uses right now, oldest first; up to IDLE_FILTERS stay mounted. */
+const idle = new Set<string>();
+const IDLE_FILTERS = 4;
 /** Encoded maps, most recently used last. */
 const mapCache = new Map<string, string>();
 const MAP_CACHE_SIZE = 24;
@@ -52,7 +55,8 @@ export function acquireGlassFilter(shape: GlassShape, scale: number, chroma: num
   const id = `${glassFilterId(shape, scale)}-c${Math.round(chroma * 10)}`;
   const count = users.get(id) ?? 0;
   users.set(id, count + 1);
-  if (count === 0) {
+  idle.delete(id);
+  if (count === 0 && !glassFilters.value.some((f) => f.id === id)) {
     const filter: GlassFilter = { id, width: shape.width, height: shape.height, map: cachedMap(id, shape), scale, chroma };
     glassFilters.value = [...glassFilters.value, filter];
   }
@@ -66,7 +70,13 @@ export function releaseGlassFilter(id: string): void {
     return;
   }
   users.delete(id);
-  glassFilters.value = glassFilters.value.filter((f) => f.id !== id);
+  // Kept mounted for a while: a sheet opened again reuses its filter instead of
+  // building it (and decoding its map) during the opening animation.
+  idle.add(id);
+  if (idle.size <= IDLE_FILTERS) return;
+  const oldest = idle.values().next().value as string;
+  idle.delete(oldest);
+  glassFilters.value = glassFilters.value.filter((f) => f.id !== oldest);
 }
 
 let themeWantsGlass = false;

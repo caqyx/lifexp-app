@@ -26,7 +26,7 @@ export function TabBar({ activeId, modules, onSelect, onAdd, onMenu, menuOpen, m
   const tabs = tabItems(modules);
   // Liquid glass (iOS theme): a floating capsule that bends the page at its rim.
   const barRef = useRef<HTMLElement>(null);
-  useLiquidGlass(barRef);
+  useLiquidGlass(barRef, { chroma: 1.5 });
   const tab = (feature: FeatureDef) => {
     const Icon = feature.icon;
     return (

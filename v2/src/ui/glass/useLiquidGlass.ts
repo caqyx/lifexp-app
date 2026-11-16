@@ -14,13 +14,17 @@ export interface LiquidGlassOptions {
   bezel?: number;
   /** Strongest shift at the rim, px (default 1.8 × bezel; the shift is at most half of it). */
   scale?: number;
-  /** Chromatic edge, px (default 1.5); 0 for big panels, where it costs the most. */
+  /**
+   * Chromatic edge, px (default 0). It triples the displacement passes: measured on a
+   * Pixel 7 profile (CPU 4×), chroma on the top and tab bars doubled long frames while
+   * a new screen rose in, so only the tab bar has it.
+   */
   chroma?: number;
 }
 
 export function useLiquidGlass(ref: RefObject<HTMLElement>, options: LiquidGlassOptions = {}): void {
   const refract = glassModeSignal.value === 'refract';
-  const { edges = ALL_EDGES, bezel, scale, chroma = 1.5 } = options;
+  const { edges = ALL_EDGES, bezel, scale, chroma = 0 } = options;
   const edgeKey = `${edges.top}${edges.right}${edges.bottom}${edges.left}`;
 
   useLayoutEffect(() => {
