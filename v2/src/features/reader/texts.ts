@@ -26,6 +26,9 @@ export function crumbText(bookTitle: string, sec: Section | undefined, index: nu
 
 export const fmt = (n: number) => formatInteger(n, locale());
 
+/** A file's size in megabytes, one decimal (never below 0.1). */
+export const fmtMegabytes = (bytes: number) => new Intl.NumberFormat(locale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(Math.max(0.1, bytes / 1048576));
+
 export function importErrorMessage(err: unknown): string {
   if (err instanceof ReaderImportError) {
     switch (err.problem) {

@@ -1734,7 +1734,16 @@
       "noStorage": "Zapis w przeglądarce niedostępny. Biblioteka działa tylko do odświeżenia.",
       "noStorageAdded": "Zapis w przeglądarce niedostępny. Książki znikną po odświeżeniu.",
       "notFound": "Nie znaleziono książki.",
-      "toLibrary": "Wróć do biblioteki"
+      "toLibrary": "Wróć do biblioteki",
+      "reprocess": "Przetwórz ponownie",
+      "reprocessLabel": "Przetwórz ponownie książkę {{title}}: wybierz ten sam plik",
+      "reprocessHint": "Ta książka nie ma jeszcze tabel ani ilustracji. Wybierz ten sam plik jeszcze raz, żeby je dodać; miejsce czytania zostanie.",
+      "reprocessing": "Przetwarzam: {{name}} ({{pct}}%)",
+      "reprocessed": "Dodano tabele i ilustracje do książki.",
+      "reprocessWrong": "To inny format niż książka. Wybierz ten sam plik.",
+      "importingPct": "Wczytuję: {{name}} ({{pct}}%)",
+      "originalSize": "Oryginał PDF na urządzeniu: {{mb}} MB",
+      "reprocessHintPdf": "Ta książka nie ma jeszcze tabel, ilustracji ani Oryginału (prawdziwych stron PDF). Wybierz ten sam plik jeszcze raz, żeby je dodać; miejsce czytania zostanie."
     },
     "errors": {
       "unsupported": "Nieobsługiwany format: .{{ext}} (obsługuję PDF, EPUB, TXT, MD).",
@@ -1805,6 +1814,26 @@
     "fullscreen": "Pełny ekran",
     "fullscreenLabel": "Pełny ekran: tylko książka i strzałki",
     "fullscreenExit": "Wyjdź",
-    "fullscreenExitLabel": "Wyjdź z pełnego ekranu"
+    "fullscreenExitLabel": "Wyjdź z pełnego ekranu",
+    "elements": {
+      "image": "Ilustracja",
+      "drawing": "Rysunek",
+      "table": "Tabela",
+      "formula": "Wzór",
+      "zoomed": "Element w pełnym ekranie",
+      "zoomHint": "Rozsuń palce, żeby powiększyć; przeciągnij, żeby przesunąć."
+    },
+    "original": {
+      "label": "Widok PDF",
+      "text": "Tekst",
+      "original": "Oryginał",
+      "loading": "Otwieram strony PDF…",
+      "missing": "Oryginał tej książki nie jest zapisany. W bibliotece wybierz „Przetwórz ponownie” i ten sam plik.",
+      "failed": "Nie udało się otworzyć stron PDF.",
+      "pages": "Strona {{n}} z {{total}}",
+      "pagesSpread": "Strony {{a}}–{{b}} z {{total}}",
+      "zoomed": "Powiększenie: {{pct}}%",
+      "resetZoom": "Cała strona"
+    }
   }
 }

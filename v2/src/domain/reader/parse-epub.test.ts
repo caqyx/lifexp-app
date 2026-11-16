@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blocksToParas, dirOf, epubSection, markToc, resolvePath, spineItems, tocPaths } from './parse-epub';
+import { blocksToParas, dirOf, epubSection, markToc, resolvePath, spineItems, tableFromCells, tocPaths } from './parse-epub';
 
 describe('resolvePath', () => {
   it('resolves relative to the OPF folder, drops the fragment', () => {
@@ -96,5 +96,40 @@ describe('tocPaths / markToc', () => {
       { t: 'Rozdział 1', h: 0, toc: 1 },
       { t: 'Tekst.', h: 0 },
     ]);
+  });
+});
+
+describe('EPUB tables and pictures', () => {
+  it('a table and a picture become elements in their place', () => {
+    const table = tableFromCells([
+      [
+        { th: true, text: 'Kraj', span: 1 },
+        { th: true, text: 'Stolica', span: 1 },
+      ],
+      [
+        { th: false, text: ' Polska ', span: 1 },
+        { th: false, text: 'Warszawa', span: 1 },
+      ],
+      [{ th: false, text: 'Razem', span: 2 }],
+    ]);
+    expect(table).toEqual({
+      rows: [[{ t: 'Kraj' }, { t: 'Stolica' }], [{ t: 'Polska' }, { t: 'Warszawa' }], [{ t: 'Razem', span: 2 }]],
+      header: true,
+    });
+    const paras = blocksToParas(
+      [
+        { tag: 'p', text: 'Przed.' },
+        { tag: 'table', text: '', table },
+        { tag: 'img', text: '', image: { asset: 'a1', w: 40, h: 30, alt: 'Mapa' } },
+        { tag: 'p', text: 'Po.' },
+      ],
+      '',
+    );
+    expect(paras.map((p) => p.el?.kind ?? p.t)).toEqual(['Przed.', 'table', 'image', 'Po.']);
+    expect(paras[2]?.el).toEqual({ kind: 'image', asset: 'a1', w: 40, h: 30, alt: 'Mapa' });
+  });
+
+  it('a file with only a picture is still a section', () => {
+    expect(epubSection([{ t: '', h: 0, el: { kind: 'image', asset: 'a', w: 1, h: 1, alt: '' } }], 0)).not.toBeNull();
   });
 });

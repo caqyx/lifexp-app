@@ -24,6 +24,8 @@ export interface ReaderSettings {
   swapButtons: boolean;
   /** The book's own table of contents is left out of reading, the counts and the percentage. */
   skipToc: boolean;
+  /** PDF books: Oryginał (the real pages) instead of the text (row r-6). */
+  original: boolean;
 }
 
 export const WPM_MIN = 60;
@@ -42,6 +44,7 @@ export function defaultReaderSettings(wide: boolean): ReaderSettings {
     zoom: true,
     swapButtons: false,
     skipToc: true,
+    original: false,
   };
 }
 
@@ -69,6 +72,7 @@ export function normalizeReaderSettings(stored: unknown, wide: boolean): ReaderS
     zoom: s.zoom !== false,
     swapButtons: s.swapButtons === true,
     skipToc: s.skipToc !== false,
+    original: s.original === true,
   };
 }
 

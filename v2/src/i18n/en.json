@@ -1734,7 +1734,16 @@
       "noStorage": "Browser storage is unavailable. The library lasts only until you reload.",
       "noStorageAdded": "Browser storage is unavailable. The books will be gone after a reload.",
       "notFound": "Book not found.",
-      "toLibrary": "Back to the library"
+      "toLibrary": "Back to the library",
+      "reprocess": "Process again",
+      "reprocessLabel": "Process the book {{title}} again: choose the same file",
+      "reprocessHint": "This book has no tables or illustrations yet. Choose the same file again to add them; your place stays.",
+      "reprocessing": "Processing: {{name}} ({{pct}}%)",
+      "reprocessed": "Tables and illustrations added to the book.",
+      "reprocessWrong": "This is a different format from the book. Choose the same file.",
+      "importingPct": "Loading: {{name}} ({{pct}}%)",
+      "originalSize": "Original PDF on this device: {{mb}} MB",
+      "reprocessHintPdf": "This book has no tables, illustrations or Original (the real PDF pages) yet. Choose the same file again to add them; your place stays."
     },
     "errors": {
       "unsupported": "Unsupported format: .{{ext}} (PDF, EPUB, TXT and MD work).",
@@ -1805,6 +1814,26 @@
     "fullscreen": "Full screen",
     "fullscreenLabel": "Full screen: only the book and the arrows",
     "fullscreenExit": "Exit",
-    "fullscreenExitLabel": "Exit full screen"
+    "fullscreenExitLabel": "Exit full screen",
+    "elements": {
+      "image": "Illustration",
+      "drawing": "Drawing",
+      "table": "Table",
+      "formula": "Formula",
+      "zoomed": "Element on the whole screen",
+      "zoomHint": "Pinch to zoom; drag to move."
+    },
+    "original": {
+      "label": "PDF view",
+      "text": "Text",
+      "original": "Original",
+      "loading": "Opening the PDF pages…",
+      "missing": "The original of this book is not stored. In the library choose \"Process again\" and the same file.",
+      "failed": "Could not open the PDF pages.",
+      "pages": "Page {{n}} of {{total}}",
+      "pagesSpread": "Pages {{a}}–{{b}} of {{total}}",
+      "zoomed": "Zoom: {{pct}}%",
+      "resetZoom": "Whole page"
+    }
   }
 }

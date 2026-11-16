@@ -15,11 +15,12 @@ describe('normalizeReaderSettings', () => {
       zoom: true,
       swapButtons: false,
       skipToc: true,
+      original: false,
     });
   });
 
   it('keeps valid values', () => {
-    const s = { theme: 'night', size: 6, per: 2, mode: 'auto', wpm: 420, view: 'page', zoom: false, swapButtons: true, skipToc: false };
+    const s = { theme: 'night', size: 6, per: 2, mode: 'auto', wpm: 420, view: 'page', zoom: false, swapButtons: true, skipToc: false, original: true };
     expect(normalizeReaderSettings(s, false)).toEqual(s);
   });
 
@@ -34,6 +35,7 @@ describe('normalizeReaderSettings', () => {
       zoom: true,
       swapButtons: false,
       skipToc: true,
+      original: false,
     });
     expect(normalizeReaderSettings({ size: -2, wpm: 10 }, false)).toMatchObject({ size: 0, wpm: 60 });
     expect(normalizeReaderSettings({ wpm: 'x' }, false).wpm).toBe(250);

@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'preact/hooks';
 import { lastAtOrBefore, type Section, type Sentence } from '@/domain/reader/book';
 import type { VNode } from 'preact';
 import type { Jump } from './Reader';
+import { elementsAfter, elementsBefore, frameClass } from './blocks';
 import { sectionHeading } from './texts';
 
 interface NormalViewProps {
@@ -39,19 +40,22 @@ export function NormalView({ sents, sections, secStart, start, current, jump, si
         const heading = sectionHeading(sections[s.sec], s.sec);
         if (heading) out.push(<h2 key={`h${s.sec}`}>{heading}</h2>);
       }
+      out.push(...elementsBefore(sents, sections, first));
       while (i < sents.length && (sents[i] as Sentence).sec === s.sec && (sents[i] as Sentence).para === s.para) i++;
       const text = sections[s.sec]?.paras[s.para]?.t ?? '';
+      const cls = frameClass(sections[s.sec], s.para).trim() || undefined;
       out.push(
         s.h ? (
-          <h3 key={first} data-s={first}>
+          <h3 key={first} data-s={first} class={cls}>
             {text}
           </h3>
         ) : (
-          <p key={first} data-s={first}>
+          <p key={first} data-s={first} class={cls}>
             {text}
           </p>
         ),
       );
+      out.push(...elementsAfter(sents, sections, i - 1));
     }
     return out;
   }, [sents, sections, secStart]);

@@ -3,7 +3,7 @@
 // decides the reading order, the paragraphs and the section titles. Text only:
 // scripts, styles, images and the book's own table of contents are dropped.
 import JSZip from 'jszip';
-import { baseName, type ParsedBook, type Section } from '@/domain/reader/book';
+import { baseName, type Section } from '@/domain/reader/book';
 import {
   BLOCK_SELECTOR,
   blocksToParas,
@@ -12,12 +12,15 @@ import {
   markToc,
   resolvePath,
   spineItems,
+  tableFromCells,
   tocPaths,
   type EpubReference,
+  type HtmlBlock,
   type ManifestItem,
 } from '@/domain/reader/parse-epub';
 import { normSpace } from '@/domain/reader/sentences';
 import { ReaderImportError } from './reader-errors';
+import type { ParsedWithAssets, PendingAsset } from './reader-assets';
 
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
 
@@ -33,13 +36,79 @@ function zipFile(zip: JSZip, path: string): JSZip.JSZipObject | null {
   return f;
 }
 
-function htmlParas(html: string) {
+/** Pictures bigger than this (either side, px) are scaled down before they are stored. */
+const MAX_PICTURE = 1600;
+
+/** A picture of the book stored as is, or scaled down when big; its size in px. */
+async function storePicture(blob: Blob, key: string, assets: PendingAsset[]): Promise<{ w: number; h: number } | null> {
+  try {
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, MAX_PICTURE / Math.max(bitmap.width, bitmap.height));
+    let out = blob;
+    const w = Math.max(1, Math.round(bitmap.width * scale));
+    const h = Math.max(1, Math.round(bitmap.height * scale));
+    if (scale < 1) {
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d')?.drawImage(bitmap, 0, 0, w, h);
+      out = (await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', 0.82))) ?? blob;
+    }
+    bitmap.close();
+    assets.push({ key, blob: out });
+    return { w, h };
+  } catch {
+    return null;
+  }
+}
+
+const MEDIA: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' };
+
+/**
+ * A chapter's paragraphs, tables and pictures in document order. Text of a table belongs
+ * to the table; a picture is read from the zip and stored (`assets`).
+ */
+async function htmlParas(html: string, zip: JSZip, dir: string, assets: PendingAsset[], next: () => string) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
-  doc.querySelectorAll('script,style,svg').forEach((n) => n.remove());
-  // The book's own navigation (its table of contents, landmarks) stays, marked (domain/reader/toc).
-  const blocks = [...doc.body.querySelectorAll(BLOCK_SELECTOR)]
-    .filter((el) => !el.querySelector(BLOCK_SELECTOR))
-    .map((el) => ({ tag: el.tagName, text: el.textContent ?? '', toc: el.closest('nav') !== null }));
+  doc.querySelectorAll('script,style').forEach((n) => n.remove());
+  // An inline <svg> is a drawing only when it shows a picture; its text otherwise.
+  doc.querySelectorAll('svg').forEach((n) => {
+    if (!n.querySelector('image')) n.remove();
+  });
+  const blocks: HtmlBlock[] = [];
+  const units = [...doc.body.querySelectorAll(`${BLOCK_SELECTOR},img,image,table`)];
+  for (const el of units) {
+    const name = el.localName.toLowerCase();
+    if (name !== 'table' && el.closest('table')) continue;
+    if (name === 'table') {
+      if (el.parentElement?.closest('table')) continue;
+      const rows = [...el.querySelectorAll('tr')]
+        .filter((tr) => tr.closest('table') === el)
+        .map((tr) =>
+          [...tr.children]
+            .filter((c) => /^t[hd]$/i.test(c.tagName))
+            .map((c) => ({ th: c.tagName.toLowerCase() === 'th', text: c.textContent ?? '', span: Number(c.getAttribute('colspan')) || 1 })),
+        );
+      blocks.push({ tag: 'table', text: '', table: tableFromCells(rows) });
+      continue;
+    }
+    if (name === 'img' || name === 'image') {
+      const src = el.getAttribute('src') ?? el.getAttribute('href') ?? el.getAttribute('xlink:href') ?? '';
+      if (!src || src.startsWith('data:')) continue;
+      const path = resolvePath(dir, src);
+      const f = zipFile(zip, path);
+      if (!f) continue;
+      const ext = path.split('.').pop()?.toLowerCase() ?? '';
+      const blob = new Blob([await f.async('arraybuffer')], { type: MEDIA[ext] ?? 'application/octet-stream' });
+      const key = next();
+      const size = await storePicture(blob, key, assets);
+      if (size) blocks.push({ tag: 'img', text: '', image: { asset: key, ...size, alt: normSpace(el.getAttribute('alt') ?? '') } });
+      continue;
+    }
+    if (el.querySelector(BLOCK_SELECTOR)) continue;
+    // The book's own navigation (its table of contents, landmarks) stays, marked (domain/reader/toc).
+    blocks.push({ tag: el.tagName, text: el.textContent ?? '', toc: el.closest('nav') !== null });
+  }
   return blocksToParas(blocks, doc.body.textContent ?? '');
 }
 
@@ -64,7 +133,7 @@ async function tocReferences(zip: JSZip, opfElements: Element[], manifest: Manif
   return tocPaths(refs);
 }
 
-export async function parseEpubFile(file: File, onProgress: (p: number) => void): Promise<ParsedBook> {
+export async function parseEpubFile(file: File, onProgress: (p: number) => void): Promise<ParsedWithAssets> {
   const zip = await JSZip.loadAsync(await file.arrayBuffer()).catch((err: unknown) => {
     throw new ReaderImportError('unreadable', err instanceof Error ? err.message : String(err));
   });
@@ -93,13 +162,15 @@ export async function parseEpubFile(file: File, onProgress: (p: number) => void)
     all.filter((e) => e.localName === 'itemref').map((e) => e.getAttribute('idref') ?? ''),
   );
   const tocFiles = new Set(await tocReferences(zip, all, manifest, opfDir));
+  const assets: PendingAsset[] = [];
+  let pictures = 0;
   const sections: Section[] = [];
   for (let i = 0; i < spine.length; i++) {
     const item = spine[i] as ManifestItem;
     const path = resolvePath(opfDir, item.href);
     const f = zipFile(zip, path);
     if (f) {
-      const paras = htmlParas(await f.async('string'));
+      const paras = await htmlParas(await f.async('string'), zip, dirOf(path), assets, () => `e${++pictures}`);
       const isToc = tocFiles.has(path) || /(^|\s)nav(\s|$)/.test(item.properties ?? '');
       const section = epubSection(isToc ? markToc(paras) : paras, sections.length);
       if (section) sections.push(section);
@@ -109,5 +180,5 @@ export async function parseEpubFile(file: File, onProgress: (p: number) => void)
       await nextFrame();
     }
   }
-  return { title, format: 'EPUB', sections };
+  return { title, format: 'EPUB', sections, assets };
 }

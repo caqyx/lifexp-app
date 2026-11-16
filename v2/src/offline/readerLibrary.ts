@@ -10,22 +10,39 @@ const META = 'meta';
 const CONTENT = 'content';
 const SETTINGS = 'settings';
 const SETTINGS_KEY = 'reader';
+/** Pictures of the books' elements (r-5): key "<book id>:<n>" → Blob. */
+const ASSETS = 'assets';
+/** The original file of a book, kept for the PDF "Oryginał" view (r-6): key = book id → Blob. */
+const FILES = 'files';
 
 interface Backend {
   persistent: boolean;
   db: IDBDatabase | null;
 }
 
-const mem = { meta: new Map<string, BookMeta>(), content: new Map<string, BookContent>(), settings: undefined as unknown };
+const mem = {
+  meta: new Map<string, BookMeta>(),
+  content: new Map<string, BookContent>(),
+  settings: undefined as unknown,
+  assets: new Map<string, Blob>(),
+  files: new Map<string, Blob>(),
+};
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = () => {
+    const request = indexedDB.open(DB_NAME, 2);
+    request.onupgradeneeded = (e) => {
       const db = request.result;
-      db.createObjectStore(META, { keyPath: 'id' });
-      db.createObjectStore(CONTENT, { keyPath: 'id' });
-      db.createObjectStore(SETTINGS);
+      // 1: books and settings; 2: pictures of elements and original files.
+      if (e.oldVersion < 1) {
+        db.createObjectStore(META, { keyPath: 'id' });
+        db.createObjectStore(CONTENT, { keyPath: 'id' });
+        db.createObjectStore(SETTINGS);
+      }
+      if (e.oldVersion < 2) {
+        db.createObjectStore(ASSETS);
+        db.createObjectStore(FILES);
+      }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -105,10 +122,12 @@ export async function removeBook(id: string): Promise<void> {
   if (!(await persistent())) {
     mem.meta.delete(id);
     mem.content.delete(id);
+    await removeBookFiles(id);
     return;
   }
   await run(META, 'readwrite', (s) => s.delete(id));
   await run(CONTENT, 'readwrite', (s) => s.delete(id));
+  await removeBookFiles(id);
 }
 
 /** The stored settings as they were saved (domain/reader/settings normalizes them). */
@@ -123,4 +142,51 @@ export async function writeReaderSettings(settings: object): Promise<void> {
     return;
   }
   await run(SETTINGS, 'readwrite', (s) => s.put({ ...settings }, SETTINGS_KEY));
+}
+
+/** Every key of a book's pictures starts with its id and a colon. */
+const assetRange = (bookId: string) => IDBKeyRange.bound(`${bookId}:`, `${bookId}:\uffff`);
+
+export async function putAssets(assets: readonly { key: string; blob: Blob }[]): Promise<void> {
+  if (!(await persistent())) {
+    for (const a of assets) mem.assets.set(a.key, a.blob);
+    return;
+  }
+  // One transaction per picture keeps each write small (a big PDF has many).
+  for (const a of assets) await run(ASSETS, 'readwrite', (s) => s.put(a.blob, a.key));
+}
+
+export async function getAsset(key: string): Promise<Blob | undefined> {
+  if (!(await persistent())) return mem.assets.get(key);
+  return run<Blob | undefined>(ASSETS, 'readonly', (s) => s.get(key));
+}
+
+export async function putOriginal(bookId: string, blob: Blob): Promise<void> {
+  if (!(await persistent())) return void mem.files.set(bookId, blob);
+  await run(FILES, 'readwrite', (s) => s.put(blob, bookId));
+}
+
+export async function getOriginal(bookId: string): Promise<Blob | undefined> {
+  if (!(await persistent())) return mem.files.get(bookId);
+  return run<Blob | undefined>(FILES, 'readonly', (s) => s.get(bookId));
+}
+
+/** A book's pictures (before it is read again). */
+export async function removeBookAssets(bookId: string): Promise<void> {
+  if (!(await persistent())) {
+    for (const k of [...mem.assets.keys()]) if (k.startsWith(`${bookId}:`)) mem.assets.delete(k);
+    return;
+  }
+  await run(ASSETS, 'readwrite', (s) => s.delete(assetRange(bookId)));
+}
+
+/** A book's pictures and original file go with it. */
+async function removeBookFiles(bookId: string): Promise<void> {
+  if (!(await persistent())) {
+    for (const k of [...mem.assets.keys()]) if (k.startsWith(`${bookId}:`)) mem.assets.delete(k);
+    mem.files.delete(bookId);
+    return;
+  }
+  await run(ASSETS, 'readwrite', (s) => s.delete(assetRange(bookId)));
+  await run(FILES, 'readwrite', (s) => s.delete(bookId));
 }

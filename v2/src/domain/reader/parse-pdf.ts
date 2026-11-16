@@ -124,3 +124,27 @@ export function pdfSections(pages: readonly (readonly string[])[]): Section[] {
     .map((paras, i) => ({ title: '', label: { kind: 'page' as const, n: i + 1 }, paras: paras.map((t): Para => ({ t, h: 0 })) }))
     .filter((s) => s.paras.length);
 }
+
+/**
+ * Like mergeAcrossPages, for pages of paragraphs that may hold elements and frames: only
+ * plain text paragraphs at the page break are joined.
+ */
+export function mergeParasAcrossPages(pages: Para[][]): Para[][] {
+  const plain = (p: Para | undefined) => p !== undefined && !p.el && p.frame === undefined && !p.h;
+  for (let i = 1; i < pages.length; i++) {
+    const prev = pages[i - 1] as Para[];
+    const cur = pages[i] as Para[];
+    const last = prev[prev.length - 1];
+    const first = cur[0];
+    if (plain(last) && plain(first) && !ENDS_PARAGRAPH.test((last as Para).t) && /^\p{Ll}/u.test((first as Para).t)) {
+      prev[prev.length - 1] = { ...(last as Para), t: `${(last as Para).t} ${(first as Para).t}` };
+      cur.shift();
+    }
+  }
+  return pages;
+}
+
+/** Pages of paragraphs as sections ("Strona N"); empty pages left out. */
+export function pdfParaSections(pages: readonly Para[][]): Section[] {
+  return pages.map((paras, i) => ({ title: '', label: { kind: 'page' as const, n: i + 1 }, paras: [...paras] })).filter((s) => s.paras.length);
+}
