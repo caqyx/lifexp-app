@@ -12,7 +12,40 @@ export interface Para {
   h: 0 | 1;
   /** The file itself says this is its table of contents (an EPUB nav or guide/landmarks "toc"). */
   toc?: 1;
+  /**
+   * Not text but an element of the page (a picture, a table): t is '' and it has no
+   * sentences, so reading steps over it, but every view shows it in its place.
+   */
+  el?: BookElement;
+  /** Part of a framed box ("ramka"): consecutive paragraphs with the same number are drawn in one frame. */
+  frame?: number;
 }
+
+/** A picture (an image, or a region of a PDF page rendered: a chart, a diagram, a formula, a table that would not rebuild). */
+export interface ImageElement {
+  kind: 'image';
+  /** Key of the picture in the device's book store (offline/readerLibrary assets). */
+  asset: string;
+  /** Size in px of the stored picture (keeps the layout stable before it loads). */
+  w: number;
+  h: number;
+  alt: string;
+}
+
+export interface TableCell {
+  t: string;
+  /** Columns the cell spans (merged cells); absent = 1. */
+  span?: number;
+}
+
+/** A table rebuilt as rows and cells; the first row is a header when `header`. */
+export interface TableElement {
+  kind: 'table';
+  rows: TableCell[][];
+  header: boolean;
+}
+
+export type BookElement = ImageElement | TableElement;
 
 /**
  * A title the parser made up, shown in the reader's language: "Część 3" for a
@@ -173,5 +206,36 @@ export function sortLibrary(list: readonly BookMeta[]): BookMeta[] {
 
 /** Sections without paragraphs dropped (the parsers' last step before saving). */
 export function withText(sections: readonly Section[]): Section[] {
-  return sections.filter((s) => s.paras.length > 0);
+  // A section of elements only (a PDF page with just a picture) has no sentence to show it
+  // at: its elements join the end of the section before (or the start of the next one).
+  const out: Section[] = [];
+  let carry: Para[] = [];
+  for (const s of sections) {
+    if (!s.paras.length) continue;
+    if (!s.paras.some((p) => !p.el && p.t)) {
+      const last = out[out.length - 1];
+      if (last) last.paras = [...last.paras, ...s.paras];
+      else carry = [...carry, ...s.paras];
+      continue;
+    }
+    out.push(carry.length ? { ...s, paras: [...carry, ...s.paras] } : s);
+    carry = [];
+  }
+  return out;
+}
+
+/** The element paragraphs of a section between paragraph `from` and `to` (exclusive both; -1 / length for the ends). */
+export function elementsBetween(sec: Section | undefined, from: number, to: number): { para: number; el: BookElement; frame?: number }[] {
+  if (!sec) return [];
+  const out: { para: number; el: BookElement; frame?: number }[] = [];
+  for (let k = Math.max(0, from + 1); k < Math.min(sec.paras.length, to); k++) {
+    const p = sec.paras[k] as Para;
+    if (p.el) out.push(p.frame === undefined ? { para: k, el: p.el } : { para: k, el: p.el, frame: p.frame });
+  }
+  return out;
+}
+
+/** Asset keys a book's elements use (to delete them with the book). */
+export function assetsOf(sections: readonly Section[]): string[] {
+  return sections.flatMap((s) => s.paras.flatMap((p) => (p.el?.kind === 'image' ? [p.el.asset] : [])));
 }

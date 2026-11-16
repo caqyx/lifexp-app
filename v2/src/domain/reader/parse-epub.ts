@@ -2,7 +2,7 @@
 // the (X)HTML files in reading order, each file is one section titled by its first
 // short heading. Pure: services/reader-epub reads the zip and the DOM and passes
 // plain values here.
-import type { Para, Section } from './book';
+import type { Para, Section, TableCell } from './book';
 import { normSpace } from './sentences';
 
 /** `href` (relative to the folder `base`, which ends with "/" or is "") as a path in the zip; "#…" dropped, "." and ".." resolved. */
@@ -42,6 +42,10 @@ export interface HtmlBlock {
   text: string;
   /** Inside the file's own navigation (<nav>: its table of contents, landmarks, page list). */
   toc?: boolean;
+  /** A <table>, its rows of cells (th/td text, colspan). */
+  table?: { rows: TableCell[][]; header: boolean };
+  /** An <img> already stored: its asset key, size and alt text. */
+  image?: { asset: string; w: number; h: number; alt: string };
 }
 
 /**
@@ -51,6 +55,14 @@ export interface HtmlBlock {
 export function blocksToParas(blocks: readonly HtmlBlock[], bodyText: string): Para[] {
   const paras: Para[] = [];
   for (const b of blocks) {
+    if (b.table) {
+      if (b.table.rows.some((r) => r.some((c) => c.t))) paras.push({ t: '', h: 0, el: { kind: 'table', rows: b.table.rows, header: b.table.header } });
+      continue;
+    }
+    if (b.image) {
+      paras.push({ t: '', h: 0, el: { kind: 'image', ...b.image } });
+      continue;
+    }
     const t = normSpace(b.text);
     if (t) paras.push(b.toc ? { t, h: /^h[1-6]$/i.test(b.tag) ? 1 : 0, toc: 1 } : { t, h: /^h[1-6]$/i.test(b.tag) ? 1 : 0 });
   }
@@ -72,7 +84,7 @@ export const BLOCK_SELECTOR = 'p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,div,td,dd,d
  * counting the sections kept so far.
  */
 export function epubSection(paras: Para[], keptSoFar: number): Section | null {
-  if (paras.reduce((n, p) => n + p.t.length, 0) < 3) return null;
+  if (paras.reduce((n, p) => n + p.t.length, 0) < 3 && !paras.some((p) => p.el)) return null;
   const head = paras.find((p) => p.h && p.t.length < 120);
   return head ? { title: head.t, label: null, paras } : { title: '', label: { kind: 'chapter', n: keptSoFar + 1 }, paras };
 }
@@ -94,4 +106,11 @@ export function tocPaths(refs: readonly EpubReference[]): string[] {
 /** Every paragraph of a file the book calls its table of contents is marked as such (domain/reader/toc). */
 export function markToc(paras: Para[]): Para[] {
   return paras.map((p) => ({ ...p, toc: 1 }));
+}
+
+/** Cell text of a table's rows (th/td), colspans kept; the first row is a header when it is all th. */
+export function tableFromCells(rows: readonly { th: boolean; text: string; span: number }[][]): { rows: TableCell[][]; header: boolean } {
+  const out = rows.filter((r) => r.length).map((r) => r.map((c) => (c.span > 1 ? { t: normSpace(c.text), span: c.span } : { t: normSpace(c.text) })));
+  const first = rows.find((r) => r.length);
+  return { rows: out, header: !!first && first.every((c) => c.th) };
 }

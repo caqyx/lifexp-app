@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assetsOf,
   baseName,
   buildGroups,
   chunkSections,
+  elementsBetween,
   flatten,
   formatOf,
   groupIndexOf,
   isPlainSection,
   percentRead,
   sortLibrary,
+  withText,
   type BookMeta,
   type Section,
 } from './book';
@@ -121,5 +124,33 @@ describe('sortLibrary', () => {
   const meta = (id: string, added: number, opened: number): BookMeta => ({ id, title: id, format: 'TXT', added, opened, pos: 0, total: 1 });
   it('last opened first; a book never opened counts from when it was added', () => {
     expect(sortLibrary([meta('a', 1, 0), meta('b', 2, 10), meta('c', 5, 0)]).map((m) => m.id)).toEqual(['b', 'c', 'a']);
+  });
+});
+
+describe('elements', () => {
+  const img = (asset: string) => ({ kind: 'image' as const, asset, w: 10, h: 10, alt: '' });
+  it('elements have no sentences: reading steps over them', () => {
+    const { sents } = flatten([{ title: '', label: null, paras: [{ t: 'Raz.', h: 0 }, { t: '', h: 0, el: img('a') }, { t: 'Dwa.', h: 0 }] }]);
+    expect(sents.map((s) => [s.t, s.para])).toEqual([
+      ['Raz.', 0],
+      ['Dwa.', 2],
+    ]);
+  });
+
+  it('elementsBetween finds the elements between two paragraphs', () => {
+    const sec = { title: '', label: null, paras: [{ t: 'Raz.', h: 0 as const }, { t: '', h: 0 as const, el: img('a') }, { t: '', h: 0 as const, el: img('b'), frame: 1 }, { t: 'Dwa.', h: 0 as const }] };
+    expect(elementsBetween(sec, 0, 3).map((e) => [e.para, e.el.kind === 'image' && e.el.asset, e.frame])).toEqual([
+      [1, 'a', undefined],
+      [2, 'b', 1],
+    ]);
+    expect(elementsBetween(sec, -1, 0)).toEqual([]);
+    expect(assetsOf([sec])).toEqual(['a', 'b']);
+  });
+
+  it('a section of elements only joins the section before (or the next one)', () => {
+    const text = (t: string) => ({ title: '', label: null, paras: [{ t, h: 0 as const }] });
+    const pic = { title: '', label: null, paras: [{ t: '', h: 0 as const, el: img('p') }] };
+    expect(withText([text('A.'), pic, text('B.')]).map((s) => s.paras.map((p) => p.el?.kind ?? p.t))).toEqual([['A.', 'image'], ['B.']]);
+    expect(withText([pic, text('B.')]).map((s) => s.paras.map((p) => p.el?.kind ?? p.t))).toEqual([['image', 'B.']]);
   });
 });
