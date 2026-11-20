@@ -194,6 +194,27 @@ test.describe('phone: drawer', () => {
     expect(backBox.y + backBox.height).toBeLessThanOrEqual(accountBox.y + 1);
   });
 
+  test('the menu lists modules in labelled sections: what goes together sits together', async ({ page, account }) => {
+    await openApp(page, account);
+    await menuButton(page).click();
+    await waitForDrawer(page, 'open');
+    const sections = drawer(page).locator('.nav__section');
+    await expect(sections.getByRole('heading', { level: 2 })).toHaveText([
+      'Plan',
+      'Finanse',
+      'Pisanie i czytanie',
+      'Rozrywka',
+      'Konto i aplikacja',
+    ]);
+    const links = (name) => drawer(page).getByRole('list', { name }).getByRole('link');
+    await expect(links('Plan')).toHaveText(['Dziś', 'Zadania', 'Cele']);
+    await expect(links('Finanse')).toHaveText(['Obowiązki', 'Pieniądze']);
+    await expect(links('Pisanie i czytanie')).toHaveText(['Notatki']);
+    await expect(links('Rozrywka')).toHaveText(['Gry']);
+    // Statistics next to Settings, at the bottom with the app's own entries.
+    await expect(links('Konto i aplikacja')).toHaveText(['Zgłoszenia i aktualizacje', 'Statystyki', 'Ustawienia']);
+  });
+
   test('menu entries and the Menu button are at least 44×44 px', async ({ page, account }) => {
     await openApp(page, account);
     const menu = await menuButton(page).boundingBox();
@@ -301,6 +322,19 @@ test.describe('desktop: sidebar', () => {
     await drawer(page).getByRole('link', { name: 'Pieniądze' }).click();
     await expect(page).toHaveURL(/#\/money$/);
     await expect(drawer(page).getByRole('link', { name: 'Pieniądze' })).toHaveAttribute('aria-current', 'page');
+    // The same sections as the phone drawer, each heading above its modules.
+    await expect(drawer(page).getByRole('heading', { level: 2 })).toHaveText([
+      'Plan',
+      'Finanse',
+      'Pisanie i czytanie',
+      'Rozrywka',
+      'Konto i aplikacja',
+    ]);
+    const heading = await drawer(page).getByRole('heading', { name: 'Konto i aplikacja' }).boundingBox();
+    const stats = await drawer(page).getByRole('link', { name: 'Statystyki' }).boundingBox();
+    const settings = await drawer(page).getByRole('link', { name: 'Ustawienia' }).boundingBox();
+    expect(stats.y).toBeGreaterThan(heading.y);
+    expect(settings.y).toBeGreaterThan(stats.y);
     expect(errors).toEqual([]);
   });
 

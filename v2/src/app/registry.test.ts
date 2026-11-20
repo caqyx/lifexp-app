@@ -1,7 +1,22 @@
 import { describe, expect, test } from 'vitest';
+import en from '@/i18n/en.json';
 import pl from '@/i18n/pl.json';
+import type { ModuleChoice } from '@/domain/modules';
 import { SCREENS } from '@/domain/exus/screens';
-import { DEFAULT_PATH, FEATURES, featureHref, featurePath, isViewSwitch, navItems, resolveRoute, tabItems } from './registry';
+import {
+  DEFAULT_PATH,
+  FEATURES,
+  featureHref,
+  featurePath,
+  isViewSwitch,
+  NAV_SECTIONS,
+  navItems,
+  navSections,
+  resolveRoute,
+  tabItems,
+} from './registry';
+
+const withReader: ModuleChoice = { enabledModules: null, disabledModules: null, optInModules: ['reader'] };
 
 describe('module registry', () => {
   test('every route of PLAN.md 4.7 resolves to its module', () => {
@@ -45,19 +60,52 @@ describe('module registry', () => {
     expect(resolveRoute(DEFAULT_PATH)?.feature.id).toBe('today');
   });
 
-  test('menu order matches the drawer in PLAN.md 7.4', () => {
-    expect(navItems('main').map((f) => f.id)).toEqual(['today', 'tasks', 'goals', 'chores', 'money', 'notes', 'stats', 'games']);
-    expect(navItems('secondary').map((f) => f.id)).toEqual(['reports', 'settings']);
+  test('the menu groups what goes together: planning, money, writing and reading, play, then Statistics next to Settings', () => {
+    const menu = (choice?: ModuleChoice, parent?: boolean) =>
+      navSections(choice, parent).map((g) => [g.section, g.items.map((f) => f.id)]);
+    expect(menu(withReader)).toEqual([
+      ['plan', ['today', 'tasks', 'goals']],
+      ['money', ['chores', 'money']],
+      ['writing', ['notes', 'reader']],
+      ['fun', ['games']],
+      ['system', ['reports', 'stats', 'settings']],
+    ]);
+    // The reader is opt-in: off until turned on.
+    expect(navItems('writing').map((f) => f.id)).toEqual(['notes']);
+    for (const group of navSections(withReader)) expect(group.labelKey).toBe(`nav.sections.${group.section}`);
+  });
+
+  test('a section whose modules are all off is not listed', () => {
+    const off: ModuleChoice = { enabledModules: ['stats', 'aichat'], disabledModules: ['chores', 'money', 'notes', 'games'] };
+    expect(navSections(off).map((g) => g.section)).toEqual(['plan', 'system']);
+  });
+
+  test('every menu module has a section and a unique place in it; every section has a heading', () => {
+    const listed = FEATURES.filter((f) => f.nav !== null);
+    for (const f of listed) expect(NAV_SECTIONS, f.id).toContain(f.nav!.section);
+    const places = listed.map((f) => `${f.nav!.section}:${f.nav!.order}`);
+    expect(new Set(places).size).toBe(places.length);
+    for (const section of NAV_SECTIONS) {
+      expect(pl.nav.sections[section], section).toBeTruthy();
+      expect(en.nav.sections[section], section).toBeTruthy();
+    }
   });
 
   test('"Rodzic" is listed only for a parent; the route is there for everyone', () => {
-    expect(navItems('secondary', undefined, true).map((f) => f.id)).toEqual(['parent', 'reports', 'settings']);
+    expect(navItems('system', undefined, true).map((f) => f.id)).toEqual(['parent', 'reports', 'stats', 'settings']);
+    expect(navItems('system').map((f) => f.id)).toEqual(['reports', 'stats', 'settings']);
     expect(resolveRoute('/parent')?.feature.id).toBe('parent');
   });
 
   test('the phone tab bar holds Today, Chores and Money (D10); each also stays in the menu', () => {
     expect(tabItems().map((f) => f.id)).toEqual(['today', 'chores', 'money']);
     for (const feature of tabItems()) expect(feature.nav).not.toBeNull();
+  });
+
+  test('a tab whose module is off gives its place to the next planning or other module, never to the account section', () => {
+    expect(tabItems({ enabledModules: ['chores', 'stats'], disabledModules: null }).map((f) => f.id)).toEqual(['today', 'chores', 'tasks']);
+    const bare: ModuleChoice = { enabledModules: [], disabledModules: ['chores', 'money', 'notes', 'stats', 'games'] };
+    expect(tabItems(bare).map((f) => f.id)).toEqual(['today', 'tasks', 'goals']);
   });
 
   test('ids and labels are unique and translated', () => {

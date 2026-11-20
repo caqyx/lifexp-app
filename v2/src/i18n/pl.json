@@ -29,7 +29,14 @@
     "classicApp": "Wróć do starej wersji",
     "tabBar": "Na skróty",
     "add": "Dodaj",
-    "parent": "Rodzic"
+    "parent": "Rodzic",
+    "sections": {
+      "plan": "Plan",
+      "money": "Finanse",
+      "writing": "Pisanie i czytanie",
+      "fun": "Rozrywka",
+      "system": "Konto i aplikacja"
+    }
   },
   "today": {
     "greeting": "Cześć, {{name}}",

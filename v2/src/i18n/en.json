@@ -29,7 +29,14 @@
     "classicApp": "Back to the old version",
     "tabBar": "Shortcuts",
     "add": "Add",
-    "parent": "Parent"
+    "parent": "Parent",
+    "sections": {
+      "plan": "Plan",
+      "money": "Finances",
+      "writing": "Writing and reading",
+      "fun": "Fun",
+      "system": "Account and app"
+    }
   },
   "today": {
     "greeting": "Hi, {{name}}",
