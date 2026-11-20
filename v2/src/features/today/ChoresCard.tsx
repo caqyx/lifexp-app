@@ -10,7 +10,7 @@ import { formatInteger } from '@/lib/format';
 import { formatMoney } from '@/lib/money';
 import { Button } from '@/ui/components/Button';
 import { ButtonLink } from '@/ui/components/ButtonLink';
-import { EmptyState, IconTile, ProgressBar } from '@/ui/components/Display';
+import { EmptyState, IconTile, MotionList, ProgressBar } from '@/ui/components/Display';
 import { Card, Section } from '@/ui/components/Layout';
 
 interface ChoresCardProps {
@@ -73,7 +73,7 @@ export function ChoresCard({ uid, profile, defs, entries, today, onLog, onEdit }
               </div>
               <ProgressBar value={done / rows.length} label={t('today.choresProgressLabel')} tone="positive" />
             </div>
-            <ul class="today-chores" aria-label={t('today.chores')}>
+            <MotionList class="today-chores" label={t('today.chores')}>
               {rows.map((row) => {
                 const def = defById.get(row.choreId);
                 const isDone = row.doneToday > 0;
@@ -103,7 +103,7 @@ export function ChoresCard({ uid, profile, defs, entries, today, onLog, onEdit }
                   </li>
                 );
               })}
-            </ul>
+            </MotionList>
           </>
         )}
         <div class="today-chores__unpaid">

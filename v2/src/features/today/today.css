@@ -97,6 +97,8 @@
   background: var(--gradient-accent);
   color: var(--color-on-accent);
   box-shadow: 0 0 0 6px rgb(255 255 255 / 8%);
+  animation: ui-pop-in var(--duration-enter) var(--ease-spring) backwards;
+  animation-delay: var(--duration-fast);
 }
 
 .today-hero__badge svg {
@@ -198,6 +200,12 @@
 .today-week__day--done .today-week__mark {
   border-color: transparent;
   background: var(--color-accent);
+}
+
+/* A day's tick lands with a small spring, after its day has risen in. */
+.today-week__day--done .today-week__mark svg {
+  animation: ui-pop-in var(--duration-enter) var(--ease-spring) backwards;
+  animation-delay: calc(var(--duration-fast) + var(--stagger-step) * 2);
 }
 
 .today-week__day--today .today-week__mark {
@@ -390,7 +398,7 @@
   height: 16px;
   stroke-width: 3;
   transform: scale(0);
-  transition: transform var(--duration-enter) var(--ease-out);
+  transition: transform var(--duration-enter) var(--ease-spring);
 }
 
 .today-chore--done .today-check {

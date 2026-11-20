@@ -119,7 +119,7 @@ export function Sheet({ open, onClose, title, children, footer }: SheetProps) {
             {t('ui.close')}
           </button>
         </header>
-        <div class="ui-sheet__body">{children}</div>
+        <div class="ui-sheet__body ui-stagger">{children}</div>
         {footer && <div class="ui-sheet__footer">{footer}</div>}
       </div>
     </dialog>

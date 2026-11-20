@@ -10,6 +10,7 @@ import { formatShortDate } from '@/lib/dates';
 import { drafts, refreshDrafts, reviewRequested, watchDraftsFromOtherTabs } from '@/offline/queue';
 import { showToast } from '@/ui/toast';
 import { Button } from '@/ui/components/Button';
+import { MotionList } from '@/ui/components/Display';
 import { Sheet } from '@/ui/components/Sheet';
 import './offline.css';
 
@@ -89,7 +90,7 @@ export function DraftsReview({ uid, rate }: DraftsReviewProps) {
             {t('offline.empty')}
           </p>
         ) : (
-          <ul class="drafts" aria-label={t('offline.reviewTitle')}>
+          <MotionList class="drafts" label={t('offline.reviewTitle')}>
             {list.map((draft) => {
               const applicable = draft.kind === 'activity' || draft.kind === 'chore' || draft.kind === 'money';
               return (
@@ -124,7 +125,7 @@ export function DraftsReview({ uid, rate }: DraftsReviewProps) {
                 </li>
               );
             })}
-          </ul>
+          </MotionList>
         )}
       </div>
     </Sheet>

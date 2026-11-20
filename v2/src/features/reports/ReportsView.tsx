@@ -11,7 +11,7 @@ import { markRead, myReports, readMarks, watchMyReportsState } from '@/stores/re
 import { account } from '@/stores/session';
 import { dismissToast, showToast, type ToastInput } from '@/ui/toast';
 import { Button } from '@/ui/components/Button';
-import { EmptyState, IconTile, Skeleton } from '@/ui/components/Display';
+import { EmptyState, IconTile, MotionList, Skeleton } from '@/ui/components/Display';
 import { Card, Section, Stack } from '@/ui/components/Layout';
 import { areaLabel, StatusTag } from './labels';
 import { ReportSheet } from './ReportSheet';
@@ -104,11 +104,11 @@ export function ReportsView() {
             ) : mine.length === 0 ? (
               <EmptyState title={t('reports.none')} />
             ) : (
-              <ul class="reports-list" aria-label={t('reports.mine')}>
+              <MotionList class="reports-list" label={t('reports.mine')}>
                 {mine.map((r) => (
                   <ReportRow key={r.id} report={r} lang={lang} onOpen={() => setOpenId(r.id)} />
                 ))}
-              </ul>
+              </MotionList>
             )}
           </Card>
         </Section>

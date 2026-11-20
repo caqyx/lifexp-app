@@ -14,7 +14,7 @@ import { account } from '@/stores/session';
 import { tasks as tasksState, watchTasks } from '@/stores/tasks';
 import { dismissToast, showToast, type ToastInput } from '@/ui/toast';
 import { Button } from '@/ui/components/Button';
-import { EmptyState, Skeleton } from '@/ui/components/Display';
+import { EmptyState, MotionList, Skeleton } from '@/ui/components/Display';
 import { Card, Page, Section, Stack } from '@/ui/components/Layout';
 import { Markdown } from '@/ui/components/Markdown';
 import { PcBuildCard } from './PcBuildCard';
@@ -90,9 +90,9 @@ function TaskGroup({ title, children }: { title: string; children: ComponentChil
   return (
     <Section title={title}>
       <Card padding="none">
-        <ul class="tasks-list" aria-label={title}>
+        <MotionList class="tasks-list" label={title}>
           {children}
-        </ul>
+        </MotionList>
       </Card>
     </Section>
   );

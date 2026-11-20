@@ -55,8 +55,10 @@
 
 .ui-card {
   min-width: 0;
-  /* A card that arrives with its data fades in instead of popping up. */
-  animation: ui-fade-in var(--duration-enter) var(--ease-out);
+  /* A card that arrives with its data rises in instead of popping up; in a column of
+     cards (.ui-stagger) one after another. */
+  animation: ui-rise-in var(--duration-enter) var(--ease-out) backwards;
+  animation-delay: calc(var(--stagger-i) * var(--stagger-step));
   border: var(--card-border-width) solid var(--color-border);
   border-radius: var(--card-radius);
   background: var(--color-surface);

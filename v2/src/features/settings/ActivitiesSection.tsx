@@ -12,7 +12,7 @@ import { activityDefs, watchActivityDefsState } from '@/stores/activityDefs';
 import { useSettingsToast } from './toast';
 import { ActivityDefSheet, colorName } from './ActivityDefSheet';
 import { Button } from '@/ui/components/Button';
-import { EmptyState, Skeleton } from '@/ui/components/Display';
+import { EmptyState, MotionList, Skeleton } from '@/ui/components/Display';
 import { Card, Stack } from '@/ui/components/Layout';
 
 export function ActivitiesSection({ uid }: { uid: string; profile: Profile }) {
@@ -77,7 +77,7 @@ export function ActivitiesSection({ uid }: { uid: string; profile: Profile }) {
           ) : defs.length === 0 ? (
             <EmptyState title={t('settings.noActivityTypes')} />
           ) : (
-            <ul class="settings-defs" aria-label={t('settings.activityTypes')}>
+            <MotionList class="settings-defs" label={t('settings.activityTypes')}>
               {defs.map((def) => (
                 <li key={def.id} class="settings-defs__row">
                   <button
@@ -104,7 +104,7 @@ export function ActivitiesSection({ uid }: { uid: string; profile: Profile }) {
                   </Button>
                 </li>
               ))}
-            </ul>
+            </MotionList>
           )}
         </Card>
       </Stack>

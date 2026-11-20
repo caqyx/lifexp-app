@@ -95,6 +95,13 @@
   line-height: 1.2;
 }
 
+/* An earned badge's mark pops in once its tile has risen (.ui-stagger). */
+.stats-badge--earned .stats-badge__emoji {
+  display: inline-block;
+  animation: ui-pop-in var(--duration-enter) var(--ease-spring) backwards;
+  animation-delay: calc(var(--duration-fast) + var(--stagger-step) * 4);
+}
+
 .stats-badge:not(.stats-badge--earned) .stats-badge__emoji {
   filter: grayscale(1);
   opacity: 0.45;

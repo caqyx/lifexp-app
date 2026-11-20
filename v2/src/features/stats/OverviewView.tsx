@@ -110,7 +110,7 @@ function Facts({ facts, names }: { facts: readonly StatsFact[]; names: ReadonlyM
   return (
     <Section title={t('stats.facts')}>
       <Card>
-        <ul class="stats-facts" aria-label={t('stats.facts')}>
+        <ul class="stats-facts ui-stagger" aria-label={t('stats.facts')}>
           {facts.map((fact) => (
             <li key={fact.kind} class="stats-fact">
               <Lightbulb aria-hidden="true" />
@@ -138,7 +138,7 @@ function Badges({ held }: { held: readonly string[] }) {
       }
     >
       <Card>
-        <ul class="stats-badges" aria-label={t('stats.badges')}>
+        <ul class="stats-badges ui-stagger" aria-label={t('stats.badges')}>
           {ACHIEVEMENTS.map((a) => {
             const done = held.includes(a.id);
             const key = a.id as 'first_activity';

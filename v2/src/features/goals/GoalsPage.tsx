@@ -13,7 +13,7 @@ import { account } from '@/stores/session';
 import { dismissToast, showToast, type ToastInput } from '@/ui/toast';
 import { Button } from '@/ui/components/Button';
 import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
-import { EmptyState, IconTile, ProgressBar } from '@/ui/components/Display';
+import { EmptyState, IconTile, MotionList, ProgressBar } from '@/ui/components/Display';
 import { Card, Page, Stack } from '@/ui/components/Layout';
 import { goalAmount, useCelebration } from '@/features/shared/goals';
 import { DepositSheet, GoalSheet } from './GoalSheets';
@@ -160,7 +160,7 @@ export default function GoalsPage() {
             <EmptyState title={t('goals.empty')} body={t('goals.emptyBody')} />
           </Card>
         ) : (
-          <ul class="goals" aria-label={t('goals.list')}>
+          <MotionList class="goals" label={t('goals.list')}>
             {goals.map((goal) => (
               <GoalCard
                 key={goal.id}
@@ -171,7 +171,7 @@ export default function GoalsPage() {
                 onDelete={setDeleting}
               />
             ))}
-          </ul>
+          </MotionList>
         )}
       </Stack>
 

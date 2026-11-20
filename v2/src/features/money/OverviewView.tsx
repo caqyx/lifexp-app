@@ -33,7 +33,7 @@ import { removeTransaction, saveTransaction } from '@/services/money';
 import { dismissToast, showToast, type ToastInput } from '@/ui/toast';
 import { Button } from '@/ui/components/Button';
 import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
-import { EmptyState } from '@/ui/components/Display';
+import { EmptyState, MotionList, RollingValue } from '@/ui/components/Display';
 import { Select } from '@/ui/components/Fields';
 import { Card, Section, Stack } from '@/ui/components/Layout';
 import { TxSheet } from './TxSheet';
@@ -188,7 +188,7 @@ export function OverviewView({ uid, profile, txs, categories, limit, balance, pa
           <div>
             <p class="money-hero__label">{t('money.balance')}</p>
             <p class="money-hero__value numeric" data-testid="money-balance">
-              {formatMoney(balance, lang)}
+              <RollingValue value={formatMoney(balance, lang)} n={balance} />
             </p>
             {savedInGoals(profile.goals) > 0 && (
               <p class="money-hero__goals" data-testid="money-in-goals">
@@ -253,11 +253,11 @@ export function OverviewView({ uid, profile, txs, categories, limit, balance, pa
                 <div key={day.date} class="money-day">
                   <h3 class="money-day__title">{title}</h3>
                   <Card padding="none">
-                    <ul class="money-day__list" aria-label={title}>
+                    <MotionList class="money-day__list" label={title}>
                       {day.txs.map((tx) => (
                         <TxRow key={tx.id} tx={tx} color={colors.get(tx.category)} onDelete={setDeleting} />
                       ))}
-                    </ul>
+                    </MotionList>
                   </Card>
                 </div>
               );

@@ -47,7 +47,7 @@ export function NavMenu({ activeId, onSelect, account, modules, onSignOut }: Nav
   };
 
   return (
-    <div class="nav">
+    <div class="nav ui-stagger">
       <p class="nav__wordmark">
         {t('app.name')} <span class="nav__beta">{t('app.beta')}</span>
       </p>

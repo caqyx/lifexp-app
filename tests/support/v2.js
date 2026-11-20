@@ -47,7 +47,18 @@ async function openSignedIn(page, account, hash = '#/today') {
  * the screen only after this, or a frame of the animation gets measured.
  */
 async function screenSettled(page) {
-  await page.locator('.shell__main').evaluate((main) => Promise.all(main.getAnimations().map((a) => a.finished)));
+  // The screen's rise-in and what arrives with it (staggered cards and rows); a
+  // looping placeholder (Skeleton) never finishes, so it is not waited for.
+  await page
+    .locator('.shell__main')
+    .evaluate((main) =>
+      Promise.all(
+        main
+          .getAnimations({ subtree: true })
+          .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+          .map((a) => a.finished.catch(() => {})),
+      ),
+    );
 }
 
 /**

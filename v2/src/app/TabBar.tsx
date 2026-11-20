@@ -47,8 +47,20 @@ export function TabBar({ activeId, modules, onSelect, onAdd, onMenu, menuOpen, m
     );
   };
 
+  // The mark under the current tab slides between columns (5: two tabs, "+", a tab, Menu).
+  // A screen without a tab hides the mark where it was, so it fades rather than flies.
+  const current = tabs.findIndex((f) => f.id === activeId);
+  const column = current < 0 ? -1 : current < 2 ? current : current + 1;
+  const lastColumn = useRef(0);
+  if (column >= 0) lastColumn.current = column;
   return (
     <nav ref={barRef} class="tabbar ui-glass" aria-label={t('nav.tabBar')}>
+      <span
+        class="tabbar__indicator"
+        aria-hidden="true"
+        data-shown={column >= 0 ? 'true' : 'false'}
+        style={{ '--tab-column': String(lastColumn.current) }}
+      />
       {tabs.slice(0, 2).map(tab)}
       <button type="button" class="tabbar__add" aria-label={t('nav.add')} onClick={onAdd}>
         <Plus aria-hidden="true" />
