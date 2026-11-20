@@ -1,5 +1,27 @@
-import { describe, expect, test } from 'vitest';
-import { addDays, formatDayKey, formatDayMonth, formatMonthKey, formatWeekdayLong, formatWeekdayShort, localDayKey, utcDayKey, weekOf, zonedDayKey, zonedIsoMinutes } from './dates';
+import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import {
+  addDays,
+  addMonths,
+  clockValue,
+  daysInMonth,
+  formatClock,
+  formatDayKey,
+  formatDayMonth,
+  formatDayShort,
+  formatMonthKey,
+  formatMonthShort,
+  formatWeekdayLong,
+  formatWeekdayShort,
+  isoWeekday,
+  localDayKey,
+  localInstant,
+  monthKeyOfDay,
+  parseClock,
+  utcDayKey,
+  weekOf,
+  zonedDayKey,
+  zonedIsoMinutes,
+} from './dates';
 
 describe('day keys', () => {
   test('the UTC day is v1 todayStr: after 22:00 UTC it is already tomorrow in Poland, not in UTC', () => {
@@ -64,5 +86,62 @@ describe('zonedDayKey', () => {
     expect(zonedDayKey(new Date('2026-07-05T21:59:00Z'), 'Europe/Warsaw')).toBe('2026-07-05');
     expect(zonedDayKey(new Date('2026-07-05T22:00:00Z'), 'Europe/Warsaw')).toBe('2026-07-06');
     expect(zonedDayKey(new Date('2026-12-06T23:00:00Z'), 'Europe/Warsaw')).toBe('2026-12-07');
+  });
+});
+
+describe('calendar helpers', () => {
+  test('ISO weekdays run Monday 1 to Sunday 7', () => {
+    expect(isoWeekday('2026-11-16')).toBe(1);
+    expect(isoWeekday('2026-11-20')).toBe(5);
+    expect(isoWeekday('2026-11-22')).toBe(7);
+  });
+
+  test('months add across years, and know their length (leap years too)', () => {
+    expect(monthKeyOfDay('2026-11-20')).toBe('2026-11');
+    expect(addMonths('2026-11', 1)).toBe('2026-12');
+    expect(addMonths('2026-12', 1)).toBe('2027-01');
+    expect(addMonths('2027-01', -1)).toBe('2026-12');
+    expect(addMonths('2026-03', -15)).toBe('2024-12');
+    expect(daysInMonth('2026-02')).toBe(28);
+    expect(daysInMonth('2028-02')).toBe(29);
+    expect(daysInMonth('2026-04')).toBe(30);
+    expect(daysInMonth('2026-12')).toBe(31);
+  });
+
+  test('wall-clock times parse strictly and print in the language', () => {
+    expect(parseClock('18:00')).toBe(1080);
+    expect(parseClock('00:00')).toBe(0);
+    expect(parseClock('23:59')).toBe(1439);
+    expect(parseClock('24:00')).toBeNull();
+    expect(parseClock('7:00')).toBeNull();
+    expect(parseClock('')).toBeNull();
+    expect(clockValue(1080)).toBe('18:00');
+    expect(clockValue(65)).toBe('01:05');
+    expect(formatClock(1080, 'pl-PL')).toBe('18:00');
+    expect(formatClock(1080, 'en-GB')).toBe('18:00');
+    expect(formatMonthShort('2026-11', 'pl-PL')).toBe('lis');
+    expect(formatDayShort('2026-11-20', 'en-GB')).toBe('20 Nov');
+  });
+
+  describe('in Europe/Warsaw', () => {
+    const zone = process.env.TZ;
+    beforeAll(() => {
+      process.env.TZ = 'Europe/Warsaw';
+    });
+    afterAll(() => {
+      process.env.TZ = zone;
+    });
+
+    test('a wall-clock time is the same local hour on both sides of a DST change', () => {
+      // Summer time starts on 2026-03-29 and ends on 2026-10-25.
+      expect(localInstant('2026-03-28', 18 * 60).toISOString()).toBe('2026-03-28T17:00:00.000Z');
+      expect(localInstant('2026-03-29', 18 * 60).toISOString()).toBe('2026-03-29T16:00:00.000Z');
+      expect(localInstant('2026-10-25', 18 * 60).toISOString()).toBe('2026-10-25T17:00:00.000Z');
+      expect(localDayKey(localInstant('2026-03-29', 18 * 60))).toBe('2026-03-29');
+    });
+
+    test('a time skipped by the spring change moves on to the next valid one', () => {
+      expect(localInstant('2026-03-29', 2 * 60 + 30).getHours()).toBe(3);
+    });
   });
 });

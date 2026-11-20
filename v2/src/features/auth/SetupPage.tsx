@@ -2,7 +2,7 @@
 // solo or supervised, then the modules, everything ticked so that saving without a
 // change hides nothing. Each step writes the profile; the next one follows from it.
 // Loaded on demand, like the login page, so Firebase stays out of the first chunk.
-import { BookOpen, Bot, ChartLine, ClipboardCheck, Gamepad2, NotebookPen, Wallet, type LucideIcon } from 'lucide-preact';
+import { BookOpen, Bot, CalendarDays, ChartLine, ClipboardCheck, Gamepad2, NotebookPen, Wallet, type LucideIcon } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { DEFAULT_ON_MODULES, type OptionalModule } from '@/domain/modules';
 import type { AccountMode } from '@/domain/profile';
@@ -20,6 +20,7 @@ const ICONS: Record<OptionalModule, LucideIcon> = {
   stats: ChartLine,
   games: Gamepad2,
   aichat: Bot,
+  calendar: CalendarDays,
   reader: BookOpen,
 };
 

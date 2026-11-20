@@ -41,6 +41,8 @@ export const MODULE_WORD = oneOf<OptionalModule>({
   'ex-us': 'aichat',
   exus: 'aichat',
   aichat: 'aichat',
+  kalendarz: 'calendar',
+  calendar: 'calendar',
   czytnik: 'reader',
   reader: 'reader',
 });

@@ -4,7 +4,7 @@
 import type { OptionalModule } from '../modules';
 import { matchEntity } from './entities';
 
-export type ScreenId = 'today' | 'tasks' | 'goals' | 'chores' | 'money' | 'notes' | 'stats' | 'games' | 'reader' | 'reports' | 'settings';
+export type ScreenId = 'today' | 'tasks' | 'goals' | 'chores' | 'money' | 'notes' | 'calendar' | 'stats' | 'games' | 'reader' | 'reports' | 'settings';
 
 export interface Screen {
   id: ScreenId;
@@ -22,6 +22,7 @@ export const SCREENS: readonly Screen[] = [
   { id: 'chores', path: '/chores', module: 'chores', words: ['obowiązki', 'chores'] },
   { id: 'money', path: '/money', module: 'money', words: ['pieniądze', 'money'] },
   { id: 'notes', path: '/notes', module: 'notes', words: ['notatki', 'notes'] },
+  { id: 'calendar', path: '/calendar', module: 'calendar', words: ['kalendarz', 'wydarzenia', 'calendar', 'events'] },
   { id: 'stats', path: '/stats', module: 'stats', words: ['statystyki', 'stats'] },
   { id: 'games', path: '/games', module: 'games', words: ['gry', 'games'] },
   { id: 'reader', path: '/reader', module: 'reader', words: ['czytnik', 'książki', 'reader', 'books'] },

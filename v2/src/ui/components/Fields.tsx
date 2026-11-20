@@ -236,6 +236,85 @@ export function DateField({ label, value, onChange, hint, error, min, max }: Dat
   );
 }
 
+interface TimeFieldProps {
+  label: string;
+  /** "HH:mm" or "" */
+  value: string;
+  onChange: (value: string) => void;
+  hint?: string;
+  error?: string | null;
+}
+
+/** A wall-clock time: the platform's time picker (24 h or 12 h as the device shows it). */
+export function TimeField({ label, value, onChange, hint, error }: TimeFieldProps) {
+  const id = useId();
+  return (
+    <FieldFrame id={id} label={label} hint={hint} error={error}>
+      <input
+        id={id}
+        class="ui-field__input"
+        type="time"
+        value={value}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={described(id, hint, error)}
+        onInput={(e) => onChange(e.currentTarget.value)}
+      />
+    </FieldFrame>
+  );
+}
+
+interface StepperProps {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+  /** The value as read, e.g. "3 pkt"; the number itself when absent. */
+  valueText?: string;
+  /** Under the control, e.g. what the value adds up to. */
+  hint?: ComponentChildren;
+}
+
+/**
+ * A small whole number changed by one: "−" and "+" as text buttons around the value.
+ * The value is announced (aria-live) after each step.
+ */
+export function Stepper({ label, value, min, max, onChange, valueText, hint }: StepperProps) {
+  const id = useId();
+  const text = valueText ?? String(value);
+  return (
+    <div class="ui-field ui-stepper" role="group" aria-labelledby={`${id}-label`}>
+      <span class="ui-field__label" id={`${id}-label`}>
+        {label}
+      </span>
+      <div class="ui-stepper__row">
+        <button
+          type="button"
+          class="ui-stepper__button"
+          aria-label={t('ui.stepper.less', { label })}
+          disabled={value <= min}
+          onClick={() => onChange(Math.max(min, value - 1))}
+        >
+          −
+        </button>
+        <output class="ui-stepper__value numeric" aria-live="polite">
+          {text}
+        </output>
+        <button
+          type="button"
+          class="ui-stepper__button"
+          aria-label={t('ui.stepper.more', { label })}
+          disabled={value >= max}
+          onClick={() => onChange(Math.min(max, value + 1))}
+        >
+          +
+        </button>
+      </div>
+      {hint && <p class="ui-field__hint">{hint}</p>}
+    </div>
+  );
+}
+
 export interface Choice<T extends string> {
   value: T;
   label: string;

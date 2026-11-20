@@ -3,6 +3,7 @@
 // this list: adding a module = one folder + one entry here.
 import {
   BookOpen,
+  CalendarDays,
   ChartLine,
   ClipboardCheck,
   Gamepad2,
@@ -29,6 +30,7 @@ export type ModuleId =
   | 'chores'
   | 'money'
   | 'notes'
+  | 'calendar'
   | 'stats'
   | 'games'
   | 'reader'
@@ -91,6 +93,17 @@ export const FEATURES: readonly FeatureDef[] = [
     nav: { group: 'main', order: 20 },
     stage: '3a',
     view: () => import('@/features/tasks/TasksPage'),
+  },
+  {
+    id: 'calendar',
+    labelKey: 'nav.calendar',
+    optional: 'calendar',
+    icon: CalendarDays,
+    paths: ['/calendar', '/calendar/week', '/calendar/day', '/calendar/categories', '/calendar/new'],
+    nav: { group: 'main', order: 25 },
+    stage: 'c-1',
+    view: () => import('@/features/calendar/CalendarModule'),
+    views: ['/calendar', '/calendar/week', '/calendar/day', '/calendar/categories'],
   },
   {
     id: 'goals',

@@ -54,6 +54,17 @@
   /* The selected segment of a segmented control / view switch. */
   --color-thumb: var(--color-surface);
 
+  /* Category palette (the calendar's categories): marks, bars and tints, never text.
+     Each holds >= 3:1 on the surfaces of its mode; light modes redefine them below. */
+  --palette-violet: #a294ff;
+  --palette-blue: #5aa9ff;
+  --palette-teal: #3dd6c6;
+  --palette-green: #5fd38d;
+  --palette-amber: #ffc94d;
+  --palette-orange: #ff9a52;
+  --palette-red: #ff6b6b;
+  --palette-pink: #ff7ac0;
+
   /* Icons (PLAN.md 7.1, D9): always next to a text label */
   --icon-size: 22px;
   --icon-stroke: 2;
@@ -320,4 +331,17 @@
   --color-topbar: rgb(8 8 7 / 72%);
   --shadow-1: 0 8px 24px rgb(0 0 0 / 45%);
   --shadow-2: 0 16px 48px rgb(0 0 0 / 60%);
+}
+
+/* ── Category palette in light modes (LifeXP light, iOS light) ───────────── */
+
+[data-mode='light'] {
+  --palette-violet: #6d4fe0;
+  --palette-blue: #1668e3;
+  --palette-teal: #0e8f86;
+  --palette-green: #1f8a4c;
+  --palette-amber: #b7791f;
+  --palette-orange: #d9611c;
+  --palette-red: #d92d20;
+  --palette-pink: #c8327f;
 }
