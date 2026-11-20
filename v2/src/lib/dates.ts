@@ -97,3 +97,66 @@ export function formatLongDate(date: Date, locale: string): string {
 export function formatShortDate(date: Date, locale: string): string {
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(date);
 }
+
+/** ISO weekday of a day key: 1 = Monday … 7 = Sunday, independent of the device's time zone. */
+export function isoWeekday(key: string): number {
+  return ((keyToUtcDate(key).getUTCDay() + 6) % 7) + 1;
+}
+
+/** "2026-11" for a day key "2026-11-20". */
+export function monthKeyOfDay(key: string): string {
+  return key.slice(0, 7);
+}
+
+/** The month key `months` months after (or before, if negative) `monthKey`. */
+export function addMonths(monthKey: string, months: number): string {
+  const [y, m] = monthKey.split('-').map(Number) as [number, number];
+  const index = y * 12 + (m - 1) + months;
+  return `${String(Math.floor(index / 12)).padStart(4, '0')}-${String((index % 12) + 1).padStart(2, '0')}`;
+}
+
+/** 28–31: the days of the month `monthKey` ("2026-02"). */
+export function daysInMonth(monthKey: string): number {
+  const [y, m] = monthKey.split('-').map(Number) as [number, number];
+  return new Date(Date.UTC(y, m, 0)).getUTCDate();
+}
+
+/** Minutes after midnight for a wall-clock time "HH:mm" (00:00–23:59), or null. */
+export function parseClock(value: string): number | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(value);
+  return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
+/** "HH:mm" for minutes after midnight (what a time input holds). */
+export function clockValue(minutes: number): string {
+  const m = Math.max(0, Math.min(24 * 60 - 1, Math.round(minutes)));
+  return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+
+/** "18:00" / "6:00 PM": minutes after midnight in the language's clock. */
+export function formatClock(minutes: number, locale: string): string {
+  const m = Math.max(0, Math.min(24 * 60, Math.round(minutes)));
+  return new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }).format(
+    new Date(Date.UTC(2000, 0, 1, 0, m)),
+  );
+}
+
+/**
+ * The moment a wall-clock time happens on a local day on this device (tasks and
+ * calendar entries are local days, G13). A time skipped by a DST change moves on
+ * to the next valid one, as the platform does it.
+ */
+export function localInstant(key: string, minutes: number): Date {
+  const [y, m, d] = key.split('-').map(Number) as [number, number, number];
+  return new Date(y, m - 1, d, 0, minutes);
+}
+
+/** "lis" / "Nov": the short month name for a month key. */
+export function formatMonthShort(monthKey: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' }).format(keyToUtcDate(`${monthKey}-01`));
+}
+
+/** "20 lis" / "20 Nov" for a day key, independent of the device's time zone. */
+export function formatDayShort(key: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(keyToUtcDate(key));
+}

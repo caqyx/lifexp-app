@@ -6,15 +6,15 @@
  * Modules that can be turned off, under v1's ids; 'aichat' (v1's chat) is Ex-us in
  * v2. Today, Tasks, Goals and Settings are always there.
  */
-export const OPTIONAL_MODULES = ['chores', 'money', 'notes', 'stats', 'games', 'aichat', 'reader'] as const;
+export const OPTIONAL_MODULES = ['chores', 'money', 'notes', 'calendar', 'stats', 'games', 'aichat', 'reader'] as const;
 export type OptionalModule = (typeof OPTIONAL_MODULES)[number];
 
 /**
- * Modules that are off until the person turns them on (the book reader). They live
+ * Modules that are off until the person turns them on (the calendar, the book reader). They live
  * in their own field, optInModules, so v1's enabledModules never sees an id it does
  * not know, and an account that never chose has them off.
  */
-export const OPT_IN_MODULES = ['reader'] as const satisfies readonly OptionalModule[];
+export const OPT_IN_MODULES = ['calendar', 'reader'] as const satisfies readonly OptionalModule[];
 
 /** The modules on by default: the first-run survey offers these, and disabledModules lists the ones turned off. */
 export const DEFAULT_ON_MODULES = OPTIONAL_MODULES.filter((m) => !isOptIn(m));

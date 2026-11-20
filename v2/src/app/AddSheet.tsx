@@ -1,6 +1,6 @@
 // What the tab bar's "+" opens (D10). Each kind of item moves here with its module
 // (stage 3); until then the row says when, and the footer hands over to v1.
-import { ClipboardCheck, ListTodo, type LucideIcon, NotebookPen, Wallet, Zap } from 'lucide-preact';
+import { CalendarPlus, ClipboardCheck, ListTodo, type LucideIcon, NotebookPen, Wallet, Zap } from 'lucide-preact';
 import { isModuleOn, type ModuleChoice, type OptionalModule } from '@/domain/modules';
 import { t } from '@/i18n';
 import { ButtonLink } from '@/ui/components/ButtonLink';
@@ -10,7 +10,7 @@ import { Sheet } from '@/ui/components/Sheet';
 
 interface AddItem {
   icon: LucideIcon;
-  labelKey: 'add.activity' | 'add.task' | 'add.chore' | 'add.expense' | 'add.note';
+  labelKey: 'add.activity' | 'add.task' | 'add.event' | 'add.chore' | 'add.expense' | 'add.note';
   /** Stage of docs/v2/PLAN.md 9 that brings adding it in v2. */
   stage: string;
   /** Where v2 adds it, once the module is here. */
@@ -22,6 +22,7 @@ interface AddItem {
 const ITEMS: readonly AddItem[] = [
   { icon: Zap, labelKey: 'add.activity', stage: '3e', path: '/today/activity', module: 'stats' },
   { icon: ListTodo, labelKey: 'add.task', stage: '3a', path: '/tasks/new' },
+  { icon: CalendarPlus, labelKey: 'add.event', stage: 'c-1', path: '/calendar/new', module: 'calendar' },
   { icon: ClipboardCheck, labelKey: 'add.chore', stage: '3b', path: '/chores/new', module: 'chores' },
   { icon: Wallet, labelKey: 'add.expense', stage: '3c', path: '/money/new', module: 'money' },
   { icon: NotebookPen, labelKey: 'add.note', stage: '3a', path: '/notes/new', module: 'notes' },
