@@ -2000,6 +2000,21 @@
     "categoryDeleted": "Deleted the category \"{{name}}\". Its events stay, without a category.",
     "needCategoryName": "Enter a name for the category.",
     "categoryTaken": "You already have a category with this name.",
-    "categoryLimit": "You can have at most 30 categories."
+    "categoryLimit": "You can have at most 30 categories.",
+    "task": "Task",
+    "taskOverdue": "overdue ({{date}})",
+    "taskDone": "Mark the task as done: {{title}}",
+    "importantToday": "Important today",
+    "openCalendar": "Calendar",
+    "importantNone": "Nothing planned for today. Events and tasks due today will show up here.",
+    "importantAllDone": "Everything for today is done.",
+    "importantMore_one": "{{count}} more in the calendar",
+    "importantMore_few": "{{count}} more in the calendar",
+    "importantMore_many": "{{count}} more in the calendar",
+    "importantMore_other": "{{count}} more in the calendar",
+    "importantSettled_one": "{{count}} done today",
+    "importantSettled_few": "{{count}} done today",
+    "importantSettled_many": "{{count}} done today",
+    "importantSettled_other": "{{count}} done today"
   }
 }

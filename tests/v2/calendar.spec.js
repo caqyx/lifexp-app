@@ -342,6 +342,130 @@ test('"+" adds an event on the chosen day', async ({ page }) => {
   await expect.poll(async () => (await eventsOf(account.uid).get()).docs.map((d) => d.data().title)).toEqual(['Dentysta']);
 });
 
+// ── c-2: tasks in the calendar, "Ważne dzisiaj" on Today ──
+
+const tasksOf = (uid) => db.collection(`users/${uid}/todos`);
+
+function seedTask(uid, patch) {
+  return tasksOf(uid).add({
+    text: 'Zadanie',
+    dueDate: localDay(0),
+    size: 'S',
+    done: false,
+    createdAt: new Date().toISOString(),
+    penaltyApplied: false,
+    ...patch,
+  });
+}
+
+test('tasks show on their due day among the entries; ticking and editing go through Tasks', async ({ page }) => {
+  const account = await calendarUser('calendar-tasks');
+  const big = await seedTask(account.uid, { text: '**Wypracowanie** z historii\nszczegóły', size: 'L' });
+  await seedTask(account.uid, { text: 'Lektura', dueDate: localDay(1) });
+  await seedTask(account.uid, { text: 'Dawno zrobione', done: true, dueDate: localDay(0) });
+  await seedEvent(account.uid, { title: 'Spacer', startTime: '18:00' });
+  await openSignedIn(page, account, '#/calendar');
+  await screenSettled(page);
+
+  // Today: the L task (importance 6, "Ważne") above the walk, the done task last.
+  const day = page.getByRole('list', { name: /^Wydarzenia \d/ }).getByRole('listitem');
+  await expect(day).toHaveCount(3);
+  await expect(day.nth(0)).toContainText('Wypracowanie z historii');
+  await expect(day.nth(0)).toContainText('Zadanie · L');
+  await expect(day.nth(0).locator('.cal-tag')).toHaveText('Ważne');
+  await expect(day.nth(1)).toContainText('Spacer');
+  await expect(day.nth(2)).toContainText('Dawno zrobione');
+  await expect(day.nth(2)).toHaveClass(/cal-row--done/);
+  // Its cell has a square task mark.
+  const cell = page.getByRole('list', { name: /^Dni miesiąca/ }).getByRole('button', { pressed: true });
+  await expect(cell.locator('.cal-mark--task')).toHaveCount(2);
+
+  // Tomorrow's task on tomorrow, in the week.
+  await page.getByRole('link', { name: 'Tydzień', exact: true }).click();
+  await expect(page.locator('.cal-week .cal-row', { hasText: 'Lektura' })).toHaveCount(1);
+  await page.getByRole('link', { name: 'Miesiąc', exact: true }).click();
+
+  // The row opens the Tasks sheet; a change is saved as Tasks saves it.
+  await day.nth(0).getByRole('button', { name: /^Wypracowanie/ }).click();
+  const sheet = page.getByRole('dialog', { name: 'Edytuj zadanie' });
+  await sheetSettled(sheet);
+  await sheet.getByLabel('Co jest do zrobienia?').fill('Wypracowanie z historii, 2 strony');
+  await sheet.getByRole('button', { name: 'Zapisz' }).click();
+  await seeToast(page, 'Zadanie zapisane.');
+  await expect.poll(async () => (await big.get()).data().text).toBe('Wypracowanie z historii, 2 strony');
+
+  // Ticking it: done (final, no undo), pieces for the PC build in time (v1 rules).
+  await day.nth(0).getByRole('button', { name: 'Oznacz zadanie jako zrobione: Wypracowanie z historii, 2 strony' }).click();
+  await expect(page.getByText('Nieźle — +3 kawałki do budowy.')).toBeVisible();
+  await expect.poll(async () => (await big.get()).data().done).toBe(true);
+  const build = (await db.doc(`users/${account.uid}`).get()).data().pcBuild;
+  expect(Object.values(build.progress).reduce((a, b) => a + b, 0)).toBe(3);
+  await expect(page.locator('.cal-row--done', { hasText: 'Wypracowanie' })).toHaveCount(1);
+  await expect(page.locator('.cal-row--done', { hasText: 'Wypracowanie' }).getByRole('button', { name: /Oznacz/ })).toHaveCount(0);
+});
+
+test('Today shows "Ważne dzisiaj" only with the calendar on', async ({ page, account }) => {
+  await seedEvent(account.uid, { title: 'Sprawdzian', extraImportance: 5 });
+  await openSignedIn(page, account, '#/today');
+  await expect(page.getByRole('heading', { name: 'Cele', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Ważne dzisiaj' })).toHaveCount(0);
+  await expect(page.getByText('Sprawdzian')).toHaveCount(0);
+});
+
+test('"Ważne dzisiaj": today\'s entries and tasks, overdue ones too, the most important first', async ({ page }) => {
+  const account = await calendarUser('calendar-today-card');
+  const cat = await categoriesOf(account.uid).add({ name: 'Szkoła', color: 'red', importance: 4, createdAt: new Date().toISOString() });
+  const exam = await seedEvent(account.uid, { title: 'Sprawdzian', categoryId: cat.id, extraImportance: 5 });
+  await seedEvent(account.uid, { title: 'Spacer', startTime: '18:00', repeat: 'daily', date: localDay(-3) });
+  await seedEvent(account.uid, { title: 'Jutro', date: localDay(1), extraImportance: 5 });
+  const late = await seedTask(account.uid, { text: 'Zaległe ćwiczenia', dueDate: localDay(-2), size: 'M' });
+  await seedTask(account.uid, { text: 'Lektura', size: 'S' });
+  await seedTask(account.uid, { text: 'Za tydzień', dueDate: localDay(7), size: 'L' });
+  await openSignedIn(page, account, '#/today');
+
+  const card = page.getByRole('list', { name: 'Ważne dzisiaj' });
+  const rows = card.getByRole('listitem');
+  await expect(rows).toHaveCount(4);
+  // Its rows move (ui MotionList): they rise in, a ticked one fades out as the rest close up.
+  await expect(card).toHaveClass(/ui-stagger/);
+  await expect(card).toHaveClass(/ui-motion-list/);
+  await expect(rows.nth(0)).toContainText('Sprawdzian');
+  await expect(rows.nth(0).locator('.cal-tag')).toHaveText('Bardzo ważne');
+  await expect(rows.nth(1)).toContainText('Zaległe ćwiczenia');
+  await expect(rows.nth(1)).toContainText(/Zadanie · M · po terminie/);
+  await expect(rows.nth(1).locator('.cal-tag')).toHaveText('Ważne');
+  await expect(rows.nth(2)).toContainText('Lektura');
+  await expect(rows.nth(3)).toContainText('Spacer');
+  await expect(card).not.toContainText('Jutro');
+  await expect(card).not.toContainText('Za tydzień');
+  // Under the Ex-us field, above the rest of Today.
+  const order = await page.locator('.ui-section__title').allTextContents();
+  expect(order.indexOf('Ważne dzisiaj')).toBeGreaterThanOrEqual(0);
+  expect(order.indexOf('Ważne dzisiaj')).toBeLessThan(order.indexOf('Cele'));
+
+  // Ticking the exam: only its mark, the row leaves the list, "1 zrobione dziś".
+  await rows.nth(0).getByRole('button', { name: 'Oznacz jako zrobione: Sprawdzian' }).click();
+  await expect(page.getByText('Zrobione: Sprawdzian.')).toBeVisible();
+  await expect.poll(async () => (await exam.get()).data().marks).toEqual({ [localDay(0)]: 'done' });
+  await expect(rows).toHaveCount(3);
+  await expect(page.getByText('1 zrobione dziś')).toBeVisible();
+  // "Cofnij" brings it back.
+  await page.getByRole('button', { name: 'Cofnij' }).click();
+  await expect.poll(async () => (await exam.get()).data().marks).toEqual({});
+  await expect(rows).toHaveCount(4);
+
+  // The overdue task: done late, no pieces (v1 rules), through the tasks service.
+  await rows.nth(1).getByRole('button', { name: 'Oznacz zadanie jako zrobione: Zaległe ćwiczenia' }).click();
+  await expect(page.getByText('Zrobione, ale po terminie — tym razem bez kawałków.')).toBeVisible();
+  await expect.poll(async () => (await late.get()).data().done).toBe(true);
+  await expect(rows).toHaveCount(3);
+
+  // A row opens the calendar's day; the link too.
+  await rows.filter({ hasText: 'Spacer' }).getByRole('button', { name: /^Spacer/ }).click();
+  await expect(page).toHaveURL(/#\/calendar\/day$/);
+  await expect(page.locator('.cal-period__title')).toContainText('Dziś');
+});
+
 const THEMES = [
   ['lifexp', 'dark'],
   ['lifexp', 'light'],
@@ -361,6 +485,8 @@ for (const [family, mode] of THEMES) {
     await seedEvent(account.uid, { title: 'Urodziny Ani', extraImportance: 3 });
     await seedEvent(account.uid, { title: 'Podlać kwiaty', date: localDay(2), repeat: 'weekly', weekdays: [2, 6] });
     await seedEvent(account.uid, { title: 'Trening', categoryId: cat.id, startTime: '18:30', endTime: '19:30' });
+    await seedTask(account.uid, { text: 'Wypracowanie z historii', size: 'L' });
+    await seedTask(account.uid, { text: 'Zaległa lektura', size: 'M', dueDate: localDay(-1) });
     await useTheme(page, family, mode);
     const shot = async (name) => {
       await screenSettled(page);
@@ -371,7 +497,12 @@ for (const [family, mode] of THEMES) {
       await page.locator('.shell__content').evaluate((el) => el.scrollTo(0, 0));
     };
 
-    await openSignedIn(page, account, '#/calendar');
+    await openSignedIn(page, account, '#/today');
+    await expect(page.getByRole('list', { name: 'Ważne dzisiaj' }).getByRole('listitem').first()).toBeVisible();
+    await page.getByRole('list', { name: 'Ważne dzisiaj' }).scrollIntoViewIfNeeded();
+    await screenSettled(page);
+    await page.screenshot({ path: testInfo.outputPath(`${family}-${mode}-today.png`) });
+    await page.goto(appUrl('#/calendar'));
     await expect(page.getByRole('list', { name: /^Wydarzenia \d/ }).getByRole('listitem').first()).toBeVisible();
     await shot('month');
     await page.getByRole('link', { name: 'Tydzień', exact: true }).click();

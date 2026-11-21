@@ -987,3 +987,22 @@
   -webkit-line-clamp: 1;
   line-clamp: 1;
 }
+
+/* ── Tasks among the entries (c-2): a square tick in the accent, final once done ── */
+
+.cal-check--task::before,
+.cal-check--static::before {
+  border-radius: 7px;
+}
+
+.cal-check--static {
+  cursor: default;
+}
+
+.cal-check[aria-busy='true']::before {
+  border-style: dashed;
+}
+
+.cal-mark--task {
+  border-radius: 2px;
+}

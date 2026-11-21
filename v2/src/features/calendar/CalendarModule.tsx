@@ -3,9 +3,11 @@
 // (#/calendar), the week, the day and the categories — over the same chosen day.
 // Entries are weighed by importance (their category plus extra points): the more
 // important stand higher and show stronger. Ticking one done gives no points.
+// Tasks show on their due day, weighed by size (domain/calendar/items); they open
+// in the Tasks sheet and are ticked through the tasks service, with v1's rules.
 import { Plus } from 'lucide-preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { occurrencesBetween, monthGrid, type Occurrence } from '@/domain/calendar/agenda';
+import { monthGrid } from '@/domain/calendar/agenda';
 import {
   canAddEvent,
   EVENTS_MAX,
@@ -15,6 +17,9 @@ import {
   type EventDraft,
   type OccurrenceMark,
 } from '@/domain/calendar/events';
+import { itemsByDay, type CalendarItem } from '@/domain/calendar/items';
+import type { Task, TaskDraft } from '@/domain/tasks';
+import { TaskSheet } from '@/features/tasks/TaskSheet';
 import { t } from '@/i18n';
 import { localDayKey, monthKeyOfDay, weekOf } from '@/lib/dates';
 import type { RouteProps } from '@/lib/route-match';
@@ -28,8 +33,10 @@ import {
   updateEvent,
   type EventRejection,
 } from '@/services/calendar';
+import { completeTask, deleteTask, updateTask } from '@/services/tasks';
 import { calendar as calendarState, calendarFocus, watchCalendar } from '@/stores/calendar';
 import { account } from '@/stores/session';
+import { tasks as tasksState, watchTasks } from '@/stores/tasks';
 import { dismissToast, showToast, type ToastInput } from '@/ui/toast';
 import { Button } from '@/ui/components/Button';
 import { Skeleton } from '@/ui/components/Display';
@@ -41,7 +48,6 @@ import { DayView } from './DayView';
 import { EventSheet } from './EventSheet';
 import { MonthView } from './MonthView';
 import { WeekView } from './WeekView';
-import './calendar.css';
 
 type View = 'month' | 'week' | 'day' | 'categories';
 
@@ -65,6 +71,12 @@ interface EventSheetState {
   day: string;
 }
 
+interface TaskSheetState {
+  open: boolean;
+  key: number;
+  task: Task | null;
+}
+
 interface CategorySheetState {
   open: boolean;
   key: number;
@@ -75,8 +87,11 @@ export default function CalendarModule({ path, navigate }: RouteProps) {
   const current = account.value;
   const uid = current?.user.uid;
   useEffect(() => (uid ? watchCalendar(uid) : undefined), [uid]);
+  useEffect(() => (uid ? watchTasks(uid) : undefined), [uid]);
 
   const [eventSheet, setEventSheet] = useState<EventSheetState>({ open: false, key: 0, event: null, day: '' });
+  const [taskSheet, setTaskSheet] = useState<TaskSheetState>({ open: false, key: 0, task: null });
+  const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   const [categorySheet, setCategorySheet] = useState<CategorySheetState>({ open: false, key: 0, category: null });
   const sheetKey = useRef(0);
   const lastToast = useRef<number | null>(null);
@@ -124,7 +139,9 @@ export default function CalendarModule({ path, navigate }: RouteProps) {
     const week = weekOf(focus);
     return { from: week[0] ?? focus, to: week[6] ?? focus };
   })();
-  const occurrences: Occurrence[] = events && categories ? occurrencesBetween(events, categories, range.from, range.to) : [];
+  // Tasks join once they are loaded; until then (or if they fail) the entries show alone.
+  const items: ReadonlyMap<string, readonly CalendarItem[]> =
+    events && categories ? itemsByDay(events, categories, tasksState.value.list ?? null, range.from, range.to, today) : new Map();
 
   const mark = (event: CalendarEvent, day: string, next: OccurrenceMark | null) => {
     const { saved, undo } = markOccurrence(uid, event, day, next);
@@ -136,7 +153,33 @@ export default function CalendarModule({ path, navigate }: RouteProps) {
       action: { label: t('ui.undo'), onAction: () => void undo().catch(saveFailed) },
     });
   };
-  const toggle = (o: Occurrence) => mark(o.event, o.day, o.mark === null ? 'done' : null);
+  const setBusyKey = (key: string, on: boolean) =>
+    setBusy((keys) => {
+      const next = new Set(keys);
+      if (on) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+
+  /** v1 markTodoDone() through the tasks service: final, pieces only in time. */
+  const finishTask = (task: Task, key: string) => {
+    setBusyKey(key, true);
+    completeTask(uid, task.id, today)
+      .then((pieces) =>
+        notify(
+          pieces > 0
+            ? { message: t('tasks.piecesEarned', { count: pieces }), tone: 'positive' }
+            : { message: t('tasks.lateNoPieces') },
+        ),
+      )
+      .catch(() => notify({ message: t('tasks.completeFailed'), tone: 'negative' }))
+      .finally(() => setBusyKey(key, false));
+  };
+
+  const toggle = (item: CalendarItem) => {
+    if (item.kind === 'event') mark(item.occurrence.event, item.day, item.state === 'open' ? 'done' : null);
+    else if (item.state === 'open') finishTask(item.task, item.key);
+  };
   const markFromSheet = (event: CalendarEvent, day: string, next: OccurrenceMark | null) => {
     closeEvent();
     mark(event, day, next);
@@ -199,7 +242,32 @@ export default function CalendarModule({ path, navigate }: RouteProps) {
     });
   };
 
-  const openOccurrence = (o: Occurrence) => openEvent(o.event, o.day);
+  const openItem = (item: CalendarItem) => {
+    if (item.kind === 'event') {
+      openEvent(item.occurrence.event, item.day);
+      return;
+    }
+    sheetKey.current += 1;
+    setTaskSheet({ open: true, key: sheetKey.current, task: item.task });
+  };
+  const closeTask = () => setTaskSheet((s) => ({ ...s, open: false }));
+  const saveTask = (draft: TaskDraft) => {
+    if (!taskSheet.task) return null;
+    const result = updateTask(uid, taskSheet.task.id, draft, today);
+    if (!result.ok) return result.problem === 'limit' ? null : result.problem;
+    result.saved.catch(() => notify({ message: t('tasks.saveFailed'), tone: 'negative' }));
+    notify({ message: t('tasks.saved'), tone: 'positive' });
+    closeTask();
+    return null;
+  };
+  const removeTask = (task: Task) => {
+    closeTask();
+    const { saved, undo } = deleteTask(uid, task);
+    const failedTask = () => notify({ message: t('tasks.saveFailed'), tone: 'negative' });
+    saved.catch(failedTask);
+    notify({ message: t('tasks.deleted'), action: { label: t('ui.undo'), onAction: () => void undo().catch(failedTask) } });
+  };
+  const handlers = { onToggle: toggle, onOpen: openItem, busy };
   const loaded = events !== undefined && categories !== undefined;
 
   return (
@@ -231,19 +299,11 @@ export default function CalendarModule({ path, navigate }: RouteProps) {
               <Skeleton lines={5} />
             </Card>
           ) : view === 'month' ? (
-            <MonthView
-              focus={focus}
-              today={today}
-              occurrences={occurrences}
-              onFocus={setFocus}
-              onToggle={toggle}
-              onOpen={openOccurrence}
-              onAdd={startNew}
-            />
+            <MonthView focus={focus} today={today} items={items} onFocus={setFocus} onAdd={startNew} {...handlers} />
           ) : view === 'week' ? (
-            <WeekView focus={focus} today={today} occurrences={occurrences} onFocus={setFocus} onToggle={toggle} onOpen={openOccurrence} />
+            <WeekView focus={focus} today={today} items={items} onFocus={setFocus} {...handlers} />
           ) : view === 'day' ? (
-            <DayView focus={focus} today={today} occurrences={occurrences} onFocus={setFocus} onToggle={toggle} onOpen={openOccurrence} />
+            <DayView focus={focus} today={today} items={items} onFocus={setFocus} {...handlers} />
           ) : (
             <CategoriesView categories={categories} events={events} onOpen={openCategory} onNew={() => openCategory(null)} />
           )}
@@ -261,6 +321,17 @@ export default function CalendarModule({ path, navigate }: RouteProps) {
           onSave={saveEvent}
           onDelete={removeEvent}
           onMark={markFromSheet}
+        />
+      )}
+      {taskSheet.key > 0 && (
+        <TaskSheet
+          key={taskSheet.key}
+          open={taskSheet.open}
+          task={taskSheet.task}
+          today={today}
+          onClose={closeTask}
+          onSave={saveTask}
+          onDelete={removeTask}
         />
       )}
       {categorySheet.key > 0 && categories && (

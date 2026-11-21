@@ -2,21 +2,20 @@
 // and a timeline of the hours with each timed entry as a block (overlapping ones
 // side by side, domain layoutTimeline). Today shows a line at the current time.
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { byDay, dayAgenda, layoutTimeline, type Occurrence } from '@/domain/calendar/agenda';
+import { layoutTimeline, type Occurrence } from '@/domain/calendar/agenda';
+import type { CalendarItem } from '@/domain/calendar/items';
 import { locale, t } from '@/i18n';
 import { addDays, formatClock, formatDayKey, weekOf } from '@/lib/dates';
-import { DayAgendaList } from './DayAgendaList';
+import { DayAgendaList, type ItemHandlers } from './DayAgendaList';
 import { ImportanceTag, PeriodNav, WeekStrip, paletteVar } from './parts';
 import { timeText } from './texts';
 
-interface DayViewProps {
+interface DayViewProps extends ItemHandlers {
   focus: string;
   today: string;
-  /** The occurrences of the focus day's week. */
-  occurrences: readonly Occurrence[];
+  /** The items of the focus day's week, by day. */
+  items: ReadonlyMap<string, readonly CalendarItem[]>;
   onFocus: (day: string) => void;
-  onToggle: (o: Occurrence) => void;
-  onOpen: (o: Occurrence) => void;
 }
 
 /** Blocks shorter than this (minutes) put the title and the time on one line. */
@@ -95,10 +94,16 @@ function Timeline({ day, today, timed, onOpen }: { day: string; today: string; t
   );
 }
 
-export function DayView({ focus, today, occurrences, onFocus, onToggle, onOpen }: DayViewProps) {
+export function DayView({ focus, today, items, onFocus, ...handlers }: DayViewProps) {
   const lang = locale();
-  const grouped = byDay(occurrences);
-  const { allDay, timed } = dayAgenda(grouped.get(focus) ?? []);
+  const day = items.get(focus) ?? [];
+  // All-day entries and tasks in the row; timed entries on the timeline.
+  const allDay = day.filter((i) => i.start === null);
+  const timed = day.flatMap((i) => (i.kind === 'event' && i.start !== null ? [i.occurrence] : []));
+  const openOccurrence = (o: Occurrence) => {
+    const item = day.find((i) => i.kind === 'event' && i.occurrence.key === o.key);
+    if (item) handlers.onOpen(item);
+  };
 
   return (
     <div class="stack cal-view">
@@ -109,20 +114,20 @@ export function DayView({ focus, today, occurrences, onFocus, onToggle, onOpen }
         onPrev={() => onFocus(addDays(focus, -1))}
         onNext={() => onFocus(addDays(focus, 1))}
       />
-      <WeekStrip days={weekOf(focus)} focus={focus} today={today} occurrences={grouped} onSelect={onFocus} />
+      <WeekStrip days={weekOf(focus)} focus={focus} today={today} items={items} onSelect={onFocus} />
       <div class="stack cal-day" key={focus}>
         <section aria-labelledby="cal-all-day">
           <h3 id="cal-all-day" class="cal-week__title">
             {t('calendar.allDayRow')}
           </h3>
-          <DayAgendaList day={focus} occurrences={allDay} onToggle={onToggle} onOpen={onOpen} empty={t('calendar.allDayEmpty')} />
+          <DayAgendaList day={focus} items={allDay} {...handlers} empty={t('calendar.allDayEmpty')} />
         </section>
         <section aria-labelledby="cal-hours">
           <h3 id="cal-hours" class="cal-week__title">
             {t('calendar.hours')}
           </h3>
           {timed.length === 0 && <p class="cal-empty">{t('calendar.timedEmpty')}</p>}
-          <Timeline day={focus} today={today} timed={timed} onOpen={onOpen} />
+          <Timeline day={focus} today={today} timed={timed} onOpen={openOccurrence} />
         </section>
       </div>
     </div>
