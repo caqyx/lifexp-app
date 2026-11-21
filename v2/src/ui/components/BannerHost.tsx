@@ -124,8 +124,10 @@ function BannerView({ banner }: { banner: Banner }) {
 
 export function BannerHost() {
   const current = banners.value[0];
+  // A polite live region, but not role="status": the toast host is the page's one
+  // status region, and a second, empty one would make "the status" ambiguous.
   return (
-    <div class="ui-banner-host" role="status" aria-live="polite">
+    <div class="ui-banner-host" aria-live="polite">
       {current && <BannerView key={current.id} banner={current} />}
     </div>
   );
