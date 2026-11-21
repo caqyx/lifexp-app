@@ -155,6 +155,75 @@ a {
   }
 }
 
+/*
+ * Staggered arrival: the children of .ui-stagger (a list, a column of cards, the
+ * menu) rise in one after another, --stagger-step apart. The index does not
+ * inherit, so a list inside the third card counts from its own first row.
+ */
+@property --stagger-i {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 0;
+}
+
+.ui-stagger > * {
+  animation: ui-rise-in var(--duration-enter) var(--ease-out) backwards;
+  animation-delay: calc(var(--stagger-i) * var(--stagger-step));
+}
+
+.ui-stagger > :nth-child(2) {
+  --stagger-i: 1;
+}
+
+.ui-stagger > :nth-child(3) {
+  --stagger-i: 2;
+}
+
+.ui-stagger > :nth-child(4) {
+  --stagger-i: 3;
+}
+
+.ui-stagger > :nth-child(5) {
+  --stagger-i: 4;
+}
+
+.ui-stagger > :nth-child(6) {
+  --stagger-i: 5;
+}
+
+.ui-stagger > :nth-child(7) {
+  --stagger-i: 6;
+}
+
+.ui-stagger > :nth-child(n + 8) {
+  --stagger-i: 7;
+}
+
+/* A list whose rows glide to their new places (ui/listMotion.ts). */
+.ui-motion-list {
+  position: relative;
+}
+
+/* A removed row, kept on screen while it fades out where it was (ui/listMotion.ts). */
+.ui-motion-ghost,
+.ui-stagger > .ui-motion-ghost {
+  position: absolute;
+  top: var(--ghost-y);
+  left: var(--ghost-x);
+  width: var(--ghost-w);
+  height: var(--ghost-h);
+  margin: 0;
+  pointer-events: none;
+  animation: none;
+}
+
+@keyframes ui-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
 @keyframes ui-dialog-in {
   from {
     opacity: 0;

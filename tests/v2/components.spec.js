@@ -2,7 +2,7 @@
 // that unit tests cannot see — themes switching live, amount entry, touch
 // targets and iOS-safe font sizes. Runs against the built app (v2/dist), signed in
 // on the Firebase emulators (tests/support/v2.js).
-const { test, expect, openSignedIn } = require('../support/v2');
+const { test, expect, openSignedIn, screenSettled } = require('../support/v2');
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -82,6 +82,8 @@ test('progress bar exposes its value', async ({ page, account }) => {
 
 test('controls are at least 44 px tall and inputs at least 16 px (no iOS zoom)', async ({ page, account }) => {
   await openGallery(page, account);
+  // Measured at rest: a row still rising in reads a fraction of a pixel off.
+  await screenSettled(page);
   // :visible skips controls inside the gallery's closed sheet and dialog.
   const targets = page.locator(
     '.ui-page button:visible, .ui-page input:not([type=radio]):visible, .ui-page select:visible, .ui-segmented__label:visible',

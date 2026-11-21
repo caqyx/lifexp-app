@@ -135,6 +135,17 @@
   padding-bottom: var(--space-5);
 }
 
+/* The content follows the sheet up, part after part (.ui-stagger). At rest and on
+   the way out it stays still, so closing never replays it. */
+.ui-sheet__body.ui-stagger > * {
+  animation: none;
+}
+
+.ui-sheet[data-state='open'] .ui-sheet__body.ui-stagger > * {
+  animation: ui-rise-in var(--duration-enter) var(--ease-out) backwards;
+  animation-delay: calc(var(--duration-fast) + var(--stagger-i) * var(--stagger-step));
+}
+
 /* Liquid glass (iOS theme, ui/glass/glass.css): an iOS 26 sheet floats inside the
    screen edges with large corners, so its whole rim is glass. */
 :root[data-glass] .ui-sheet {

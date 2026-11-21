@@ -26,7 +26,7 @@ import { deleteChoreEntry, logChore, settleChores } from '@/services/chores';
 import { dismissToast, showToast, type ToastInput } from '@/ui/toast';
 import { Button } from '@/ui/components/Button';
 import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
-import { EmptyState, List, ListRow, Skeleton } from '@/ui/components/Display';
+import { EmptyState, List, ListRow, MotionList, Skeleton } from '@/ui/components/Display';
 import { SegmentedControl } from '@/ui/components/Fields';
 import { Card, Section } from '@/ui/components/Layout';
 import { ChoreCalendar } from './ChoreCalendar';
@@ -39,7 +39,7 @@ function DayEntries({ day, entries, onDelete }: { day: string; entries: ChoreEnt
   return (
     <div class="chores-day">
       <h3 class="chores-day__title">{title}</h3>
-      <ul class="chores-day__list" aria-label={title}>
+      <MotionList class="chores-day__list" label={title}>
         {entries.map((entry) => (
           <li key={entry.id} class="chores-day__entry">
             <span class="chores-emoji" aria-hidden="true">
@@ -52,7 +52,7 @@ function DayEntries({ day, entries, onDelete }: { day: string; entries: ChoreEnt
             </Button>
           </li>
         ))}
-      </ul>
+      </MotionList>
     </div>
   );
 }

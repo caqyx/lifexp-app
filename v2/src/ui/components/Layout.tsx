@@ -38,5 +38,5 @@ export function Card({ children, padding = 'md' }: CardProps) {
 
 /** Vertical rhythm for a column of cards/sections. */
 export function Stack({ children, gap = 'md' }: { children: ComponentChildren; gap?: 'sm' | 'md' | 'lg' }) {
-  return <div class={`stack ui-stack ui-stack--${gap}`}>{children}</div>;
+  return <div class={`stack ui-stack ui-stagger ui-stack--${gap}`}>{children}</div>;
 }

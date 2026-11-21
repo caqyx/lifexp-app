@@ -92,7 +92,7 @@
 }
 
 .tasks-check--done svg {
-  animation: ui-fade-in var(--duration-enter) var(--ease-out) backwards;
+  animation: ui-pop-in var(--duration-enter) var(--ease-spring) backwards;
   animation-delay: var(--duration-fast);
 }
 

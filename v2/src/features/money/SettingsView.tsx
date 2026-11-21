@@ -16,7 +16,7 @@ import { formatMoney } from '@/lib/money';
 import { createCategory, deleteCategory, removeDuplicateCategories, saveMonthlyLimit } from '@/services/money';
 import { dismissToast, showToast, type ToastInput } from '@/ui/toast';
 import { Button } from '@/ui/components/Button';
-import { EmptyState } from '@/ui/components/Display';
+import { EmptyState, MotionList } from '@/ui/components/Display';
 import { MoneyField, TextField } from '@/ui/components/Fields';
 import { Card, Section } from '@/ui/components/Layout';
 
@@ -167,7 +167,7 @@ export function SettingsView({ uid, categories, txs, limit }: SettingsViewProps)
           {sorted.length === 0 ? (
             <EmptyState title={t('money.noCategories')} />
           ) : (
-            <ul class="money-categories" aria-label={t('money.categories')}>
+            <MotionList class="money-categories" label={t('money.categories')}>
               {sorted.map((category) => (
                 <li key={category.id} class="money-category">
                   <span class="money-tx__dot" style={{ '--category-color': category.color }} aria-hidden="true" />
@@ -181,7 +181,7 @@ export function SettingsView({ uid, categories, txs, limit }: SettingsViewProps)
                   </Button>
                 </li>
               ))}
-            </ul>
+            </MotionList>
           )}
         </Card>
       </Section>

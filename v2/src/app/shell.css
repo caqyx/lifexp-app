@@ -166,14 +166,17 @@
 /* ── Tab bar (phone, D10) ────────────────────────────────────────────────── */
 
 .tabbar {
+  --tabbar-pad-x: var(--space-2);
+  --tabbar-gap: 0px;
   position: sticky;
   bottom: 0;
   z-index: var(--z-topbar);
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: var(--tabbar-gap);
   align-items: center;
   min-height: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
-  padding: 0 var(--space-2) env(safe-area-inset-bottom);
+  padding: 0 var(--tabbar-pad-x) env(safe-area-inset-bottom);
   background: var(--color-topbar);
   border-top: 1px solid var(--color-separator);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
@@ -201,6 +204,44 @@
 
 .tabbar__item[aria-current='page'] {
   color: var(--color-accent-text);
+}
+
+/*
+ * The current tab's mark: one element, one column wide, that slides to the column
+ * of the current tab (--tab-column, TabBar.tsx) instead of one mark switching off and
+ * another on. Here a short bar on the top edge; on liquid glass the selected lens.
+ */
+.tabbar__indicator {
+  position: absolute;
+  top: 0;
+  left: var(--tabbar-pad-x);
+  z-index: -1;
+  display: flex;
+  justify-content: center;
+  width: calc((100% - 2 * var(--tabbar-pad-x) - 4 * var(--tabbar-gap)) / 5);
+  height: 3px;
+  pointer-events: none;
+  transform: translateX(calc(var(--tab-column, 0) * (100% + var(--tabbar-gap))));
+  transition:
+    transform var(--duration-enter) var(--ease-out),
+    opacity var(--duration-exit) var(--ease-out);
+}
+
+.tabbar__indicator::before {
+  content: '';
+  width: 28px;
+  height: 100%;
+  border-radius: 0 0 3px 3px;
+  background: var(--color-accent);
+}
+
+.tabbar__indicator[data-shown='false'] {
+  opacity: 0;
+}
+
+/* The current tab's icon lands with a small spring when it becomes current. */
+.tabbar__item[aria-current='page'] .tabbar__icon {
+  animation: ui-pop-in var(--duration-enter) var(--ease-spring);
 }
 
 .tabbar__icon {
@@ -280,8 +321,9 @@
   }
 
   :root[data-glass] .tabbar {
+    --tabbar-pad-x: var(--space-1);
+    --tabbar-gap: 2px;
     bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
-    gap: 2px;
     min-height: var(--tabbar-height);
     margin: 0 var(--space-3) calc(var(--space-2) + env(safe-area-inset-bottom));
     padding: var(--space-1);
@@ -300,8 +342,19 @@
   }
 
   :root[data-glass] .tabbar__item[aria-current='page'] {
-    background: var(--glass-selected);
     color: var(--color-accent-text);
+  }
+
+  /* The selected lens is the sliding mark itself, so it glides from tab to tab. */
+  :root[data-glass] .tabbar__indicator {
+    top: var(--space-1);
+    height: calc(100% - 2 * var(--space-1));
+    border-radius: var(--radius-pill);
+    background: var(--glass-selected);
+  }
+
+  :root[data-glass] .tabbar__indicator::before {
+    content: none;
   }
 
   /* "+" sits inside the capsule as tinted glass; a press magnifies it, as in iOS 26. */
@@ -376,13 +429,19 @@
   color: var(--color-text);
   font-weight: var(--font-weight-medium);
   text-decoration: none;
-  transition: background-color var(--duration-fast) var(--ease-standard);
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
   -webkit-tap-highlight-color: transparent;
 }
 
 .nav__link:hover,
 .nav__link:active {
   background: var(--color-surface-raised);
+}
+
+.nav__link:active {
+  transform: scale(0.98);
 }
 
 .nav__link[aria-current='page'] {
@@ -411,6 +470,30 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/*
+ * Opening the drawer with a tap: the menu's parts (.ui-stagger) drift in from the
+ * left one after another while the card slides away. A drag already shows the menu
+ * under the finger, so nothing replays when it settles open.
+ */
+@media (max-width: 839.98px) {
+  /* Closed, closing or dragged: still (the sidebar rises in with the screen instead). */
+  .nav.ui-stagger > * {
+    animation: none;
+  }
+
+  .shell[data-drawer='open'][data-motion='tap'] .nav.ui-stagger > * {
+    animation: nav-part-in var(--duration-enter) var(--ease-out) backwards;
+    animation-delay: calc(var(--duration-fast) + var(--stagger-i) * var(--stagger-step));
+  }
+}
+
+@keyframes nav-part-in {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
 }
 
 /* A labelled group of modules that go together (registry NAV_SECTIONS). */

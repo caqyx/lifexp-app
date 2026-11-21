@@ -22,7 +22,7 @@ export function PcBuildCard({ build }: { build: PcBuild | null }) {
           ? t('tasks.pc.complete')
           : t('tasks.pc.current', { name: t(`tasks.pc.components.${current}`) })}
       </p>
-      <ol class="tasks-pc" aria-label={t('tasks.pc.title')}>
+      <ol class="tasks-pc ui-stagger" aria-label={t('tasks.pc.title')}>
         {build.componentOrder.map((component, i) => {
           const filled = Math.min(PIECES_PER_COMPONENT, build.progress[component] || 0);
           const state = i === build.currentComponentIndex ? 'current' : i > build.currentComponentIndex ? 'locked' : 'done';

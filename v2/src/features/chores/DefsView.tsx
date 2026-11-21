@@ -9,7 +9,7 @@ import { t } from '@/i18n';
 import { createChoreDef, deleteChoreDef, editChoreDef } from '@/services/chores';
 import { dismissToast, showToast, type ToastInput } from '@/ui/toast';
 import { Button } from '@/ui/components/Button';
-import { EmptyState } from '@/ui/components/Display';
+import { EmptyState, MotionList } from '@/ui/components/Display';
 import { Card } from '@/ui/components/Layout';
 import { ChoreDefSheet } from './ChoreDefSheet';
 
@@ -68,7 +68,7 @@ export function DefsView({ uid, defs }: { uid: string; defs: readonly ChoreDef[]
         {defs.length === 0 ? (
           <EmptyState title={t('chores.noDefs')} />
         ) : (
-          <ul class="chores-defs" aria-label={t('chores.defsView')}>
+          <MotionList class="chores-defs" label={t('chores.defsView')}>
             {defs.map((def) => (
               <li key={def.id} class="chores-defs__row">
                 <button
@@ -94,7 +94,7 @@ export function DefsView({ uid, defs }: { uid: string; defs: readonly ChoreDef[]
                 </Button>
               </li>
             ))}
-          </ul>
+          </MotionList>
         )}
       </Card>
 

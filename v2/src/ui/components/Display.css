@@ -109,7 +109,9 @@
 }
 
 .ui-list__row--action {
-  transition: background-color var(--duration-fast) var(--ease-standard);
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -117,6 +119,11 @@
 .ui-list__row--action:hover,
 .ui-list__row--action:active {
   background: var(--color-surface-raised);
+}
+
+/* The press answers at once; the row settles back when the finger lifts. */
+.ui-list__row--action:active {
+  transform: scale(0.985);
 }
 
 .ui-list__text {
@@ -228,5 +235,81 @@
 @media (prefers-reduced-motion: reduce) {
   .ui-skeleton__line {
     animation: none;
+  }
+}
+
+/* ── Rolling value: a changed number rolls instead of jumping ── */
+
+.ui-roll {
+  position: relative;
+  display: inline-block;
+}
+
+/* Clipped to its line, like an odometer: the old value leaves over the top edge,
+   the new one comes up from the bottom (sideways the old, wider one may show). */
+.ui-roll--rolling {
+  clip-path: inset(0 -100vw);
+}
+
+.ui-roll__value {
+  display: inline-block;
+  animation: ui-roll-in var(--duration-enter) var(--ease-out);
+}
+
+/* The old value, drawn only (empty alt text: neither read out nor part of the text). */
+.ui-roll--rolling::after {
+  content: attr(data-prev) / '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  animation: ui-roll-out var(--duration-exit) var(--ease-in) backwards;
+}
+
+.ui-roll--down .ui-roll__value {
+  animation-name: ui-roll-in-down;
+}
+
+.ui-roll--down::after {
+  animation-name: ui-roll-out-down;
+}
+
+@keyframes ui-roll-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em);
+  }
+}
+
+@keyframes ui-roll-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-0.45em);
+  }
+}
+
+@keyframes ui-roll-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-0.45em);
+  }
+}
+
+@keyframes ui-roll-out-down {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(0.45em);
   }
 }

@@ -1,7 +1,9 @@
 // Read-only building blocks (docs/v2/PLAN.md 7.5): big numbers as the heroes of a
 // screen, lists, icon tiles, progress, empty and loading states.
 import type { ComponentChildren } from 'preact';
+import { useRef } from 'preact/hooks';
 import { t } from '@/i18n';
+import { useListMotion } from '../listMotion';
 import './Display.css';
 
 export type Tone = 'default' | 'positive' | 'negative' | 'warning';
@@ -32,15 +34,69 @@ export function Metric({ value, label, detail, tone = 'default', size = 'md' }: 
   return (
     <div class={`ui-metric ui-metric--${size}`}>
       <span class="ui-metric__label">{label}</span>
-      <span class={`ui-metric__value numeric tone-${tone}`}>{value}</span>
+      <span class={`ui-metric__value numeric tone-${tone}`}>
+        <RollingValue value={value} />
+      </span>
       {detail && <span class="ui-metric__detail">{detail}</span>}
     </div>
   );
 }
 
-export function List({ children, label }: { children: ComponentChildren; label?: string }) {
+interface RollingValueProps {
+  /** Already formatted (formatMoney, formatInteger, …). */
+  value: string;
+  /** The number behind it: a smaller one rolls down instead of up. */
+  n?: number;
+}
+
+/**
+ * A value that rolls to its new state instead of jumping: the old one slides away
+ * and fades while the new one rises into its place. The old copy is drawn by CSS
+ * (alt text empty), so the element's text is always just the current value.
+ */
+export function RollingValue({ value, n }: RollingValueProps) {
+  const state = useRef<{ value: string; n?: number; run: number; prev?: string; down: boolean }>({ value, n, run: 0, down: false });
+  const last = state.current;
+  if (last.value !== value) {
+    const down = n !== undefined && last.n !== undefined && n < last.n;
+    state.current = { value, n, run: last.run + 1, prev: last.value, down };
+  }
+  const { run, prev, down } = state.current;
+  if (prev === undefined) return <span class="ui-roll">{value}</span>;
+  // A new key per change: the copy and the value start their animations afresh.
   return (
-    <ul class="ui-list" aria-label={label}>
+    <span key={run} class={`ui-roll ui-roll--rolling${down ? ' ui-roll--down' : ''}`} data-prev={prev}>
+      <span class="ui-roll__value">{value}</span>
+    </span>
+  );
+}
+
+interface MotionListProps {
+  /** The list's own class (its look); the motion classes are added. */
+  class: string;
+  label?: string;
+  ordered?: boolean;
+  children: ComponentChildren;
+}
+
+/**
+ * A feature's own list whose rows move like List's: they rise in one after another,
+ * glide to new places and a removed one fades out while the rest close the gap.
+ */
+export function MotionList({ class: cls, label, ordered = false, children }: MotionListProps) {
+  const ref = useListMotion<HTMLUListElement & HTMLOListElement>();
+  const Tag = ordered ? 'ol' : 'ul';
+  return (
+    <Tag ref={ref} class={`${cls} ui-stagger`} aria-label={label}>
+      {children}
+    </Tag>
+  );
+}
+
+export function List({ children, label }: { children: ComponentChildren; label?: string }) {
+  const ref = useListMotion<HTMLUListElement>();
+  return (
+    <ul ref={ref} class="ui-list ui-stagger" aria-label={label}>
       {children}
     </ul>
   );
@@ -131,7 +187,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, body, action }: EmptyStateProps) {
   return (
-    <div class="ui-empty">
+    <div class="ui-empty ui-stagger">
       <p class="ui-empty__title">{title}</p>
       {body && <p class="ui-empty__body">{body}</p>}
       {action}

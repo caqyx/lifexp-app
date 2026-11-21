@@ -20,7 +20,7 @@ import { createLoan, removeLoan, repay } from '@/services/loans';
 import { dismissToast, showToast, type ToastInput } from '@/ui/toast';
 import { Button } from '@/ui/components/Button';
 import { ConfirmDialog } from '@/ui/components/ConfirmDialog';
-import { EmptyState, Metric, ProgressBar } from '@/ui/components/Display';
+import { EmptyState, Metric, MotionList, ProgressBar } from '@/ui/components/Display';
 import { Card } from '@/ui/components/Layout';
 import { LoanSheet, RepaySheet } from './LoanSheets';
 
@@ -140,7 +140,7 @@ export function LoansView({ uid, loans, balance }: { uid: string; loans: readonl
         {sorted.length === 0 ? (
           <EmptyState title={t('money.noLoans')} />
         ) : (
-          <ul class="money-loans" aria-label={t('money.loans')}>
+          <MotionList class="money-loans" label={t('money.loans')}>
             {sorted.map((loan) => (
               <LoanRow
                 key={loan.id}
@@ -149,7 +149,7 @@ export function LoansView({ uid, loans, balance }: { uid: string; loans: readonl
                 onDelete={setDeleting}
               />
             ))}
-          </ul>
+          </MotionList>
         )}
       </Card>
 

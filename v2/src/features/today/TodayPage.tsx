@@ -48,7 +48,7 @@ import { today as todaySources, watchToday } from '@/stores/today';
 import { dismissToast, showToast, type ToastInput } from '@/ui/toast';
 import { afterModalHistory } from '@/ui/components/useModal';
 import { Button } from '@/ui/components/Button';
-import { EmptyState, IconTile, List, ListRow, ProgressBar, Skeleton } from '@/ui/components/Display';
+import { EmptyState, IconTile, List, ListRow, MotionList, ProgressBar, RollingValue, Skeleton } from '@/ui/components/Display';
 import { Card, Page, Section, Stack } from '@/ui/components/Layout';
 import { ActivitySheet } from './ActivitySheet';
 import { ChoresCard } from './ChoresCard';
@@ -65,7 +65,7 @@ function PointsHero({ profile }: { profile: Profile }) {
         <p class="today-hero__label">{t('today.points')}</p>
         <p class="today-hero__value">
           <span class="numeric" data-testid="points-total">
-            {formatInteger(total, locale())}
+            <RollingValue value={formatInteger(total, locale())} n={total} />
           </span>{' '}
           <span class="today-hero__unit">{t('today.pointsUnit')}</span>
         </p>
@@ -167,7 +167,7 @@ function StreakCard({ profile, days, todayKey }: { profile: Profile; days: Reado
           {streak.days > 0 ? t('today.streakDays', { count: streak.days }) : t('today.streakNone')}
         </p>
       </div>
-      <ol class="today-week" aria-label={t('today.thisWeek')}>
+      <ol class="today-week ui-stagger" aria-label={t('today.thisWeek')}>
         {weekOf(todayKey).map((key) => {
           const day = formatWeekdayShort(key, lang);
           const done = active.has(key);
@@ -208,7 +208,7 @@ function TodayCard({ profile, day, onLog, onWhatNow }: TodayCardProps) {
         <div>
           <p class="today-card__meta">{t('today.todayPoints')}</p>
           <p class="today-card__number numeric" data-testid="today-points">
-            {formatInteger(progress.earned, locale())}
+            <RollingValue value={formatInteger(progress.earned, locale())} n={progress.earned} />
           </p>
           <p class="today-card__meta">{t('today.ofLimit', { limit: progress.limit })}</p>
         </div>
@@ -265,7 +265,7 @@ function GoalsCard({ uid, profile }: { uid: string; profile: Profile }) {
             />
           </List>
         ) : (
-          <ul class="today-goals" aria-label={t('today.goals')}>
+          <MotionList class="today-goals" label={t('today.goals')}>
             {profile.goals.map((goal) => {
               const progress = goalProgress(goal, pointsTotal);
               return (
@@ -292,7 +292,7 @@ function GoalsCard({ uid, profile }: { uid: string; profile: Profile }) {
                 </li>
               );
             })}
-          </ul>
+          </MotionList>
         )}
       </Card>
     </Section>
@@ -319,7 +319,7 @@ function Shortcuts({ profile }: { profile: Profile }) {
   if (shown.length === 0) return null;
   return (
     <Section title={t('today.quick')}>
-      <ul class="today-shortcuts">
+      <ul class="today-shortcuts ui-stagger">
         {shown.map(({ href, icon: Icon, labelKey }) => (
           <li key={href}>
             <a class="today-shortcut" href={href}>

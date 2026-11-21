@@ -87,6 +87,13 @@
   --duration-exit: 160ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* Things arriving together (a list, the cards of a screen, the menu's sections)
+     come in one after another, this far apart; from the eighth on, together
+     (ui/base.css .ui-stagger). */
+  --stagger-step: 30ms;
+  /* A small mark landing (a tick, the tab bar's dot, a badge): it overshoots a
+     touch and settles, so it reads as placed, not switched on. */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   /* Drawer opened or closed by a tap (Menu, Esc, Back): starts from rest (initial
      slope 0) and lands softly. A fast-start curve made the card jump. */
   --duration-drawer: 450ms;
@@ -119,6 +126,7 @@
     --duration-drawer: 0ms;
     --duration-drawer-settle: 0ms;
     --duration-page-turn: 0ms;
+    --stagger-step: 0ms;
   }
 }
 
