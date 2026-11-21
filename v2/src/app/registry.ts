@@ -40,6 +40,16 @@ export type ModuleId =
   | 'parent'
   | 'gallery';
 
+/**
+ * Sections of the menu, in the order they are listed (owner: things that go
+ * together sit together). Planning first; what earns and spends money; what is
+ * written and read; play; and at the bottom the person's overview and the app
+ * itself, Statistics next to Settings. A section whose modules are all off is not
+ * shown. A new module only names its section here (e.g. a calendar: 'plan').
+ */
+export const NAV_SECTIONS = ['plan', 'money', 'writing', 'fun', 'system'] as const;
+export type NavSection = (typeof NAV_SECTIONS)[number];
+
 export interface FeatureDef {
   id: ModuleId;
   labelKey: `nav.${ModuleId}`;
@@ -47,8 +57,11 @@ export interface FeatureDef {
   paths: readonly [string, ...string[]];
   /** Shown next to the label, never instead of it (PLAN.md 7.1, D9). */
   icon: LucideIcon;
-  /** null = reachable, but not listed in the menu (e.g. Ex-us has its own button). */
-  nav: { group: 'main' | 'secondary'; order: number } | null;
+  /**
+   * Where the menu lists it: its section and its place there (ascending).
+   * null = reachable, but not listed in the menu (e.g. Ex-us has its own button).
+   */
+  nav: { section: NavSection; order: number } | null;
   /** Also in the phone tab bar (D10), in this order; the "+" sits after the second. */
   tab?: number;
   /** Stage of docs/v2/PLAN.md 9 that builds the module; shown until it exists. */
@@ -80,7 +93,7 @@ export const FEATURES: readonly FeatureDef[] = [
     labelKey: 'nav.today',
     icon: House,
     paths: ['/today', '/today/activity'],
-    nav: { group: 'main', order: 10 },
+    nav: { section: 'plan', order: 10 },
     tab: 1,
     stage: '2',
     view: () => import('@/features/today/TodayPage'),
@@ -90,7 +103,7 @@ export const FEATURES: readonly FeatureDef[] = [
     labelKey: 'nav.tasks',
     icon: ListTodo,
     paths: ['/tasks', '/tasks/new'],
-    nav: { group: 'main', order: 20 },
+    nav: { section: 'plan', order: 20 },
     stage: '3a',
     view: () => import('@/features/tasks/TasksPage'),
   },
@@ -100,7 +113,7 @@ export const FEATURES: readonly FeatureDef[] = [
     optional: 'calendar',
     icon: CalendarDays,
     paths: ['/calendar', '/calendar/week', '/calendar/day', '/calendar/categories', '/calendar/new'],
-    nav: { group: 'main', order: 25 },
+    nav: { section: 'plan', order: 25 },
     stage: 'c-1',
     view: () => import('@/features/calendar/CalendarModule'),
     views: ['/calendar', '/calendar/week', '/calendar/day', '/calendar/categories'],
@@ -110,7 +123,7 @@ export const FEATURES: readonly FeatureDef[] = [
     labelKey: 'nav.goals',
     icon: Target,
     paths: ['/goals'],
-    nav: { group: 'main', order: 30 },
+    nav: { section: 'plan', order: 30 },
     stage: '3d',
     view: () => import('@/features/goals/GoalsPage'),
   },
@@ -120,7 +133,7 @@ export const FEATURES: readonly FeatureDef[] = [
     optional: 'chores',
     icon: ClipboardCheck,
     paths: ['/chores', '/chores/new', '/chores/defs'],
-    nav: { group: 'main', order: 40 },
+    nav: { section: 'money', order: 10 },
     tab: 2,
     stage: '3b',
     view: () => import('@/features/chores/ChoresModule'),
@@ -132,7 +145,7 @@ export const FEATURES: readonly FeatureDef[] = [
     optional: 'money',
     icon: Wallet,
     paths: ['/money', '/money/new', '/money/loans', '/money/settings'],
-    nav: { group: 'main', order: 50 },
+    nav: { section: 'money', order: 20 },
     tab: 3,
     stage: '3c',
     view: () => import('@/features/money/MoneyModule'),
@@ -144,7 +157,7 @@ export const FEATURES: readonly FeatureDef[] = [
     optional: 'notes',
     icon: NotebookPen,
     paths: ['/notes', '/notes/:id'],
-    nav: { group: 'main', order: 60 },
+    nav: { section: 'writing', order: 10 },
     stage: '3a',
     view: () => import('@/features/notes/NotesModule'),
   },
@@ -154,7 +167,7 @@ export const FEATURES: readonly FeatureDef[] = [
     optional: 'stats',
     icon: ChartLine,
     paths: ['/stats', '/stats/history'],
-    nav: { group: 'main', order: 70 },
+    nav: { section: 'system', order: 30 },
     stage: '2',
     view: () => import('@/features/stats/StatsModule'),
     views: ['/stats', '/stats/history'],
@@ -165,7 +178,7 @@ export const FEATURES: readonly FeatureDef[] = [
     optional: 'games',
     icon: Gamepad2,
     paths: ['/games', '/games/:id'],
-    nav: { group: 'main', order: 80 },
+    nav: { section: 'fun', order: 10 },
     stage: 'g',
     view: () => import('@/features/games/GamesModule'),
   },
@@ -175,7 +188,7 @@ export const FEATURES: readonly FeatureDef[] = [
     optional: 'reader',
     icon: BookOpen,
     paths: ['/reader', '/reader/:id'],
-    nav: { group: 'main', order: 90 },
+    nav: { section: 'writing', order: 20 },
     stage: 'r',
     view: () => import('@/features/reader/ReaderModule'),
     bare: ['/reader/:id'],
@@ -185,7 +198,7 @@ export const FEATURES: readonly FeatureDef[] = [
     labelKey: 'nav.reports',
     icon: Megaphone,
     paths: ['/reports', '/reports/broadcasts', '/reports/updates'],
-    nav: { group: 'secondary', order: 10 },
+    nav: { section: 'system', order: 20 },
     stage: '4',
     view: () => import('@/features/reports/ReportsModule'),
     views: ['/reports', '/reports/broadcasts', '/reports/updates'],
@@ -195,7 +208,7 @@ export const FEATURES: readonly FeatureDef[] = [
     labelKey: 'nav.settings',
     icon: Settings,
     paths: ['/settings/:section?'],
-    nav: { group: 'secondary', order: 20 },
+    nav: { section: 'system', order: 40 },
     stage: '4',
     view: () => import('@/features/settings/SettingsModule'),
   },
@@ -214,7 +227,7 @@ export const FEATURES: readonly FeatureDef[] = [
     labelKey: 'nav.parent',
     icon: Users,
     paths: ['/parent'],
-    nav: { group: 'secondary', order: 5 },
+    nav: { section: 'system', order: 10 },
     stage: '6',
     audience: 'parent',
     view: () => import('@/features/parent/ParentPage'),
@@ -254,12 +267,30 @@ export function featureOn(feature: FeatureDef, choice: ModuleChoice = ALL_ON): b
   return feature.optional === undefined || isModuleOn(feature.optional, choice);
 }
 
-export function navItems(group: 'main' | 'secondary', choice: ModuleChoice = ALL_ON, parent = false): FeatureDef[] {
-  return FEATURES.filter(
-    (f) => f.nav?.group === group && featureOn(f, choice) && (f.audience !== 'parent' || parent),
-  ).sort(
+function listedFor(feature: FeatureDef, choice: ModuleChoice, parent: boolean): boolean {
+  return feature.nav !== null && featureOn(feature, choice) && (feature.audience !== 'parent' || parent);
+}
+
+/** The modules a section lists for this person, in order. */
+export function navItems(section: NavSection, choice: ModuleChoice = ALL_ON, parent = false): FeatureDef[] {
+  return FEATURES.filter((f) => f.nav?.section === section && listedFor(f, choice, parent)).sort(
     (a, b) => (a.nav?.order ?? 0) - (b.nav?.order ?? 0),
   );
+}
+
+export interface NavGroup {
+  section: NavSection;
+  labelKey: `nav.sections.${NavSection}`;
+  items: FeatureDef[];
+}
+
+/** The menu: its sections in order, each with what it lists; empty sections are left out. */
+export function navSections(choice: ModuleChoice = ALL_ON, parent = false): NavGroup[] {
+  return NAV_SECTIONS.map((section) => ({
+    section,
+    labelKey: `nav.sections.${section}` as const,
+    items: navItems(section, choice, parent),
+  })).filter((group) => group.items.length > 0);
 }
 
 /** How many modules the phone tab bar holds besides "+" and Menu (D10). */
@@ -267,13 +298,15 @@ const TAB_COUNT = 3;
 
 /**
  * Modules in the phone tab bar, in order (D10). A tab whose module is off gives its
- * place to the next module of the menu that is on, so the bar stays full.
+ * place to the next module of the menu that is on (in menu order, leaving out the
+ * account and app section), so the bar stays full.
  */
 export function tabItems(choice: ModuleChoice = ALL_ON): FeatureDef[] {
   const tabs = FEATURES.filter((f) => f.tab !== undefined && featureOn(f, choice)).sort(
     (a, b) => (a.tab ?? 0) - (b.tab ?? 0),
   );
-  for (const f of navItems('main', choice)) {
+  const next = NAV_SECTIONS.filter((section) => section !== 'system').flatMap((section) => navItems(section, choice));
+  for (const f of next) {
     if (tabs.length >= TAB_COUNT) break;
     if (!tabs.includes(f)) tabs.push(f);
   }

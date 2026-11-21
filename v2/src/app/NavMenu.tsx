@@ -1,12 +1,12 @@
-// Menu content (docs/v2/PLAN.md 7.4), generated from the registry: each module's
-// icon next to its name (D9). Right-hand metadata ("2 po terminie") arrives with
+// Menu content (docs/v2/PLAN.md 7.4), generated from the registry: modules in
+// labelled sections (registry NAV_SECTIONS), each module's icon next to its name (D9). Right-hand metadata ("2 po terminie") arrives with
 // the modules' data (stage 2+).
 import { LogOut, Sparkles, Undo2 } from 'lucide-preact';
 import { isModuleOn, type ModuleChoice } from '@/domain/modules';
 import { t } from '@/i18n';
 import { isParent } from '@/stores/parent';
 import { isPlainClick } from './links';
-import { featureHref, featurePath, navItems, type FeatureDef, type ModuleId } from './registry';
+import { featureHref, featurePath, navSections, type FeatureDef, type ModuleId } from './registry';
 
 export interface Account {
   name: string;
@@ -62,9 +62,19 @@ export function NavMenu({ activeId, onSelect, account, modules, onSignOut }: Nav
           {t('nav.askExus')}
         </button>
       )}
-      <ul class="nav__list">{navItems('main', modules).map(item)}</ul>
-      <hr class="nav__divider" />
-      <ul class="nav__list">{navItems('secondary', modules, parent).map(item)}</ul>
+      {navSections(modules, parent).map((group) => {
+        const headingId = `nav-section-${group.section}`;
+        return (
+          <div key={group.section} class="nav__section" data-section={group.section}>
+            <h2 class="nav__heading" id={headingId}>
+              {t(group.labelKey)}
+            </h2>
+            <ul class="nav__list" aria-labelledby={headingId}>
+              {group.items.map(item)}
+            </ul>
+          </div>
+        );
+      })}
       {/* v2 is in beta: the way back to v1 (app.html next to /v2/) stays in reach. */}
       <a class="nav__classic" href="../app.html">
         <Undo2 class="nav__icon" aria-hidden="true" />
