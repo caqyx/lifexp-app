@@ -70,6 +70,13 @@ describe('G5 a transaction (v1 saveMoneyTx)', () => {
     expect(balanceDelta('income', 3000)).toBe(3000);
   });
 
+  test('money coming in fits a balance v1 left below zero; money going out does not', () => {
+    // v1 lets a spent income be deleted, so the balance can be -20 zł.
+    expect(fitsBalance(-2000, balanceDelta('income', 500))).toBe(true);
+    expect(fitsBalance(-2000, 0)).toBe(true);
+    expect(fitsBalance(-2000, balanceDelta('expense', 1))).toBe(false);
+  });
+
   test('an amount above zero and a category are required', () => {
     expect(txProblem(draft())).toBeNull();
     expect(txProblem(draft({ grosze: null }))).toBe('amountRequired');
