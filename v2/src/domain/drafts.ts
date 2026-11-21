@@ -12,6 +12,11 @@ export interface DraftBase {
   summary: string;
   /** When it was made, offline: the entry's time once it is added. */
   createdAt: Date;
+  /**
+   * The account it was made on (v2 writes it next to v1's fields; v1 ignores it).
+   * null for a draft from v1, which does not say: it is shown to whoever is signed in, as v1 does.
+   */
+  uid: string | null;
 }
 
 export interface ActivityDraftItem extends DraftBase {
@@ -83,6 +88,7 @@ export function draftFromRaw(raw: unknown): DraftItem | null {
     id,
     summary: str(item.summary) ?? '',
     createdAt: Number.isNaN(created.getTime()) ? new Date(0) : created,
+    uid: str(item.uid) || null,
   };
   const p = (typeof item.payload === 'object' && item.payload !== null ? item.payload : {}) as Record<string, unknown>;
   const other: OtherDraftItem = { ...base, kind: 'other' };
@@ -140,6 +146,15 @@ export function draftFromRaw(raw: unknown): DraftItem | null {
     default:
       return other;
   }
+}
+
+/**
+ * The drafts the signed-in account may see and confirm. The queue belongs to the
+ * device, not the account: a draft another account made here stays in the queue for
+ * it (and is never added to this account), a v1 draft without an owner is shown.
+ */
+export function draftsOf(drafts: readonly DraftItem[], uid: string): DraftItem[] {
+  return drafts.filter((draft) => draft.uid === null || draft.uid === uid);
 }
 
 /** v1 queueOfflineDraft()'s id: time in base 36 and 5 random characters. */

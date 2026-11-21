@@ -24,7 +24,7 @@ import {
   type ActivityDraft,
   type DayLog,
 } from '@/domain/activity';
-import { activityDraftPayload } from '@/domain/drafts';
+import { activityDraftPayload, draftsOf } from '@/domain/drafts';
 import { choresOnCard, type ChoreDef, type ChoresCardSettings } from '@/domain/chores';
 import { isModuleOn } from '@/domain/modules';
 import { newAchievements } from '@/domain/achievements';
@@ -421,6 +421,7 @@ export default function TodayPage({ path, navigate }: RouteProps) {
   };
 
   const choresToday = localDayKey(new Date());
+  const pendingDrafts = draftsOf(drafts.value, uid).length;
   const closeCardEditor = () => setCardEditor((s) => ({ ...s, open: false }));
   const saveCard = (settings: ChoresCardSettings) => {
     const result = saveChoresCard(uid, settings);
@@ -452,6 +453,7 @@ export default function TodayPage({ path, navigate }: RouteProps) {
     const rate = generated?.points ?? def?.points;
     if (!name || rate === undefined || !draft.type || draft.minutes === null) return 'typeRequired';
     addDraft(
+      uid,
       'activity',
       t('offline.sumActivity', { name, min: draft.minutes, pts: earnedPoints(draft.minutes, rate) }),
       activityDraftPayload({
@@ -506,11 +508,11 @@ export default function TodayPage({ path, navigate }: RouteProps) {
 
         {sources.failed && <p class="today-error" role="alert">{t('today.loadFailed')}</p>}
 
-        {drafts.value.length > 0 && (
+        {pendingDrafts > 0 && (
           <Card>
             <div class="today-drafts">
               <div>
-                <p class="today-drafts__title">{t('offline.pending', { count: drafts.value.length })}</p>
+                <p class="today-drafts__title">{t('offline.pending', { count: pendingDrafts })}</p>
                 <p class="today-drafts__note">{t('offline.pendingNote')}</p>
               </div>
               <Button variant="secondary" onClick={() => (reviewRequested.value = true)}>

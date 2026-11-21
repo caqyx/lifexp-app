@@ -41,10 +41,15 @@ export function removeDraft(id: string): void {
   refreshDrafts();
 }
 
-/** v1 queueOfflineDraft(): appends an entry in v1's format. */
-export function addDraft(type: 'activity' | 'chore' | 'money_tx', summary: string, payload: Record<string, unknown>): void {
+/** v1 queueOfflineDraft(): appends an entry in v1's format, plus the account it belongs to (v1 ignores `uid`). */
+export function addDraft(
+  uid: string,
+  type: 'activity' | 'chore' | 'money_tx',
+  summary: string,
+  payload: Record<string, unknown>,
+): void {
   const now = new Date();
-  writeRaw([...readRaw(), { id: newDraftId(now.getTime()), type, summary, payload, createdAtLocal: now.toISOString() }]);
+  writeRaw([...readRaw(), { id: newDraftId(now.getTime()), type, summary, payload, createdAtLocal: now.toISOString(), uid }]);
   refreshDrafts();
 }
 
