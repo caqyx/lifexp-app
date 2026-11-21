@@ -121,8 +121,8 @@ interface RecordProgressProps {
 function RecordProgress({ uid, profile, days, todayKey }: RecordProgressProps) {
   const { streak } = streakFor(profile, days, todayKey);
   useEffect(() => {
-    if (streak.newFreeze) recordFreeze(uid, todayKey).catch(() => {});
-  }, [uid, streak.newFreeze, todayKey]);
+    if (streak.bridged) recordFreeze(uid, todayKey, streak.bridged).catch(() => {});
+  }, [uid, streak.bridged, todayKey]);
 
   const todayLog = days.get(todayKey);
   const input = {
