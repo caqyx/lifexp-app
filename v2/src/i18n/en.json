@@ -308,6 +308,7 @@
     "save": "Save",
     "saved": "Task saved.",
     "needText": "Describe the task.",
+    "textTooLong": "A task can be at most {{max}} characters long.",
     "needDue": "Pick a due date.",
     "dueInPast": "The due date cannot be in the past.",
     "maxTasks": "Limit reached: {{max}} tasks. Delete done ones to add new ones.",
@@ -1348,6 +1349,7 @@
     "taskCreated": "Added \"{{text}}\" for {{date}} (size {{size}}).",
     "taskProblem": {
       "textRequired": "Describe the task.",
+      "textTooLong": "A task can be at most {{max}} characters long. Shorten it and send it again.",
       "dueRequired": "Give a due date, e.g. tomorrow or fri.",
       "dueInPast": "The due date cannot be in the past."
     },

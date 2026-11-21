@@ -8,7 +8,7 @@ import { findCommand } from '@/domain/exus/commands';
 import { DAILY_LIMIT_DEFAULT } from '@/domain/points';
 import { isModuleOn } from '@/domain/modules';
 import type { Profile } from '@/domain/profile';
-import { TASKS_MAX, type TaskSize } from '@/domain/tasks';
+import { TASKS_MAX, TASK_TEXT_MAX, type TaskSize } from '@/domain/tasks';
 import { locale, t } from '@/i18n';
 import { formatDayMonth, utcDayKey } from '@/lib/dates';
 import type { Navigate } from '@/lib/route-match';
@@ -128,7 +128,7 @@ export const HANDLERS: Record<CommandId, CommandHandler> = {
       const size = (args.size as TaskSize | undefined) ?? 'M';
       const result = createTask(uid, { text, dueDate, size }, list, profile.pcBuild !== null, today);
       if (!result.ok) {
-        return { reply: result.problem === 'limit' ? t('tasks.maxTasks', { max: TASKS_MAX }) : t(`exus.taskProblem.${result.problem}`) };
+        return { reply: result.problem === 'limit' ? t('tasks.maxTasks', { max: TASKS_MAX }) : t(`exus.taskProblem.${result.problem}`, { max: TASK_TEXT_MAX }) };
       }
       return {
         reply: t('exus.taskCreated', { text, date: formatDayMonth(dueDate, locale()), size }),

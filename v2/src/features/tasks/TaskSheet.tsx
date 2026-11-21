@@ -13,6 +13,7 @@ const FORM_ID = 'task-form';
 
 const PROBLEM_KEY = {
   textRequired: 'tasks.needText',
+  textTooLong: 'tasks.textTooLong',
   dueRequired: 'tasks.needDue',
   dueInPast: 'tasks.dueInPast',
 } as const;
@@ -45,7 +46,7 @@ export function TaskSheet({ open, task, today, onClose, onSave, onDelete }: Task
     setDraft({ ...draft, ...patch });
     setProblem(null);
   };
-  const error = (...kinds: TaskProblem[]) => (problem && kinds.includes(problem) ? t(PROBLEM_KEY[problem]) : null);
+  const error = (...kinds: TaskProblem[]) => (problem && kinds.includes(problem) ? t(PROBLEM_KEY[problem], { max: TASK_TEXT_MAX }) : null);
 
   return (
     <Sheet
@@ -83,7 +84,7 @@ export function TaskSheet({ open, task, today, onClose, onSave, onDelete }: Task
           value={draft.text}
           onInput={(text) => set({ text })}
           placeholder={t('tasks.textPh')}
-          error={error('textRequired')}
+          error={error('textRequired', 'textTooLong')}
           rows={3}
           maxLength={TASK_TEXT_MAX}
         />
