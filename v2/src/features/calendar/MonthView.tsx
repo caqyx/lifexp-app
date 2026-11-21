@@ -1,21 +1,21 @@
 // The month (#/calendar): whole weeks from Monday, each day with marks of its most
 // important entries in their categories' colours (bigger for more important ones),
 // today ringed, and the chosen day's agenda under the grid.
-import { byDay, daySummary, inMonth, monthGrid, type Occurrence } from '@/domain/calendar/agenda';
+import { inMonth, monthGrid } from '@/domain/calendar/agenda';
+import { itemSummary, type CalendarItem } from '@/domain/calendar/items';
 import { locale, t } from '@/i18n';
 import { addMonths, formatDayKey, formatDayMonth, formatMonthKey, formatWeekdayShort, monthKeyOfDay } from '@/lib/dates';
 import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Layout';
-import { DayAgendaList } from './DayAgendaList';
-import { PeriodNav, paletteVar } from './parts';
+import { DayAgendaList, type ItemHandlers } from './DayAgendaList';
+import { ItemMark, PeriodNav } from './parts';
 
-interface MonthViewProps {
+interface MonthViewProps extends ItemHandlers {
   focus: string;
   today: string;
-  occurrences: readonly Occurrence[];
+  /** The grid's items by day. */
+  items: ReadonlyMap<string, readonly CalendarItem[]>;
   onFocus: (day: string) => void;
-  onToggle: (o: Occurrence) => void;
-  onOpen: (o: Occurrence) => void;
   onAdd: (day: string) => void;
 }
 
@@ -27,12 +27,11 @@ function shiftMonth(day: string, months: number): string {
   return wanted > grid.last ? grid.last : wanted;
 }
 
-export function MonthView({ focus, today, occurrences, onFocus, onToggle, onOpen, onAdd }: MonthViewProps) {
+export function MonthView({ focus, today, items, onFocus, onAdd, ...handlers }: MonthViewProps) {
   const lang = locale();
   const monthKey = monthKeyOfDay(focus);
   const grid = monthGrid(monthKey);
-  const days = byDay(occurrences);
-  const chosen = days.get(focus) ?? [];
+  const chosen = items.get(focus) ?? [];
 
   return (
     <div class="stack cal-view">
@@ -52,7 +51,7 @@ export function MonthView({ focus, today, occurrences, onFocus, onToggle, onOpen
           </div>
           <ol class="cal-month__grid" aria-label={t('calendar.monthGrid', { month: formatMonthKey(monthKey, lang) })}>
             {grid.weeks.flat().map((day) => {
-              const summary = daySummary(days.get(day) ?? []);
+              const summary = itemSummary(items.get(day) ?? []);
               const cls = [
                 'cal-month__day',
                 inMonth(day, monthKey) ? '' : 'cal-month__day--outside',
@@ -74,12 +73,8 @@ export function MonthView({ focus, today, occurrences, onFocus, onToggle, onOpen
                       {Number(day.slice(8))}
                     </span>
                     <span class="cal-marks" aria-hidden="true">
-                      {summary.marks.map((o) => (
-                        <span
-                          key={o.key}
-                          class={`cal-mark cal-mark--${o.level}${o.mark === 'done' ? ' cal-mark--done' : ''}`}
-                          style={{ '--cat-color': paletteVar(o.category?.color) }}
-                        />
+                      {summary.marks.map((item) => (
+                        <ItemMark key={item.key} item={item} />
                       ))}
                     </span>
                     {summary.more > 0 && (
@@ -104,7 +99,7 @@ export function MonthView({ focus, today, occurrences, onFocus, onToggle, onOpen
             {t('calendar.addHere')}
           </Button>
         </div>
-        <DayAgendaList day={focus} occurrences={chosen} onToggle={onToggle} onOpen={onOpen} />
+        <DayAgendaList day={focus} items={chosen} {...handlers} />
       </section>
     </div>
   );

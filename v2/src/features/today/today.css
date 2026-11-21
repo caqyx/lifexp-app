@@ -595,3 +595,18 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
 }
+
+/* ── "Ważne dzisiaj" (calendar, c-2) ── */
+
+.today-important__empty {
+  animation: ui-rise-in var(--duration-enter) var(--ease-out);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.today-important__foot {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-separator);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}

@@ -2000,6 +2000,21 @@
     "categoryDeleted": "Usunięto kategorię „{{name}}”. Jej wydarzenia zostały, bez kategorii.",
     "needCategoryName": "Wpisz nazwę kategorii.",
     "categoryTaken": "Masz już kategorię o tej nazwie.",
-    "categoryLimit": "Możesz mieć najwyżej 30 kategorii."
+    "categoryLimit": "Możesz mieć najwyżej 30 kategorii.",
+    "task": "Zadanie",
+    "taskOverdue": "po terminie ({{date}})",
+    "taskDone": "Oznacz zadanie jako zrobione: {{title}}",
+    "importantToday": "Ważne dzisiaj",
+    "openCalendar": "Kalendarz",
+    "importantNone": "Na dziś nic zaplanowanego. Wydarzenia i zadania z terminem na dziś pojawią się tutaj.",
+    "importantAllDone": "Wszystko na dziś zrobione.",
+    "importantMore_one": "Jeszcze {{count}} w kalendarzu",
+    "importantMore_few": "Jeszcze {{count}} w kalendarzu",
+    "importantMore_many": "Jeszcze {{count}} w kalendarzu",
+    "importantMore_other": "Jeszcze {{count}} w kalendarzu",
+    "importantSettled_one": "{{count}} zrobione dziś",
+    "importantSettled_few": "{{count}} zrobione dziś",
+    "importantSettled_many": "{{count}} zrobionych dziś",
+    "importantSettled_other": "{{count}} zrobionych dziś"
   }
 }

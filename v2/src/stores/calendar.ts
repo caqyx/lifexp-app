@@ -21,6 +21,9 @@ export const calendar = signal<CalendarState>(EMPTY);
  */
 export const calendarFocus = signal<string | null>(null);
 
+/** How long the listeners outlive their last watcher. */
+const LEAVE_GRACE_MS = 2000;
+
 let active: { uid: string; watchers: number; stop: () => void } | null = null;
 
 function start(uid: string): () => void {
@@ -60,9 +63,12 @@ export function watchCalendar(uid: string): () => void {
     if (left) return;
     left = true;
     mine.watchers -= 1;
-    if (mine.watchers === 0 && active === mine) {
-      mine.stop();
-      active = null;
-    }
+    // A moment's grace: moving between two screens that both watch keeps the data.
+    setTimeout(() => {
+      if (mine.watchers === 0 && active === mine) {
+        mine.stop();
+        active = null;
+      }
+    }, LEAVE_GRACE_MS);
   };
 }

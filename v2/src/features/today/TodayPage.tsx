@@ -54,6 +54,7 @@ import { ActivitySheet } from './ActivitySheet';
 import { ChoresCard } from './ChoresCard';
 import { ChoresCardSheet } from './ChoresCardSheet';
 import { ExusField } from './ExusField';
+import { ImportantTodayCard } from './ImportantTodayCard';
 import './today.css';
 
 function PointsHero({ profile }: { profile: Profile }) {
@@ -525,6 +526,8 @@ export default function TodayPage({ path, navigate }: RouteProps) {
         {/* Owner's decision (2026-10-25): the Ex-us field sits right under the points card,
             or in its place when "Statystyki XP" is off. */}
         {isModuleOn('aichat', profile) && <ExusField navigate={navigate} />}
+        {/* The calendar's "Ważne dzisiaj": what matters today, entries and tasks, right under them. */}
+        {isModuleOn('calendar', profile) && <ImportantTodayCard uid={uid} today={choresToday} navigate={navigate} />}
         {statsOn && <LevelCard profile={profile} />}
 
         {sources.days ? (

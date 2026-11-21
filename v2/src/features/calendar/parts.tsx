@@ -2,12 +2,14 @@
 // the previous/next bar, the week strip and the colour picker of the sheets.
 import { Check, ChevronLeft, ChevronRight } from 'lucide-preact';
 import type { ComponentChildren } from 'preact';
-import { daySummary, type Occurrence } from '@/domain/calendar/agenda';
 import { CATEGORY_COLORS, type CalendarCategory, type CategoryColor } from '@/domain/calendar/events';
 import { levelRank, type ImportanceLevel } from '@/domain/calendar/importance';
+import { itemSummary, type CalendarItem } from '@/domain/calendar/items';
 import { locale, t } from '@/i18n';
+import { MotionList } from '@/ui/components/Display';
 import { formatDayMonth, formatWeekdayShort } from '@/lib/dates';
 import { levelText, repeatText, timeText } from './texts';
+import './calendar.css';
 
 /** The palette colour of a category as a CSS variable value (tokens.css --palette-*). */
 export const paletteVar = (color: CategoryColor | null | undefined) =>
@@ -24,52 +26,81 @@ export function ImportanceTag({ level }: { level: ImportanceLevel }) {
   return <span class={`cal-tag cal-tag--${level}`}>{levelText(level)}</span>;
 }
 
-interface OccurrenceRowProps {
-  occurrence: Occurrence;
-  onToggle: (o: Occurrence) => void;
-  onOpen: (o: Occurrence) => void;
+/** The colour of an item: its category's, or the accent for a task. */
+export function itemColor(item: CalendarItem): string {
+  return item.kind === 'task' ? 'var(--color-accent-text)' : paletteVar(item.occurrence.category?.color);
+}
+
+/** The line under an item's title. */
+export function itemMeta(item: CalendarItem): string {
+  if (item.kind === 'task') {
+    const due = item.overdue ? t('calendar.taskOverdue', { date: formatDayMonth(item.task.dueDate ?? item.day, locale()) }) : null;
+    return [t('calendar.task'), item.task.size, due, item.state === 'done' ? t('calendar.done') : null].filter(Boolean).join(' · ');
+  }
+  const o = item.occurrence;
+  const meta = [timeText(o), o.category?.name, repeatText(o.event)].filter(Boolean).join(' · ');
+  return item.state === 'skipped' ? `${t('calendar.skipped')} · ${meta}` : meta;
+}
+
+interface ItemRowProps {
+  item: CalendarItem;
+  onToggle: (item: CalendarItem) => void;
+  onOpen: (item: CalendarItem) => void;
+  /** The tick is busy (a task being completed). */
+  busy?: boolean;
 }
 
 /**
- * One occurrence in a list: tick (done, no points), the title with its time,
- * category and repetition, and how important it is. More important rows are
- * drawn stronger (cal-imp--*).
+ * One item in a list: the tick, the title with its time, category and repetition
+ * (or "Zadanie", size and due date), and how important it is. More important rows
+ * are drawn stronger (cal-imp--*). An entry's tick gives no points and can be
+ * undone; a task's goes through the tasks service and is final, as in v1.
  */
-export function OccurrenceRow({ occurrence: o, onToggle, onOpen }: OccurrenceRowProps) {
-  const title = o.event.title;
-  const meta = [timeText(o), o.category?.name, repeatText(o.event)].filter(Boolean).join(' · ');
-  const done = o.mark === 'done';
-  const skipped = o.mark === 'skipped';
+export function ItemRow({ item, onToggle, onOpen, busy = false }: ItemRowProps) {
+  const done = item.state === 'done';
+  const skipped = item.state === 'skipped';
+  const task = item.kind === 'task';
   return (
     <li
-      class={`cal-row cal-imp--${o.level}${done ? ' cal-row--done' : ''}${skipped ? ' cal-row--skipped' : ''}`}
-      style={{ '--cat-color': paletteVar(o.category?.color) }}
+      class={`cal-row cal-imp--${item.level}${task ? ' cal-row--task' : ''}${done ? ' cal-row--done' : ''}${skipped ? ' cal-row--skipped' : ''}`}
+      style={{ '--cat-color': itemColor(item) }}
     >
-      <button
-        type="button"
-        class={`cal-check${done ? ' cal-check--done' : ''}`}
-        aria-pressed={done}
-        aria-label={t(done ? 'calendar.markOpen' : 'calendar.markDone', { title })}
-        onClick={() => onToggle(o)}
-      >
-        <Check aria-hidden="true" />
-      </button>
-      <button type="button" class="cal-row__body" onClick={() => onOpen(o)}>
-        <span class="cal-row__title user-text clamp-2">{title}</span>
-        <span class="cal-row__meta user-text clamp-1">
-          {skipped ? `${t('calendar.skipped')} · ${meta}` : meta}
+      {task && done ? (
+        <span class="cal-check cal-check--done cal-check--static" aria-hidden="true">
+          <Check />
         </span>
+      ) : (
+        <button
+          type="button"
+          class={`cal-check${done ? ' cal-check--done' : ''}${task ? ' cal-check--task' : ''}`}
+          aria-pressed={task ? undefined : done}
+          aria-busy={busy || undefined}
+          disabled={busy}
+          aria-label={t(task ? 'calendar.taskDone' : done ? 'calendar.markOpen' : 'calendar.markDone', { title: item.title })}
+          onClick={() => onToggle(item)}
+        >
+          <Check aria-hidden="true" />
+        </button>
+      )}
+      <button type="button" class="cal-row__body" onClick={() => onOpen(item)}>
+        <span class="cal-row__title user-text clamp-2">{item.title}</span>
+        <span class="cal-row__meta user-text clamp-1">{itemMeta(item)}</span>
       </button>
-      <ImportanceTag level={o.level} />
+      <ImportanceTag level={item.level} />
     </li>
   );
 }
 
-export function OccurrenceList({ label, children }: { label: string; children: ComponentChildren }) {
+/**
+ * A list of items whose rows move (ui MotionList): they rise in one after another,
+ * a ticked row that leaves fades out while the rest close the gap, a reordered one
+ * glides to its new place.
+ */
+export function ItemList({ label, children }: { label: string; children: ComponentChildren }) {
   return (
-    <ul class="cal-list" aria-label={label}>
+    <MotionList class="cal-list" label={label}>
       {children}
-    </ul>
+    </MotionList>
   );
 }
 
@@ -105,17 +136,17 @@ interface WeekStripProps {
   days: readonly string[];
   focus: string;
   today: string;
-  occurrences: ReadonlyMap<string, readonly Occurrence[]>;
+  items: ReadonlyMap<string, readonly CalendarItem[]>;
   onSelect: (day: string) => void;
 }
 
 /** Seven days, Monday first: weekday, number and up to three marks; the chosen one filled. */
-export function WeekStrip({ days, focus, today, occurrences, onSelect }: WeekStripProps) {
+export function WeekStrip({ days, focus, today, items, onSelect }: WeekStripProps) {
   const lang = locale();
   return (
     <ol class="cal-strip" aria-label={t('calendar.weekDays')}>
       {days.map((day) => {
-        const summary = daySummary(occurrences.get(day) ?? []);
+        const summary = itemSummary(items.get(day) ?? []);
         const label = t('calendar.dayCell', { date: formatDayMonth(day, lang), count: summary.total });
         return (
           <li key={day}>
@@ -133,8 +164,8 @@ export function WeekStrip({ days, focus, today, occurrences, onSelect }: WeekStr
                 {Number(day.slice(8))}
               </span>
               <span class="cal-marks" aria-hidden="true">
-                {summary.marks.map((o) => (
-                  <span key={o.key} class={`cal-mark cal-mark--${o.level}`} style={{ '--cat-color': paletteVar(o.category?.color) }} />
+                {summary.marks.map((item) => (
+                  <ItemMark key={item.key} item={item} />
                 ))}
               </span>
             </button>
@@ -142,6 +173,16 @@ export function WeekStrip({ days, focus, today, occurrences, onSelect }: WeekStr
         );
       })}
     </ol>
+  );
+}
+
+/** A day cell's mark of one item: round for an entry, square for a task, bigger when more important. */
+export function ItemMark({ item }: { item: CalendarItem }) {
+  return (
+    <span
+      class={`cal-mark cal-mark--${item.level}${item.kind === 'task' ? ' cal-mark--task' : ''}${item.state === 'done' ? ' cal-mark--done' : ''}`}
+      style={{ '--cat-color': itemColor(item) }}
+    />
   );
 }
 

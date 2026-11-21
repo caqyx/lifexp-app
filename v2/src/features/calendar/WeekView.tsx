@@ -1,18 +1,16 @@
 // The week (#/calendar/week): the strip of seven days, then each day's entries, the
 // most important first. A tap on a day in the strip makes it the chosen day.
-import { byDay, type Occurrence } from '@/domain/calendar/agenda';
+import type { CalendarItem } from '@/domain/calendar/items';
 import { locale, t } from '@/i18n';
 import { addDays, formatDayMonth, formatWeekdayLong, weekOf } from '@/lib/dates';
-import { DayAgendaList } from './DayAgendaList';
+import { DayAgendaList, type ItemHandlers } from './DayAgendaList';
 import { PeriodNav, WeekStrip } from './parts';
 
-interface WeekViewProps {
+interface WeekViewProps extends ItemHandlers {
   focus: string;
   today: string;
-  occurrences: readonly Occurrence[];
+  items: ReadonlyMap<string, readonly CalendarItem[]>;
   onFocus: (day: string) => void;
-  onToggle: (o: Occurrence) => void;
-  onOpen: (o: Occurrence) => void;
 }
 
 /** "16–22 listopada" or "30 listopada – 6 grudnia". */
@@ -26,10 +24,9 @@ export function weekTitle(days: readonly string[]): string {
   return t('calendar.weekRange', { from: formatDayMonth(first, lang), to: formatDayMonth(last, lang) });
 }
 
-export function WeekView({ focus, today, occurrences, onFocus, onToggle, onOpen }: WeekViewProps) {
+export function WeekView({ focus, today, items, onFocus, ...handlers }: WeekViewProps) {
   const lang = locale();
   const days = weekOf(focus);
-  const grouped = byDay(occurrences);
 
   return (
     <div class="stack cal-view">
@@ -40,7 +37,7 @@ export function WeekView({ focus, today, occurrences, onFocus, onToggle, onOpen 
         onPrev={() => onFocus(addDays(focus, -7))}
         onNext={() => onFocus(addDays(focus, 7))}
       />
-      <WeekStrip days={days} focus={focus} today={today} occurrences={grouped} onSelect={onFocus} />
+      <WeekStrip days={days} focus={focus} today={today} items={items} onSelect={onFocus} />
       <div class="stack cal-week" key={days[0]}>
         {days.map((day) => (
           <section
@@ -55,9 +52,8 @@ export function WeekView({ focus, today, occurrences, onFocus, onToggle, onOpen 
             </h3>
             <DayAgendaList
               day={day}
-              occurrences={grouped.get(day) ?? []}
-              onToggle={onToggle}
-              onOpen={onOpen}
+              items={items.get(day) ?? []}
+              {...handlers}
               empty={t('calendar.weekDayEmpty')}
             />
           </section>
