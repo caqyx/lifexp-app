@@ -433,7 +433,8 @@ export default function TodayPage({ path, navigate }: RouteProps) {
   };
 
   const logChoreToday = (def: ChoreDef) => {
-    const { saved, undo } = logChore(uid, def, choresToday);
+    // The day of the tap, not of the last render: Today may have been left open over midnight.
+    const { saved, undo } = logChore(uid, def, localDayKey(new Date()));
     const failed = () => notify({ message: t('chores.saveFailed'), tone: 'negative' });
     saved.catch(failed);
     notify({

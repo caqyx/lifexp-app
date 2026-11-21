@@ -168,7 +168,7 @@ export default function TasksPage({ path, navigate }: RouteProps) {
 
   const complete = (task: Task) => {
     setBusyIds((ids) => new Set(ids).add(task.id));
-    completeTask(uid, task.id, today)
+    completeTask(uid, task.id)
       .then((pieces) =>
         notify(
           pieces > 0

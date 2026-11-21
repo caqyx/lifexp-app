@@ -43,7 +43,7 @@ function dueWords(task: Task, today: string): string {
 
 export const TASK_HANDLERS = {
   'complete-task': {
-    run: async (args, { uid, today }) => {
+    run: async (args, { uid }) => {
       const list = await loadedTasks().catch(() => null);
       if (!list) return { reply: t('tasks.loadFailed') };
       const found = findTask(args, open(list));
@@ -52,7 +52,7 @@ export const TASK_HANDLERS = {
       let pieces: number;
       try {
         // The screen's own transaction: done is final, the pieces go to the build only when it is in time.
-        pieces = await completeTask(uid, task.id, today);
+        pieces = await completeTask(uid, task.id);
       } catch {
         return { reply: t('tasks.completeFailed') };
       }

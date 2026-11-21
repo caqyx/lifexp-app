@@ -164,7 +164,7 @@ export default function CalendarModule({ path, navigate }: RouteProps) {
   /** v1 markTodoDone() through the tasks service: final, pieces only in time. */
   const finishTask = (task: Task, key: string) => {
     setBusyKey(key, true);
-    completeTask(uid, task.id, today)
+    completeTask(uid, task.id)
       .then((pieces) =>
         notify(
           pieces > 0
