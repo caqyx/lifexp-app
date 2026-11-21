@@ -829,6 +829,9 @@
     "stepper": {
       "less": "Mniej: {{label}}",
       "more": "Więcej: {{label}}"
+    },
+    "banner": {
+      "now": "teraz"
     }
   },
   "gallery": {
@@ -936,7 +939,7 @@
       "games": "Gry w aplikacji; czas grania liczy się sam, bez punktów.",
       "aichat": "Asystent AI, który pomaga zapisywać i planować.",
       "reader": "Książki PDF, EPUB, TXT i Markdown, zdanie po zdaniu. Zostają na tym urządzeniu; bez punktów.",
-      "calendar": "Wydarzenia z kategoriami i ważnością, widok miesiąca, tygodnia i dnia. Bez punktów."
+      "calendar": "Wydarzenia z kategoriami i ważnością, widok miesiąca, tygodnia i dnia, zadania w kalendarzu i powiadomienia w aplikacji. Bez punktów."
     },
     "theme": "Motyw",
     "family": "Styl",
@@ -2016,5 +2019,27 @@
     "importantSettled_few": "{{count}} zrobione dziś",
     "importantSettled_many": "{{count}} zrobionych dziś",
     "importantSettled_other": "{{count}} zrobionych dziś"
+  },
+  "notifications": {
+    "title": "Powiadomienia",
+    "bellUnread_one": "Powiadomienia, {{count}} nowe",
+    "bellUnread_few": "Powiadomienia, {{count}} nowe",
+    "bellUnread_many": "Powiadomienia, {{count}} nowych",
+    "bellUnread_other": "Powiadomienia, {{count}} nowych",
+    "empty": "Nic nowego",
+    "emptyBody": "Tutaj pojawią się przypomnienia z kalendarza i o terminach zadań, gdy aplikacja jest otwarta.",
+    "markAllRead": "Oznacz wszystkie jako przeczytane",
+    "unread": "nieprzeczytane",
+    "more_one": "i jeszcze {{count}} przypomnienie",
+    "more_few": "i jeszcze {{count}} przypomnienia",
+    "more_many": "i jeszcze {{count}} przypomnień",
+    "more_other": "i jeszcze {{count}} przypomnień",
+    "today": "dziś",
+    "tomorrow": "jutro",
+    "dayAfter": "pojutrze",
+    "yesterday": "wczoraj",
+    "taskDue": "Termin zadania: {{day}}",
+    "taskOverdue": "Zadanie po terminie ({{date}})",
+    "shownAt": "{{day}}, {{time}}"
   }
 }

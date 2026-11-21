@@ -1,0 +1,162 @@
+/* In-app notification banner (ui/banner.ts): slides in from the top, like a phone's. */
+
+.ui-banner-host {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + var(--space-2));
+  right: 0;
+  left: 0;
+  z-index: var(--z-toast);
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--space-2);
+  pointer-events: none;
+}
+
+.ui-banner {
+  --drag-y: 0px;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+  max-width: 480px;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: 22px;
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-2);
+  pointer-events: auto;
+  touch-action: none;
+  transform: translateY(var(--drag-y));
+  transition: transform var(--duration-enter) var(--ease-out);
+  animation: ui-banner-in var(--duration-enter) var(--ease-out);
+  user-select: none;
+}
+
+.ui-banner.is-dragging {
+  transition: none;
+}
+
+.ui-banner--leaving {
+  pointer-events: none;
+  animation: ui-banner-out var(--duration-exit) var(--ease-in) forwards;
+}
+
+/* Liquid glass (iOS theme): a floating glass panel like the toasts. */
+:root[data-glass] .ui-banner.ui-glass {
+  border: 0;
+  border-radius: 26px;
+  box-shadow:
+    var(--glass-rim),
+    var(--glass-shadow);
+}
+
+.ui-banner__open {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ui-banner__open:focus-visible,
+.ui-banner__close:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.ui-banner__source {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.ui-banner__app {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--gradient-accent);
+  color: var(--color-on-accent);
+}
+
+.ui-banner__app svg {
+  width: 13px;
+  height: 13px;
+  stroke-width: 2.5;
+}
+
+.ui-banner__when {
+  margin-left: auto;
+  font-weight: var(--font-weight-medium);
+  text-transform: none;
+}
+
+.ui-banner__title {
+  overflow: hidden;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-banner__body {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.ui-banner__close {
+  flex-shrink: 0;
+  align-self: center;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--color-accent-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.ui-banner__close:hover {
+  background: var(--color-accent-soft);
+}
+
+@keyframes ui-banner-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-100% - var(--space-4)));
+  }
+}
+
+@keyframes ui-banner-out {
+  from {
+    transform: translateY(var(--drag-y));
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(calc(-100% - var(--space-4)));
+  }
+}

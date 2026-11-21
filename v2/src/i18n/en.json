@@ -829,6 +829,9 @@
     "stepper": {
       "less": "Less: {{label}}",
       "more": "More: {{label}}"
+    },
+    "banner": {
+      "now": "now"
     }
   },
   "gallery": {
@@ -936,7 +939,7 @@
       "games": "Games in the app; playing time counts itself, no points.",
       "aichat": "An AI assistant that helps you log and plan.",
       "reader": "PDF, EPUB, TXT and Markdown books, sentence by sentence. They stay on this device; no points.",
-      "calendar": "Events with categories and importance; month, week and day views. No points."
+      "calendar": "Events with categories and importance; month, week and day views, tasks in the calendar and in-app notifications. No points."
     },
     "theme": "Theme",
     "family": "Style",
@@ -2016,5 +2019,27 @@
     "importantSettled_few": "{{count}} done today",
     "importantSettled_many": "{{count}} done today",
     "importantSettled_other": "{{count}} done today"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "bellUnread_one": "Notifications, {{count}} new",
+    "bellUnread_few": "Notifications, {{count}} new",
+    "bellUnread_many": "Notifications, {{count}} new",
+    "bellUnread_other": "Notifications, {{count}} new",
+    "empty": "Nothing new",
+    "emptyBody": "Reminders from the calendar and about task due dates show up here while the app is open.",
+    "markAllRead": "Mark all as read",
+    "unread": "unread",
+    "more_one": "and {{count}} more reminder",
+    "more_few": "and {{count}} more reminders",
+    "more_many": "and {{count}} more reminders",
+    "more_other": "and {{count}} more reminders",
+    "today": "today",
+    "tomorrow": "tomorrow",
+    "dayAfter": "the day after tomorrow",
+    "yesterday": "yesterday",
+    "taskDue": "Task due {{day}}",
+    "taskOverdue": "Task overdue ({{date}})",
+    "shownAt": "{{day}}, {{time}}"
   }
 }

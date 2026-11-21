@@ -7,7 +7,11 @@ import type { ComponentChildren } from 'preact';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { isModuleOn, type ModuleChoice } from '@/domain/modules';
 import { t } from '@/i18n';
+import { NotificationBell } from '@/features/notifications/NotificationBell';
+import { Reminders } from '@/features/notifications/Reminders';
 import { requestExusFocus } from '@/stores/exusFocus';
+import { account as currentAccount } from '@/stores/session';
+import { BannerHost } from '@/ui/components/BannerHost';
 import { ToastHost } from '@/ui/components/ToastHost';
 import { useLiquidGlass } from '@/ui/glass/useLiquidGlass';
 import { playEnter } from '@/ui/motion';
@@ -75,6 +79,8 @@ export function AppShell({ title, activeId, path, account, modules, onSignOut, c
   }, []);
   // Ctrl/Cmd+K: Ex-us from anywhere, with the field focused (PLAN.md 6.10). Not while a layer is open.
   const exusOn = isModuleOn('aichat', modules);
+  const remindersOn = isModuleOn('calendar', modules);
+  const uid = currentAccount.value?.user.uid ?? null;
   const pathRef = useRef(path);
   pathRef.current = path;
   useEffect(() => {
@@ -265,6 +271,8 @@ export function AppShell({ title, activeId, path, account, modules, onSignOut, c
       <div ref={contentRef} class="shell__content" inert={modal}>
         <header ref={topbarRef} class="topbar ui-glass">
           <h1 class="topbar__title">{title}</h1>
+          {/* In-app reminders come with the calendar (c-3): its entries and the tasks' due dates. */}
+          {remindersOn && uid && <NotificationBell uid={uid} navigate={navigate} />}
         </header>
         {offline && (
           <p class="shell__offline" role="status">
@@ -302,6 +310,8 @@ export function AppShell({ title, activeId, path, account, modules, onSignOut, c
       )}
       {drawerMode && !open && standalone && <div class="shell__edge" aria-hidden="true" {...gestureHandlers} />}
       <ToastHost />
+      <BannerHost />
+      {remindersOn && uid && <Reminders uid={uid} navigate={navigate} />}
     </div>
   );
 }

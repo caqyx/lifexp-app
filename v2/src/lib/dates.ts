@@ -160,3 +160,8 @@ export function formatMonthShort(monthKey: string, locale: string): string {
 export function formatDayShort(key: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(keyToUtcDate(key));
 }
+
+/** "17:05" / "5:05 pm": the time of a moment on this device, in the language's clock. */
+export function formatTimeOfDay(date: Date, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(date);
+}

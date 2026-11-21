@@ -1,0 +1,174 @@
+/* The bell in the top bar and the list of recent reminders (c-3). */
+
+.notice-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.notice-bell:hover {
+  background: var(--color-accent-soft);
+}
+
+.notice-bell:active {
+  transform: scale(0.96);
+}
+
+.notice-bell:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.notice-bell svg {
+  width: 20px;
+  height: 20px;
+}
+
+.notice-bell--unread {
+  color: var(--color-text);
+}
+
+.notice-bell--unread svg {
+  color: var(--color-accent-text);
+  transform-origin: 50% 10%;
+  animation: notice-bell-ring var(--duration-page-turn) var(--ease-out);
+}
+
+.notice-bell__count {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-negative);
+  color: var(--color-bg);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  animation: notice-count-in var(--duration-enter) var(--ease-spring);
+}
+
+/* A new unread reminder: the bell swings once (rotation is a transform). */
+@keyframes notice-bell-ring {
+  20% {
+    transform: rotate(14deg);
+  }
+
+  45% {
+    transform: rotate(-10deg);
+  }
+
+  70% {
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes notice-count-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+/* On a narrow phone with a long screen title the word gives way; the bell and count stay. */
+@media (max-width: 359.98px) {
+  .notice-bell__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* ── The list ── */
+
+.notice-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notice-row + .notice-row {
+  border-top: 1px solid var(--color-separator);
+}
+
+.notice-row__button {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-3) var(--space-1);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.notice-row__button:hover {
+  background: var(--color-accent-soft);
+}
+
+.notice-row__button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.notice-row__source {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.notice-row__when {
+  margin-left: auto;
+  font-weight: var(--font-weight-medium);
+  text-transform: none;
+}
+
+.notice-row__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
+.notice-row__title {
+  font-weight: var(--font-weight-medium);
+}
+
+.notice-row--unread .notice-row__title {
+  font-weight: var(--font-weight-bold);
+}
+
+.notice-row__body {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
