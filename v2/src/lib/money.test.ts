@@ -51,3 +51,15 @@ describe('v1 boundary', () => {
     expect(zlotyFromGrosze(1250)).toBe(12.5);
   });
 });
+
+describe('the balance moved in grosze, as v1 moves it in złoty', () => {
+  test("lands where v1's round2(current + delta) lands, for balances from -50 to 2000 zł", () => {
+    const round2 = (x: number) => Math.round(x * 100) / 100;
+    for (let cents = -5000; cents <= 200_000; cents += 7) {
+      const current = cents / 100;
+      for (const delta of [0.01, 0.1, 0.45, 3.15, 12.5, -0.01, -4.99, -19.99]) {
+        expect(zlotyFromGrosze(groszeFromZloty(current) + groszeFromZloty(delta))).toBe(round2(current + delta));
+      }
+    }
+  });
+});
