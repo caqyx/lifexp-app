@@ -760,7 +760,6 @@
   },
   "add": {
     "title": "Add",
-    "intro": "Adding moves to the new version with each module. What is not here yet, you add in the current version of LifeXP.",
     "activity": "Activity",
     "task": "Task",
     "event": "Event",
@@ -868,6 +867,7 @@
     "secondary": "Cancel",
     "quiet": "All",
     "danger": "Delete",
+    "quietDanger": "Delete in a row",
     "busy": "Saving",
     "addExpense": "Add expense",
     "fields": "Fields",
@@ -2041,5 +2041,9 @@
     "taskDue": "Task due {{day}}",
     "taskOverdue": "Task overdue ({{date}})",
     "shownAt": "{{day}}, {{time}}"
+  },
+  "charts": {
+    "noPoints": "No points on these days.",
+    "noGaming": "No gaming on these days."
   }
 }

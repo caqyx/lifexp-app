@@ -39,7 +39,7 @@ export function ActivityRow({ activity, names, onDelete }: ActivityRowProps) {
       valueTone="positive"
       trailing={
         onDelete && (
-          <Button variant="quiet" onClick={() => onDelete(activity)} aria-label={t('activity.deleteNamed', { name })}>
+          <Button variant="quiet-danger" onClick={() => onDelete(activity)} aria-label={t('activity.deleteNamed', { name })}>
             {t('activity.delete')}
           </Button>
         )

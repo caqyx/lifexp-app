@@ -44,6 +44,32 @@
   padding: 0 var(--space-1);
 }
 
+/* The title row's one text action ("Wszystkie", "Edytuj listę"): a full 44 px target
+   whose extra height and inset hang outside the 24 px row, so the text still lines up
+   with the card edge below and the row does not grow. */
+.ui-section__header > :is(a, button):not(.ui-button) {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  min-height: var(--touch-target);
+  margin: calc((24px - var(--touch-target)) / 2) calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.ui-section__header > :is(a, button):not(.ui-button):hover,
+.ui-section__header > :is(a, button):not(.ui-button):active {
+  background: var(--color-accent-soft);
+}
+
 .ui-section__title {
   min-width: 0;
   color: var(--color-text-secondary);

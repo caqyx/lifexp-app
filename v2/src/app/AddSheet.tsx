@@ -1,5 +1,5 @@
-// What the tab bar's "+" opens (D10). Each kind of item moves here with its module
-// (stage 3); until then the row says when, and the footer hands over to v1.
+// What the tab bar's "+" opens (D10): one row per kind of item, each opening where it
+// is added. A row without a path says when it comes; the footer still links to v1.
 import { CalendarPlus, ClipboardCheck, ListTodo, type LucideIcon, NotebookPen, Wallet, Zap } from 'lucide-preact';
 import { isModuleOn, type ModuleChoice, type OptionalModule } from '@/domain/modules';
 import { t } from '@/i18n';
@@ -44,12 +44,13 @@ export function AddSheet({ open, modules, onClose, onPick }: AddSheetProps) {
       onClose={onClose}
       title={t('add.title')}
       footer={
-        <ButtonLink variant="primary" size="lg" block href="../app.html">
+        // Everything listed is added here; the old version stays reachable for the rest
+        // (e.g. a gaming session), as a quiet way out rather than the sheet's main action.
+        <ButtonLink variant="quiet" block href="../app.html">
           {t('add.openV1')}
         </ButtonLink>
       }
     >
-      <p class="add-sheet__intro">{t('add.intro')}</p>
       <Card padding="none">
         <List>
           {items.map(({ icon: Icon, labelKey, stage, path }) => (

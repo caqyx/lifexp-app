@@ -38,7 +38,6 @@ export function ImportantTodayCard({ uid, today, navigate }: ImportantTodayCardP
   const title = t('calendar.importantToday');
   const link = (
     <a
-      class="today-card__link"
       href="#/calendar/day"
       onClick={() => {
         calendarFocus.value = null;

@@ -49,7 +49,7 @@ function LoanRow({ loan, onRepay, onDelete }: { loan: Loan; onRepay: (l: Loan) =
             {t('money.repay')}
           </Button>
         )}
-        <Button variant="quiet" onClick={() => onDelete(loan)} aria-label={t('money.deleteNamedLoan', { title })}>
+        <Button variant="quiet-danger" onClick={() => onDelete(loan)} aria-label={t('money.deleteNamedLoan', { title })}>
           {t('money.delete')}
         </Button>
       </div>

@@ -81,6 +81,7 @@ function Charts({ s, todayKey }: { s: ParentSummary; todayKey: string }) {
           <BarChart
             label={t('parent.pointsWeek')}
             data={weekBars(s.week, todayKey, (d) => d.points, (n) => t('units.points', { points: n }))}
+            emptyText={t('charts.noPoints')}
           />
         </Card>
       </Section>
@@ -93,6 +94,7 @@ function Charts({ s, todayKey }: { s: ParentSummary; todayKey: string }) {
           <BarChart
             label={t('parent.gamingWeek')}
             data={weekBars(s.week, todayKey, (d) => d.gamingMinutes, formatDuration)}
+            emptyText={t('charts.noGaming')}
           />
         </Card>
       </Section>

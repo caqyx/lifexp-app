@@ -275,9 +275,13 @@ test('a sheet’s content follows it up, part after part', async ({ page, accoun
   await page.locator('.tabbar').getByRole('button', { name: 'Dodaj' }).click();
   const sheet = page.getByRole('dialog', { name: 'Dodaj' });
   await expect(sheet).toBeVisible();
+  // The body's parts rise with the sheet; inside them (the Add sheet is one list), rows
+  // follow one after another.
   const parts = await cssAnimations(sheet.locator('.ui-sheet__body > *'));
   expect(parts.map((p) => p.name)).toEqual(parts.map(() => 'ui-rise-in'));
-  expect(parts[1].delay).toBeGreaterThan(parts[0].delay);
+  const rows = await cssAnimations(sheet.locator('.ui-list > li'));
+  expect(rows.map((p) => p.name)).toEqual(rows.map(() => 'ui-rise-in'));
+  expect(rows[1].delay).toBeGreaterThan(rows[0].delay);
 });
 
 test.describe('with reduced motion, nothing new moves either', () => {

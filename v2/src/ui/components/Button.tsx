@@ -1,7 +1,13 @@
 import type { ComponentChildren, JSX } from 'preact';
 import './Button.css';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
+/**
+ * primary: the one main action. secondary: a filled alternative. quiet: a text action.
+ * danger: a destructive action that stands alone (a dialog's confirm). quiet-danger: a
+ * destructive text action next to others (Usuń in a row or card), red so it never looks
+ * like the safe actions beside it.
+ */
+export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger' | 'quiet-danger';
 
 export interface ButtonProps extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, 'class' | 'className' | 'size'> {
   variant?: ButtonVariant;

@@ -61,7 +61,7 @@ function TxRow({ tx, color, onDelete }: { tx: MoneyTx; color: string | undefined
       </span>
       <span class={`money-tx__amount numeric tone-${income ? 'positive' : 'negative'}`}>{amount}</span>
       <Button
-        variant="quiet"
+        variant="quiet-danger"
         onClick={() => onDelete(tx)}
         aria-label={t('money.deleteNamed', { category: tx.category, amount })}
       >

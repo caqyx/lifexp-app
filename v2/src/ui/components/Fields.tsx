@@ -357,15 +357,20 @@ interface SegmentedControlProps<T extends string> {
   value: T;
   options: readonly Choice<T>[];
   onChange: (value: T) => void;
+  /**
+   * The label is read out but not shown: for a filter at the top of a screen whose
+   * options say it all ("Aktywne | Zarchiwizowane"). Form fields keep it visible.
+   */
+  hideLabel?: boolean;
 }
 
 /** 2–4 mutually exclusive options. Native radios underneath: arrow keys and screen readers work as usual. */
-export function SegmentedControl<T extends string>({ label, value, options, onChange }: SegmentedControlProps<T>) {
+export function SegmentedControl<T extends string>({ label, value, options, onChange, hideLabel = false }: SegmentedControlProps<T>) {
   const name = useId();
   const active = options.findIndex((o) => o.value === value);
   return (
     <fieldset class="ui-segmented">
-      <legend class="ui-field__label">{label}</legend>
+      <legend class={hideLabel ? 'visually-hidden' : 'ui-field__label'}>{label}</legend>
       <div class="ui-segmented__track" style={{ '--segments': String(options.length), '--active': String(active) }}>
         {/* One thumb slides under the options instead of each option lighting up on its own. */}
         {active >= 0 && <span class="ui-segmented__thumb" aria-hidden="true" />}

@@ -760,7 +760,6 @@
   },
   "add": {
     "title": "Dodaj",
-    "intro": "Dodawanie przechodzi do nowej wersji razem z modułami. Czego tu jeszcze nie ma, dodasz w obecnej wersji LifeXP.",
     "activity": "Aktywność",
     "task": "Zadanie",
     "event": "Wydarzenie",
@@ -868,6 +867,7 @@
     "secondary": "Anuluj",
     "quiet": "Wszystkie",
     "danger": "Usuń",
+    "quietDanger": "Usuń w wierszu",
     "busy": "Zapisywanie",
     "addExpense": "Dodaj wydatek",
     "fields": "Pola",
@@ -2041,5 +2041,9 @@
     "taskDue": "Termin zadania: {{day}}",
     "taskOverdue": "Zadanie po terminie ({{date}})",
     "shownAt": "{{day}}, {{time}}"
+  },
+  "charts": {
+    "noPoints": "Brak punktów w tych dniach.",
+    "noGaming": "Bez grania w tych dniach."
   }
 }

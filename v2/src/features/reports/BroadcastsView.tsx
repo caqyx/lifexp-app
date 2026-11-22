@@ -107,7 +107,7 @@ export function BroadcastsView() {
                         .join(' · ')}
                     </span>
                   </span>
-                  <Button variant="quiet" onClick={() => setRemoving(b)} aria-label={t('broadcasts.deleteNamed', { text: b.text })}>
+                  <Button variant="quiet-danger" onClick={() => setRemoving(b)} aria-label={t('broadcasts.deleteNamed', { text: b.text })}>
                     {t('settings.delete')}
                   </Button>
                 </li>

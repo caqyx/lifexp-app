@@ -42,11 +42,11 @@ function Totals({ profile, gamingMinutes }: { profile: Profile; gamingMinutes: n
   );
 }
 
-function WeekChart({ title, data }: { title: string; data: BarDatum[] }) {
+function WeekChart({ title, data, emptyText }: { title: string; data: BarDatum[]; emptyText: string }) {
   return (
     <Section title={title}>
       <Card>
-        <BarChart label={title} data={data} />
+        <BarChart label={title} data={data} emptyText={emptyText} />
       </Card>
     </Section>
   );
@@ -190,10 +190,12 @@ export function OverviewView({ uid, profile }: { uid: string; profile: Profile }
           <WeekChart
             title={t('stats.pointsChart')}
             data={weekBars(weeks.thisWeek, todayKey, (d) => d.points, pointsUnit)}
+            emptyText={t('charts.noPoints')}
           />
           <WeekChart
             title={t('stats.gamingChart')}
             data={weekBars(weeks.thisWeek, todayKey, (d) => d.gamingMinutes, formatDuration)}
+            emptyText={t('charts.noGaming')}
           />
         </>
       ) : (

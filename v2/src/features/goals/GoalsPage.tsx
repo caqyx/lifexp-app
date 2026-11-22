@@ -64,7 +64,7 @@ function GoalCard({ goal, pointsTotal, onDeposit, onEdit, onDelete }: GoalCardPr
           <Button variant="quiet" onClick={() => onEdit(goal)} aria-label={t('goals.editNamed', { name: goal.name })}>
             {t('goals.edit')}
           </Button>
-          <Button variant="quiet" onClick={() => onDelete(goal)} aria-label={t('goals.deleteNamed', { name: goal.name })}>
+          <Button variant="quiet-danger" onClick={() => onDelete(goal)} aria-label={t('goals.deleteNamed', { name: goal.name })}>
             {t('goals.delete')}
           </Button>
         </div>

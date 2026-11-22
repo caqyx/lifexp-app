@@ -96,7 +96,7 @@ export function ActivitiesSection({ uid }: { uid: string; profile: Profile }) {
                     </span>
                   </button>
                   <Button
-                    variant="quiet"
+                    variant="quiet-danger"
                     onClick={() => remove(def)}
                     aria-label={t('settings.activityDeleteNamed', { name: def.name })}
                   >

@@ -78,7 +78,7 @@ function TaskRow({ task, today, busy, onComplete, onOpen, onDelete }: TaskRowPro
         </button>
       )}
       {task.done && (
-        <Button variant="quiet" onClick={() => onDelete(task)} aria-label={t('tasks.deleteNamed', { text: label })}>
+        <Button variant="quiet-danger" onClick={() => onDelete(task)} aria-label={t('tasks.deleteNamed', { text: label })}>
           {t('tasks.delete')}
         </Button>
       )}

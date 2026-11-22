@@ -89,7 +89,7 @@ export function DefsView({ uid, defs }: { uid: string; defs: readonly ChoreDef[]
                     </span>
                   </span>
                 </button>
-                <Button variant="quiet" onClick={() => remove(def)} aria-label={t('chores.deleteNamed', { name: def.name })}>
+                <Button variant="quiet-danger" onClick={() => remove(def)} aria-label={t('chores.deleteNamed', { name: def.name })}>
                   {t('chores.delete')}
                 </Button>
               </li>

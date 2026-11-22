@@ -374,7 +374,7 @@
 }
 
 .today-chore__emoji {
-  font-size: 20px;
+  font-size: var(--font-size-lg);
   line-height: 1;
 }
 
@@ -408,13 +408,6 @@
 
 .today-chore--done .today-check svg {
   transform: scale(1);
-}
-
-.today-card__link--button {
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
 }
 
 /* ── The card's editor ── */
@@ -463,13 +456,6 @@
 }
 
 /* ── Goals ── */
-
-.today-card__link {
-  color: var(--color-accent-text);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  text-decoration: none;
-}
 
 .today-goals {
   margin: 0;

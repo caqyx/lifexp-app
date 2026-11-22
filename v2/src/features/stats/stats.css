@@ -91,7 +91,7 @@
 }
 
 .stats-badge__emoji {
-  font-size: 26px;
+  font-size: var(--font-size-xl);
   line-height: 1.2;
 }
 

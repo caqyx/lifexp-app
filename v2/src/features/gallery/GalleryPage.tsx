@@ -199,6 +199,7 @@ export default function GalleryPage() {
                 <Button>{t('gallery.secondary')}</Button>
                 <Button variant="quiet">{t('gallery.quiet')}</Button>
                 <Button variant="danger">{t('gallery.danger')}</Button>
+                <Button variant="quiet-danger">{t('gallery.quietDanger')}</Button>
                 <Button variant="primary" busy>
                   {t('gallery.busy')}
                 </Button>

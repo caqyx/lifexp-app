@@ -246,7 +246,7 @@ function GoalsCard({ uid, profile }: { uid: string; profile: Profile }) {
     <Section
       title={t('today.goals')}
       action={
-        <a class="today-card__link" href="#/goals">
+        <a href="#/goals">
           {t('today.goalsOpen')}
         </a>
       }
@@ -341,7 +341,7 @@ function RecentActivities({ recent, names }: { recent: readonly Activity[]; name
     <Section
       title={t('today.recent')}
       action={
-        <a class="today-card__link" href="#/stats/history">
+        <a href="#/stats/history">
           {t('today.recentAll')}
         </a>
       }

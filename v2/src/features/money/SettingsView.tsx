@@ -173,7 +173,7 @@ export function SettingsView({ uid, categories, txs, limit }: SettingsViewProps)
                   <span class="money-tx__dot" style={{ '--category-color': category.color }} aria-hidden="true" />
                   <span class="money-category__name user-text">{category.name}</span>
                   <Button
-                    variant="quiet"
+                    variant="quiet-danger"
                     onClick={() => remove(category)}
                     aria-label={t('money.deleteCategoryNamed', { name: category.name })}
                   >
