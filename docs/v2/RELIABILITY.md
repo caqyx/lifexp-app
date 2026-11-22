@@ -21,6 +21,11 @@ Dodatkowe testy ścieżek krytycznych (bez znalezionych różnic): przesunięcie
 `round2(punkty × kurs)` v1 dla 1–10 000 pkt przy kilku kursach (`domain/chores.test.ts`). Kopie domeny w
 `functions/src/v2` przegenerowane (`gen:shared-domain`).
 
+Niestabilne testy e2e (bez zmian w aplikacji): `calendar.spec.js` „tasks show on their due day…” w niedzielę
+szukał jutrzejszego zadania w bieżącym tygodniu (jutro to już następny tydzień) — teraz bierze inny dzień tego
+samego tygodnia; `exus.spec.js` „a goal is found…” sprawdzał ostatnią odpowiedź, która przed nową odpowiedzią miała
+już ten sam tekst — teraz czeka na odpowiedź tej komendy.
+
 ## Sprawdzone bez błędów
 
 Konwertery (profil, cele, transakcje, pożyczki, obowiązki, zadania, kalendarz) dają wartości domyślne dla braków

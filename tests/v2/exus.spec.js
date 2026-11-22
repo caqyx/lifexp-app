@@ -337,8 +337,10 @@ test('a goal is found by a part of its name or a typo; several fits are listed, 
   await expect(replies.last()).toHaveText('Wpłacono 10,00 zł na: Rower szosowy');
   await send(page, '/wplac ZAGLOWKA 5');
   await expect(replies.last()).toHaveText('Wpłacono 5,00 zł na: Żaglówka');
+  // The same reply as the one before: wait for this command's own reply, not the last one on screen.
+  const shown = await replies.count();
   await send(page, '/wplac zaglowca 5');
-  await expect(replies.last()).toHaveText('Wpłacono 5,00 zł na: Żaglówka');
+  await expect(replies.nth(shown)).toHaveText('Wpłacono 5,00 zł na: Żaglówka');
   await send(page, '/wplac samochód 5');
   await expect(replies.last()).toContainText('Nie ma celu „samochód”.');
   await send(page, '/usun-cel rower');
