@@ -1,11 +1,12 @@
 // Stand-in for every module until its stage lands. Points back to v1, which keeps
 // working on the same data.
 import { t } from '@/i18n';
+import { Page } from '@/ui/components/Layout';
 import type { FeatureDef } from './registry';
 
 export function ComingSoonPage({ feature }: { feature: FeatureDef }) {
   return (
-    <div class="page">
+    <Page>
       <section class="coming-soon" aria-labelledby="coming-soon-title">
         <p class="coming-soon__overline">{t('comingSoon.overline')}</p>
         <h2 id="coming-soon-title" class="coming-soon__title">
@@ -16,6 +17,6 @@ export function ComingSoonPage({ feature }: { feature: FeatureDef }) {
           {t('comingSoon.openV1')}
         </a>
       </section>
-    </div>
+    </Page>
   );
 }
