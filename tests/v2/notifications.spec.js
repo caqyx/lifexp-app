@@ -143,7 +143,10 @@ test('back from the background: several waiting become one banner, not a flood',
   await expect(banner(page)).toContainText('Ważne spotkanie');
   await expect(banner(page)).toContainText('Dziś · 12:30 · Ważne · i jeszcze 2 przypomnienia');
   await expect(bell(page).locator('.notice-bell__count')).toHaveText('3');
-  // Swipe up to put it away.
+  // Swipe up to put it away. Measured once it has slid in: it arrives from above the
+  // screen, and a box taken on its first frames lies off screen, so the "finger" would
+  // press nothing (CI 2026-11-22).
+  await banner(page).evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished.catch(() => {}))));
   const box = await banner(page).boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
