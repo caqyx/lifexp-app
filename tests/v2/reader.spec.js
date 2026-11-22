@@ -4,7 +4,7 @@
 // real books), kept in this browser's IndexedDB only, and read in the three modes.
 const path = require('path');
 const { createUser, db } = require('../support/emulator');
-const { test, expect, openSignedIn, appUrl } = require('../support/v2');
+const { test, expect, openSignedIn, appUrl, signIn } = require('../support/v2');
 // The reader's own EPUB library, from v2's dependencies: the root has no copy.
 const JSZip = require(path.join(__dirname, '..', '..', 'v2', 'node_modules', 'jszip'));
 
@@ -78,9 +78,10 @@ async function makeEpub() {
 /** The reader's book records in this browser's IndexedDB. */
 function storedBooks(page) {
   return page.evaluate(
-    () =>
-      new Promise((resolve, reject) => {
-        const open = indexedDB.open('lifexp-v2-reader');
+    async () => {
+      const dbName = (await indexedDB.databases()).map((d) => d.name).find((n) => n && n.startsWith('lifexp-v2-reader:'));
+      return new Promise((resolve, reject) => {
+        const open = indexedDB.open(dbName);
         open.onerror = () => reject(open.error);
         open.onsuccess = () => {
           const db = open.result;
@@ -91,7 +92,8 @@ function storedBooks(page) {
           };
           req.onerror = () => reject(req.error);
         };
-      }),
+      });
+    },
   );
 }
 
@@ -378,4 +380,90 @@ test('Normalny follows the scroll, and a reload opens where it stopped', async (
   // At the very end the last sentence counts as read.
   await page.locator('.reader__scroller--normal').evaluate((el) => el.scrollTo(0, el.scrollHeight));
   await expect(status(page)).toHaveText('100%zdanie 60 z 60');
+});
+
+// ── The library is per account (owner's decision 2026-11-22) ──
+
+async function signOutHere(page) {
+  await page.evaluate(() => (location.hash = '#/today'));
+  await page.locator('.tabbar').getByRole('button', { name: 'Menu' }).click();
+  await page.getByRole('region', { name: 'Konto' }).getByRole('button', { name: 'Wyloguj' }).click();
+  await expect(page.getByRole('heading', { name: 'Zaloguj się' })).toBeVisible();
+}
+
+/** Signs in on the login screen already shown (no reload: nothing of the previous account is reloaded away). */
+async function signInHere(page, account) {
+  await signIn(page, account);
+  await expect(page.locator('.shell')).toBeVisible({ timeout: 15000 });
+  await page.evaluate(() => (location.hash = '#/reader'));
+}
+
+test("two accounts on one browser: each sees only its own books, and its own come back", async ({ page }) => {
+  const a = await createUser({ tag: 'reader-owner-a', profile: { optInModules: ['reader'] } });
+  const b = await createUser({ tag: 'reader-owner-b', profile: { optInModules: ['reader'] } });
+  await openSignedIn(page, a, '#/reader');
+  await importFiles(page, [TXT]);
+  await expect(bookRow(page, 'Krótka opowieść')).toBeVisible();
+
+  await signOutHere(page);
+  await signInHere(page, b);
+  await expect(page.getByText('Biblioteka jest pusta. Dodaj pierwszą książkę.')).toBeVisible();
+  await expect(bookRow(page, 'Krótka opowieść')).toHaveCount(0);
+  await importFiles(page, [MD]);
+  await expect(bookRow(page, 'Notatki')).toBeVisible();
+
+  await signOutHere(page);
+  await signInHere(page, a);
+  await expect(bookRow(page, 'Krótka opowieść')).toBeVisible();
+  await expect(bookRow(page, 'Notatki')).toHaveCount(0);
+  // One database per account; nothing under the old shared name.
+  const names = await page.evaluate(async () => (await indexedDB.databases()).map((d) => d.name).filter((n) => n.startsWith('lifexp-v2-reader')).sort());
+  expect(names).toEqual([`lifexp-v2-reader:${a.uid}`, `lifexp-v2-reader:${b.uid}`].sort());
+});
+
+test('the shared library from before the update goes to the first account that opens the reader, and only to it', async ({ page }) => {
+  const maker = await createUser({ tag: 'reader-legacy-maker', profile: { optInModules: ['reader'] } });
+  const first = await createUser({ tag: 'reader-legacy-first', profile: { optInModules: ['reader'] } });
+  // A real book, made by the app, then moved into the old per-device database as the earlier build kept it.
+  await openSignedIn(page, maker, '#/reader');
+  await importFiles(page, [TXT]);
+  await expect(bookRow(page, 'Krótka opowieść')).toBeVisible();
+  await signOutHere(page);
+  await page.evaluate(async (from) => {
+    const req = (r) => new Promise((resolve, reject) => ((r.onsuccess = () => resolve(r.result)), (r.onerror = () => reject(r.error))));
+    const stores = ['meta', 'content', 'settings', 'assets', 'files'];
+    const source = await req(indexedDB.open(from));
+    const read = source.transaction(stores);
+    const data = {};
+    for (const s of stores) data[s] = { keys: await req(read.objectStore(s).getAllKeys()), values: await req(read.objectStore(s).getAll()) };
+    source.close();
+    const open = indexedDB.open('lifexp-v2-reader', 2);
+    open.onupgradeneeded = () => {
+      open.result.createObjectStore('meta', { keyPath: 'id' });
+      open.result.createObjectStore('content', { keyPath: 'id' });
+      for (const s of ['settings', 'assets', 'files']) open.result.createObjectStore(s);
+    };
+    const legacy = await req(open);
+    const write = legacy.transaction(stores, 'readwrite');
+    for (const s of stores) {
+      data[s].values.forEach((v, i) => (s === 'meta' || s === 'content' ? write.objectStore(s).put(v) : write.objectStore(s).put(v, data[s].keys[i])));
+    }
+    await new Promise((resolve) => (write.oncomplete = resolve));
+    legacy.close();
+    await req(indexedDB.deleteDatabase(from));
+  }, `lifexp-v2-reader:${maker.uid}`);
+
+  await signInHere(page, first);
+  await expect(bookRow(page, 'Krótka opowieść')).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(async () => (await indexedDB.databases()).some((d) => d.name === 'lifexp-v2-reader')))
+    .toBe(false);
+
+  // Taken: another account does not get it, the first one keeps it.
+  await signOutHere(page);
+  await signInHere(page, maker);
+  await expect(page.getByText('Biblioteka jest pusta. Dodaj pierwszą książkę.')).toBeVisible();
+  await signOutHere(page);
+  await signInHere(page, first);
+  await expect(bookRow(page, 'Krótka opowieść')).toBeVisible();
 });

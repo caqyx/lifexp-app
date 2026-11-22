@@ -37,8 +37,14 @@ logowania bez szczegółów technicznych.
 
 ## Uwagi bez poprawki (do decyzji)
 
-- Biblioteka Czytnika (IndexedDB `lifexp-v2-reader`) jest wspólna dla wszystkich kont na urządzeniu — inne konto
-  widzi te same książki i miejsca czytania. Jeśli to niepożądane, klucz per `uid` (zmiana tylko lokalna).
+- ~~Biblioteka Czytnika wspólna dla kont na urządzeniu~~ — **rozdzielona według konta** (decyzja właściciela
+  2026-11-22, q-rel-2): osobna baza IndexedDB `lifexp-v2-reader:{uid}` na konto (książki, miejsca czytania,
+  obrazy, pliki PDF i ustawienia czytnika, bo motyw i rozmiar tekstu to wybór osoby); po wylogowaniu biblioteki
+  nie ma, przy zmianie konta połączenie jest zamykane, a kopia w pamięci czyszczona. Dawną wspólną bazę
+  `lifexp-v2-reader` przejmuje pierwsze konto, które po aktualizacji otworzy Czytnik: baza jest oznaczana jako
+  zajęta przez to konto, kopiowana do jego bazy i kasowana; inne konto zajętej bazy nie dostaje, a przerwaną
+  kopię kończy to samo konto. Testy: `offline/readerLibrary.test.ts` (fake-indexeddb), e2e `tests/v2/reader.spec.js`
+  (dwa konta w jednej przeglądarce, przejęcie starej biblioteki).
 - Limity list (30 zadań, 30 notatek, 500 wydarzeń, 30 kategorii) sprawdzane są na liście z nasłuchu, nie w
   transakcji: dwie karty jednocześnie mogą je przekroczyć o jeden wpis (v1 tak samo).
 - Ten sam szkic zatwierdzony w tej samej chwili w dwóch kartach może dodać wpis dwa razy (v1 tak samo); szkic znika
