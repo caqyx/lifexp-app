@@ -79,12 +79,15 @@ async function tour(page) {
   for (const [hash, title] of TOUR) {
     await page.evaluate((h) => (location.hash = h), hash);
     await expect(page.locator('.topbar__title')).toHaveText(title);
+    // The screen's data is in, so its listeners are registered (they start after a dynamic import).
+    await expect(page.locator('.shell__main .ui-skeleton')).toHaveCount(0, { timeout: 15000 });
     await screenSettled(page);
   }
 }
 
 test('Today starts a fixed number of listeners; screens visited again reuse theirs and none are left behind', async ({ page, account }) => {
-  test.setTimeout(90000);
+  test.setTimeout(120000);
+  await seedActivities(account.uid, 1);
   const listens = countListens(page);
   await openSignedIn(page, account, '#/today');
   await expect(page.getByTestId('points-total')).toBeVisible();
