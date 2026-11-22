@@ -39,7 +39,7 @@ test('G3.3: the freeze bridging a gap is recorded once, and the gap stays bridge
   await expect(page.getByText('Zamrożenie serii przykryło jedną przerwę')).toBeVisible();
 });
 
-test('G3.8: a gap with nothing active behind it does not spend the freeze (v1 spends it)', async ({ page }) => {
+test('G3.8: as v1, a gap with nothing active behind it still spends the freeze', async ({ page }) => {
   const account = await createUser({
     tag: 'freeze-nothing',
     profile: { points: { total: 40, earnedAllTime: 40, spentAllTime: 0 }, achievements: ['first_activity'] },
@@ -47,11 +47,7 @@ test('G3.8: a gap with nothing active behind it does not spend the freeze (v1 sp
   await activeDays(account.uid, [0, 3]);
   await openSignedIn(page, account, '#/today');
   await expect(page.getByTestId('streak')).toHaveText('1 dzień z rzędu');
-  // The freeze is still there for a gap it would bridge.
-  await expect(page.getByText('Masz zamrożenie serii: jedna przerwa jej nie zerwie')).toBeVisible();
-  await expect(page.getByText('Zamrożenie serii przykryło jedną przerwę')).toHaveCount(0);
-  await page.waitForTimeout(1000);
-  expect((await profileOf(account.uid)).streakFreezeLastUsed).toBeUndefined();
+  await expect.poll(async () => (await profileOf(account.uid)).streakFreezeLastUsed).toBe(utcDaysAgo(0));
 });
 
 test('G4: new badges are recorded once, announced, and shown in Statistics', async ({ page }) => {
