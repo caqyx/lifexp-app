@@ -22,6 +22,7 @@ import {
 import type { ComponentType } from 'preact';
 import { isModuleOn, type ModuleChoice, type OptionalModule } from '@/domain/modules';
 import { matchPath, type RouteParams, type RouteProps } from '@/lib/route-match';
+import { preloadTasks } from '@/stores/tasks';
 import { preloadToday } from '@/stores/today';
 
 export type ModuleId =
@@ -100,7 +101,11 @@ export const FEATURES: readonly FeatureDef[] = [
     tab: 1,
     stage: '2',
     view: () => import('@/features/today/TodayPage'),
-    preload: preloadToday,
+    // Today's own sources and its task card (always on Today since q-ui-2).
+    preload: () => {
+      preloadToday();
+      preloadTasks();
+    },
   },
   {
     id: 'tasks',

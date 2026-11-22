@@ -8,11 +8,11 @@ test.use({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true
 
 /**
  * Today's live Firestore listeners: the profile, the six sources of Today
- * (stores/today), broadcasts and, with the calendar on, its two collections and the
- * tasks (the reminders and "Ważne dzisiaj"). A new listener on the start screen is a
+ * (stores/today), broadcasts, the tasks (Today's task card, q-ui-2) and, with the
+ * calendar on, its two collections. A new listener on the start screen is a
  * decision: raise this with a line in PERF.md.
  */
-const TODAY_LISTENERS = 8;
+const TODAY_LISTENERS = 9;
 const TODAY_LISTENERS_WITH_CALENDAR = 11;
 
 /** Counts Listen targets the page adds and removes (the bodies of Firestore's WebChannel requests). */

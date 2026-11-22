@@ -15,6 +15,13 @@ const EMPTY: TasksState = { list: undefined, failed: false };
 
 export const tasks = signal<TasksState>(EMPTY);
 
+const repo = () => import('@/data/repos/tasks');
+
+/** Fetches the repository's code before a screen mounts (Today's task card at start; app/registry.ts). */
+export function preloadTasks(): void {
+  repo().catch(() => undefined);
+}
+
 function start(uid: string): () => void {
   tasks.value = EMPTY;
   let stopped = false;
@@ -22,7 +29,7 @@ function start(uid: string): () => void {
   const fail = () => {
     if (!stopped) tasks.value = { ...tasks.value, failed: true };
   };
-  void import('@/data/repos/tasks')
+  void repo()
     .then((repo) => {
       if (stopped) return;
       stop = repo.watchTasks(

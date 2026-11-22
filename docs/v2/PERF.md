@@ -83,7 +83,7 @@ Czytnik 72 / 25 (+28 kB CSS). Firebase 395 / 117 kB. Precache Service Workera 18
   importy) > **240 KiB** albo CSS startu > **56 KiB**, albo gdy Firebase, `en.json`, marked/DOMPurify lub
   pdf.js/JSZip trafią do startu. Teraz: JS 220 KiB, CSS 49 KiB (stan sprzed q-perf by go przekroczył). Podnoszenie budżetu = świadoma decyzja z wpisem tutaj.
 - `v2/tools/bundle-budget.test.ts`, `v2/src/stores/shared.test.ts` — testy jednostkowe.
-- `tests/v2/perf.spec.js` (e2e, Pixel 7): nasłuchy Firestore na Dziś (8; 11 z Kalendarzem), druga wizyta na
+- `tests/v2/perf.spec.js` (e2e, Pixel 7): nasłuchy Firestore na Dziś (9 — od q-ui-2 z zadaniami; 11 z Kalendarzem), druga wizyta na
   ekranach bez nowych zapytań i po 30 s tylko nasłuchy Dziś; polski start bez chunku `en`, angielski od pierwszego
   renderu; otwarcie menu bez odczytów układu wierszy listy; bezczynne Dziś bez zmian DOM przez 5 s. Liczy rzeczy
   niezależne od szybkości maszyny — testu z progami czasu w CI nie ma (byłby niestabilny).
