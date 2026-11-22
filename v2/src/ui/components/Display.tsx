@@ -111,6 +111,8 @@ interface ListRowProps {
   /** Right-hand value, e.g. an amount. */
   value?: string;
   valueTone?: Tone;
+  /** 'meta': the value is context (a date), not a figure — small and secondary, not bold. */
+  valueKind?: 'figure' | 'meta';
   /** After the value, e.g. a done mark; decorative, the text says the same. */
   trailing?: ComponentChildren;
   /** Makes the row a button (shows ›). */
@@ -119,7 +121,7 @@ interface ListRowProps {
   href?: string;
 }
 
-export function ListRow({ leading, title, meta, value, valueTone = 'default', trailing, onClick, href }: ListRowProps) {
+export function ListRow({ leading, title, meta, value, valueTone = 'default', valueKind = 'figure', trailing, onClick, href }: ListRowProps) {
   const interactive = Boolean(onClick || href);
   const body = (
     <>
@@ -128,7 +130,7 @@ export function ListRow({ leading, title, meta, value, valueTone = 'default', tr
         <span class="ui-list__title user-text clamp-2">{title}</span>
         {meta && <span class="ui-list__meta user-text clamp-1">{meta}</span>}
       </span>
-      {value && <span class={`ui-list__value numeric tone-${valueTone}`}>{value}</span>}
+      {value && <span class={`ui-list__value${valueKind === 'meta' ? ' ui-list__value--meta' : ''} numeric tone-${valueTone}`}>{value}</span>}
       {trailing}
       {interactive && (
         <span class="ui-list__chevron" aria-hidden="true">

@@ -156,7 +156,6 @@ export function LibraryPage({ navigate }: { navigate: Navigate }) {
   return (
     <Page>
       <Stack>
-        <p class="reader-lib__intro">{t('reader.library.intro')}</p>
         <div
           class={`reader-lib__drop${over ? ' is-over' : ''}`}
           onDragEnter={(e) => {
@@ -186,6 +185,9 @@ export function LibraryPage({ navigate }: { navigate: Navigate }) {
                   {t('reader.library.add')}
                 </Button>
                 <p class="reader-lib__hint">{t('reader.library.dropHint')}</p>
+                {/* What it reads and where the books stay, with the action they are about. */}
+                <p class="reader-lib__intro">{t('reader.library.intro')}</p>
+                <p class="reader-lib__local">{t('reader.library.local')}</p>
                 <input
                   ref={input}
                   class="visually-hidden"
@@ -200,7 +202,6 @@ export function LibraryPage({ navigate }: { navigate: Navigate }) {
             )}
           </Card>
         </div>
-        <p class="reader-lib__local">{t('reader.library.local')}</p>
         {books?.some(needsReprocess) && (
           <input
             ref={againInput}

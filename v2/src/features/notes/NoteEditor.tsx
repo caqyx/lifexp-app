@@ -294,9 +294,6 @@ export function NoteEditor({ uid, id, notes, navigate }: NoteEditorProps) {
             maxLength={NOTE_TITLE_MAX}
           />
 
-          <IconPicker value={draft.icon} color={draft.color} onChange={(icon) => set({ icon })} />
-          <ColorPicker value={draft.color} onChange={(color) => set({ color })} />
-
           <SegmentedControl
             label={t('notes.mode')}
             value={mode}
@@ -349,6 +346,10 @@ export function NoteEditor({ uid, id, notes, navigate }: NoteEditorProps) {
               </div>
             )}
           </div>
+
+          {/* The note's look comes after what it says: title and content first. */}
+          <IconPicker value={draft.icon} color={draft.color} onChange={(icon) => set({ icon })} />
+          <ColorPicker value={draft.color} onChange={(color) => set({ color })} />
 
           <Button type="submit" variant="primary" size="lg" block disabled={!dirty}>
             {t('notes.save')}
