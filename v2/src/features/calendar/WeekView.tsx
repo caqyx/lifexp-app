@@ -42,7 +42,8 @@ export function WeekView({ focus, today, items, onFocus, ...handlers }: WeekView
         {days.map((day) => (
           <section
             key={day}
-            class={`cal-week__day${day === focus ? ' cal-week__day--focus' : ''}`}
+            // A free day is one line ("Poniedziałek 16 listopada · Wolne."), not a heading and a row.
+            class={`cal-week__day${day === focus ? ' cal-week__day--focus' : ''}${(items.get(day) ?? []).length === 0 ? ' cal-week__day--free' : ''}`}
             aria-labelledby={`cal-week-${day}`}
           >
             <h3 id={`cal-week-${day}`} class="cal-week__title">

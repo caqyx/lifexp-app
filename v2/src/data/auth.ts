@@ -4,6 +4,7 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -28,6 +29,12 @@ export async function signInWithEmail(email: string, password: string): Promise<
 export async function signInWithGoogle(): Promise<void> {
   // The popup helper is loaded here, not at start (see firebase.ts).
   await signInWithPopup(auth, new GoogleAuthProvider(), browserPopupRedirectResolver);
+}
+
+/** Firebase's own "reset your password" e-mail, in the app's language. */
+export async function sendPasswordReset(email: string, languageCode: string): Promise<void> {
+  auth.languageCode = languageCode;
+  await sendPasswordResetEmail(auth, email);
 }
 
 export function signOutUser(): Promise<void> {

@@ -71,6 +71,8 @@ for (const [family, mode] of THEMES) {
     pairs.push(['--color-negative', '--color-bg'], ['--color-negative', '--color-surface']);
     // Selected rows, badges and today's marks put the accent text on its soft tint, on a card.
     pairs.push(['--color-accent-text', '--color-accent-soft', '--color-surface']);
+    // …and on the page itself (the calendar's "Dziś" tag in the week).
+    pairs.push(['--color-accent-text', '--color-accent-soft', '--color-bg']);
     const low = (await tokenContrasts(page, pairs)).filter(([, ratio]) => ratio < 4.5);
     expect(low).toEqual([]);
   });

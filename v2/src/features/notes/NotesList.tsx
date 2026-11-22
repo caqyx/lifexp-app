@@ -50,6 +50,7 @@ export function NotesList({ notes }: { notes: readonly Note[] }) {
                 title={note.title}
                 meta={noteExcerpt(note.content) || undefined}
                 value={note.createdAt ? formatShortDate(note.createdAt, lang) : undefined}
+                valueKind="meta"
                 href={`#/notes/${encodeURIComponent(note.id)}`}
               />
             ))}

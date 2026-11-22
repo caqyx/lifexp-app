@@ -15,7 +15,8 @@
 
 .stats-totals {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Three on a wide card; on a phone two, the third below, so no label breaks in two. */
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: var(--space-4);
 }
 
@@ -119,4 +120,9 @@
 .stats-badge__desc {
   color: var(--color-text-secondary);
   font-size: var(--font-size-xs);
+}
+
+/* On an earned badge's accent tint the secondary grey fell under 4.5:1 (Gold). */
+.stats-badge--earned .stats-badge__desc {
+  color: var(--color-text);
 }

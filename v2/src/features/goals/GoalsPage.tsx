@@ -42,31 +42,33 @@ function GoalCard({ goal, pointsTotal, onDeposit, onEdit, onDelete }: GoalCardPr
         <div class="goal__head">
           <IconTile tone={progress.reached ? 'positive' : 'default'}>{money ? <PiggyBank /> : <Target />}</IconTile>
           <div class="goal__title">
-            <h3 class="goal__name user-text">{goal.name}</h3>
+            <h2 class="goal__name user-text">{goal.name}</h2>
             <p class="goal__type">{t(money ? 'goals.typeMoney' : 'goals.typePoints')}</p>
           </div>
         </div>
+        {/* What is still missing is the card's headline; how far it is, under the bar. */}
+        <p class={`goal__missing numeric tone-${progress.reached ? 'positive' : 'default'}`}>
+          {progress.reached
+            ? t('goals.reached')
+            : t('goals.missing', { amount: goalAmount(goal.type, progress.missing, lang) })}
+        </p>
         <ProgressBar value={progress.share} label={status} tone={progress.reached ? 'positive' : 'default'} />
-        <div class="goal__numbers">
-          <span class="goal__progress numeric">{status}</span>
-          <span class={`goal__missing numeric tone-${progress.reached ? 'positive' : 'default'}`}>
-            {progress.reached
-              ? t('goals.reached')
-              : t('goals.missing', { amount: goalAmount(goal.type, progress.missing, lang) })}
-          </span>
-        </div>
+        <p class="goal__progress numeric">{status}</p>
         <div class="goal__actions">
           {money && !progress.reached && (
             <Button variant="secondary" onClick={() => onDeposit(goal)} aria-label={t('goals.depositNamed', { name: goal.name })}>
               {t('goals.deposit')}
             </Button>
           )}
-          <Button variant="quiet" onClick={() => onEdit(goal)} aria-label={t('goals.editNamed', { name: goal.name })}>
-            {t('goals.edit')}
-          </Button>
-          <Button variant="quiet-danger" onClick={() => onDelete(goal)} aria-label={t('goals.deleteNamed', { name: goal.name })}>
-            {t('goals.delete')}
-          </Button>
+          {/* Editing and deleting sit apart from the deposit, at the other end. */}
+          <div class="goal__manage">
+            <Button variant="quiet" onClick={() => onEdit(goal)} aria-label={t('goals.editNamed', { name: goal.name })}>
+              {t('goals.edit')}
+            </Button>
+            <Button variant="quiet-danger" onClick={() => onDelete(goal)} aria-label={t('goals.deleteNamed', { name: goal.name })}>
+              {t('goals.delete')}
+            </Button>
+          </div>
         </div>
       </Card>
     </li>

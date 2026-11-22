@@ -46,6 +46,38 @@
   font-weight: var(--font-weight-medium);
 }
 
+/* "Nie pamiętam hasła": a text action under the password, right-aligned, a full target
+   whose padding hangs into the form's gap. */
+.auth__forgot {
+  align-self: flex-end;
+  min-height: var(--touch-target);
+  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-2)) calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.auth__forgot:hover:not(:disabled),
+.auth__forgot:active:not(:disabled) {
+  background: var(--color-accent-soft);
+}
+
+.auth__forgot:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.auth__note {
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
 /* "albo" between two rules. */
 .auth__or {
   display: flex;

@@ -237,7 +237,7 @@ export default function TasksPage({ path, navigate }: RouteProps) {
           </Card>
         ) : groups.overdue.length + groups.open.length + groups.done.length === 0 ? (
           <Card>
-            <EmptyState title={t('tasks.empty')} />
+            <EmptyState title={t('tasks.empty')} body={t('tasks.emptyBody')} />
           </Card>
         ) : (
           <>

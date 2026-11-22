@@ -8,7 +8,14 @@
   font-size: var(--font-size-sm);
 }
 
+.reader-lib__intro {
+  max-width: 44ch;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-separator);
+}
+
 .reader-lib__local {
+  margin-top: calc(-1 * var(--space-2));
   font-size: var(--font-size-xs);
 }
 
@@ -82,7 +89,13 @@
   transition: background-color var(--duration-fast) var(--ease-standard);
 }
 
-.reader-lib__open:hover {
+/* The whole row answers, not just the part under the pointer (the delete stays apart). */
+.reader-lib__book {
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.reader-lib__book:has(> .reader-lib__open:hover),
+.reader-lib__book:has(> .reader-lib__open:active) {
   background: var(--color-surface-raised);
 }
 
@@ -116,9 +129,11 @@
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--color-text-secondary);
+  /* Destructive: red as every "Usuń" (Button quiet-danger); the second tap confirms. */
+  color: var(--color-negative);
   font: inherit;
   font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
   transition:
     background-color var(--duration-fast) var(--ease-standard),
@@ -126,8 +141,7 @@
 }
 
 .reader-lib__delete:hover {
-  background: var(--color-surface-raised);
-  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-negative) 8%, transparent);
 }
 
 .reader-lib__delete.is-sure {

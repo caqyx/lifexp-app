@@ -134,67 +134,11 @@ export function MonthView({ uid, rate, defs, entries, payouts, path, navigate }:
 
   return (
     <>
-      <SegmentedControl<Month>
-        label={t('chores.month')}
-        hideLabel
-        value={month}
-        options={[
-          { value: 'current', label: t('chores.current') },
-          { value: 'prev', label: t('chores.prev') },
-        ]}
-        onChange={(next) => {
-          setMonth(next);
-          setSelectedDay(null);
-        }}
-      />
-
-      <Card>
-        <div class="chores-summary">
-          <div>
-            <p class="chores-summary__label">
-              {t('chores.monthEarnings')} · <span class="chores-summary__month">{formatMonthKey(monthKey, lang)}</span>
-            </p>
-            <p class="chores-summary__value numeric" data-testid="month-points">
-              {t('units.points', { points: formatInteger(earned.points, lang) })}
-            </p>
-            <p class="chores-summary__money numeric" data-testid="month-money">
-              {formatMoney(earned.grosze, lang)}
-            </p>
-          </div>
-          {month === 'current' && (
-            <Button variant="primary" onClick={() => setSheet((s) => ({ open: true, key: s.key + 1 }))}>
-              <Plus aria-hidden="true" />
-              {t('chores.add')}
-            </Button>
-          )}
-        </div>
-        <p class="chores-summary__rate">{t('chores.rate', { amount: formatMoney(Math.round(rate * 100), lang) })}</p>
-      </Card>
-
-      <Section title={t('chores.calendar')}>
-        <Card>
-          <ChoreCalendar
-            monthKey={monthKey}
-            entries={monthEntries}
-            today={today}
-            selected={selected}
-            onSelect={setSelectedDay}
-          />
-          {selected && selectedEntries.length > 0 ? (
-            <DayEntries key={selected} day={selected} entries={selectedEntries} onDelete={remove} />
-          ) : (
-            <p class="chores-cal__hint">{t('chores.pickDay')}</p>
-          )}
-        </Card>
-      </Section>
-
+      {/* What is owed first (PLAN.md 7.6): the amount to pay out and settling it. */}
       <Card>
         <div class="chores-unpaid">
           <div>
             <p class="chores-summary__label">{t('chores.outstanding')}</p>
-            <p class="chores-unpaid__note">{t('chores.outstandingNote')}</p>
-          </div>
-          <div class="chores-unpaid__value">
             <p class="chores-unpaid__money numeric" data-testid="unpaid-money">
               {formatMoney(unpaid.grosze, lang)}
             </p>
@@ -202,19 +146,68 @@ export function MonthView({ uid, rate, defs, entries, payouts, path, navigate }:
               {t('units.points', { points: formatInteger(unpaid.points, lang) })}
             </p>
           </div>
-        </div>
-        <div class="chores-unpaid__action">
-          <Button
-            variant="primary"
-            block
-            busy={settling}
-            disabled={unpaid.points === 0 || settling}
-            onClick={() => setConfirming(true)}
-          >
+          <Button variant="secondary" busy={settling} disabled={unpaid.points === 0 || settling} onClick={() => setConfirming(true)}>
             {t('chores.settle')}
           </Button>
         </div>
+        <p class="chores-unpaid__note">
+          {t('chores.outstandingNote')} ({t('chores.rate', { amount: formatMoney(Math.round(rate * 100), lang) })})
+        </p>
       </Card>
+
+      {/* The month: which one, what it earned, adding to it, its calendar and a day's entries. */}
+      <Section title={t('chores.calendar')}>
+        <Card>
+          <div class="stack">
+            <SegmentedControl<Month>
+              label={t('chores.month')}
+              hideLabel
+              value={month}
+              options={[
+                { value: 'current', label: t('chores.current') },
+                { value: 'prev', label: t('chores.prev') },
+              ]}
+              onChange={(next) => {
+                setMonth(next);
+                setSelectedDay(null);
+              }}
+            />
+            <div class="chores-summary">
+              <div>
+                <p class="chores-summary__label">
+                  {t('chores.monthEarnings')} · <span class="chores-summary__month">{formatMonthKey(monthKey, lang)}</span>
+                </p>
+                <p class="chores-summary__line">
+                  <span class="chores-summary__value numeric" data-testid="month-points">
+                    {t('units.points', { points: formatInteger(earned.points, lang) })}
+                  </span>{' '}
+                  <span class="chores-summary__money numeric" data-testid="month-money">
+                    {formatMoney(earned.grosze, lang)}
+                  </span>
+                </p>
+              </div>
+              {month === 'current' && (
+                <Button variant="primary" onClick={() => setSheet((s) => ({ open: true, key: s.key + 1 }))}>
+                  <Plus aria-hidden="true" />
+                  {t('chores.add')}
+                </Button>
+              )}
+            </div>
+            <ChoreCalendar
+              monthKey={monthKey}
+              entries={monthEntries}
+              today={today}
+              selected={selected}
+              onSelect={setSelectedDay}
+            />
+            {selected && selectedEntries.length > 0 ? (
+              <DayEntries key={selected} day={selected} entries={selectedEntries} onDelete={remove} />
+            ) : (
+              <p class="chores-cal__hint">{t('chores.pickDay')}</p>
+            )}
+          </div>
+        </Card>
+      </Section>
 
       <Section title={t('chores.history')}>
         <Card padding="none">

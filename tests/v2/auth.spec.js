@@ -34,6 +34,32 @@ async function openMenu(page) {
 }
 
 test.describe('login', () => {
+  test('"Nie pamiętam hasła" e-mails a reset link to the address in the field (Auth emulator)', async ({ page, account }) => {
+    const resetCodes = async () => {
+      const res = await fetch('http://127.0.0.1:9099/emulator/v1/projects/demo-lifexp/oobCodes');
+      const { oobCodes = [] } = await res.json();
+      return oobCodes.filter((c) => c.email === account.email && c.requestType === 'PASSWORD_RESET').length;
+    };
+    await page.goto(appUrl('#/today'));
+    const forgot = page.getByRole('button', { name: 'Nie pamiętam hasła' });
+    // Without an address it says where to type it, and sends nothing.
+    await forgot.click();
+    await expect(page.getByRole('alert')).toHaveText('Wpisz adres e-mail powyżej, a wyślemy link do zmiany hasła.');
+    expect(await resetCodes()).toBe(0);
+
+    await page.getByLabel('E-mail').fill(account.email);
+    await forgot.click();
+    await expect(page.getByRole('status')).toContainText(`Jeśli ${account.email} ma konto, wysłaliśmy`);
+    await expect.poll(resetCodes).toBe(1);
+    // An address without an account gets the same answer: the screen never tells who has one.
+    await page.getByLabel('E-mail').fill(`nobody-${Date.now()}@test.lifexp`);
+    await forgot.click();
+    await expect(page.getByRole('status')).toContainText('ma konto, wysłaliśmy');
+    // The login itself still works from the same screen.
+    await signIn(page, account);
+    await expect(title(page)).toHaveText('Dziś');
+  });
+
   test('signed out, any screen shows the login; it keeps the link and adds no history', async ({ page, account }) => {
     await page.goto(appUrl('#/money'));
     await expect(loginHeading(page)).toBeVisible();

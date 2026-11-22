@@ -16,7 +16,7 @@ export function UpdatesView() {
       <p class="reports-note">{t('reports.updatesIntro')}</p>
       {(changelog as ChangelogGroup[]).map((group) => (
         <Card key={group.version}>
-          <h3 class="reports-version">{t('reports.version', { v: group.version })}</h3>
+          <h2 class="reports-version">{t('reports.version', { v: group.version })}</h2>
           <ul class="reports-changes">
             {group.items.map((item, i) => (
               <li key={i} class="reports-change">
