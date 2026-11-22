@@ -34,6 +34,7 @@ function countListens(page) {
 
 async function seedActivities(uid, n) {
   const batch = db.batch();
+  batch.set(db.doc(`users/${uid}/activityDefs/study`), { name: 'Nauka', points: 60, order: 1 });
   for (let i = 0; i < n; i++) {
     batch.set(db.collection(`users/${uid}/activities`).doc(), {
       type: 'study',
