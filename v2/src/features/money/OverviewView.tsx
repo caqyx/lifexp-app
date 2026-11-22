@@ -45,7 +45,13 @@ function TxRow({ tx, color, onDelete }: { tx: MoneyTx; color: string | undefined
   const lang = locale();
   const income = tx.type === 'income';
   const amount = `${income ? '+' : '−'}${formatMoney(tx.grosze, lang)}`;
-  const meta = [tx.note, tx.pointsCost > 0 ? t('money.pointsTaken', { points: formatInteger(tx.pointsCost, lang) }) : '']
+  // The category names the row; without one (older entries), the note does, and failing
+  // that the kind of entry — never a bare dash.
+  const title = tx.category || tx.note || t(income ? 'money.income' : 'money.expense');
+  const meta = [
+    tx.category ? tx.note : '',
+    tx.pointsCost > 0 ? t('money.pointsTaken', { points: formatInteger(tx.pointsCost, lang) }) : '',
+  ]
     .filter(Boolean)
     .join(' · ');
   return (
@@ -56,14 +62,14 @@ function TxRow({ tx, color, onDelete }: { tx: MoneyTx; color: string | undefined
         aria-hidden="true"
       />
       <span class="money-tx__text">
-        <span class="money-tx__category user-text">{tx.category || '—'}</span>
+        <span class="money-tx__category user-text">{title}</span>
         {meta && <span class="money-tx__meta user-text">{meta}</span>}
       </span>
       <span class={`money-tx__amount numeric tone-${income ? 'positive' : 'negative'}`}>{amount}</span>
       <Button
         variant="quiet-danger"
         onClick={() => onDelete(tx)}
-        aria-label={t('money.deleteNamed', { category: tx.category, amount })}
+        aria-label={t('money.deleteNamed', { category: title, amount })}
       >
         {t('money.delete')}
       </Button>
@@ -236,6 +242,7 @@ export function OverviewView({ uid, profile, txs, categories, limit, balance, pa
         <Stack>
           <Select<Period>
             label={t('money.period')}
+            hideLabel
             value={shownPeriod}
             options={[
               { value: '', label: t('money.last30') },

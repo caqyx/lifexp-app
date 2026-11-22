@@ -12,13 +12,15 @@ interface FieldFrameProps {
   label: string;
   hint?: ComponentChildren;
   error?: string | null;
+  /** Read out, not shown (the field's value says what it is, e.g. a period filter). */
+  hideLabel?: boolean;
   children: ComponentChildren;
 }
 
-function FieldFrame({ id, label, hint, error, children }: FieldFrameProps) {
+function FieldFrame({ id, label, hint, error, hideLabel = false, children }: FieldFrameProps) {
   return (
     <div class={`ui-field${error ? ' ui-field--error' : ''}`}>
-      <label class="ui-field__label" for={id}>
+      <label class={hideLabel ? 'visually-hidden' : 'ui-field__label'} for={id}>
         {label}
       </label>
       {children}
@@ -327,13 +329,15 @@ interface SelectProps<T extends string> {
   onChange: (value: T) => void;
   hint?: string;
   error?: string | null;
+  /** A filter whose value names itself ("Ostatnie 30 dni"): the label is for screen readers only. */
+  hideLabel?: boolean;
 }
 
 /** Native select: the platform picker is the best one on phones. */
-export function Select<T extends string>({ label, value, options, onChange, hint, error }: SelectProps<T>) {
+export function Select<T extends string>({ label, value, options, onChange, hint, error, hideLabel }: SelectProps<T>) {
   const id = useId();
   return (
-    <FieldFrame id={id} label={label} hint={hint} error={error}>
+    <FieldFrame id={id} label={label} hint={hint} error={error} hideLabel={hideLabel}>
       <select
         id={id}
         class="ui-field__input ui-field__select"
