@@ -2,6 +2,7 @@
 
 export type AuthErrorKey =
   | 'auth.errors.fillAll'
+  | 'auth.errors.emailFirst'
   | 'auth.errors.userNotFound'
   | 'auth.errors.wrongPassword'
   | 'auth.errors.invalidCredential'

@@ -149,12 +149,18 @@
 }
 
 .topbar__title {
+  /* A long title ("Zgłoszenia i aktualizacje") takes a second line in the 56 px bar
+     instead of an ellipsis; beyond two lines it is cut. */
+  display: -webkit-box;
   max-width: 100%;
   overflow: hidden;
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 @media (min-width: 840px) {
@@ -474,9 +480,10 @@
 .nav__label {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* A long name ("Zgłoszenia i aktualizacje") takes two lines instead of an ellipsis. */
+  padding: var(--space-1) 0;
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
 }
 
 /*

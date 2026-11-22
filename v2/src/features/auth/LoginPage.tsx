@@ -2,30 +2,45 @@
 // same accounts as v1. Creating an account stays in v1, which writes the profile.
 // Loaded as its own chunk: only signed-out visitors need it.
 import { useState } from 'preact/hooks';
-import { t } from '@/i18n';
+import { language, t } from '@/i18n';
 import type { AuthErrorKey } from '@/services/auth-errors';
-import { login, loginWithGoogle, type AuthResult } from '@/services/auth';
+import { login, loginWithGoogle, requestPasswordReset, type AuthResult } from '@/services/auth';
 import { Button } from '@/ui/components/Button';
 import { TextField } from '@/ui/components/Fields';
 import './auth.css';
 
-type Pending = 'email' | 'google' | null;
+type Pending = 'email' | 'google' | 'reset' | null;
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<AuthErrorKey | null>(null);
   const [pending, setPending] = useState<Pending>(null);
+  /** The address a reset link went to (shown until the next attempt). */
+  const [resetSentTo, setResetSentTo] = useState<string | null>(null);
 
   const run = async (kind: Exclude<Pending, null>, action: () => Promise<AuthResult>) => {
     setPending(kind);
     setError(null);
+    setResetSentTo(null);
     const result = await action();
     // On success the session changes and the app replaces this screen.
     if (!result.ok) {
       setError(result.error);
       setPending(null);
     }
+  };
+
+  /** "Nie pamiętam hasła": a link to the address in the field; the screen stays. */
+  const reset = async () => {
+    const address = email.trim();
+    setPending('reset');
+    setError(null);
+    setResetSentTo(null);
+    const result = await requestPasswordReset(address, language.value);
+    setPending(null);
+    if (result.ok) setResetSentTo(address);
+    else setError(result.error);
   };
 
   return (
@@ -51,9 +66,23 @@ export default function LoginPage() {
             value={password}
             onInput={setPassword}
           />
+          <button
+            type="button"
+            class="auth__forgot"
+            aria-busy={pending === 'reset' || undefined}
+            disabled={pending !== null}
+            onClick={() => void reset()}
+          >
+            {t('auth.forgot')}
+          </button>
           {error && (
             <p class="auth__error" role="alert">
               {t(error)}
+            </p>
+          )}
+          {resetSentTo && (
+            <p class="auth__note" role="status">
+              {t('auth.resetSent', { email: resetSentTo })}
             </p>
           )}
           <Button type="submit" variant="primary" size="lg" block busy={pending === 'email'} disabled={pending !== null}>
