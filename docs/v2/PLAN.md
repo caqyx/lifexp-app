@@ -534,7 +534,9 @@ export interface FeatureDef {
 - `stores/session` — user z Auth, bramy boot.
 - `stores/profile` — `onSnapshot(users/{uid})` przez cały czas życia sesji (1 dokument).
 - Stores modułów subskrybują swoje kolekcje **tylko gdy moduł jest otwarty** (subscribe on enter,
-  unsubscribe on leave) albo gdy potrzebuje ich Ex-us (lazy fetch).
+  unsubscribe on leave) albo gdy potrzebuje ich Ex-us (lazy fetch). Od q-perf (2026-11-22) jeden nasłuch na
+  konto, wspólny dla ekranów i Ex-us, kończy się 30 s po wyjściu ostatniego (`stores/shared.ts`), od razu po
+  wylogowaniu; powrót na ekran w tym czasie nie rejestruje zapytań od nowa (`docs/v2/PERF.md`).
 - Po zapisie nie ma ręcznego „przeładuj wszystko”: Firestore z `onSnapshot` daje natychmiastową kompensację
   opóźnienia (lokalny zapis widać od razu), a widoki są funkcją stanu.
 - Jeden kierunek: widok → `service.x()` → Firestore → snapshot → store → widok.
@@ -1620,6 +1622,12 @@ ekrany wolno przebudować). Audyt i plan: `docs/v2/QUALITY.md` (oznaczenia K/N/C
 | q-ui-5 | Notatki, biblioteka Czytnika | do zrobienia |
 | q-ui-6 | Statystyki, Zgłoszenia, Ustawienia, Rodzic, logowanie (N4, D7, D10) | do zrobienia |
 | q-ui-7 | Przegląd dostępności i testy e2e (kontrast, cele dotyku, fokus; N5) | do zrobienia |
+
+**Wydajność (2026-11-22)**
+
+| PR | Zakres | Stan |
+|---|---|---|
+| q-perf | **Wydajność v2 poza grami** (pomiar i wyniki: `docs/v2/PERF.md`; Pixel 7, CPU 4×, emulatory, konto ze 150 zadaniami/transakcjami/notatkami/wydarzeniami). **Start:** angielski słownik we własnym chunku (polski zostaje w wejściu, pierwszy render czeka na język, więc nic nie miga po polsku) — chunk wejścia 270 → 204 kB (91 → 70 kB gzip); gdy Auth zna osobę, ekran startowy i repozytoria Dziś (z zadaniami) ściągają się w trakcie ładowania profilu, nie po nim; ekrany paska dolnego i Service Worker (precache) dopiero w bezczynności po pierwszym ekranie (`app/idle.ts`, `afterFirstScreen`); Manrope cyrylica/greka/wietnamski poza precache. **Render:** formatery `Intl` budowane raz (`lib/intl.ts`; lista 150 transakcji tworzyła setki formaterów), listy nie czytają układu wierszy, gdy klucze się nie zmieniły (`useListMotion(rowKeys(children))`; otwarcie menu wymuszało layout w trakcie renderu), wjazd po kolei tylko dla pierwszych 20 wierszy listy. **Nasłuchy:** `stores/shared.ts` — jeden nasłuch na konto dla ekranów i Ex-us, 30 s zapasu po wyjściu (było 2 s tylko dla zadań i kalendarza), od razu stop po wylogowaniu, restart po błędzie (4.5). **Strażnicy:** `tools/bundle-budget.ts` (wtyczka Vite: build pada, gdy JS startu > 240 KiB, CSS startu > 56 KiB albo Firebase/angielski/Markdown/czytnik trafią do startu; test jednostkowy), `stores/shared.test.ts`, `tests/v2/perf.spec.js` (liczba nasłuchów Dziś 9 / 11 z kalendarzem, ponowna wizyta bez nowych zapytań, nic nie zostaje po 30 s; bez chunku `en` dla polskiego; brak odczytów układu wierszy przy menu; Dziś bezczynne bez zmian DOM). **Na prawdziwym telefonie do sprawdzenia:** pierwsze otwarcie na sieci komórkowej (czas do ekranu Dziś), przełączanie kart paska dolnego tam i z powrotem | gotowe |
 
 Kolejność od 2026-09-29: 1g → 2a (ekran „Dziś” tylko do odczytu, pierwszy ekran z danymi) → 1f. Właściciel
 nie widział dotąd zmian w aplikacji, a 1f (offline, manifest) też jest niewidoczne, więc ekran z danymi idzie przed nim.

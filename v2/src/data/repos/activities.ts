@@ -38,14 +38,22 @@ const dayOf = (uid: string, key: string) => doc(db, 'users', uid, 'dailyLog', ke
 
 /**
  * Every definition with a name, in v1's order. An empty answer from the local cache
- * says nothing yet (never read on this device), so it waits for the server instead
- * of reporting "no definitions".
+ * says nothing yet, so it waits for the server instead of reporting "no definitions".
+ * The server's answer to a query the cache already knew (after a reload) is often only
+ * "your cache is current": the same documents, fromCache true → false. A plain listener
+ * never hears that change of metadata alone, so an account without definitions stayed
+ * "loading" for good; this one listens to metadata too and passes on only what is new.
  */
 export function watchActivityDefs(uid: string, onChange: (defs: ActivityDef[]) => void, onError: OnError) {
+  let delivered = false;
   return onSnapshot(
     defsOf(uid),
+    { includeMetadataChanges: true },
     (snap) => {
-      if (snap.empty && snap.metadata.fromCache) return;
+      if (!delivered && snap.empty && snap.metadata.fromCache) return;
+      // Metadata alone (a write confirmed, the cache confirmed): nothing new to show.
+      if (delivered && snap.docChanges().length === 0) return;
+      delivered = true;
       onChange(sortActivityDefs(snap.docs.flatMap((d) => activityDefFromData(d.id, d.data()) ?? [])));
     },
     onError,

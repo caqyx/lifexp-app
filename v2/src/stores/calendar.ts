@@ -3,6 +3,7 @@
 // listeners run while at least one of them watches, one pair per account.
 import { signal } from '@preact/signals';
 import type { CalendarCategory, CalendarEvent } from '@/domain/calendar/events';
+import { SCREEN_GRACE_MS, sharedWatch } from './shared';
 
 export interface CalendarState {
   /** undefined = still loading. */
@@ -20,11 +21,6 @@ export const calendar = signal<CalendarState>(EMPTY);
  * views, so Month → Day opens the day that was chosen.
  */
 export const calendarFocus = signal<string | null>(null);
-
-/** How long the listeners outlive their last watcher. */
-const LEAVE_GRACE_MS = 2000;
-
-let active: { uid: string; watchers: number; stop: () => void } | null = null;
 
 function start(uid: string): () => void {
   calendar.value = EMPTY;
@@ -50,25 +46,4 @@ function start(uid: string): () => void {
 }
 
 /** Start watching (or join the watch already running); call the result to leave. */
-export function watchCalendar(uid: string): () => void {
-  if (active && active.uid !== uid) {
-    active.stop();
-    active = null;
-  }
-  if (!active) active = { uid, watchers: 0, stop: start(uid) };
-  const mine = active;
-  mine.watchers += 1;
-  let left = false;
-  return () => {
-    if (left) return;
-    left = true;
-    mine.watchers -= 1;
-    // A moment's grace: moving between two screens that both watch keeps the data.
-    setTimeout(() => {
-      if (mine.watchers === 0 && active === mine) {
-        mine.stop();
-        active = null;
-      }
-    }, LEAVE_GRACE_MS);
-  };
-}
+export const watchCalendar = sharedWatch(start, SCREEN_GRACE_MS, () => calendar.peek().failed);

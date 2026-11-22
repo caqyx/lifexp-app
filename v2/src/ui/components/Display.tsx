@@ -3,7 +3,7 @@
 import type { ComponentChildren } from 'preact';
 import { useRef } from 'preact/hooks';
 import { t } from '@/i18n';
-import { useListMotion } from '../listMotion';
+import { rowKeys, useListMotion } from '../listMotion';
 import './Display.css';
 
 export type Tone = 'default' | 'positive' | 'negative' | 'warning';
@@ -84,7 +84,7 @@ interface MotionListProps {
  * glide to new places and a removed one fades out while the rest close the gap.
  */
 export function MotionList({ class: cls, label, ordered = false, children }: MotionListProps) {
-  const ref = useListMotion<HTMLUListElement & HTMLOListElement>();
+  const ref = useListMotion<HTMLUListElement & HTMLOListElement>(rowKeys(children));
   const Tag = ordered ? 'ol' : 'ul';
   return (
     <Tag ref={ref} class={`${cls} ui-stagger`} aria-label={label}>
@@ -94,7 +94,7 @@ export function MotionList({ class: cls, label, ordered = false, children }: Mot
 }
 
 export function List({ children, label }: { children: ComponentChildren; label?: string }) {
-  const ref = useListMotion<HTMLUListElement>();
+  const ref = useListMotion<HTMLUListElement>(rowKeys(children));
   return (
     <ul ref={ref} class="ui-list ui-stagger" aria-label={label}>
       {children}

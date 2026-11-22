@@ -3,6 +3,7 @@
 // them watches, one per account. The PC build comes with the profile (session).
 import { signal } from '@preact/signals';
 import type { Task } from '@/domain/tasks';
+import { SCREEN_GRACE_MS, sharedWatch } from './shared';
 
 export interface TasksState {
   /** undefined = still loading. */
@@ -14,6 +15,13 @@ const EMPTY: TasksState = { list: undefined, failed: false };
 
 export const tasks = signal<TasksState>(EMPTY);
 
+const repo = () => import('@/data/repos/tasks');
+
+/** Fetches the repository's code before a screen mounts (Today's task card at start; app/registry.ts). */
+export function preloadTasks(): void {
+  repo().catch(() => undefined);
+}
+
 function start(uid: string): () => void {
   tasks.value = EMPTY;
   let stopped = false;
@@ -21,7 +29,7 @@ function start(uid: string): () => void {
   const fail = () => {
     if (!stopped) tasks.value = { ...tasks.value, failed: true };
   };
-  void import('@/data/repos/tasks')
+  void repo()
     .then((repo) => {
       if (stopped) return;
       stop = repo.watchTasks(
@@ -39,31 +47,5 @@ function start(uid: string): () => void {
   };
 }
 
-/** How long the listeners outlive their last watcher. */
-const LEAVE_GRACE_MS = 2000;
-
-let active: { uid: string; watchers: number; stop: () => void } | null = null;
-
 /** Start watching (or join the watch already running); call the result to leave. */
-export function watchTasks(uid: string): () => void {
-  if (active && active.uid !== uid) {
-    active.stop();
-    active = null;
-  }
-  if (!active) active = { uid, watchers: 0, stop: start(uid) };
-  const mine = active;
-  mine.watchers += 1;
-  let left = false;
-  return () => {
-    if (left) return;
-    left = true;
-    mine.watchers -= 1;
-    // A moment's grace: moving between two screens that both watch keeps the data.
-    setTimeout(() => {
-      if (mine.watchers === 0 && active === mine) {
-        mine.stop();
-        active = null;
-      }
-    }, LEAVE_GRACE_MS);
-  };
-}
+export const watchTasks = sharedWatch(start, SCREEN_GRACE_MS, () => tasks.peek().failed);

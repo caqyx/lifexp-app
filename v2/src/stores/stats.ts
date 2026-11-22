@@ -1,9 +1,10 @@
 // Live data behind Statistics and History (stage 2c), read-only. Each screen starts
-// its sources when it mounts and stops them when it leaves.
+// its sources when it mounts and they stop a moment after it leaves (stores/shared.ts).
 import { signal } from '@preact/signals';
 import type { ActivityPager } from '@/data/repos/history';
 import type { Activity, DayLog } from '@/domain/activity';
 import { TOP_SAMPLE } from '@/domain/stats';
+import { SCREEN_GRACE_MS, sharedWatch } from './shared';
 
 /** undefined = still loading. */
 export interface StatsSources {
@@ -18,7 +19,10 @@ const NO_STATS: StatsSources = { days: undefined, latest: undefined, activityNam
 
 export const stats = signal<StatsSources>(NO_STATS);
 
-export function watchStats(uid: string): () => void {
+/** Start watching (or join the watch already running: Statistics, Ex-us); call the result to leave. */
+export const watchStats = sharedWatch(startStats, SCREEN_GRACE_MS, () => stats.peek().failed);
+
+function startStats(uid: string): () => void {
   stats.value = NO_STATS;
   let stopped = false;
   const stops: (() => void)[] = [];

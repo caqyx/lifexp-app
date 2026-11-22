@@ -253,6 +253,21 @@ test('no tasks for today: the card says where they will appear', async ({ page, 
   await expect(page.getByText('Na dziś nic. Zadania z terminem na dziś i zaległe pojawią się tutaj.')).toBeVisible();
 });
 
+test('an account without activity types shows "no activities" after every reload, not a skeleton', async ({ page, account }) => {
+  // No activityDefs (a new v2 account: v2 seeds them only when something is logged).
+  // After a reload Firestore answers from its cache (empty) and then only confirms it with
+  // the server: a change of metadata alone, which a plain listener never hears.
+  await openSignedIn(page, account, '#/today');
+  const recent = page.locator('.ui-section', { has: page.getByRole('heading', { name: 'Ostatnie aktywności' }) });
+  await expect(recent.getByText('Brak aktywności. Zacznij zarabiać punkty!')).toBeVisible();
+  for (let i = 0; i < 3; i++) {
+    await page.reload();
+    await expect(page.getByTestId('points-total')).toBeVisible();
+    await expect(recent.getByText('Brak aktywności. Zacznij zarabiać punkty!')).toBeVisible({ timeout: 10000 });
+    await expect(recent.locator('.ui-skeleton')).toHaveCount(0);
+  }
+});
+
 test('the level is on the points card, the streak and logging in the day card', async ({ page }) => {
   const account = await seededAccount();
   await openSignedIn(page, account, '#/today');

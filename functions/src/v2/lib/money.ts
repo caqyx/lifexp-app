@@ -3,6 +3,7 @@
 // Money as integer grosze (docs/v2/PLAN.md 4.6): 12,50 zł = 1250. Floats never
 // hold amounts, so 0.1 + 0.2 problems cannot creep into balances. Converting to
 // v1's złoty numbers happens at the Firestore boundary, not here.
+import { numberFormat } from './intl';
 
 const GROSZE_PER_ZLOTY = 100;
 
@@ -32,7 +33,7 @@ export function formatMoneyInput(grosze: number): string {
 
 /** 123456 → "1234,56 zł" in Polish, "PLN 1,234.56" in English. */
 export function formatMoney(grosze: number, locale = 'pl-PL', currency = 'PLN'): string {
-  return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(grosze / GROSZE_PER_ZLOTY);
+  return numberFormat(locale, { style: 'currency', currency }).format(grosze / GROSZE_PER_ZLOTY);
 }
 
 /** v1 stores złoty as numbers (e.g. 12.5); this is the only way in. */

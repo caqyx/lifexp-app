@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url';
 import preact from '@preact/preset-vite';
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { bundleBudget } from './tools/bundle-budget.ts';
 
 export default defineConfig({
   // Relative base: the same build works at /lifexp-app/v2/ on GitHub Pages and
@@ -10,6 +11,8 @@ export default defineConfig({
   base: './',
   plugins: [
     preact(),
+    // The start-up JS and CSS stay within budget (docs/v2/PERF.md).
+    bundleBudget(),
     // Service Worker (src/sw.ts) and the web app manifest (docs/v2/PLAN.md 4.8, stage 1f).
     VitePWA({
       strategies: 'injectManifest',
@@ -24,7 +27,17 @@ export default defineConfig({
         // Vendored games (public/games, stage g-1) are cached when first played, not
         // installed with the app: Wartime alone is ~4.5 MB (src/sw.ts). The same for the opt-in
         // reader's pdf.js, JSZip and Literata (its pdf.js worker, .mjs, is not matched anyway).
-        globIgnores: ['games/**', 'assets/reader-pdf-*', 'assets/reader-epub-*', 'assets/literata-*'],
+        // Manrope's Cyrillic, Greek and Vietnamese files are fetched only for text in those
+        // scripts (unicode-range), so Polish and English never need them (docs/v2/PERF.md).
+        globIgnores: [
+          'games/**',
+          'assets/reader-pdf-*',
+          'assets/reader-epub-*',
+          'assets/literata-*',
+          'assets/manrope-cyrillic-*',
+          'assets/manrope-greek-*',
+          'assets/manrope-vietnamese-*',
+        ],
       },
       manifest: {
         // Its own name while v1 and v2 live side by side, so two installed icons are told apart.

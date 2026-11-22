@@ -1,7 +1,8 @@
 // Chore definitions, unpaid entries and past payouts, live (stage 3b). The Chores screen starts
-// the listeners when it mounts and stops them when it leaves.
+// the listeners when it mounts and they stop a moment after it leaves (stores/shared.ts).
 import { signal } from '@preact/signals';
 import type { ChoreDef, ChoreEntry, ChorePayout } from '@/domain/chores';
+import { SCREEN_GRACE_MS, sharedWatch } from './shared';
 
 /** undefined = still loading. */
 export interface ChoresState {
@@ -15,7 +16,10 @@ const EMPTY: ChoresState = { defs: undefined, entries: undefined, payouts: undef
 
 export const chores = signal<ChoresState>(EMPTY);
 
-export function watchChores(uid: string): () => void {
+/** Start watching (or join the watch already running); call the result to leave. */
+export const watchChores = sharedWatch(start, SCREEN_GRACE_MS, () => chores.peek().failed);
+
+function start(uid: string): () => void {
   chores.value = EMPTY;
   let stopped = false;
   const stops: (() => void)[] = [];

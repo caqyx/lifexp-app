@@ -3,7 +3,6 @@
 // as v2 screens need them, reusing the wording of v1's i18n-resources.js.
 import { signal } from '@preact/signals';
 import i18next from 'i18next';
-import en from './en.json';
 import pl from './pl.json';
 
 export const LANGUAGES = ['pl', 'en'] as const;
@@ -19,25 +18,62 @@ export function pickLanguage(stored: string | null): Language {
 /** The active language. Reading it subscribes a component, so a change re-renders the app. */
 export const language = signal<Language>('pl');
 
-export function initI18n(lng: Language): void {
-  language.value = lng;
+/**
+ * Polish is in the entry chunk (it is also the fallback for a missing key); English is
+ * its own chunk, fetched only by someone who uses it (docs/v2/PERF.md), so the start
+ * does not download and parse a dictionary nobody reads.
+ */
+let english: Promise<void> | null = null;
+
+/** Resolves once `lng`'s strings are loaded (at once for Polish); rejects if its chunk cannot be fetched. */
+export function loadLanguage(lng: Language): Promise<void> {
+  if (lng === 'pl') return Promise.resolve();
+  english ??= import('./en.json').then(
+    (en) => {
+      i18next.addResourceBundle('en', 'translation', en.default, true, true);
+    },
+    (error: unknown) => {
+      english = null;
+      throw error;
+    },
+  );
+  return english;
+}
+
+/** Starts i18n; resolves when the first render can show `lng` (at once for Polish). */
+export function initI18n(lng: Language): Promise<void> {
   void i18next.init({
-    lng,
+    lng: 'pl',
     fallbackLng: 'pl',
-    resources: { pl: { translation: pl }, en: { translation: en } },
+    resources: { pl: { translation: pl } },
     // Preact escapes text itself.
     interpolation: { escapeValue: false },
     // Resources are bundled: initialise synchronously, before the first render.
     initAsync: false,
   });
+  return setLanguage(lng);
 }
 
-/** Switch language at runtime (the profile's choice wins over the device's, as in v1). */
-export function setLanguage(lng: Language): void {
+/** The language asked for last: a slower earlier switch must not win over it. */
+let requested: Language = 'pl';
+
+/**
+ * Switch language at runtime (the profile's choice wins over the device's, as in v1).
+ * It switches once the language's strings are loaded; if they cannot be (offline before
+ * the chunk was ever cached), the current language stays.
+ */
+export function setLanguage(lng: Language): Promise<void> {
+  requested = lng;
   // peek(): callable from an effect without subscribing it to the language.
-  if (language.peek() === lng) return;
-  void i18next.changeLanguage(lng);
-  language.value = lng;
+  if (language.peek() === lng && i18next.language === lng) return Promise.resolve();
+  return loadLanguage(lng).then(
+    () => {
+      if (requested !== lng) return;
+      void i18next.changeLanguage(lng);
+      language.value = lng;
+    },
+    () => {},
+  );
 }
 
 export const t = i18next.t.bind(i18next);

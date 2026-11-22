@@ -3,7 +3,7 @@
 // new one, and a removed row fades out where it was while the others close the gap.
 // Transform and opacity only, on the compositor; nothing when motion is reduced
 // (the duration tokens are 0 ms then).
-import type { RefObject } from 'preact';
+import { toChildArray, type ComponentChildren, type RefObject } from 'preact';
 import { useLayoutEffect, useRef } from 'preact/hooks';
 import { cssDurationMs } from './motion';
 
@@ -58,17 +58,38 @@ function fadeOut(list: HTMLElement, row: Element, place: Place, duration: number
 }
 
 /**
+ * What identifies each row of a list for Preact: its key, or its type and place when
+ * unkeyed. The same sequence twice means Preact keeps every row element where it was.
+ */
+export function rowKeys(children: ComponentChildren): unknown[] {
+  return toChildArray(children).map((child) => (typeof child === 'object' ? (child.key ?? child.type) : child));
+}
+
+function sameKeys(a: readonly unknown[], b: readonly unknown[]): boolean {
+  return a.length === b.length && a.every((key, i) => key === b[i]);
+}
+
+/**
  * Put the returned ref on a list (ul/ol or any container of rows). Its rows animate
  * between renders; rows that appear rise in by CSS (.ui-stagger).
+ *
+ * `keys` (rowKeys of the list's children): when they are the same as at the last
+ * render, no row can move, so the old layout is not read. Reading it forces the
+ * browser to lay out the page in the middle of a render (docs/v2/PERF.md: opening the
+ * drawer re-rendered the lists of the screen and paid for a layout each time).
  */
-export function useListMotion<T extends HTMLElement>(): RefObject<T> {
+export function useListMotion<T extends HTMLElement>(keys?: readonly unknown[]): RefObject<T> {
   const ref = useRef<T>(null);
   const before = useRef<Snapshot | null>(null);
+  const lastKeys = useRef<readonly unknown[] | null>(null);
+  const unchanged = keys !== undefined && lastKeys.current !== null && sameKeys(lastKeys.current, keys);
+  lastKeys.current = keys ?? null;
 
   // Where every row is just before this render changes the list. The component
   // body runs before Preact touches the list's children, so this is the old layout.
   const list = ref.current;
-  if (list) {
+  before.current = null;
+  if (list && !unchanged) {
     const rows = rowsOf(list);
     before.current = { rows, places: new Map(rows.map((row) => [row, placeOf(row)])) };
   }

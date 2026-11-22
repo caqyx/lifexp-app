@@ -10,7 +10,7 @@ export function startLanguageSync(root: HTMLElement = document.documentElement):
     const profile = current.status === 'signedIn' ? current.profile : null;
     const lang = typeof profile === 'object' && profile !== null ? profile.lang : null;
     if (!lang) return;
-    setLanguage(lang);
+    void setLanguage(lang);
     try {
       localStorage.setItem(V1_LANG_STORAGE_KEY, lang);
     } catch {

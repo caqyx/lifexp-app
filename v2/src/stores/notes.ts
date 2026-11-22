@@ -1,7 +1,8 @@
 // The account's notes, live (stage 3a). The notes screens start the listener when
-// they mount and stop it when they leave.
+// they mount and it stops a moment after they leave (stores/shared.ts).
 import { signal } from '@preact/signals';
 import type { Note } from '@/domain/notes';
+import { SCREEN_GRACE_MS, sharedWatch } from './shared';
 
 export interface NotesState {
   /** undefined = still loading. */
@@ -13,7 +14,10 @@ const EMPTY: NotesState = { list: undefined, failed: false };
 
 export const notes = signal<NotesState>(EMPTY);
 
-export function watchNotes(uid: string): () => void {
+/** Start watching (or join the watch already running: the notes screens, Ex-us); call the result to leave. */
+export const watchNotes = sharedWatch(start, SCREEN_GRACE_MS, () => notes.peek().failed);
+
+function start(uid: string): () => void {
   notes.value = EMPTY;
   let stopped = false;
   let stop: (() => void) | null = null;

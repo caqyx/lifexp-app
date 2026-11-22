@@ -10,7 +10,7 @@
 //   on Back through its close watcher, sometimes without a cancel event) reports
 //   it to the parent, which would otherwise keep `open` true: the button that
 //   opens it would then do nothing until the page was reloaded.
-import { useEffect, useLayoutEffect, useRef } from 'preact/hooks';
+import { useLayoutEffect, useRef } from 'preact/hooks';
 
 const HISTORY_KEY = 'lifexpModal';
 let counter = 0;
@@ -174,7 +174,12 @@ export function useModal(open: boolean, onClose: () => void) {
     }
   }, [open]);
 
-  useEffect(() => {
+  // A layout effect too: the layer's history entry is pushed in the commit that opens it
+  // (above), and a Back right after must find this popstate listener already there. A
+  // passive effect runs only after the next paint; on a busy device a Back taken in that
+  // gap left the layer open over the screen it had already returned to (CI 2026-11-22,
+  // tests/v2/tasks.spec.js "+" → Zadanie).
+  useLayoutEffect(() => {
     const dialog = ref.current;
     const onCancel = (e: Event) => {
       e.preventDefault(); // Escape: close through the parent, with the animation

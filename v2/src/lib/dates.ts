@@ -2,6 +2,7 @@
 // calendars and v2 keeps both until migration M4: the UTC day (dailyLog, streak,
 // daily limit — v1's todayStr) and the local day (chores, tasks — dateISOLocal).
 // Keys never go through Date parsing in local time, so they cannot shift.
+import { dateFormat } from './intl';
 
 /** v1's `todayStr()`: the UTC calendar date. */
 export function utcDayKey(date: Date): string {
@@ -22,7 +23,7 @@ export function localDayKey(date: Date): string {
  */
 export function zonedIsoMinutes(date: Date, timeZone: string): string {
   const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-CA', {
+    dateFormat('en-CA', {
       timeZone,
       year: 'numeric',
       month: '2-digit',
@@ -61,41 +62,41 @@ export function weekOf(key: string): string[] {
 
 /** "pon." / "Mon" for a day key, independent of the device's time zone. */
 export function formatWeekdayShort(key: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(keyToUtcDate(key));
+  return dateFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(keyToUtcDate(key));
 }
 
 /** "wtorek" / "Tuesday" for a day key, independent of the device's time zone. */
 export function formatWeekdayLong(key: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(keyToUtcDate(key));
+  return dateFormat(locale, { weekday: 'long', timeZone: 'UTC' }).format(keyToUtcDate(key));
 }
 
 /** "wtorek, 29 września" for a day key, independent of the device's time zone. */
 export function formatDayKey(key: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
+  return dateFormat(locale, { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
     keyToUtcDate(key),
   );
 }
 
 /** "29 września" for a day key, independent of the device's time zone. */
 export function formatDayMonth(key: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(keyToUtcDate(key));
+  return dateFormat(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(keyToUtcDate(key));
 }
 
 /** "wrzesień 2026" for a month key "2026-09". */
 export function formatMonthKey(monthKey: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
+  return dateFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
     keyToUtcDate(`${monthKey}-01`),
   );
 }
 
 /** "wtorek, 29 września" for the device's current day. */
 export function formatLongDate(date: Date, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
+  return dateFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
 }
 
 /** "12 wrz" — the day of a moment, as a person on this device sees it. */
 export function formatShortDate(date: Date, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(date);
+  return dateFormat(locale, { day: 'numeric', month: 'short' }).format(date);
 }
 
 /** ISO weekday of a day key: 1 = Monday … 7 = Sunday, independent of the device's time zone. */
@@ -136,7 +137,7 @@ export function clockValue(minutes: number): string {
 /** "18:00" / "6:00 PM": minutes after midnight in the language's clock. */
 export function formatClock(minutes: number, locale: string): string {
   const m = Math.max(0, Math.min(24 * 60, Math.round(minutes)));
-  return new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }).format(
+  return dateFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' }).format(
     new Date(Date.UTC(2000, 0, 1, 0, m)),
   );
 }
@@ -153,15 +154,15 @@ export function localInstant(key: string, minutes: number): Date {
 
 /** "lis" / "Nov": the short month name for a month key. */
 export function formatMonthShort(monthKey: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' }).format(keyToUtcDate(`${monthKey}-01`));
+  return dateFormat(locale, { month: 'short', timeZone: 'UTC' }).format(keyToUtcDate(`${monthKey}-01`));
 }
 
 /** "20 lis" / "20 Nov" for a day key, independent of the device's time zone. */
 export function formatDayShort(key: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(keyToUtcDate(key));
+  return dateFormat(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(keyToUtcDate(key));
 }
 
 /** "17:05" / "5:05 pm": the time of a moment on this device, in the language's clock. */
 export function formatTimeOfDay(date: Date, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(date);
+  return dateFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(date);
 }

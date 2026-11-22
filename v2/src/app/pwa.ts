@@ -1,13 +1,38 @@
 // Installs v2's Service Worker (src/sw.ts) and recovers from a deploy that happened
 // while the page was open (docs/v2/PLAN.md 4.8, stage 1f).
+import { effect } from '@preact/signals';
 import { t } from '@/i18n';
+import { session } from '@/stores/session';
 import { showToast } from '@/ui/toast';
+import { whenIdle } from './idle';
 
-/** Production builds only: the dev server has no sw.js. Failure (private mode, blocked) is harmless. */
+/**
+ * Production builds only: the dev server has no sw.js. Failure (private mode, blocked) is harmless.
+ * Registered once the start is over: installing downloads the whole precache (~1.7 MB), which on
+ * a first visit over a phone network would otherwise share the line with the app's own start.
+ */
 export function registerServiceWorker(): void {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return;
-  // Relative to this page, so the scope is /lifexp-app/v2/ (or the test server's folder).
-  navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => undefined);
+  afterFirstScreen(() => {
+    // Relative to this page, so the scope is /lifexp-app/v2/ (or the test server's folder).
+    navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => undefined);
+  });
+}
+
+/** After the first real screen (the login, or the signed-in person's profile) its data gets this long. */
+const FIRST_SCREEN_GRACE_MS = 2500;
+
+/** Runs `task` when idle a moment after the first real screen (app/idle.ts). */
+export function afterFirstScreen(task: () => void): void {
+  let done = false;
+  const stop = effect(() => {
+    const current = session.value;
+    const settled = current.status !== 'loading' && (current.status !== 'signedIn' || current.profile !== 'loading');
+    if (!settled || done) return;
+    done = true;
+    whenIdle(task, { afterMs: FIRST_SCREEN_GRACE_MS });
+    queueMicrotask(() => stop());
+  });
 }
 
 const RELOADED_AT_KEY = 'lifexp-v2-stale-reload';

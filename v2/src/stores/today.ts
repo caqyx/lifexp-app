@@ -1,9 +1,10 @@
 // Live data behind the Today screen (stage 2a). The screen starts the listeners when
-// it mounts and stops them when it leaves; each source fills in on its own, so the
-// page shows what has arrived instead of waiting for everything.
+// it mounts and they stop a moment after it leaves (stores/shared.ts); each source fills
+// in on its own, so the page shows what has arrived instead of waiting for everything.
 import { signal } from '@preact/signals';
 import type { Activity, ActivityDef, DayLog } from '@/domain/activity';
 import type { ChoreDef, ChoreEntry } from '@/domain/chores';
+import { SCREEN_GRACE_MS, sharedWatch } from './shared';
 
 /** undefined = still loading. */
 export interface TodaySources {
@@ -36,7 +37,20 @@ export const today = signal<TodaySources>(EMPTY);
 /** v1's dashboard shows the last five activities. */
 export const RECENT_COUNT = 5;
 
-export function watchToday(uid: string): () => void {
+const repos = () => Promise.all([import('@/data/repos/today'), import('@/data/repos/activities')]);
+
+/**
+ * Fetches the repositories' code before the screen mounts (app/registry.ts preloadRoute):
+ * at start they arrive while the profile loads, not one round trip after it.
+ */
+export function preloadToday(): void {
+  repos().catch(() => undefined);
+}
+
+/** Start watching (or join the watch already running: Today, Ex-us); call the result to leave. */
+export const watchToday = sharedWatch(start, SCREEN_GRACE_MS, () => today.peek().failed);
+
+function start(uid: string): () => void {
   today.value = EMPTY;
   let stopped = false;
   const stops: (() => void)[] = [];
@@ -45,7 +59,7 @@ export function watchToday(uid: string): () => void {
   };
   const fail = () => set({ failed: true });
 
-  void Promise.all([import('@/data/repos/today'), import('@/data/repos/activities')])
+  void repos()
     .then(([repo, activities]) => {
       if (stopped) return;
       stops.push(

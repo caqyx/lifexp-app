@@ -15,6 +15,8 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
+    // vite.config.ts imports tools/bundle-budget.ts by its full name (Vite's native config loader needs it).
+    "allowImportingTsExtensions": true,
     // LifeXP's own games are plain JS (public/games/<id>/js, `// @ts-check`), imported by its tests.
     "allowJs": true,
     "skipLibCheck": true,
