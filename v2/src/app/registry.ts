@@ -22,6 +22,7 @@ import {
 import type { ComponentType } from 'preact';
 import { isModuleOn, type ModuleChoice, type OptionalModule } from '@/domain/modules';
 import { matchPath, type RouteParams, type RouteProps } from '@/lib/route-match';
+import { preloadToday } from '@/stores/today';
 
 export type ModuleId =
   | 'today'
@@ -70,6 +71,8 @@ export interface FeatureDef {
   optional?: OptionalModule;
   /** The module's screen, loaded on first visit. Absent = "coming soon". */
   view?: () => Promise<{ default: ComponentType<RouteProps> }>;
+  /** Fetches the code the screen asks for as soon as it mounts (its stores' repositories); see preloadRoute. */
+  preload?: () => void;
   /**
    * Sibling views of one screen, switched by its ViewSwitch. Moving between them is
    * not a new screen: the switch slides and only the content below changes.
@@ -97,6 +100,7 @@ export const FEATURES: readonly FeatureDef[] = [
     tab: 1,
     stage: '2',
     view: () => import('@/features/today/TodayPage'),
+    preload: preloadToday,
   },
   {
     id: 'tasks',
@@ -339,4 +343,25 @@ export function resolveRoute(path: string): ResolvedRoute | null {
     }
   }
   return null;
+}
+
+/**
+ * Starts downloading a screen's chunk (and what it imports) before it is shown, e.g.
+ * the first screen while the profile loads (docs/v2/PERF.md). LazyView then finds the
+ * module loaded; a failure is left to LazyView's own retry.
+ */
+export function preloadRoute(path: string): void {
+  const route = resolveRoute(path) ?? resolveRoute(DEFAULT_PATH);
+  route?.feature.view?.().catch(() => undefined);
+  route?.feature.preload?.();
+}
+
+/**
+ * The screens one tap away on a phone (the tab bar, D10): fetched when the browser is
+ * idle after the first screen, so the first switch to them does not wait for the network.
+ */
+export function preloadTabs(choice: ModuleChoice): void {
+  // A chunk that fails to load reloads the page (app/pwa.ts reloadOnStaleChunk): not for a mere prefetch.
+  if (!navigator.onLine) return;
+  for (const feature of tabItems(choice)) feature.view?.().catch(() => undefined);
 }
