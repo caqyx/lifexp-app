@@ -141,12 +141,12 @@
 }
 
 .cal-period__title {
-  overflow: hidden;
+  /* A long day title ("Dziś, niedziela, 22 listopada") wraps instead of being cut. */
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
   text-align: center;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .cal-period__title::first-letter {
@@ -260,7 +260,10 @@
 }
 
 .cal-month__day--outside {
-  color: var(--color-text-tertiary);
+  /* Another month's days stay tappable buttons, so their numbers keep 4.5:1; the
+     lighter weight and dimmed marks say "not this month". */
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-regular);
 }
 
 .cal-month__day--outside .cal-marks {
@@ -601,6 +604,27 @@
   font-weight: var(--font-weight-semibold);
 }
 
+.cal-week__day--free {
+  flex-flow: row wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: var(--space-3);
+}
+
+.cal-week__day--free .cal-empty {
+  padding: 0;
+}
+
+/* Month view on a wide screen: the grid and the chosen day side by side. */
+@media (min-width: 1180px) {
+  .cal-view--month {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+    align-items: start;
+    gap: var(--space-6);
+  }
+}
+
 .cal-week__weekday {
   color: var(--color-text);
   text-transform: capitalize;
@@ -707,6 +731,8 @@
   left: calc(100% * var(--col) / var(--cols));
   width: calc(100% / var(--cols) - 3px);
   height: calc(var(--length) * var(--minute) - 2px);
+  /* A short entry stays a 24 px target (WCAG 2.5.8) however few minutes it lasts. */
+  min-height: 24px;
   animation: ui-rise-in var(--duration-enter) var(--ease-out);
 }
 
@@ -772,8 +798,10 @@
 }
 
 .cal-block__meta {
-  color: var(--color-text-secondary);
+  /* On the category-tinted block the secondary grey fell under 4.5:1. */
+  color: var(--color-text);
   font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
 }
 
 .cal-block .cal-tag {

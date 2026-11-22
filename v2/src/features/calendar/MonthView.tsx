@@ -34,7 +34,7 @@ export function MonthView({ focus, today, items, onFocus, onAdd, ...handlers }: 
   const chosen = items.get(focus) ?? [];
 
   return (
-    <div class="stack cal-view">
+    <div class="stack cal-view cal-view--month">
       <Card padding="sm">
         <PeriodNav
           title={formatMonthKey(monthKey, lang)}

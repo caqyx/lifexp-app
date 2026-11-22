@@ -117,14 +117,20 @@ interface PeriodNavProps {
 export function PeriodNav({ title, prevLabel, nextLabel, onPrev, onNext }: PeriodNavProps) {
   return (
     <div class="cal-period">
-      <button type="button" class="cal-period__step" aria-label={prevLabel} onClick={onPrev}>
+      {/* The name starts with the visible word (WCAG 2.5.3), then says which period. */}
+      <button type="button" class="cal-period__step" aria-label={t('calendar.stepLabel', { step: t('calendar.back'), period: prevLabel })} onClick={onPrev}>
         <ChevronLeft aria-hidden="true" />
         <span>{t('calendar.back')}</span>
       </button>
       <h2 class="cal-period__title" aria-live="polite">
         {title}
       </h2>
-      <button type="button" class="cal-period__step cal-period__step--next" aria-label={nextLabel} onClick={onNext}>
+      <button
+        type="button"
+        class="cal-period__step cal-period__step--next"
+        aria-label={t('calendar.stepLabel', { step: t('calendar.forward'), period: nextLabel })}
+        onClick={onNext}
+      >
         <span>{t('calendar.forward')}</span>
         <ChevronRight aria-hidden="true" />
       </button>

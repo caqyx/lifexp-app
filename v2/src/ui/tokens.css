@@ -244,7 +244,8 @@
   --color-text-secondary: rgb(60 60 67 / 76%); /* secondaryLabel, AA */
   --color-text-tertiary: rgb(60 60 67 / 30%); /* tertiaryLabel */
   --color-accent: #0071e3;
-  --color-accent-text: #0062cc;
+  /* A shade under Apple's #0062cc: 4.5:1 also on accent-soft over the grouped background. */
+  --color-accent-text: #005ec4;
   --color-on-accent: #ffffff;
   --color-accent-soft: rgb(0 122 255 / 12%);
   --color-positive: #1f7a35;
