@@ -199,6 +199,15 @@ a {
   --stagger-i: 7;
 }
 
+/*
+ * Rows past the first screen are not seen rising: they arrive in place. A list of 150
+ * notes or transactions otherwise starts 150 animations at once, each its own layer,
+ * and the frame that starts them is ~100 ms longer on a phone (docs/v2/PERF.md).
+ */
+.ui-stagger > :nth-child(n + 21) {
+  animation: none;
+}
+
 /* A list whose rows glide to their new places (ui/listMotion.ts). */
 .ui-motion-list {
   position: relative;
