@@ -8,6 +8,8 @@
   /* Type: one family per theme, scale 1.25 */
   --font-family-base: 'Manrope Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-family-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  /* Only for a number inside a calendar cell, where 12 px does not fit; never running text. */
+  --font-size-2xs: 10px;
   --font-size-xs: 12px;
   --font-size-sm: 14px;
   --font-size-md: 16px;
@@ -180,11 +182,13 @@
   --color-text-secondary: #5f6b7a;
   --color-text-tertiary: #98a2b3;
   --color-accent: #1668e3;
-  --color-accent-text: #1668e3;
+  /* A touch darker than the fill: 4.5:1 also on the accent-soft tint (selected rows, badges). */
+  --color-accent-text: #145fd0;
   --color-on-accent: #ffffff;
   --color-accent-soft: rgb(22 104 227 / 10%);
   --color-positive: #15803d;
-  --color-negative: #d92d20;
+  /* 4.5:1 also on the raised surface and its own 8 % tint (a destructive button's hover). */
+  --color-negative: #c8291e;
   --color-warning: #b45309;
   --color-focus: #1668e3;
   --color-topbar: rgb(245 247 251 / 82%);
@@ -326,7 +330,8 @@
   --color-border: #252420;
   --color-separator: #252420;
   --color-text: #f5f2ec;
-  --color-text-secondary: #7a7872;
+  /* v1's #7a7872 lightened to 4.5:1 on the raised surface (fields, segmented track). */
+  --color-text-secondary: #8c8981;
   --color-text-tertiary: #55534e;
   --color-accent: #f5c842;
   --color-accent-text: #f5c842;

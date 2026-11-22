@@ -6,7 +6,7 @@
 import { findCommand } from '@/domain/exus/commands';
 import { matchTask, tasksInScope, type TasksScope } from '@/domain/exus/tasks';
 import { noteExcerpt } from '@/domain/notes';
-import { isOverdue, taskProblem, TASKS_MAX, type Task, type TaskDraft, type TaskSize } from '@/domain/tasks';
+import { isOverdue, taskProblem, TASKS_MAX, TASK_TEXT_MAX, type Task, type TaskDraft, type TaskSize } from '@/domain/tasks';
 import { locale, t } from '@/i18n';
 import { formatDayMonth } from '@/lib/dates';
 import { completeTask, deleteTask, updateTask } from '@/services/tasks';
@@ -43,7 +43,7 @@ function dueWords(task: Task, today: string): string {
 
 export const TASK_HANDLERS = {
   'complete-task': {
-    run: async (args, { uid, today }) => {
+    run: async (args, { uid }) => {
       const list = await loadedTasks().catch(() => null);
       if (!list) return { reply: t('tasks.loadFailed') };
       const found = findTask(args, open(list));
@@ -52,7 +52,7 @@ export const TASK_HANDLERS = {
       let pieces: number;
       try {
         // The screen's own transaction: done is final, the pieces go to the build only when it is in time.
-        pieces = await completeTask(uid, task.id, today);
+        pieces = await completeTask(uid, task.id);
       } catch {
         return { reply: t('tasks.completeFailed') };
       }
@@ -98,7 +98,7 @@ export const TASK_HANDLERS = {
       const result = updateTask(uid, task.id, draft, today);
       if (!result.ok) {
         if (result.problem === 'dueInPast' && args.due === undefined) return { reply: t('exus.task.editOverdue') };
-        return { reply: result.problem === 'limit' ? t('tasks.maxTasks', { max: TASKS_MAX }) : t(`exus.taskProblem.${result.problem}`) };
+        return { reply: result.problem === 'limit' ? t('tasks.maxTasks', { max: TASKS_MAX }) : t(`exus.taskProblem.${result.problem}`, { max: TASK_TEXT_MAX }) };
       }
       const restorable = taskProblem(before, today) === null;
       return {

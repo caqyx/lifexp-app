@@ -1,8 +1,9 @@
-// "Ważne dzisiaj" on Today (docs/v2/PLAN.md 9.1, row c-2), only while the calendar is
-// on: today's entries and tasks still open — overdue tasks too — the most important
-// first (domain/calendar/items importantToday). Ticking an entry marks the day (no
-// points, with "Cofnij"); ticking a task goes through the tasks service (v1 rules).
-// A row opens it where it lives: the entry in the calendar's day, the task in Tasks.
+// Today's tasks on Today (docs/v2/PLAN.md 7.6; QUALITY.md D1): the tasks due today
+// and overdue ones still open, the most important first (domain/calendar/items
+// importantToday). With the calendar on it is the calendar's "Ważne dzisiaj" (row c-2):
+// the day's entries among the tasks. Ticking an entry marks the day (no points, with
+// "Cofnij"); ticking a task goes through the tasks service (v1 rules). A row opens it
+// where it lives: the entry in the calendar's day, the task in Tasks.
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { importantToday, type CalendarItem } from '@/domain/calendar/items';
 import { ItemList, ItemRow } from '@/features/calendar/parts';
@@ -20,25 +21,28 @@ interface ImportantTodayCardProps {
   uid: string;
   today: string;
   navigate: Navigate;
+  /** The calendar module is on: its entries join the tasks ("Ważne dzisiaj"). */
+  withCalendar: boolean;
 }
 
-export function ImportantTodayCard({ uid, today, navigate }: ImportantTodayCardProps) {
-  useEffect(() => watchCalendar(uid), [uid]);
+const NO_EVENTS: readonly never[] = [];
+
+export function ImportantTodayCard({ uid, today, navigate, withCalendar }: ImportantTodayCardProps) {
+  useEffect(() => (withCalendar ? watchCalendar(uid) : undefined), [uid, withCalendar]);
   useEffect(() => watchTasks(uid), [uid]);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   const lastToast = useRef<number | null>(null);
 
-  const { events, categories } = calendarState.value;
+  const { events, categories } = withCalendar ? calendarState.value : { events: NO_EVENTS, categories: NO_EVENTS };
   const taskList = tasksState.value.list;
   const notify = (input: ToastInput) => {
     if (lastToast.current !== null) dismissToast(lastToast.current);
     lastToast.current = showToast(input);
   };
 
-  const title = t('calendar.importantToday');
-  const link = (
+  const title = t(withCalendar ? 'calendar.importantToday' : 'today.tasksToday');
+  const link = withCalendar ? (
     <a
-      class="today-card__link"
       href="#/calendar/day"
       onClick={() => {
         calendarFocus.value = null;
@@ -46,6 +50,8 @@ export function ImportantTodayCard({ uid, today, navigate }: ImportantTodayCardP
     >
       {t('calendar.openCalendar')}
     </a>
+  ) : (
+    <a href="#/tasks">{t('today.tasksOpen')}</a>
   );
 
   if (!events || !categories || !taskList) {
@@ -74,7 +80,7 @@ export function ImportantTodayCard({ uid, today, navigate }: ImportantTodayCardP
       return;
     }
     setBusy((keys) => new Set(keys).add(item.key));
-    completeTask(uid, item.task.id, today)
+    completeTask(uid, item.task.id)
       .then((pieces) =>
         notify(
           pieces > 0
@@ -105,7 +111,9 @@ export function ImportantTodayCard({ uid, today, navigate }: ImportantTodayCardP
     <Section title={title} action={link}>
       <Card padding={items.length === 0 ? 'md' : 'none'}>
         {items.length === 0 ? (
-          <p class="today-important__empty">{t(settled > 0 ? 'calendar.importantAllDone' : 'calendar.importantNone')}</p>
+          <p class="today-important__empty">
+            {t(settled > 0 ? 'calendar.importantAllDone' : withCalendar ? 'calendar.importantNone' : 'today.tasksNone')}
+          </p>
         ) : (
           <ItemList label={title}>
             {items.map((item) => (

@@ -42,13 +42,37 @@
   font-size: var(--font-size-sm);
 }
 
+/* ── Two columns once the content is wide (PLAN.md 7.3): what to do today on the
+   left, where things stand on the right. On a phone the right one follows. ── */
+
+.today-columns {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.today-columns > * {
+  min-width: 0;
+}
+
+/* The columns are a frame, not a card: their cards rise in one after another, the
+   frame itself does not move under them. */
+.ui-stagger > .today-columns {
+  animation: none;
+}
+
+@media (min-width: 1180px) {
+  .today-columns {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    align-items: start;
+  }
+}
+
 /* ── Points hero: the dark card of the reference ── */
 
 .today-hero {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
+  flex-direction: column;
+  gap: var(--space-5);
   padding: var(--space-6);
   border-radius: var(--card-radius);
   background: var(--gradient-hero);
@@ -56,8 +80,50 @@
   box-shadow: var(--shadow-1);
 }
 
+.today-hero__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
 .today-hero__text {
   min-width: 0;
+}
+
+/* The level under the points: name and title, XP, a bar in white on the dark card. */
+.today-hero__level {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.today-hero__level-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.today-hero__level-name {
+  min-width: 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.today-hero__level-title,
+.today-hero__xp {
+  color: rgb(255 255 255 / 75%);
+  font-weight: var(--font-weight-medium);
+}
+
+.today-hero__xp {
+  flex-shrink: 0;
+}
+
+.today-hero .ui-progress {
+  background: rgb(255 255 255 / 16%);
+  color: #ffffff;
 }
 
 .today-hero__label {
@@ -160,6 +226,19 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-4);
+}
+
+/* ── The streak, inside the day card under the limit ── */
+
+.today-streak {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-separator);
+}
+
+.today-streak__state {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 /* ── Week of the streak: Mon … Sun ── */
@@ -275,6 +354,21 @@
   text-decoration: none;
 }
 
+.today-shortcut {
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.today-shortcut:hover,
+.today-shortcut:active {
+  background: var(--color-surface-raised);
+}
+
+.today-shortcut:active {
+  transform: scale(0.97);
+}
+
 .today-shortcut__label {
   max-width: 100%;
   overflow: hidden;
@@ -374,7 +468,7 @@
 }
 
 .today-chore__emoji {
-  font-size: 20px;
+  font-size: var(--font-size-lg);
   line-height: 1;
 }
 
@@ -408,13 +502,6 @@
 
 .today-chore--done .today-check svg {
   transform: scale(1);
-}
-
-.today-card__link--button {
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
 }
 
 /* ── The card's editor ── */
@@ -463,13 +550,6 @@
 }
 
 /* ── Goals ── */
-
-.today-card__link {
-  color: var(--color-accent-text);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  text-decoration: none;
-}
 
 .today-goals {
   margin: 0;
@@ -544,8 +624,14 @@
 
 .today-card__actions--two {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+/* The text action beside the main one: a full-height target, less side padding. */
+.today-card__actions--two .ui-button--quiet {
+  padding: 0 var(--space-3);
 }
 
 .activity-sheet__time {
@@ -589,7 +675,19 @@
   font-weight: var(--font-weight-medium);
 }
 
-/* The Ex-us field (PLAN.md 6.10): one hint line under it, no command palette here. */
+/* The Ex-us field (PLAN.md 6.10): the field across, then one hint line with the send
+   button beside it; no command palette here. */
+.today-exus {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.today-exus > .ui-field {
+  grid-column: 1 / -1;
+}
+
 .today-exus__hint {
   margin: 0;
   font-size: var(--font-size-sm);

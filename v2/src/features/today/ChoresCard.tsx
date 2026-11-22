@@ -36,7 +36,7 @@ export function ChoresCard({ uid, profile, defs, entries, today, onLog, onEdit }
     <Section
       title={t('today.chores')}
       action={
-        <button type="button" class="today-card__link today-card__link--button" onClick={onEdit}>
+        <button type="button" onClick={onEdit}>
           {t('today.choresEdit')}
         </button>
       }

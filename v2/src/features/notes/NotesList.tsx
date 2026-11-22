@@ -29,6 +29,7 @@ export function NotesList({ notes }: { notes: readonly Note[] }) {
 
       <SegmentedControl
         label={t('notes.views')}
+        hideLabel
         value={view}
         options={[
           { value: 'active', label: t('notes.active') },

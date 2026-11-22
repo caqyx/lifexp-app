@@ -92,7 +92,8 @@ test.describe('phone: drawer', () => {
     await openApp(page, account);
     await menuButton(page).click();
     await waitForDrawer(page, 'open');
-    await page.getByRole('link', { name: 'Zadania' }).click();
+    // In the menu: Today has a "Zadania" link of its own (its tasks card).
+    await drawer(page).getByRole('link', { name: 'Zadania' }).click();
     await waitForDrawer(page, 'closed');
     await expect(page).toHaveURL(/#\/tasks$/);
     await expect(page.locator('.topbar__title')).toHaveText('Zadania');

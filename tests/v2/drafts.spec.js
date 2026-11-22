@@ -160,6 +160,25 @@ test('a gaming draft can only be discarded; one v2 cannot read stays for v1; Tod
   await expect(sheet).toBeVisible();
 });
 
+test("another account's draft made on this device is neither shown nor counted; v1's own still are", async ({ page }) => {
+  const account = await draftsAccount('drafts-owner');
+  const [activity, , expense] = v1Drafts();
+  // The second draft was made in v2 by someone else signed in on this phone earlier.
+  const theirs = { ...expense, id: 'm2', summary: 'Wydatek 9,00 zł — jedzenie', uid: 'someone-else' };
+  await seedQueue(page, [activity, theirs]);
+  await openSignedIn(page, account, '#/today');
+  const sheet = page.getByRole('dialog', { name: 'Szkice zrobione offline' });
+  await expect(sheet.getByRole('listitem')).toHaveCount(1);
+  await expect(sheet.getByText('Wydatek 9,00 zł — jedzenie')).toHaveCount(0);
+  await sheet.getByRole('button', { name: 'Dodaj: Nauka — 45 min (~30 pkt)' }).click();
+  await expect(sheet.getByText('Wszystkie szkice przetworzone.')).toBeVisible();
+  // It waits in the queue for its own account, untouched.
+  expect(await queueIn(page)).toEqual([theirs]);
+  await sheet.getByRole('button', { name: 'Zamknij' }).click();
+  await expect(page.getByText(/do zatwierdzenia/)).toHaveCount(0);
+  expect((await db.collection(`users/${account.uid}/moneyTransactions`).get()).size).toBe(0);
+});
+
 test('offline in v2: an activity and an expense wait as v1 drafts, confirmed once back online', async ({ page, context }) => {
   const account = await draftsAccount('drafts-offline-v2');
   // Both screens are opened online first: their code is loaded, their data cached.
@@ -202,6 +221,8 @@ test('offline in v2: an activity and an expense wait as v1 drafts, confirmed onc
   ]);
   // formatMoney puts a no-break space before the currency.
   expect(queue.map((d) => d.summary)).toEqual(['Aktywność: Nauka — 45 min (~30 pkt)', 'Wydatek: 12,50\u00a0zł — jedzenie']);
+  // v2 also says whose drafts they are (v1 ignores the field).
+  expect(queue.map((d) => d.uid)).toEqual([account.uid, account.uid]);
   expect((await db.collection(`users/${account.uid}/activities`).get()).size).toBe(0);
 
   // Back online: the review opens by itself.

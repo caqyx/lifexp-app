@@ -52,12 +52,22 @@
   color: var(--color-negative);
 }
 
+.ui-button--quiet-danger {
+  background: transparent;
+  color: var(--color-negative);
+}
+
 .ui-button:hover:not(:disabled) {
   filter: brightness(1.08);
 }
 
 .ui-button--quiet:hover:not(:disabled) {
   background: var(--color-accent-soft);
+  filter: none;
+}
+
+.ui-button--quiet-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-negative) 8%, transparent);
   filter: none;
 }
 

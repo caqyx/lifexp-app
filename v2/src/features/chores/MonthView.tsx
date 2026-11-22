@@ -47,7 +47,7 @@ function DayEntries({ day, entries, onDelete }: { day: string; entries: ChoreEnt
             </span>
             <span class="chores-day__name user-text">{entry.name}</span>
             <span class="chores-day__points numeric">{t('units.pointsGained', { points: entry.points })}</span>
-            <Button variant="quiet" onClick={() => onDelete(entry)} aria-label={t('chores.deleteNamed', { name: entry.name })}>
+            <Button variant="quiet-danger" onClick={() => onDelete(entry)} aria-label={t('chores.deleteNamed', { name: entry.name })}>
               {t('chores.delete')}
             </Button>
           </li>
@@ -136,6 +136,7 @@ export function MonthView({ uid, rate, defs, entries, payouts, path, navigate }:
     <>
       <SegmentedControl<Month>
         label={t('chores.month')}
+        hideLabel
         value={month}
         options={[
           { value: 'current', label: t('chores.current') },

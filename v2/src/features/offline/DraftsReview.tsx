@@ -4,7 +4,7 @@
 // comes back while drafts wait, and from Today's reminder. Confirming loads the
 // services on demand, so the app's first screen does not wait for Firebase.
 import { useEffect, useState } from 'preact/hooks';
-import type { DraftItem } from '@/domain/drafts';
+import { draftsOf, type DraftItem } from '@/domain/drafts';
 import { locale, t } from '@/i18n';
 import { formatShortDate } from '@/lib/dates';
 import { drafts, refreshDrafts, reviewRequested, watchDraftsFromOtherTabs } from '@/offline/queue';
@@ -28,7 +28,7 @@ interface DraftsReviewProps {
 export function DraftsReview({ uid, rate }: DraftsReviewProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const list = drafts.value;
+  const list = draftsOf(drafts.value, uid);
   const lang = locale();
 
   useEffect(() => watchDraftsFromOtherTabs(), []);
@@ -37,12 +37,12 @@ export function DraftsReview({ uid, rate }: DraftsReviewProps) {
   useEffect(() => {
     const maybeOpen = () => {
       refreshDrafts();
-      if (navigator.onLine && drafts.peek().length > 0) setOpen(true);
+      if (navigator.onLine && draftsOf(drafts.peek(), uid).length > 0) setOpen(true);
     };
     maybeOpen();
     addEventListener('online', maybeOpen);
     return () => removeEventListener('online', maybeOpen);
-  }, []);
+  }, [uid]);
 
   useEffect(() => {
     if (!reviewRequested.value) return;

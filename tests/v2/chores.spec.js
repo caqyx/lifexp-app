@@ -532,3 +532,23 @@ test("the card's editor: a chosen list with a one-time chore, kept on the accoun
   await expect(page).toHaveURL(/#\/chores\/defs$/);
   await expect(sheet).toBeHidden();
 });
+
+test.describe('Today left open over midnight', () => {
+  test.use({ timezoneId: 'Europe/Warsaw' });
+
+  test("a chore ticked on Today's card after midnight goes to the new day", async ({ page }) => {
+    const account = await choresAccount('chores-midnight');
+    // 23:58 on 30.11 in Warsaw (UTC+1): the next day is also the next month.
+    await page.clock.install({ time: new Date('2026-11-30T22:58:00Z') });
+    await openSignedIn(page, account, '#/today');
+    const chores = page.getByRole('list', { name: 'Obowiązki dziś' });
+    await expect(chores.getByRole('listitem')).toHaveCount(2);
+
+    await page.clock.fastForward('05:00');
+    await chores.getByRole('button', { name: /Opróżnienie zmywarki/ }).click();
+    await expect(page.getByText('Dodano: Opróżnienie zmywarki (+15 pkt)')).toBeVisible();
+    await expect
+      .poll(async () => (await entriesOf(account.uid).get()).docs.map((d) => [d.data().dateISO, d.data().monthKey]))
+      .toEqual([['2026-12-01', '2026-12']]);
+  });
+});
