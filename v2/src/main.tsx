@@ -21,7 +21,7 @@ function storedLanguage(): string | null {
 }
 
 // This device's language first; the profile's replaces it once it loads.
-initI18n(pickLanguage(storedLanguage()));
+const languageReady = initI18n(pickLanguage(storedLanguage()));
 startLanguageSync();
 startThemeSync();
 startRouter();
@@ -30,12 +30,15 @@ void startSession();
 
 const root = document.getElementById('app');
 if (!root) throw new Error('Missing #app root element');
-render(
-  <>
-    <App />
-    <GlassFilters />
-  </>,
-  root,
+// Polish at once; English after its chunk (i18n), so the first screen is never in the wrong language.
+void languageReady.then(() =>
+  render(
+    <>
+      <App />
+      <GlassFilters />
+    </>,
+    root,
+  ),
 );
 registerServiceWorker();
 watchForNewBuild();

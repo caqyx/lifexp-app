@@ -18,7 +18,7 @@ export function AppearanceSection({ uid }: { uid: string; profile: Profile }) {
   const modes = FAMILY_MODES[theme.family];
 
   const chooseLanguage = (lang: Language) => {
-    setLanguage(lang);
+    void setLanguage(lang);
     try {
       localStorage.setItem(V1_LANG_STORAGE_KEY, lang);
     } catch {

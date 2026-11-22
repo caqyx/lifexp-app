@@ -9,7 +9,7 @@ import { isModuleOn, type OptionalModule } from '@/domain/modules';
 import { DAILY_LIMIT_DEFAULT } from '@/domain/points';
 import type { Language, Profile } from '@/domain/profile';
 import { DAILY_LIMIT_MAX, DAILY_LIMIT_MIN, dailyLimitProblem } from '@/domain/settings';
-import { language, setLanguage, t, V1_LANG_STORAGE_KEY } from '@/i18n';
+import { language, loadLanguage, setLanguage, t, V1_LANG_STORAGE_KEY } from '@/i18n';
 import type { ModePreference, ThemeFamily } from '@/lib/theme';
 import { saveDailyLimit, saveLanguage, saveModule } from '@/services/settings';
 import { account } from '@/stores/session';
@@ -53,10 +53,12 @@ export const SETTINGS_HANDLERS = {
   lang: {
     run: async (args, { uid }) => {
       const lang = args.lang as Language;
+      // The reply is written in the new language: its strings first (English is a chunk).
+      await loadLanguage(lang).catch(() => {});
       const name = t(`settings.languages.${lang}`, { lng: lang });
       if (language.value === lang) return { reply: t('exus.lang.same', { name, lng: lang }) };
       // As Settings → Wygląd does: this device now, the profile for the other devices.
-      setLanguage(lang);
+      await setLanguage(lang);
       try {
         localStorage.setItem(V1_LANG_STORAGE_KEY, lang);
       } catch {
