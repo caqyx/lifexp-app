@@ -38,7 +38,6 @@ export function ImportantTodayCard({ uid, today, navigate }: ImportantTodayCardP
   const title = t('calendar.importantToday');
   const link = (
     <a
-      class="today-card__link"
       href="#/calendar/day"
       onClick={() => {
         calendarFocus.value = null;
@@ -74,7 +73,7 @@ export function ImportantTodayCard({ uid, today, navigate }: ImportantTodayCardP
       return;
     }
     setBusy((keys) => new Set(keys).add(item.key));
-    completeTask(uid, item.task.id, today)
+    completeTask(uid, item.task.id)
       .then((pieces) =>
         notify(
           pieces > 0

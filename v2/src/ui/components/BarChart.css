@@ -4,8 +4,26 @@
  * bar heights are a share of the same fixed height. The baseline is the only rule.
  */
 
-.ui-bars {
+.ui-bars-frame {
   --bars-plot-height: 128px;
+  position: relative;
+}
+
+/* All values 0: a note in the middle of the plot (above the day labels), not a blank box. */
+.ui-bars__empty {
+  position: absolute;
+  inset: 0 0 auto;
+  display: grid;
+  place-items: center;
+  height: var(--bars-plot-height);
+  padding: 0 var(--space-4);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  pointer-events: none;
+}
+
+.ui-bars {
   --bars-label-band: 20px;
 
   display: grid;
@@ -54,7 +72,7 @@
   /* Grows from the baseline when the chart appears, one day after another. */
   transform-origin: bottom;
   animation: ui-bar-grow var(--duration-slow) var(--ease-out) backwards;
-  animation-delay: calc(var(--i, 0) * 30ms);
+  animation-delay: calc(var(--i, 0) * var(--stagger-step));
 }
 
 @keyframes ui-bar-grow {
@@ -71,7 +89,7 @@
   line-height: 1;
   white-space: nowrap;
   animation: ui-fade-in var(--duration-enter) var(--ease-out) backwards;
-  animation-delay: calc(var(--i, 0) * 30ms + var(--duration-fast));
+  animation-delay: calc(var(--i, 0) * var(--stagger-step) + var(--duration-fast));
 }
 
 .ui-bars__label {

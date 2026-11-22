@@ -71,6 +71,8 @@ async function apply(uid: string, draft: DraftItem, rate: number): Promise<Draft
 
 /** v1 "Dodaj" on a draft: written to the account, then out of the queue. `rate` is the general złoty per point. */
 export async function confirmDraft(uid: string, draft: DraftItem, rate: number): Promise<DraftOutcome> {
+  // Another account's draft (made on this device) is never written to this one.
+  if (draft.uid !== null && draft.uid !== uid) return { ok: false, problem: 'unsupported' };
   const outcome = await apply(uid, draft, rate);
   if (outcome.ok) removeDraft(draft.id);
   return outcome;

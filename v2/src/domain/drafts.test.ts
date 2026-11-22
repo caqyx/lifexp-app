@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { activityDraftPayload, draftFromRaw, moneyDraftPayload } from './drafts';
+import { activityDraftPayload, draftFromRaw, draftsOf, moneyDraftPayload } from './drafts';
 
 const at = '2026-10-02T07:15:00.000Z';
 const raw = (type: string, payload: unknown) => ({ id: 'd1', type, summary: 'Nauka — 45 min (~30 pkt)', payload, createdAtLocal: at });
@@ -12,6 +12,7 @@ describe('offline drafts as v1 writes them', () => {
       id: 'd1',
       summary: 'Nauka — 45 min (~30 pkt)',
       createdAt: new Date(at),
+      uid: null,
       kind: 'activity',
       type: 'learning',
       typeName: null,
@@ -48,6 +49,18 @@ describe('offline drafts as v1 writes them', () => {
     expect(draftFromRaw(raw('activity', { type: 'learning', minutes: '45' }))?.kind).toBe('other');
     expect(draftFromRaw(raw('money_tx', { txType: 'gift', amount: 5, category: 'x', date: '2026-10-02' }))?.kind).toBe('other');
     expect(draftFromRaw(raw('teleport', {}))?.kind).toBe('other');
+  });
+
+  test('a draft belongs to the account it was made on; one from v1 to nobody in particular', () => {
+    const mine = draftFromRaw({ ...raw('gaming', {}), id: 'a', uid: 'me' });
+    const theirs = draftFromRaw({ ...raw('gaming', {}), id: 'b', uid: 'someone-else' });
+    const v1 = draftFromRaw({ ...raw('gaming', {}), id: 'c' });
+    expect(mine?.uid).toBe('me');
+    expect(v1?.uid).toBeNull();
+    const all = [mine, theirs, v1].flatMap((d) => (d ? [d] : []));
+    // The queue is the device's: another account's draft is neither shown nor counted here.
+    expect(draftsOf(all, 'me').map((d) => d.id)).toEqual(['a', 'c']);
+    expect(draftsOf(all, 'someone-else').map((d) => d.id)).toEqual(['b', 'c']);
   });
 
   test('not a queue entry at all', () => {

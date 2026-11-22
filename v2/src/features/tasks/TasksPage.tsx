@@ -78,7 +78,7 @@ function TaskRow({ task, today, busy, onComplete, onOpen, onDelete }: TaskRowPro
         </button>
       )}
       {task.done && (
-        <Button variant="quiet" onClick={() => onDelete(task)} aria-label={t('tasks.deleteNamed', { text: label })}>
+        <Button variant="quiet-danger" onClick={() => onDelete(task)} aria-label={t('tasks.deleteNamed', { text: label })}>
           {t('tasks.delete')}
         </Button>
       )}
@@ -168,7 +168,7 @@ export default function TasksPage({ path, navigate }: RouteProps) {
 
   const complete = (task: Task) => {
     setBusyIds((ids) => new Set(ids).add(task.id));
-    completeTask(uid, task.id, today)
+    completeTask(uid, task.id)
       .then((pieces) =>
         notify(
           pieces > 0

@@ -85,9 +85,14 @@ export function balanceDelta(type: TxType, grosze: number): number {
   return type === 'income' ? grosze : -grosze;
 }
 
-/** G5.5: the balance never goes below zero (v1 blocks before saving anything). */
+/**
+ * G5.5: a change that takes money out never leaves the balance below zero (v1 blocks
+ * before saving anything). A change that adds money always fits: v1 can leave a
+ * balance below zero (deleting a spent income), and an income, a borrowed loan or a
+ * repayment coming back must still be able to bring it up again, as in v1.
+ */
 export function fitsBalance(balance: number, delta: number): boolean {
-  return balance + delta >= 0;
+  return delta >= 0 || balance + delta >= 0;
 }
 
 /**

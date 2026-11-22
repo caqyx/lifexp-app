@@ -166,6 +166,15 @@ describe('G8.5–G8.7 payout plan (v1 settleChores)', () => {
     expect(payoutPlan([entry('a', '2026-01-01', 10), entry('b', TODAY, 10)], 1)?.grosze).toBe(2000);
   });
 
+  test("the amount matches v1's round2(points × rate) for every total up to 10 000 points, at odd rates too", () => {
+    const round2 = (x: number) => Math.round(x * 100) / 100;
+    for (const rate of [0.45, 1 / 3, 0.07, 1.15, 2.5, choresRate(1, 7)]) {
+      for (let points = 1; points <= 10_000; points += 1) {
+        expect(unpaidChores([entry('a', TODAY, points)], rate).grosze / 100).toBe(round2(points * rate));
+      }
+    }
+  });
+
   test('nothing to pay → no payout', () => {
     expect(payoutPlan([], 0.45)).toBeNull();
     expect(payoutPlan([entry('a', TODAY, 0)], 0.45)).toBeNull();

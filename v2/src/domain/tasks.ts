@@ -32,11 +32,15 @@ export interface TaskDraft {
   size: TaskSize;
 }
 
-export type TaskProblem = 'textRequired' | 'dueRequired' | 'dueInPast';
+export type TaskProblem = 'textRequired' | 'textTooLong' | 'dueRequired' | 'dueInPast';
 
-/** v1 saveTodo(): text (trimmed), a due date, not before today (local). Also on edit. */
+/**
+ * v1 saveTodo(): text (trimmed, at most v1's 500 characters: the sheet's field stops
+ * there, a command does not), a due date, not before today (local). Also on edit.
+ */
 export function taskProblem(draft: TaskDraft, today: string): TaskProblem | null {
   if (!draft.text.trim()) return 'textRequired';
+  if (draft.text.trim().length > TASK_TEXT_MAX) return 'textTooLong';
   if (!draft.dueDate) return 'dueRequired';
   if (draft.dueDate < today) return 'dueInPast';
   return null;

@@ -26,38 +26,46 @@ interface BarChartProps {
   /** Names the series (the section title says the same). */
   label: string;
   data: readonly BarDatum[];
+  /**
+   * Said over the empty plot when every value is 0 (e.g. "Brak punktów w tych dniach"),
+   * so a blank chart never looks like one that failed to load.
+   */
+  emptyText?: string;
 }
 
-export function BarChart({ label, data }: BarChartProps) {
+export function BarChart({ label, data, emptyText }: BarChartProps) {
   const max = Math.max(0, ...data.map((d) => d.value));
   const highest = max > 0 ? data.findIndex((d) => d.value === max) : -1;
   return (
-    <ol class="ui-bars" aria-label={label}>
-      {data.map((d, i) => {
-        const labelled = d.value > 0 && (d.current || i === highest);
-        return (
-          <li
-            key={d.key}
-            class={d.current ? 'ui-bars__item ui-bars__item--current' : 'ui-bars__item'}
-            // Focusable so keyboard and touch reach the tooltip; the text is in the list for screen readers.
-            tabIndex={0}
-            style={{ '--bar': String(max > 0 ? Math.max(0, d.value) / max : 0), '--i': String(i) }}
-          >
-            <span class="visually-hidden">{d.description}</span>
-            <span class="ui-bars__plot" aria-hidden="true">
-              {labelled && <span class="ui-bars__value numeric">{d.valueText}</span>}
-              {d.value > 0 && <span class="ui-bars__bar" />}
-            </span>
-            <span class="ui-bars__label" aria-hidden="true">
-              {d.label}
-            </span>
-            <span class="ui-bars__tip" aria-hidden="true">
-              <span class="ui-bars__tip-title">{d.title}</span>
-              <span class="ui-bars__tip-value numeric">{d.valueLabel}</span>
-            </span>
-          </li>
-        );
-      })}
-    </ol>
+    <div class="ui-bars-frame">
+      <ol class="ui-bars" aria-label={label}>
+        {data.map((d, i) => {
+          const labelled = d.value > 0 && (d.current || i === highest);
+          return (
+            <li
+              key={d.key}
+              class={d.current ? 'ui-bars__item ui-bars__item--current' : 'ui-bars__item'}
+              // Focusable so keyboard and touch reach the tooltip; the text is in the list for screen readers.
+              tabIndex={0}
+              style={{ '--bar': String(max > 0 ? Math.max(0, d.value) / max : 0), '--i': String(i) }}
+            >
+              <span class="visually-hidden">{d.description}</span>
+              <span class="ui-bars__plot" aria-hidden="true">
+                {labelled && <span class="ui-bars__value numeric">{d.valueText}</span>}
+                {d.value > 0 && <span class="ui-bars__bar" />}
+              </span>
+              <span class="ui-bars__label" aria-hidden="true">
+                {d.label}
+              </span>
+              <span class="ui-bars__tip" aria-hidden="true">
+                <span class="ui-bars__tip-title">{d.title}</span>
+                <span class="ui-bars__tip-value numeric">{d.valueLabel}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {max === 0 && emptyText && <p class="ui-bars__empty">{emptyText}</p>}
+    </div>
   );
 }

@@ -61,7 +61,7 @@ function TxRow({ tx, color, onDelete }: { tx: MoneyTx; color: string | undefined
       </span>
       <span class={`money-tx__amount numeric tone-${income ? 'positive' : 'negative'}`}>{amount}</span>
       <Button
-        variant="quiet"
+        variant="quiet-danger"
         onClick={() => onDelete(tx)}
         aria-label={t('money.deleteNamed', { category: tx.category, amount })}
       >
@@ -135,6 +135,7 @@ export function OverviewView({ uid, profile, txs, categories, limit, balance, pa
       const grosze = draft.grosze ?? 0;
       const category = draft.newCategory?.trim() || draft.category;
       addDraft(
+        uid,
         'money_tx',
         t(draft.type === 'income' ? 'offline.sumIncome' : 'offline.sumExpense', { amount: formatMoney(grosze, lang), cat: category }),
         moneyDraftPayload({

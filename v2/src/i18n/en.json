@@ -308,6 +308,7 @@
     "save": "Save",
     "saved": "Task saved.",
     "needText": "Describe the task.",
+    "textTooLong": "A task can be at most {{max}} characters long.",
     "needDue": "Pick a due date.",
     "dueInPast": "The due date cannot be in the past.",
     "maxTasks": "Limit reached: {{max}} tasks. Delete done ones to add new ones.",
@@ -760,7 +761,6 @@
   },
   "add": {
     "title": "Add",
-    "intro": "Adding moves to the new version with each module. What is not here yet, you add in the current version of LifeXP.",
     "activity": "Activity",
     "task": "Task",
     "event": "Event",
@@ -868,6 +868,7 @@
     "secondary": "Cancel",
     "quiet": "All",
     "danger": "Delete",
+    "quietDanger": "Delete in a row",
     "busy": "Saving",
     "addExpense": "Add expense",
     "fields": "Fields",
@@ -1348,6 +1349,7 @@
     "taskCreated": "Added \"{{text}}\" for {{date}} (size {{size}}).",
     "taskProblem": {
       "textRequired": "Describe the task.",
+      "textTooLong": "A task can be at most {{max}} characters long. Shorten it and send it again.",
       "dueRequired": "Give a due date, e.g. tomorrow or fri.",
       "dueInPast": "The due date cannot be in the past."
     },
@@ -2041,5 +2043,9 @@
     "taskDue": "Task due {{day}}",
     "taskOverdue": "Task overdue ({{date}})",
     "shownAt": "{{day}}, {{time}}"
+  },
+  "charts": {
+    "noPoints": "No points on these days.",
+    "noGaming": "No gaming on these days."
   }
 }

@@ -158,6 +158,7 @@ export function AdminReportsView() {
     <Stack>
       <SegmentedControl<AdminTab>
         label={t('reports.adminTabs')}
+        hideLabel
         value={tab}
         options={ADMIN_TABS.map((id) => ({
           value: id,

@@ -99,7 +99,7 @@ export function AppShell({ title, activeId, path, account, modules, onSignOut, c
   const wasOpen = useRef(false);
   const drag = useRef<Drag | null>(null);
   const shellRef = useRef<HTMLDivElement>(null);
-  const navRef = useRef<HTMLElement>(null);
+  const navRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const lastPath = useRef<string | null>(null);
@@ -246,27 +246,31 @@ export function AppShell({ title, activeId, path, account, modules, onSignOut, c
 
   return (
     <div ref={shellRef} class="shell" data-drawer={drawerMode ? (open ? 'open' : 'closed') : 'sidebar'}>
-      <nav
+      {/* The open drawer is a modal dialog around the navigation (a <nav> itself may not
+          take the dialog role); as a sidebar it is just the navigation. */}
+      <div
         ref={navRef}
         id="app-nav"
         class="shell__nav"
-        aria-label={t('nav.label')}
         role={modal ? 'dialog' : undefined}
         aria-modal={modal ? 'true' : undefined}
+        aria-label={modal ? t('nav.label') : undefined}
         inert={drawerMode && !open}
       >
-        <NavMenu
-          activeId={activeId}
-          onSelect={selectPath}
-          account={account}
-          modules={modules}
-          onSignOut={() => {
-            // Take the drawer's history entry with it; the login screen replaces the shell.
-            closeDrawer();
-            onSignOut();
-          }}
-        />
-      </nav>
+        <nav class="shell__nav-landmark" aria-label={t('nav.label')}>
+          <NavMenu
+            activeId={activeId}
+            onSelect={selectPath}
+            account={account}
+            modules={modules}
+            onSignOut={() => {
+              // Take the drawer's history entry with it; the login screen replaces the shell.
+              closeDrawer();
+              onSignOut();
+            }}
+          />
+        </nav>
+      </div>
 
       <div ref={contentRef} class="shell__content" inert={modal}>
         <header ref={topbarRef} class="topbar ui-glass">

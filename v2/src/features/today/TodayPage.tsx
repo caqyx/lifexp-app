@@ -24,7 +24,7 @@ import {
   type ActivityDraft,
   type DayLog,
 } from '@/domain/activity';
-import { activityDraftPayload } from '@/domain/drafts';
+import { activityDraftPayload, draftsOf } from '@/domain/drafts';
 import { choresOnCard, type ChoreDef, type ChoresCardSettings } from '@/domain/chores';
 import { isModuleOn } from '@/domain/modules';
 import { newAchievements } from '@/domain/achievements';
@@ -121,8 +121,8 @@ interface RecordProgressProps {
 function RecordProgress({ uid, profile, days, todayKey }: RecordProgressProps) {
   const { streak } = streakFor(profile, days, todayKey);
   useEffect(() => {
-    if (streak.newFreeze) recordFreeze(uid, todayKey).catch(() => {});
-  }, [uid, streak.newFreeze, todayKey]);
+    if (streak.bridged) recordFreeze(uid, todayKey, streak.bridged).catch(() => {});
+  }, [uid, streak.bridged, todayKey]);
 
   const todayLog = days.get(todayKey);
   const input = {
@@ -246,7 +246,7 @@ function GoalsCard({ uid, profile }: { uid: string; profile: Profile }) {
     <Section
       title={t('today.goals')}
       action={
-        <a class="today-card__link" href="#/goals">
+        <a href="#/goals">
           {t('today.goalsOpen')}
         </a>
       }
@@ -341,7 +341,7 @@ function RecentActivities({ recent, names }: { recent: readonly Activity[]; name
     <Section
       title={t('today.recent')}
       action={
-        <a class="today-card__link" href="#/stats/history">
+        <a href="#/stats/history">
           {t('today.recentAll')}
         </a>
       }
@@ -421,6 +421,7 @@ export default function TodayPage({ path, navigate }: RouteProps) {
   };
 
   const choresToday = localDayKey(new Date());
+  const pendingDrafts = draftsOf(drafts.value, uid).length;
   const closeCardEditor = () => setCardEditor((s) => ({ ...s, open: false }));
   const saveCard = (settings: ChoresCardSettings) => {
     const result = saveChoresCard(uid, settings);
@@ -432,7 +433,8 @@ export default function TodayPage({ path, navigate }: RouteProps) {
   };
 
   const logChoreToday = (def: ChoreDef) => {
-    const { saved, undo } = logChore(uid, def, choresToday);
+    // The day of the tap, not of the last render: Today may have been left open over midnight.
+    const { saved, undo } = logChore(uid, def, localDayKey(new Date()));
     const failed = () => notify({ message: t('chores.saveFailed'), tone: 'negative' });
     saved.catch(failed);
     notify({
@@ -452,6 +454,7 @@ export default function TodayPage({ path, navigate }: RouteProps) {
     const rate = generated?.points ?? def?.points;
     if (!name || rate === undefined || !draft.type || draft.minutes === null) return 'typeRequired';
     addDraft(
+      uid,
       'activity',
       t('offline.sumActivity', { name, min: draft.minutes, pts: earnedPoints(draft.minutes, rate) }),
       activityDraftPayload({
@@ -506,11 +509,11 @@ export default function TodayPage({ path, navigate }: RouteProps) {
 
         {sources.failed && <p class="today-error" role="alert">{t('today.loadFailed')}</p>}
 
-        {drafts.value.length > 0 && (
+        {pendingDrafts > 0 && (
           <Card>
             <div class="today-drafts">
               <div>
-                <p class="today-drafts__title">{t('offline.pending', { count: drafts.value.length })}</p>
+                <p class="today-drafts__title">{t('offline.pending', { count: pendingDrafts })}</p>
                 <p class="today-drafts__note">{t('offline.pendingNote')}</p>
               </div>
               <Button variant="secondary" onClick={() => (reviewRequested.value = true)}>

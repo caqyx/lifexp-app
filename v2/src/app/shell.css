@@ -373,12 +373,19 @@
   }
 }
 
-.add-sheet__intro {
-  margin-bottom: var(--space-4);
-  color: var(--color-text-secondary);
+/* ── Menu ───────────────────────────────────────────────────────────────── */
+
+/* The navigation landmark inside the drawer/sidebar: fills it, so the menu can push
+   the account to the bottom. */
+.shell__nav-landmark {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
 }
 
-/* ── Menu ───────────────────────────────────────────────────────────────── */
+.shell__nav-landmark > .nav {
+  flex: 1 0 auto;
+}
 
 .nav {
   display: flex;
