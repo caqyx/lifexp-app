@@ -3,6 +3,7 @@
 // them watches, one per account. The PC build comes with the profile (session).
 import { signal } from '@preact/signals';
 import type { Task } from '@/domain/tasks';
+import { SCREEN_GRACE_MS, sharedWatch } from './shared';
 
 export interface TasksState {
   /** undefined = still loading. */
@@ -39,31 +40,5 @@ function start(uid: string): () => void {
   };
 }
 
-/** How long the listeners outlive their last watcher. */
-const LEAVE_GRACE_MS = 2000;
-
-let active: { uid: string; watchers: number; stop: () => void } | null = null;
-
 /** Start watching (or join the watch already running); call the result to leave. */
-export function watchTasks(uid: string): () => void {
-  if (active && active.uid !== uid) {
-    active.stop();
-    active = null;
-  }
-  if (!active) active = { uid, watchers: 0, stop: start(uid) };
-  const mine = active;
-  mine.watchers += 1;
-  let left = false;
-  return () => {
-    if (left) return;
-    left = true;
-    mine.watchers -= 1;
-    // A moment's grace: moving between two screens that both watch keeps the data.
-    setTimeout(() => {
-      if (mine.watchers === 0 && active === mine) {
-        mine.stop();
-        active = null;
-      }
-    }, LEAVE_GRACE_MS);
-  };
-}
+export const watchTasks = sharedWatch(start, SCREEN_GRACE_MS, () => tasks.peek().failed);

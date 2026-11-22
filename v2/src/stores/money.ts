@@ -1,9 +1,10 @@
 // Money, live (stage 3c): transactions, categories, the monthly limit, loans and
-// the balance. The Money screen starts the listeners when it mounts and stops them
-// when it leaves.
+// the balance. The Money screen starts the listeners when it mounts and they stop a
+// moment after it leaves (stores/shared.ts).
 import { signal } from '@preact/signals';
 import type { Loan } from '@/domain/loans';
 import type { MoneyCategory, MoneyTx } from '@/domain/money';
+import { SCREEN_GRACE_MS, sharedWatch } from './shared';
 
 /** undefined = still loading. */
 export interface MoneyState {
@@ -28,7 +29,10 @@ const EMPTY: MoneyState = {
 
 export const money = signal<MoneyState>(EMPTY);
 
-export function watchMoney(uid: string): () => void {
+/** Start watching (or join the watch already running: the Money screen, Ex-us); call the result to leave. */
+export const watchMoney = sharedWatch(start, SCREEN_GRACE_MS, () => money.peek().failed);
+
+function start(uid: string): () => void {
   let stopped = false;
   const stops: Array<() => void> = [];
   const set = (patch: Partial<MoneyState>) => {
