@@ -90,18 +90,15 @@ niż v2 na tym samym koncie.
 |---|---|---|---|---|---|---|---:|---:|---|
 | G3.7 | ✓ | · | ✓ | ✓ | · | użyte dziś (na D1) | 3 | 1 | e2e (`tests/v2/progress.spec.js`) |
 
-**Świadoma zmiana w v2 (q-rel, 2026-11-21).** v1 zużywa zamrożenie na pierwszej luce także wtedy, gdy za nią
-(idąc wstecz) nie ma aktywnego dnia, czyli zamrożenie niczego nie przykrywa: seria zostaje taka sama, a zamrożenie
-przepada na 7 dni. Dotyczy to każdego pierwszego dnia po przerwie, także pierwszego dnia nowego konta, więc gdy
-po tygodniu zamrożenie byłoby naprawdę potrzebne, często go nie ma. v2 zużywa zamrożenie tylko wtedy, gdy dzień
-przed luką jest aktywny (przykrycie wydłuża serię), i przed zapisem sprawdza w transakcji na dokumentach `dailyLog`
-z serwera, że luka i dzień przed nią nadal tak wyglądają (ekran mógł liczyć z nieaktualnego cache). Pole i jego
-format bez zmian. Do cutover v1 dalej zużywa zamrożenie po swojemu przy wejściu na dashboard.
+**Zamrożenie na luce bez niczego za nią — jak v1 (decyzja właściciela 2026-11-22).** v1 zużywa zamrożenie na
+pierwszej luce także wtedy, gdy za nią (idąc wstecz) nie ma aktywnego dnia: seria zostaje taka sama, a zamrożenie
+wraca dopiero po 7 dniach. Przegląd q-rel proponował to zmienić; właściciel zdecydował zachować zachowanie v1, więc
+v2 robi to samo i zapisuje `streakFreezeLastUsed = dziś (UTC)`.
 
-| # | D0 | D1 | D2 | D3 | D4 | Zamrożenie | v2 seria / zużyte | v1 seria / zużyte | Status |
-|---|---|---|---|---|---|---|---|---|---|
-| G3.8 | ✓ | · | · | ✓ | · | dostępne | 1 / nie | 1 / tak | e2e (`tests/v2/progress.spec.js`) |
-| G3.9 | ✓ | · | · | · | · | dostępne (nowe konto) | 1 / nie | 1 / tak | kod (`domain/streak.test.ts`) |
+| # | D0 | D1 | D2 | D3 | D4 | Zamrożenie | Seria | Zużyte zamrożenie | Status |
+|---|---|---|---|---|---|---|---:|---|---|
+| G3.8 | ✓ | · | · | ✓ | · | dostępne | 1 | tak | e2e (`tests/v2/progress.spec.js`) |
+| G3.9 | ✓ | · | · | · | · | dostępne (nowe konto) | 1 | tak | kod (`domain/streak.test.ts`) |
 
 ## G4. Osiągnięcia
 

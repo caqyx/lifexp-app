@@ -144,9 +144,10 @@ async function elementsEpub() {
 /** Records of one store of the reader's IndexedDB. */
 function storeKeys(page, store) {
   return page.evaluate(
-    (name) =>
-      new Promise((resolve, reject) => {
-        const open = indexedDB.open('lifexp-v2-reader');
+    async (name) => {
+      const dbName = (await indexedDB.databases()).map((d) => d.name).find((n) => n && n.startsWith('lifexp-v2-reader:'));
+      return new Promise((resolve, reject) => {
+        const open = indexedDB.open(dbName);
         open.onerror = () => reject(open.error);
         open.onsuccess = () => {
           const db = open.result;
@@ -157,7 +158,8 @@ function storeKeys(page, store) {
           };
           req.onerror = () => reject(req.error);
         };
-      }),
+      });
+    },
     store,
   );
 }
@@ -165,9 +167,10 @@ function storeKeys(page, store) {
 /** Makes every stored book look as if added before r-5 (no parser version, no pictures, no kept file). */
 function makeBooksOld(page) {
   return page.evaluate(
-    () =>
-      new Promise((resolve, reject) => {
-        const open = indexedDB.open('lifexp-v2-reader');
+    async () => {
+      const dbName = (await indexedDB.databases()).map((d) => d.name).find((n) => n && n.startsWith('lifexp-v2-reader:'));
+      return new Promise((resolve, reject) => {
+        const open = indexedDB.open(dbName);
         open.onsuccess = () => {
           const db = open.result;
           const tx = db.transaction(['meta', 'assets', 'files'], 'readwrite');
@@ -187,7 +190,8 @@ function makeBooksOld(page) {
           };
           tx.onerror = () => reject(tx.error);
         };
-      }),
+      });
+    },
   );
 }
 

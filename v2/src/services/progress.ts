@@ -4,9 +4,9 @@
 import { addAchievements, recordStreakFreeze } from '@/data/repos/profile';
 import { newAchievements, type Achievement, type AchievementInput } from '@/domain/achievements';
 
-/** G3: the freeze bridged the gap `bridged` today (UTC day); resolves to whether this call recorded it. */
-export function recordFreeze(uid: string, day: string, bridged: string, now = new Date()): Promise<boolean> {
-  return recordStreakFreeze(uid, day, bridged, now);
+/** G3: the freeze bridged a gap today (UTC day); resolves to whether this call recorded it. */
+export function recordFreeze(uid: string, day: string, now = new Date()): Promise<boolean> {
+  return recordStreakFreeze(uid, day, now);
 }
 
 /** G4: records the badges earned now; resolves to the ones this call added (for the toast). */

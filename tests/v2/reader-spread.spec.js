@@ -40,9 +40,10 @@ const TOTAL = 1 + 2 + 4 * PARAGRAPHS;
 /** Where the book's reading stands in this browser's IndexedDB (without the contents list). */
 function storedProgress(page) {
   return page.evaluate(
-    () =>
-      new Promise((resolve, reject) => {
-        const open = indexedDB.open('lifexp-v2-reader');
+    async () => {
+      const dbName = (await indexedDB.databases()).map((d) => d.name).find((n) => n && n.startsWith('lifexp-v2-reader:'));
+      return new Promise((resolve, reject) => {
+        const open = indexedDB.open(dbName);
         open.onerror = () => reject(open.error);
         open.onsuccess = () => {
           const req = open.result.transaction('meta').objectStore('meta').getAll();
@@ -51,7 +52,8 @@ function storedProgress(page) {
             open.result.close();
           };
         };
-      }),
+      });
+    },
   );
 }
 

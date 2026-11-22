@@ -27,8 +27,6 @@ export interface Streak {
   freezeUsed: boolean;
   /** The bridge uses the freeze available now: the service records it (v1 saves it while rendering). */
   newFreeze: boolean;
-  /** The gap the freeze available now bridges (UTC day); null when newFreeze is false. */
-  bridged: string | null;
 }
 
 /**
@@ -49,9 +47,6 @@ export function frozenDay(activeDays: ReadonlySet<string>, lastUsed: string | nu
  * yesterday while today is still empty, so a streak does not break in the
  * morning. One gap may be skipped with the freeze, once the streak has started;
  * the skipped day does not count.
- *
- * Unlike v1 (GOLDEN G3.8), a gap is bridged only when the day before it was active:
- * a bridge to nothing would leave the streak as it is and spend the freeze for a week.
  */
 export function calculateStreak(
   activeDays: ReadonlySet<string>,
@@ -62,32 +57,22 @@ export function calculateStreak(
 ): Streak {
   let days = 0;
   let freezeUsed = false;
-  let bridged: string | null = null;
+  let newFreeze = false;
   let cursor = activeDays.has(today) ? today : addDays(today, -1);
   for (;;) {
-    const leadsOn = days > 0 && activeDays.has(addDays(cursor, -1));
     if (activeDays.has(cursor)) {
       days += 1;
-    } else if (leadsOn && cursor === frozen) {
+    } else if (days > 0 && cursor === frozen) {
       freezeUsed = true;
-    } else if (leadsOn && bridged === null && freezeAvailable) {
+    } else if (!newFreeze && freezeAvailable && days > 0) {
       freezeUsed = true;
-      bridged = cursor;
+      newFreeze = true;
     } else {
       break;
     }
     cursor = addDays(cursor, -1);
   }
-  return { days, freezeUsed, newFreeze: bridged !== null, bridged };
-}
-
-/**
- * The check the service makes on the server's day logs before it records a freeze:
- * the gap it bridges is still a day without points and the day before it still has
- * some (the screen may have counted from a cache that was behind).
- */
-export function freezeStillBridges(gap: DayLog | null, dayBefore: DayLog | null): boolean {
-  return (gap?.pointsEarned ?? 0) <= 0 && (dayBefore?.pointsEarned ?? 0) > 0;
+  return { days, freezeUsed, newFreeze };
 }
 
 /**

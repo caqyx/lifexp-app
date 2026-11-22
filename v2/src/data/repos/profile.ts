@@ -2,12 +2,10 @@
 // writes the streak and the badges need (stage 3e), each a transaction on the
 // server's profile so two tabs record a freeze or a badge once, and the plain
 // settings fields (stage 4), written as v1 settings.js writes them.
-import { deleteField, doc, getDocFromServer, onSnapshot, runTransaction, updateDoc, type Transaction } from 'firebase/firestore';
+import { deleteField, doc, getDocFromServer, onSnapshot, runTransaction, updateDoc } from 'firebase/firestore';
 import type { StoredCode } from '@/domain/parent-email';
 import type { AccountMode, Language, Profile } from '@/domain/profile';
-import { freezeStillBridges, isFreezeAvailable } from '@/domain/streak';
-import { addDays } from '@/lib/dates';
-import { dayLogFromData } from '../converters/activity';
+import { isFreezeAvailable } from '@/domain/streak';
 import { profileFromData } from '../converters/profile';
 import { db } from '../firebase';
 
@@ -25,23 +23,14 @@ export function watchProfile(
 }
 
 /**
- * G3: the freeze bridges the gap `bridged` today (UTC day `day`). Recorded only while
- * the server's profile still has it available and the server's day logs still show
- * that gap with an active day before it (G3.8: the screen may have counted from a
- * cache that was behind). Resolves to whether it wrote.
+ * G3: the freeze bridges a gap today (UTC day `day`). Recorded only while the
+ * server's profile still has it available; resolves to whether it wrote.
  */
-export function recordStreakFreeze(uid: string, day: string, bridged: string, now: Date): Promise<boolean> {
+export function recordStreakFreeze(uid: string, day: string, now: Date): Promise<boolean> {
   const ref = doc(db, 'users', uid);
-  const dayLog = async (tx: Transaction, key: string) => {
-    const snap = await tx.get(doc(db, 'users', uid, 'dailyLog', key));
-    return snap.exists() ? dayLogFromData(snap.data()) : null;
-  };
   return runTransaction(db, async (tx) => {
     const lastUsed: unknown = (await tx.get(ref)).data()?.streakFreezeLastUsed;
-    const gap = await dayLog(tx, bridged);
-    const before = await dayLog(tx, addDays(bridged, -1));
     if (!isFreezeAvailable(typeof lastUsed === 'string' ? lastUsed : null, now)) return false;
-    if (!freezeStillBridges(gap, before)) return false;
     tx.update(ref, { streakFreezeLastUsed: day });
     return true;
   });
