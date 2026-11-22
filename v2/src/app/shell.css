@@ -631,21 +631,7 @@
   animation: ui-fade-in var(--duration-slow) var(--ease-standard);
 }
 
-/* ── Page frame and the "coming soon" stand-in ──────────────────────────── */
-
-.page {
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto;
-  padding: var(--space-6) var(--space-4) calc(var(--space-10) + env(safe-area-inset-bottom));
-}
-
-@media (min-width: 840px) {
-  .page {
-    max-width: var(--content-max-width);
-    padding: var(--space-8);
-  }
-}
+/* ── The "coming soon" stand-in (framed by ui Page's .ui-page) ───────────── */
 
 .coming-soon {
   display: flex;

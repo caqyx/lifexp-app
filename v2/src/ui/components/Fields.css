@@ -21,9 +21,11 @@
   background: var(--color-surface-raised);
 }
 
+/* Focus: a 2 px ring in the focus colour (border + 1 px shadow) — the soft accent halo
+   alone was under 3:1 against the field (WCAG 1.4.11). */
 .ui-field__control:focus-within {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-soft);
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 1px var(--color-focus);
 }
 
 .ui-field__input {
@@ -39,8 +41,8 @@
 }
 
 .ui-field__input:focus {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px var(--color-accent-soft);
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 1px var(--color-focus);
 }
 
 .ui-field__textarea {
