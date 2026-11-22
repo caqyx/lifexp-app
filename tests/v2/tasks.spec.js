@@ -230,3 +230,23 @@ test('"+" → Zadanie opens the form over the task list', async ({ page, account
   await page.goBack();
   await expect(page).toHaveURL(/#\/today$/);
 });
+
+test.describe('a screen left open over midnight', () => {
+  test.use({ timezoneId: 'Europe/Warsaw' });
+
+  test('a task due yesterday, ticked after midnight, is late: no pieces', async ({ page }) => {
+    const account = await createUser({ tag: 'tasks-midnight', profile: { pcBuild: build([0], 0) } });
+    const task = await seedTask(account.uid, { text: 'Na wczoraj', size: 'L', dueDate: '2026-11-21' });
+    // 23:58 on 21.11 in Warsaw (UTC+1); the list renders once and is left as it is.
+    await page.clock.install({ time: new Date('2026-11-21T22:58:00Z') });
+    await openSignedIn(page, account, '#/tasks');
+    const tick = page.getByRole('button', { name: 'Oznacz jako zrobione: Na wczoraj' });
+    await expect(tick).toBeVisible();
+
+    await page.clock.fastForward('05:00');
+    await tick.click();
+    await expect(page.getByText('Zrobione, ale po terminie — tym razem bez kawałków.')).toBeVisible();
+    expect((await task.get()).data().done).toBe(true);
+    expect((await userDoc(account.uid).get()).data().pcBuild).toEqual(build([0], 0));
+  });
+});

@@ -176,6 +176,21 @@ test('an income that was already spent cannot be deleted below zero', async ({ p
   expect(await moneyState(account.uid)).toEqual(before);
 });
 
+test('a balance v1 left below zero still takes an income, and still refuses an expense', async ({ page }) => {
+  // v1 lets a spent income be deleted, so an account can have -20 zł (GOLDEN G5).
+  const account = await moneyAccount('money-below-zero', { balance: -20 });
+  await openSignedIn(page, account, '#/money');
+  await expect(page.getByTestId('money-balance')).toHaveText('-20,00 zł');
+
+  await addInV2(page, { type: 'Wpływ', amount: '5', category: 'gry' });
+  await expect.poll(async () => (await moneyState(account.uid)).balance).toEqual({ current: -15 });
+  expect((await moneyState(account.uid)).moneyIncomeAllTime).toBe(5);
+
+  const sheet = await addInV2(page, { amount: '1', category: 'jedzenie' });
+  await expect(sheet.getByText('Za mało środków na saldzie.')).toBeVisible();
+  expect(await txCount(account.uid)).toBe(1);
+});
+
 test('two tabs saving at the same moment both count', async ({ page, context }) => {
   const account = await moneyAccount('money-two-tabs');
   await openSignedIn(page, account, '#/money');

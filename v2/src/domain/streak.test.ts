@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { addDays } from '@/lib/dates';
-import { calculateStreak, frozenDay, isFreezeAvailable, streakOf } from './streak';
+import { calculateStreak, freezeStillBridges, frozenDay, isFreezeAvailable, streakOf } from './streak';
 
 const TODAY = '2026-09-29';
 
@@ -18,11 +18,42 @@ describe('G3 streak', () => {
     ['G3.5', '··✓✓·', true, 0, false],
     ['G3.6', '✓·✓·✓', true, 2, true],
   ])('%s: %s, freeze available %s → %i days, freeze used %s', (_case, pattern, freeze, expected, used) => {
-    expect(calculateStreak(days(pattern), TODAY, freeze)).toEqual({ days: expected, freezeUsed: used, newFreeze: used });
+    expect(calculateStreak(days(pattern), TODAY, freeze)).toMatchObject({ days: expected, freezeUsed: used, newFreeze: used });
   });
 
   test('no activity at all', () => {
-    expect(calculateStreak(new Set(), TODAY, true)).toEqual({ days: 0, freezeUsed: false, newFreeze: false });
+    expect(calculateStreak(new Set(), TODAY, true)).toEqual({ days: 0, freezeUsed: false, newFreeze: false, bridged: null });
+  });
+
+  test('the freeze names the gap it bridges, for the service to check on the server', () => {
+    expect(calculateStreak(days('✓·✓✓·'), TODAY, true).bridged).toBe(addDays(TODAY, -1));
+    expect(calculateStreak(days('·✓·✓'), TODAY, true).bridged).toBe(addDays(TODAY, -2));
+  });
+});
+
+describe('v2: the freeze is spent only on a gap it bridges (GOLDEN G3.8, G3.9; v1 spends it anyway)', () => {
+  test.each([
+    ['G3.8', '✓··✓·', 1],
+    ['G3.9 (a new account)', '✓····', 1],
+    ['yesterday only', '·✓···', 1],
+    ['two days, then two gaps', '✓✓··✓', 2],
+  ])('%s: %s → %i days, the freeze stays', (_case, pattern, expected) => {
+    expect(calculateStreak(days(pattern), TODAY, true)).toEqual({ days: expected, freezeUsed: false, newFreeze: false, bridged: null });
+  });
+
+  test('a freeze v1 spent on a gap to nothing does not claim to bridge it', () => {
+    const active = days('✓··✓');
+    expect(calculateStreak(active, TODAY, false, addDays(TODAY, -1))).toEqual({ days: 1, freezeUsed: false, newFreeze: false, bridged: null });
+  });
+
+  test("the service's server check: the gap is still empty and the day before it is not", () => {
+    const log = (pointsEarned: number) => ({ pointsEarned, gamingMinutes: 0 });
+    expect(freezeStillBridges(null, log(20))).toBe(true);
+    expect(freezeStillBridges(log(0), log(20))).toBe(true);
+    // The cache was behind: the gap has points on the server, or the day before it has none.
+    expect(freezeStillBridges(log(15), log(20))).toBe(false);
+    expect(freezeStillBridges(null, null)).toBe(false);
+    expect(freezeStillBridges(null, log(0))).toBe(false);
   });
 
   test('a long streak across a month boundary', () => {
@@ -49,7 +80,7 @@ describe('a used freeze keeps bridging its gap (v2; v1 loses it on the next rend
     const active = days('✓·✓✓·');
     const frozen = frozenDay(active, TODAY);
     expect(frozen).toBe(addDays(TODAY, -1));
-    expect(calculateStreak(active, TODAY, false, frozen)).toEqual({ days: 3, freezeUsed: true, newFreeze: false });
+    expect(calculateStreak(active, TODAY, false, frozen)).toEqual({ days: 3, freezeUsed: true, newFreeze: false, bridged: null });
     // What v1 shows on its next render: the gap is not bridged any more.
     expect(calculateStreak(active, TODAY, false).days).toBe(1);
   });
@@ -63,7 +94,7 @@ describe('a used freeze keeps bridging its gap (v2; v1 loses it on the next rend
   test('a week later the freeze is back for a second gap; the first stays bridged', () => {
     const active = days('✓·✓✓✓✓✓✓✓·✓');
     const frozen = addDays(TODAY, -9);
-    expect(calculateStreak(active, TODAY, true, frozen)).toEqual({ days: 9, freezeUsed: true, newFreeze: true });
+    expect(calculateStreak(active, TODAY, true, frozen)).toEqual({ days: 9, freezeUsed: true, newFreeze: true, bridged: addDays(TODAY, -1) });
   });
 
   test('no streak on the day it was used: nothing was bridged', () => {
@@ -91,6 +122,6 @@ describe('streakOf (the streak card on Today and /seria)', () => {
 
   test('bridges one gap with the freeze that is available', () => {
     const got = streakOf(null, logs('2026-10-09', '2026-10-07', '2026-10-06'), '2026-10-09', NOW);
-    expect(got.streak).toEqual({ days: 3, freezeUsed: true, newFreeze: true });
+    expect(got.streak).toEqual({ days: 3, freezeUsed: true, newFreeze: true, bridged: '2026-10-08' });
   });
 });

@@ -361,7 +361,9 @@ function seedTask(uid, patch) {
 test('tasks show on their due day among the entries; ticking and editing go through Tasks', async ({ page }) => {
   const account = await calendarUser('calendar-tasks');
   const big = await seedTask(account.uid, { text: '**Wypracowanie** z historii\nszczegóły', size: 'L' });
-  await seedTask(account.uid, { text: 'Lektura', dueDate: localDay(1) });
+  // Another day of this week: tomorrow, or on a Sunday the day before (tomorrow is next week then).
+  const otherDay = new Date().getDay() === 0 ? localDay(-1) : localDay(1);
+  await seedTask(account.uid, { text: 'Lektura', dueDate: otherDay });
   await seedTask(account.uid, { text: 'Dawno zrobione', done: true, dueDate: localDay(0) });
   await seedEvent(account.uid, { title: 'Spacer', startTime: '18:00' });
   await openSignedIn(page, account, '#/calendar');
@@ -380,7 +382,7 @@ test('tasks show on their due day among the entries; ticking and editing go thro
   const cell = page.getByRole('list', { name: /^Dni miesiąca/ }).getByRole('button', { pressed: true });
   await expect(cell.locator('.cal-mark--task')).toHaveCount(2);
 
-  // Tomorrow's task on tomorrow, in the week.
+  // That task on its own day, in the week.
   await page.getByRole('link', { name: 'Tydzień', exact: true }).click();
   await expect(page.locator('.cal-week .cal-row', { hasText: 'Lektura' })).toHaveCount(1);
   await page.getByRole('link', { name: 'Miesiąc', exact: true }).click();

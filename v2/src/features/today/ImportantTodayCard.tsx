@@ -73,7 +73,7 @@ export function ImportantTodayCard({ uid, today, navigate }: ImportantTodayCardP
       return;
     }
     setBusy((keys) => new Set(keys).add(item.key));
-    completeTask(uid, item.task.id, today)
+    completeTask(uid, item.task.id)
       .then((pieces) =>
         notify(
           pieces > 0

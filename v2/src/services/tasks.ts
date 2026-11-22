@@ -21,6 +21,7 @@ import {
   type TaskDraft,
   type TaskProblem,
 } from '@/domain/tasks';
+import { localDayKey } from '@/lib/dates';
 
 export type TaskRejection = TaskProblem | 'limit';
 
@@ -54,9 +55,13 @@ export function updateTask(uid: string, id: string, draft: TaskDraft, today: str
   return { ok: true, id, saved: editTask(uid, id, normalizedTaskDraft(draft)) };
 }
 
-/** Pieces added to the build (0 when done late). */
-export function completeTask(uid: string, id: string, today: string): Promise<number> {
-  return completeInStore(uid, id, today);
+/**
+ * Pieces added to the build (0 when done late). In time or late is decided on the
+ * local day of the tap (`now`), not of the screen's last render: a screen left open
+ * over midnight must not count a task due yesterday as done in time.
+ */
+export function completeTask(uid: string, id: string, now = new Date()): Promise<number> {
+  return completeInStore(uid, id, localDayKey(now));
 }
 
 /** Undo of a task just created (Ex-us "Cofnij"): the document goes again. */

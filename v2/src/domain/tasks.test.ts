@@ -11,6 +11,7 @@ import {
   taskProblem,
   tasksToPenalise,
   TASKS_MAX,
+  TASK_TEXT_MAX,
   type PcBuild,
   type Task,
 } from './tasks';
@@ -92,6 +93,15 @@ describe('task rules (v1 saveTodo, openTodoForm, applyOverduePenalties)', () => 
     expect(taskProblem({ text: 'x', dueDate: '', size: 'S' }, TODAY)).toBe('dueRequired');
     expect(taskProblem({ text: 'x', dueDate: '2026-09-29', size: 'S' }, TODAY)).toBe('dueInPast');
     expect(taskProblem({ text: 'x', dueDate: TODAY, size: 'S' }, TODAY)).toBeNull();
+  });
+
+  test("the text stops at v1's 500 characters (a command has no field to stop it), spaces around aside", () => {
+    expect(taskProblem({ text: 'x'.repeat(TASK_TEXT_MAX), dueDate: TODAY, size: 'S' }, TODAY)).toBeNull();
+    expect(taskProblem({ text: ` ${'x'.repeat(TASK_TEXT_MAX)}  `, dueDate: TODAY, size: 'S' }, TODAY)).toBeNull();
+    expect(taskProblem({ text: 'x'.repeat(TASK_TEXT_MAX + 1), dueDate: TODAY, size: 'S' }, TODAY)).toBe('textTooLong');
+    // Emoji count as v1's maxlength counts them: UTF-16 units.
+    expect(taskProblem({ text: '🧹'.repeat(250), dueDate: TODAY, size: 'S' }, TODAY)).toBeNull();
+    expect(taskProblem({ text: '🧹'.repeat(251), dueDate: TODAY, size: 'S' }, TODAY)).toBe('textTooLong');
   });
 
   test('30 tasks block a new one, done ones included', () => {
