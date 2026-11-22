@@ -82,7 +82,7 @@ lub niespójność; **P3** — szlif. Kolumna „Etap” mówi, w którym commic
 | Zapisać aktywność | 1 (Dziś → „Zapisz aktywność”) + formularz | dobrze |
 | Odhaczyć obowiązek | 1 (karta na Dziś) | dobrze |
 | Dodać wydatek | 2 („+” → Wydatek albo Pieniądze → Dodaj) | dobrze |
-| Odhaczyć zadanie na dziś | 3 bez Kalendarza (Menu → Zadania → odhacz), 1 z Kalendarzem | D1 |
+| Odhaczyć zadanie na dziś | 1 (karta na Dziś; przed q-ui-2 bez Kalendarza 3: Menu → Zadania → odhacz) | D1 |
 | Zapytać Ex-us | 1 (pole na Dziś) | dobrze |
 | Sprawdzić saldo | 0 (karta na Dziś) | dobrze |
 

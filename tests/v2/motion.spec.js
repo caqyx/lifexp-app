@@ -176,7 +176,8 @@ const centreX = async (locator) => {
 
 test('a screen’s cards arrive one after another, rising with transform and opacity only', async ({ page, account }) => {
   await openSignedIn(page, account, '#/today');
-  const cards = page.locator('.shell__main .ui-stack.ui-stagger').first().locator(':scope > *');
+  // Today's left column: the points, the Ex-us field, today's tasks, the day, the chores.
+  const cards = page.locator('.shell__main .today-columns > .ui-stack.ui-stagger').first().locator(':scope > *');
   await expect.poll(() => cards.count()).toBeGreaterThan(3);
   const arrivals = (await cssAnimations(cards)).slice(0, 4);
   expect(arrivals.map((a) => a.name)).toEqual(['ui-rise-in', 'ui-rise-in', 'ui-rise-in', 'ui-rise-in']);

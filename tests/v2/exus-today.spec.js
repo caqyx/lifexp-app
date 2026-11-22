@@ -73,7 +73,8 @@ function fieldPlacement(page) {
     return {
       index: cards.indexOf(card),
       heroIndex: hero ? cards.indexOf(hero) : -1,
-      previous: card.previousElementSibling?.className ?? '',
+      // The first card of Today's left column sits right under what precedes the columns.
+      previous: (card.previousElementSibling ?? card.closest('.today-columns')?.previousElementSibling)?.className ?? '',
       fieldTop,
       heroBottom,
       between,

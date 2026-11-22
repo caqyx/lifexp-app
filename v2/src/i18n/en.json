@@ -75,6 +75,9 @@
     "recent": "Recent activities",
     "noRecent": "No activities yet. Start earning points!",
     "recentAll": "History",
+    "tasksToday": "Tasks for today",
+    "tasksOpen": "Tasks",
+    "tasksNone": "Nothing for today. Tasks due today and overdue ones show up here.",
     "balance": "Balance",
     "chores": "Chores today",
     "choresProgress": "{{done}} of {{total}} done",
@@ -107,8 +110,9 @@
     "newBadge": "New badge: {{list}}!",
     "exus": {
       "label": "Ask Ex-us",
-      "hint": "Plain text goes to Ex-us AI; commands start with /, e.g. /today.",
-      "send": "Send to Ex-us"
+      "hint": "Commands start with /, e.g. /today.",
+      "send": "Send to Ex-us",
+      "sendShort": "Send"
     }
   },
   "stats": {

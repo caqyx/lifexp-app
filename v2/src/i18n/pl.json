@@ -75,6 +75,9 @@
     "recent": "Ostatnie aktywności",
     "noRecent": "Brak aktywności. Zacznij zarabiać punkty!",
     "recentAll": "Historia",
+    "tasksToday": "Zadania na dziś",
+    "tasksOpen": "Zadania",
+    "tasksNone": "Na dziś nic. Zadania z terminem na dziś i zaległe pojawią się tutaj.",
     "balance": "Saldo",
     "chores": "Obowiązki dziś",
     "choresProgress": "{{done}} z {{total}} zrobione",
@@ -107,8 +110,9 @@
     "newBadge": "Nowa odznaka: {{list}}!",
     "exus": {
       "label": "Zapytaj Ex-us",
-      "hint": "Zwykły tekst trafia do Ex-us AI, a komendy zaczynają się od /, np. /dzis.",
-      "send": "Wyślij do Ex-us"
+      "hint": "Komendy zaczynają się od /, np. /dzis.",
+      "send": "Wyślij do Ex-us",
+      "sendShort": "Wyślij"
     }
   },
   "stats": {

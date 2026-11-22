@@ -209,3 +209,75 @@ test.describe('v1 on a desktop', () => {
     await expect(page.locator('#chore-outstanding')).toHaveText('20,25 zł');
   });
 });
+
+// q-ui-2 (docs/v2/QUALITY.md D1-D3): today's tasks are on Today without the calendar,
+// the level sits on the points card, the streak in the day card, and a wide screen
+// shows two columns.
+function seedTodo(uid, patch) {
+  return db.collection(`users/${uid}/todos`).add({
+    text: 'Zadanie',
+    dueDate: localDaysAgo(0),
+    size: 'S',
+    done: false,
+    createdAt: new Date().toISOString(),
+    penaltyApplied: false,
+    ...patch,
+  });
+}
+
+test('without the calendar, Today lists the tasks due today and overdue, and ticks them off', async ({ page, account }) => {
+  const late = await seedTodo(account.uid, { text: 'Zaległe ćwiczenia', dueDate: localDaysAgo(2), size: 'M' });
+  await seedTodo(account.uid, { text: 'Lektura' });
+  await seedTodo(account.uid, { text: 'Za tydzień', dueDate: localDaysAgo(-7) });
+  await openSignedIn(page, account, '#/today');
+
+  await expect(page.getByRole('heading', { name: 'Ważne dzisiaj' })).toHaveCount(0);
+  const section = page.locator('.ui-section', { has: page.getByRole('heading', { name: 'Zadania na dziś' }) });
+  await expect(section.getByRole('link', { name: 'Zadania' })).toHaveAttribute('href', '#/tasks');
+  const rows = page.getByRole('list', { name: 'Zadania na dziś' }).getByRole('listitem');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('Zaległe ćwiczenia');
+  await expect(rows.nth(1)).toContainText('Lektura');
+  // Above the day's points and the goals: what to do comes first.
+  const order = await page.locator('.ui-section__title').allTextContents();
+  expect(order.indexOf('Zadania na dziś')).toBeLessThan(order.indexOf('Cele'));
+
+  await rows.nth(0).getByRole('button', { name: 'Oznacz zadanie jako zrobione: Zaległe ćwiczenia' }).click();
+  await expect(page.getByText('Zrobione, ale po terminie — tym razem bez kawałków.')).toBeVisible();
+  await expect.poll(async () => (await late.get()).data().done).toBe(true);
+  await expect(rows).toHaveCount(1);
+});
+
+test('no tasks for today: the card says where they will appear', async ({ page, account }) => {
+  await openSignedIn(page, account, '#/today');
+  await expect(page.getByText('Na dziś nic. Zadania z terminem na dziś i zaległe pojawią się tutaj.')).toBeVisible();
+});
+
+test('the level is on the points card, the streak and logging in the day card', async ({ page }) => {
+  const account = await seededAccount();
+  await openSignedIn(page, account, '#/today');
+  const hero = page.getByRole('region', { name: 'Twoje punkty' });
+  await expect(hero.getByTestId('level')).toHaveText('Poziom 2');
+  await expect(hero.getByText('120 / 500 XP')).toBeVisible();
+  const day = page.locator('.ui-card', { has: page.getByTestId('today-points') });
+  await expect(day.getByTestId('streak')).toBeVisible();
+  await expect(day.getByRole('list', { name: 'Ten tydzień' })).toBeVisible();
+  await expect(day.getByRole('button', { name: 'Zapisz aktywność' })).toBeVisible();
+  // Money and Ex-us have their own cards on Today: no shortcut repeats them.
+  await expect(page.locator('.today-shortcut', { hasText: 'Pieniądze' })).toHaveCount(0);
+  await expect(page.locator('.today-shortcut', { hasText: 'Ex-us' })).toHaveCount(0);
+});
+
+test.describe('a wide screen', () => {
+  test.use({ viewport: { width: 1280, height: 900 } });
+
+  test('shows two columns: what to do on the left, the overview on the right', async ({ page }) => {
+    const account = await seededAccount();
+    await openSignedIn(page, account, '#/today');
+    await expect(page.getByTestId('today-points')).toBeVisible();
+    const hero = await page.getByRole('region', { name: 'Twoje punkty' }).boundingBox();
+    const goals = await page.locator('.ui-section', { has: page.getByRole('heading', { name: 'Cele' }) }).boundingBox();
+    expect(goals.x).toBeGreaterThan(hero.x + hero.width);
+    expect(Math.abs(goals.y - hero.y)).toBeLessThan(40);
+  });
+});
