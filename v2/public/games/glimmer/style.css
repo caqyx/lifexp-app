@@ -1,0 +1,415 @@
+/* Świetlik (Glimmer), docs/v2/PLAN.md 9.1 gl-1. The arena is the whole frame: main.js
+   sets --board-w/-h (the art canvas, a whole number of device pixels per art pixel) and
+   --px (one art pixel in CSS pixels: the cards' borders and shadows are whole art pixels,
+   hard-edged, to match the pixel art). Panels lie over the meadow; motion only through
+   transform and opacity, times from the tokens (0 ms with reduced motion). */
+
+:root {
+  color-scheme: dark;
+  --color-bg: #15111f;
+  --color-text: #fbf7ff;
+  --color-text-secondary: #c9c0ec;
+  --color-focus: #ffd166;
+  --font: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --duration-enter: 260ms;
+  --duration-exit: 160ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --px: 2px;
+  --ink: #15111f;
+  --card: rgb(36 29 59 / 94%);
+  --card-rim: #544583;
+  --gold: #ffd166;
+  --gold-pale: #fff1b8;
+  --button: #ffd166;
+  --button-shade: #c98f1c;
+  --plain: #3a2f57;
+  --plain-shade: #241d3b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-enter: 0ms;
+    --duration-exit: 0ms;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app {
+  position: fixed;
+  inset: 0;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  touch-action: none;
+  outline: none;
+}
+
+/* The art canvas, scaled up by whole device pixels with no smoothing: crisp squares. */
+.board {
+  display: block;
+  width: var(--board-w, 100%);
+  height: var(--board-h, 100%);
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+@supports (image-rendering: pixelated) {
+  .board {
+    image-rendering: pixelated;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── Chips and buttons (pixel frames) ─────────────────────────────────────── */
+
+.chip {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 0;
+  background: var(--plain);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  box-shadow:
+    inset 0 calc(var(--px) * -2) 0 var(--plain-shade),
+    0 0 0 var(--px) var(--ink);
+  cursor: pointer;
+  transition: background-color var(--duration-exit) var(--ease-in);
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--gold);
+  color: var(--ink);
+  box-shadow:
+    inset 0 calc(var(--px) * -2) 0 var(--button-shade),
+    0 0 0 var(--px) var(--ink);
+}
+
+.button {
+  width: 100%;
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 0;
+  background: var(--button);
+  color: var(--ink);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  box-shadow:
+    inset 0 calc(var(--px) * -2) 0 var(--button-shade),
+    0 0 0 var(--px) var(--ink);
+  cursor: pointer;
+  transition: background-color var(--duration-exit) var(--ease-in);
+}
+
+.button--plain {
+  background: var(--plain);
+  color: var(--color-text);
+  box-shadow:
+    inset 0 calc(var(--px) * -2) 0 var(--plain-shade),
+    0 0 0 var(--px) var(--ink);
+}
+
+.button:hover {
+  background: #ffe08f;
+}
+
+.button--plain:hover,
+.chip:hover:not([aria-pressed='true']) {
+  background: #4a3d6e;
+}
+
+/* Pressed: it sinks by its 2-pixel lip. */
+.button:active,
+.chip:active {
+  transform: translateY(calc(var(--px) * 2));
+}
+
+.button:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+/* ── In-play controls ─────────────────────────────────────────────────────── */
+
+.controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.controls .chip {
+  position: absolute;
+  pointer-events: auto;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--duration-exit) var(--ease-in),
+    visibility 0s linear var(--duration-exit),
+    background-color var(--duration-exit) var(--ease-in);
+}
+
+.app[data-screen='play'] .controls .chip {
+  opacity: 0.88;
+  visibility: visible;
+  transition:
+    opacity var(--duration-enter) var(--ease-out),
+    visibility 0s,
+    background-color var(--duration-exit) var(--ease-in);
+}
+
+.controls__pause {
+  top: max(8px, env(safe-area-inset-top));
+  left: 50%;
+  translate: -50% 0;
+}
+
+.controls__focus {
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  min-width: 112px;
+  min-height: 56px;
+}
+
+/* Focus by button only where fingers play; the keyboard has Shift. */
+@media (hover: hover) and (pointer: fine) {
+  .controls__focus {
+    display: none;
+  }
+}
+
+/* ── Panels ───────────────────────────────────────────────────────────────── */
+
+.panel {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding:
+    max(16px, env(safe-area-inset-top))
+    max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  overflow-y: auto;
+  opacity: 0;
+  visibility: hidden;
+  /* A panel on its way out lets the arena have the finger at once (a drag right after "Graj"). */
+  pointer-events: none;
+  transform: translateY(10px);
+  transition:
+    opacity var(--duration-exit) var(--ease-in),
+    transform var(--duration-exit) var(--ease-in),
+    visibility 0s linear var(--duration-exit);
+}
+
+.panel--paused,
+.panel--over {
+  background: rgb(21 17 31 / 45%);
+}
+
+.app[data-screen='menu'] .panel--menu,
+.app[data-screen='over'] .panel--over,
+.app[data-screen='play'][data-paused='true'] .panel--paused {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: none;
+  transition:
+    opacity var(--duration-enter) var(--ease-out),
+    transform var(--duration-enter) var(--ease-out),
+    visibility 0s;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(100%, 340px);
+  padding: 20px 18px;
+  background: var(--card);
+  text-align: center;
+  /* A pixel frame: ink outline, a lighter inner rim, a hard drop shadow. */
+  box-shadow:
+    inset 0 0 0 var(--px) var(--card-rim),
+    0 0 0 var(--px) var(--ink),
+    0 calc(var(--px) * 3) 0 var(--px) var(--ink);
+}
+
+.card--menu {
+  width: min(100%, 380px);
+}
+
+.card__main,
+.card__side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.05;
+  color: var(--gold);
+  /* A hard, stepped outline in whole art pixels (no blur): pixel lettering. */
+  text-shadow:
+    var(--px) 0 0 var(--ink),
+    calc(var(--px) * -1) 0 0 var(--ink),
+    0 var(--px) 0 var(--ink),
+    0 calc(var(--px) * -1) 0 var(--ink),
+    var(--px) calc(var(--px) * 2) 0 var(--ink),
+    0 calc(var(--px) * 2) 0 var(--ink);
+}
+
+.card__title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--gold-pale);
+}
+
+.card__text,
+.card__best,
+.card__hint {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.card__text {
+  font-size: 15px;
+  color: var(--color-text);
+}
+
+.card__best {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.card__hint {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* The other device's line stays out of the way. */
+@media (hover: hover) and (pointer: fine) {
+  .card__hint--touch {
+    display: none;
+  }
+}
+
+@media (pointer: coarse) {
+  .card__hint--keys {
+    display: none;
+  }
+}
+
+.card__score {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 900;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.effects {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 10px;
+}
+
+.effects__label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.badge {
+  align-self: center;
+  margin: 0;
+  padding: 4px 12px;
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  box-shadow: 0 0 0 var(--px) var(--ink);
+}
+
+/* A short, wide frame (a sideways phone): the menu's two halves side by side. */
+@media (max-height: 520px) and (min-aspect-ratio: 4/3) {
+  .card--menu {
+    flex-direction: row;
+    align-items: center;
+    gap: 20px;
+    width: min(100%, 720px);
+    padding: 16px 18px;
+  }
+
+  .card--menu > * {
+    flex: 1 1 0;
+  }
+
+  .title {
+    font-size: 34px;
+  }
+
+  .card {
+    gap: 10px;
+  }
+
+  .card__score {
+    font-size: 32px;
+  }
+}

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<link rel="icon" href="data:,">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Świetlik</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="js/main.js"></script>
+</head>
+<body>
+<main id="app" class="app" data-screen="menu" data-paused="false">
+  <div id="stage" class="stage" tabindex="-1">
+    <canvas id="board" class="board" role="img"></canvas>
+  </div>
+
+  <div class="controls">
+    <button id="pause" class="chip controls__pause" type="button" aria-pressed="false" data-t="pause"></button>
+    <button id="focus" class="chip controls__focus" type="button" aria-pressed="false" data-t="focus"></button>
+  </div>
+
+  <section id="menu" class="panel panel--menu" aria-labelledby="menu-title">
+    <div class="card card--menu">
+      <div class="card__main">
+        <h1 id="menu-title" class="title" data-t="title"></h1>
+        <p class="card__text" data-t="intro"></p>
+        <button id="play-button" class="button" type="button" data-t="play"></button>
+        <p id="menu-best" class="card__best"></p>
+      </div>
+      <div class="card__side">
+        <div class="effects" role="group" aria-labelledby="fx-label-menu">
+          <span id="fx-label-menu" class="effects__label" data-t="effects"></span>
+          <button class="chip" type="button" data-fx="full" aria-pressed="true" data-t="fxFull"></button>
+          <button class="chip" type="button" data-fx="calm" aria-pressed="false" data-t="fxCalm"></button>
+        </div>
+        <p class="card__hint card__hint--touch" data-t="controlsTouch"></p>
+        <p class="card__hint card__hint--keys" data-t="controlsKeys"></p>
+        <p class="card__hint" data-t="grazeHint"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="paused" class="panel panel--paused" aria-labelledby="paused-title">
+    <div class="card">
+      <h2 id="paused-title" class="card__title" data-t="paused"></h2>
+      <button id="resume" class="button" type="button" data-t="resume"></button>
+      <button id="restart" class="button button--plain" type="button" data-t="restart"></button>
+      <button id="to-menu" class="button button--plain" type="button" data-t="menu"></button>
+      <div class="effects" role="group" aria-labelledby="fx-label-pause">
+        <span id="fx-label-pause" class="effects__label" data-t="effects"></span>
+        <button class="chip" type="button" data-fx="full" aria-pressed="true" data-t="fxFull"></button>
+        <button class="chip" type="button" data-fx="calm" aria-pressed="false" data-t="fxCalm"></button>
+      </div>
+    </div>
+  </section>
+
+  <section id="over" class="panel panel--over" aria-labelledby="over-title">
+    <div class="card">
+      <h2 id="over-title" class="card__title" data-t="over"></h2>
+      <p id="new-best" class="badge" data-t="newBest" hidden></p>
+      <p id="over-score" class="card__score"></p>
+      <p id="over-detail" class="card__text"></p>
+      <p id="over-best" class="card__best"></p>
+      <button id="again" class="button" type="button" data-t="again"></button>
+      <button id="over-menu" class="button button--plain" type="button" data-t="menu"></button>
+    </div>
+  </section>
+
+  <p id="live" class="visually-hidden" aria-live="polite"></p>
+</main>
+</body>
+</html>
