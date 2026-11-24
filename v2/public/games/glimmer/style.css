@@ -1,5 +1,6 @@
 /* Świetlik (Glimmer), docs/v2/PLAN.md 9.1 gl-1. The arena is the whole frame: main.js
-   sets --board-w/-h (the art canvas, a whole number of device pixels per art pixel) and
+   sets --board-w/-h/-x/-y (the art canvas, a whole number of device pixels per art pixel,
+   covering the frame and centred) and
    --px (one art pixel in CSS pixels: the cards' borders and shadows are whole art pixels,
    hard-edged, to match the pixel art). Panels lie over the meadow; motion only through
    transform and opacity, times from the tokens (0 ms with reduced motion). */
@@ -67,15 +68,17 @@ body {
 .stage {
   position: absolute;
   inset: 0;
-  display: grid;
-  place-items: center;
   overflow: hidden;
   touch-action: none;
   outline: none;
 }
 
-/* The art canvas, scaled up by whole device pixels with no smoothing: crisp squares. */
+/* The art canvas, scaled up by whole device pixels with no smoothing: crisp squares. It
+   covers the stage (at most one art pixel larger), centred; the stage crops the rest. */
 .board {
+  position: absolute;
+  top: var(--board-y, 0px);
+  left: var(--board-x, 0px);
   display: block;
   width: var(--board-w, 100%);
   height: var(--board-h, 100%);

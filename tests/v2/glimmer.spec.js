@@ -3,11 +3,13 @@
 // (?test=1 with seed=, hp=, start=, speed=) make a run repeatable and short, and the stage
 // carries the run's state in data-* for the test to read. The rules, the patterns'
 // fairness and the pacing are tested headless in v2/tests/glimmer.test.ts.
+const { devices } = require('@playwright/test');
 const { test, expect, openSignedIn } = require('../support/v2');
 
 const NAME = 'Świetlik';
 const PIXEL_7 = { viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2.625 };
 const PIXEL_7_SIDEWAYS = { viewport: { width: 915, height: 412 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2.625 };
+const { defaultBrowserType, ...PIXEL_7_LANDSCAPE } = devices['Pixel 7 landscape'];
 
 /** A request off this origin, a CSP violation, a console error or an exception. */
 async function watchProblems(page) {
@@ -61,6 +63,29 @@ async function hide(frame) {
   });
 }
 
+/**
+ * The arena covers the frame: the canvas reaches past every edge of the game's page by less
+ * than one art pixel (centred, cropped), so no empty band shows; its art pixels are whole
+ * device pixels.
+ */
+async function expectArenaCovers(game, dpr) {
+  const page = await game.locator('#stage').boundingBox();
+  const canvas = await game.locator('#board').boundingBox();
+  const artWidth = await game.locator('#board').evaluate((c) => c.width);
+  const art = canvas.width / artWidth; // one art pixel in CSS pixels
+  expect(art * dpr).toBeCloseTo(Math.round(art * dpr), 2);
+  for (const [over, name] of [
+    [page.x - canvas.x, 'left'],
+    [page.y - canvas.y, 'top'],
+    [canvas.x + canvas.width - (page.x + page.width), 'right'],
+    [canvas.y + canvas.height - (page.y + page.height), 'bottom'],
+  ]) {
+    expect(over, name).toBeGreaterThanOrEqual(-0.01);
+    expect(over, name).toBeLessThan(art);
+  }
+  return canvas;
+}
+
 const bestOf = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('lifexp-glimmer-best') || 'null'));
 
 test.describe('on a Pixel 7 held upright', () => {
@@ -83,10 +108,7 @@ test.describe('on a Pixel 7 held upright', () => {
     await expect.poll(async () => (await stateOf(game)).phase).toBe('play');
 
     // The arena is the whole frame: the canvas, crisp, within an art pixel of it.
-    const box = await host.locator('iframe').boundingBox();
-    const canvas = await game.locator('#board').boundingBox();
-    expect(Math.abs(canvas.width - box.width)).toBeLessThan(4);
-    expect(Math.abs(canvas.height - box.height)).toBeLessThan(4);
+    const canvas = await expectArenaCovers(game, PIXEL_7.deviceScaleFactor);
     expect(await game.locator('#board').evaluate((c) => getComputedStyle(c).imageRendering)).toBe('pixelated');
 
     // A drag far from the wisp moves it by the drag (relative: the finger never covers it).
@@ -126,25 +148,30 @@ test.describe('on a Pixel 7 held upright', () => {
   });
 });
 
-test.describe('on a Pixel 7 held sideways', () => {
-  test.use(PIXEL_7_SIDEWAYS);
+// Two sideways shapes: a tall browser (915 × 412) and Playwright's own Pixel 7 landscape
+// (its descriptor: a shorter viewport, as with the browser's bars).
+for (const [label, phone] of [
+  ['915 × 412', PIXEL_7_SIDEWAYS],
+  ['Playwright descriptor', PIXEL_7_LANDSCAPE],
+]) {
+  test.describe(`on a Pixel 7 held sideways (${label})`, () => {
+    test.use(phone);
 
-  test('the menu fits the short screen and a run fills it', async ({ page, account }) => {
-    const { host, game } = await openFromList(page, account);
-    const frameBox = await host.locator('iframe').boundingBox();
-    for (const id of ['#play-button', '.card--menu']) {
-      const b = await game.locator(id).boundingBox();
-      expect(b.y).toBeGreaterThanOrEqual(frameBox.y - 1);
-      expect(b.y + b.height).toBeLessThanOrEqual(frameBox.y + frameBox.height + 1);
-    }
-    await reopenWith(page, host, 'test=1&seed=2&hp=99');
-    await game.getByRole('button', { name: 'Graj' }).tap();
-    await expect.poll(async () => (await stateOf(game)).phase).toBe('play');
-    const canvas = await game.locator('#board').boundingBox();
-    expect(Math.abs(canvas.width - frameBox.width)).toBeLessThan(4);
-    expect(Math.abs(canvas.height - frameBox.height)).toBeLessThan(4);
+    test('the menu fits the short screen and a run fills it', async ({ page, account }) => {
+      const { host, game } = await openFromList(page, account);
+      const frameBox = await host.locator('iframe').boundingBox();
+      for (const id of ['#play-button', '.card--menu']) {
+        const b = await game.locator(id).boundingBox();
+        expect(b.y).toBeGreaterThanOrEqual(frameBox.y - 1);
+        expect(b.y + b.height).toBeLessThanOrEqual(frameBox.y + frameBox.height + 1);
+      }
+      await reopenWith(page, host, 'test=1&seed=2&hp=99');
+      await game.getByRole('button', { name: 'Graj' }).tap();
+      await expect.poll(async () => (await stateOf(game)).phase).toBe('play');
+      await expectArenaCovers(game, phone.deviceScaleFactor);
+    });
   });
-});
+}
 
 test.describe('on a computer', () => {
   test.use({ viewport: { width: 1280, height: 800 } });

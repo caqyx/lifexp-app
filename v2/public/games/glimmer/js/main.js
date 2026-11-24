@@ -100,36 +100,45 @@ function applyTexts() {
 // ── Layout ───────────────────────────────────────────────────────────────────
 
 /**
- * The arena is the whole frame: a whole number k of device pixels per art pixel, the short
- * side about ARENA_SHORT art pixels. On the menu and the result card a new shape makes a
- * new arena; under a run in progress the arena keeps its size and is only scaled to fit.
+ * The arena is the whole frame: k whole device pixels per art pixel (the short side about
+ * ARENA_SHORT art pixels), and enough art pixels to cover the frame — rounded up, so the
+ * canvas is at most one art pixel larger than the frame and, centred, crops less than that
+ * on each side: no empty band on any screen. A new shape mid-run resizes the arena too (the
+ * wisp stays inside; shots that end up outside fly off as usual).
  */
 function layout() {
   const dpr = Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO);
-  const devW = Math.max(1, Math.floor(innerWidth * dpr));
-  const devH = Math.max(1, Math.floor(innerHeight * dpr));
-  let { width, height } = state.art;
-  if (state.screen !== 'play') {
-    const k = Math.max(1, Math.floor(Math.min(devW, devH) / ARENA_SHORT));
-    width = Math.max(120, Math.floor(devW / k));
-    height = Math.max(120, Math.floor(devH / k));
-  }
-  // Whole device pixels per art pixel when they fit, else a plain fit (a tiny frame).
-  const fit = Math.min(devW / width, devH / height);
-  const k = fit >= 1 ? Math.floor(fit) : fit;
-  const sizeChanged = width !== state.art.width || height !== state.art.height || renderer.canvas.width !== width;
+  const box = dom.stage.getBoundingClientRect();
+  const cssW = box.width || innerWidth;
+  const cssH = box.height || innerHeight;
+  const devW = Math.max(1, Math.ceil(cssW * dpr - 0.01));
+  const devH = Math.max(1, Math.ceil(cssH * dpr - 0.01));
+  const k = Math.max(1, Math.floor(Math.min(devW, devH) / ARENA_SHORT));
+  const width = Math.max(120, Math.ceil(devW / k));
+  const height = Math.max(120, Math.ceil(devH / k));
+  if (width !== state.art.width || height !== state.art.height || renderer.canvas.width !== width) resizeRenderer(renderer, width, height);
   state.art = { width, height, k };
-  if (sizeChanged) resizeRenderer(renderer, width, height);
-  if (state.screen !== 'play' && (state.game.width !== width || state.game.height !== height)) {
-    state.game = createGame({ width, height, seed: 1 });
-    resetRenderer(renderer, state.game);
+  const g = state.game;
+  if (g.width !== width || g.height !== height) {
+    if (state.screen === 'play') {
+      g.width = width;
+      g.height = height;
+      g.player.x = Math.min(width - 4, Math.max(4, g.player.x));
+      g.player.y = Math.min(height - 4, Math.max(4, g.player.y));
+    } else {
+      state.game = createGame({ width, height, seed: 1 });
+      resetRenderer(renderer, state.game);
+    }
   }
-  const cssW = (width * k) / dpr;
-  const cssH = (height * k) / dpr;
-  dom.stage.style.setProperty('--board-w', `${cssW}px`);
-  dom.stage.style.setProperty('--board-h', `${cssH}px`);
+  // Centred on whole device pixels (crisp), the overflow cropped by the stage.
+  const left = Math.floor((devW - width * k) / 2) / dpr;
+  const top = Math.floor((devH - height * k) / 2) / dpr;
+  dom.stage.style.setProperty('--board-w', `${(width * k) / dpr}px`);
+  dom.stage.style.setProperty('--board-h', `${(height * k) / dpr}px`);
+  dom.stage.style.setProperty('--board-x', `${left}px`);
+  dom.stage.style.setProperty('--board-y', `${top}px`);
   // One art pixel in CSS pixels: the panels' borders are whole art pixels.
-  dom.stage.style.setProperty('--px', `${Math.max(1, Math.round(k / dpr)) }px`);
+  dom.stage.style.setProperty('--px', `${Math.max(1, Math.round(k / dpr))}px`);
 }
 
 // ── Screens ──────────────────────────────────────────────────────────────────
@@ -310,6 +319,7 @@ function bindInput() {
     if (document.visibilityState === 'hidden' && state.screen === 'play') setPaused(true);
   });
   addEventListener('resize', layout);
+  new ResizeObserver(layout).observe(dom.stage);
 }
 
 // ── Loop ─────────────────────────────────────────────────────────────────────
