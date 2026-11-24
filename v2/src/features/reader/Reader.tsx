@@ -28,6 +28,7 @@ import {
 import { firstContentSentence, fromFull, hasToc, readingView, tocBlocks, type TocMarks } from '@/domain/reader/toc';
 import { t } from '@/i18n';
 import { saveReaderSettings, saveReadingPosition } from '@/services/reader';
+import { useLiquidGlass } from '@/ui/glass/useLiquidGlass';
 import { showToast } from '@/ui/toast';
 import { AutoView } from './AutoView';
 import { EasyText } from './EasyText';
@@ -60,6 +61,21 @@ export type Jump = { s: number; n: number };
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 
 type Panel = 'settings' | 'toc' | 'bookToc' | null;
+
+/**
+ * "Wyjdź" in full screen: the one control floating over the book. In the iOS theme a
+ * small piece of liquid glass tinted with the page (reader.css), lens included.
+ */
+function FullscreenExit({ onExit }: { onExit: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  useLiquidGlass(ref, { bezel: 12 });
+  return (
+    <button ref={ref} type="button" class="reader__fs-exit ui-glass" aria-label={t('reader.fullscreenExitLabel')} onClick={onExit}>
+      <Minimize2 aria-hidden="true" />
+      <span>{t('reader.fullscreenExit')}</span>
+    </button>
+  );
+}
 
 export function Reader({ meta, content, marks, initialSettings, onBack }: ReaderProps) {
   const full = useMemo(() => flatten(content.sections), [content]);
@@ -447,12 +463,7 @@ export function Reader({ meta, content, marks, initialSettings, onBack }: Reader
         )}
       </header>
       )}
-      {fullscreen && (
-        <button type="button" class="reader__fs-exit" aria-label={t('reader.fullscreenExitLabel')} onClick={exitFullscreen}>
-          <Minimize2 aria-hidden="true" />
-          <span>{t('reader.fullscreenExit')}</span>
-        </button>
-      )}
+      {fullscreen && <FullscreenExit onExit={exitFullscreen} />}
       {!landscape && !fullscreen && <div class="reader__crumb">{crumbText(meta.title, sections[secIndex], secIndex)}</div>}
 
       <div class="reader__stage" key={`${settings.skipToc}-${landscape}-${original}`}>
