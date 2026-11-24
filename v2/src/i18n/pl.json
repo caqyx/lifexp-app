@@ -1707,6 +1707,7 @@
       "quick-math": "Szybkie liczenie",
       "rush": "Rush",
       "wardens": "Strażnicy Doliny",
+      "glimmer": "Świetlik",
       "test": "Gra testowa"
     },
     "descriptions": {
@@ -1715,7 +1716,8 @@
       "gridlock": "Neonowa gra zręcznościowa: unikaj laserów na planszy 16×16.",
       "quick-math": "Liczenie w pamięci na czas: poziomy trudności i rekordy.",
       "rush": "Cztery tryby w jednej grze: Wave, Ship, Flip i Robot Rush — każdy z własnymi sektorami, skórkami i finałem.",
-      "wardens": "Obrona wieżami: trzy mapy, pięć wież, fale coraz groźniejszych najeźdźców i tryb bez końca.",
+      "wardens": "Obrona wieżami: trzy mapy, dziewięć wież, fale coraz groźniejszych najeźdźców i tryb bez końca.",
+      "glimmer": "Unikanie bez końca: świetlik na jednej otwartej polanie, iskry, promienie, pierścienie i ściany z każdej strony.",
       "test": "Gra do testów automatycznych."
     },
     "play": "Graj",

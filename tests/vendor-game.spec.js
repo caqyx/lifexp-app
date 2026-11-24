@@ -172,6 +172,8 @@ const OWN_GAMES = [
   { id: 'rush', prefix: 'lifexp-rush-', storageArgs: [] },
   // Strażnicy Doliny (td-1): progress and settings through records.js's readJson/writeJson only.
   { id: 'wardens', prefix: 'lifexp-wardens-', storageArgs: ['key'] },
+  // Świetlik (gl-1): the best run and the settings through records.js's readJson/writeJson only.
+  { id: 'glimmer', prefix: 'lifexp-glimmer-', storageArgs: ['key'] },
 ];
 
 /** Every file of a directory, recursively. @param {string} dir */

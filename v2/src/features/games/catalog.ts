@@ -4,13 +4,14 @@
 // v1's Coins, Snake, 2048, Redstone and FPS stay in v1 until the cutover). Every game
 // runs in GameHost.
 // Vendored games live in v2/public/games/<id>/ (scripts/vendor-game.mjs, VENDORED.json);
-// Flappy Bird, Szybkie liczenie, Wave Rush, Ship Rush and Flip Rush are LifeXP's own,
-// written in this repo in v2/public/games/flappy/, quick-math/, wave-rush/, ship-rush/ and
-// flip-rush/ (GAME.json; the Rush games share their engine in v2/public/games/_engine/).
-import { Activity, Bird, Calculator, Castle, FlaskConical, Grid3x3, type LucideIcon, Swords } from 'lucide-preact';
+// Flappy Bird, Szybkie liczenie, the Rush modes, Strażnicy Doliny and Świetlik are LifeXP's
+// own, written in this repo in v2/public/games/flappy/, quick-math/, rush/ (with the modes'
+// pages), wardens/ and glimmer/ (GAME.json; the Rush modes share their engine in
+// v2/public/games/_engine/).
+import { Activity, Bird, Calculator, Castle, FlaskConical, Grid3x3, type LucideIcon, Sparkles, Swords } from 'lucide-preact';
 import { emulatorTarget } from '@/lib/emulator';
 
-export type GameId = 'flappy-bird' | 'wartime' | 'gridlock' | 'quick-math' | 'rush' | 'wardens' | 'test';
+export type GameId = 'flappy-bird' | 'wartime' | 'gridlock' | 'quick-math' | 'rush' | 'wardens' | 'glimmer' | 'test';
 
 export interface GameDef {
   id: GameId;
@@ -52,6 +53,8 @@ export const GAMES: readonly GameDef[] = [
   },
   // LifeXP's own tower defense (stage td-1), written in this repo in games/wardens/.
   { id: 'wardens', sessionName: 'Strażnicy Doliny', icon: Castle, src: 'games/wardens/index.html' },
+  // LifeXP's own endless dodge game (stage gl-1), written in this repo in games/glimmer/.
+  { id: 'glimmer', sessionName: 'Świetlik', icon: Sparkles, src: 'games/glimmer/index.html' },
 ];
 
 /** The modes' old games (their links still work: the game Rush, opened in that mode). */

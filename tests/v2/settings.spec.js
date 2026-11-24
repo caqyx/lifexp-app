@@ -154,15 +154,16 @@ test.describe('v1 on a desktop', () => {
     await page.click('#settings-cat-dashboard .settings-cat-label');
     await page.fill('#set-daily-limit', '200');
     await page.click('#settings-cat-dashboard button[onclick="saveSettings()"]');
-    // v1 reloads the profile after each save and fills every field again: wait for it.
-    await expect.poll(async () => (await settingsOf(account.uid)).dailyLimit).toBe(200);
-    await expect(page.locator('#set-daily-limit')).toHaveValue('200');
+    // After each save v1 reads the profile again (loadProfile) and fills EVERY settings field
+    // from it, then shows its toast. Typing the next fields before that refill lands loses
+    // them to the old stored values (0,45 zł instead of 0,50). The toast comes only after the
+    // refill, so it is the signal that the form is settled; the saved document alone is not.
+    await expect(page.locator('#toast')).toHaveText('Zapisano ustawienia.');
     await page.click('#settings-cat-expenses .settings-cat-label');
     await page.fill('#econ-general-zl', '2.5');
     await page.fill('#econ-general-pts', '20');
     await page.click('button[onclick="saveEconomyGeneral()"]');
-    await expect.poll(async () => (await settingsOf(account.uid)).pointsRateGeneralPts).toBe(20);
-    await expect(page.locator('#econ-general-pts')).toHaveValue('20');
+    await expect(page.locator('#toast')).toHaveText('Zapisano ekonomię ogólną.');
     await page.click('#settings-cat-chores .settings-cat-label');
     await page.fill('#econ-chore-zl', '0.5');
     await page.fill('#econ-chore-pts', '1');
