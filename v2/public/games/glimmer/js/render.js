@@ -7,7 +7,7 @@
 // the game only (js/sim.js); effects from its events. With "fewer effects" or reduced
 // motion: no shake, no flash, fewer particles.
 
-import { EVENT_RING } from './sim.js';
+import { EVENT_RING, zoneRadius } from './sim.js';
 import { PALETTE, digitsWidth, drawDigits, heart, shotSprites, wisp } from './sprites.js';
 import { clockText } from './i18n.js';
 
@@ -153,6 +153,7 @@ export function consumeEvents(r, game, calm) {
         ring.life = ring.max = e.value;
       }
     } else if (e.type === 'over') burst(r, e.x, e.y, calm ? 8 : 30, PALETTE.y, 60);
+    else if (e.type === 'pop') burst(r, e.x, e.y, calm ? 3 : 10, PALETTE.o, 45);
   }
   r.lastSeq = game.eventSeq;
 }
@@ -170,21 +171,51 @@ export function resetRenderer(r, game) {
  * with a dashed line down its middle that crawls along it.
  * @param {CanvasRenderingContext2D} ctx @param {Game} game @param {number} px @param {number} py @param {number} angle
  * @param {number} half @param {number} urgency 0 (just started) … 1 (about to burn) @param {number} clock
+ * @param {boolean} [marker] a comet's path: orange, not red (it is a shot that comes, not a beam)
  */
-function beamWarning(ctx, game, px, py, angle, half, urgency, clock) {
+function beamWarning(ctx, game, px, py, angle, half, urgency, clock, marker = false) {
   const len = game.width + game.height;
   ctx.save();
   ctx.translate(px, py);
   ctx.rotate(angle);
   const pulse = Math.floor(clock * (6 + urgency * 10)) % 2 === 0;
   ctx.globalAlpha = 0.14 + urgency * 0.22 + (pulse ? 0.08 : 0);
-  ctx.fillStyle = PALETTE.r;
+  ctx.fillStyle = marker ? PALETTE.o : PALETTE.r;
   ctx.fillRect(-len, -half, len * 2, half * 2);
   ctx.globalAlpha = 1;
-  ctx.fillStyle = pulse || urgency > 0.7 ? PALETTE.R : PALETTE.r;
+  ctx.fillStyle = marker ? (pulse ? PALETTE.y : PALETTE.o) : pulse || urgency > 0.7 ? PALETTE.R : PALETTE.r;
   const shift = (clock * 40) % 8;
   for (let t = -len - shift; t < len; t += 8) ctx.fillRect(t, -0.5, 4, 1);
   ctx.restore();
+}
+
+/** Dots round a circle (pixel art: no anti-aliased arc). @param {CanvasRenderingContext2D} ctx @param {number} x @param {number} y @param {number} rad @param {number} dots @param {string} color */
+function dottedCircle(ctx, x, y, rad, dots, color) {
+  ctx.fillStyle = color;
+  for (let i = 0; i < dots; i++) {
+    const a = (i / dots) * Math.PI * 2;
+    ctx.fillRect(Math.round(x + Math.cos(a) * rad), Math.round(y + Math.sin(a) * rad), 1, 1);
+  }
+}
+
+/**
+ * A zone: outside it is shaded (faintly while it warns, darker once it hurts), its edge a
+ * dotted ring, and while it warns also where it will end.
+ * @param {CanvasRenderingContext2D} ctx @param {Game} game @param {import('./sim.js').Zone} z @param {boolean} blink
+ */
+function drawZone(ctx, game, z, blink) {
+  const rad = zoneRadius(z);
+  const live = z.warn <= 0;
+  ctx.globalAlpha = live ? 0.3 : blink ? 0.14 : 0.08;
+  ctx.fillStyle = PALETTE.r;
+  ctx.beginPath();
+  ctx.rect(0, 0, game.width, game.height);
+  ctx.arc(z.cx, z.cy, rad, 0, Math.PI * 2);
+  ctx.fill('evenodd');
+  ctx.globalAlpha = 1;
+  const dots = Math.max(24, Math.round(rad * 1.2));
+  dottedCircle(ctx, z.cx, z.cy, rad, dots, live || blink ? PALETTE.R : PALETTE.r);
+  if (!live) dottedCircle(ctx, z.cx, z.cy, z.r1, Math.max(16, Math.round(z.r1 * 0.8)), PALETTE.y);
 }
 
 /** A solid beam: a wide pink body, a white core. @param {CanvasRenderingContext2D} ctx @param {Game} game @param {import('./sim.js').Beam} b @param {number} clock */
@@ -231,10 +262,11 @@ export function renderFrame(r, game, view) {
 
   // Warnings first (under everything that can hurt).
   const blink = Math.floor(view.clock * 8) % 2 === 0;
+  for (const z of game.zones) if (z.alive) drawZone(ctx, game, z, blink);
   for (const b of game.beams) {
     if (!b.alive || b.warn <= 0) continue;
     const urgency = 1 - b.warn / b.warnTotal;
-    beamWarning(ctx, game, b.px, b.py, b.angle, b.half, urgency, view.clock);
+    beamWarning(ctx, game, b.px, b.py, b.angle, b.half, urgency, view.clock, b.marker);
     // A sweep: where it will end, too (a thin line), so the safe side is plain.
     if (b.spin !== 0) beamWarning(ctx, game, b.px, b.py, b.angle + b.sweep, 0.5, urgency * 0.5, view.clock);
   }
@@ -296,7 +328,7 @@ export function renderFrame(r, game, view) {
       }
     }
   }
-  for (const b of game.beams) if (b.alive && b.warn <= 0) beamBody(ctx, game, b, view.clock);
+  for (const b of game.beams) if (b.alive && b.warn <= 0 && !b.marker) beamBody(ctx, game, b, view.clock);
 
   // Shots.
   for (const s of game.shots) {
@@ -307,6 +339,12 @@ export function renderFrame(r, game, view) {
     if (alpha < 1) ctx.globalAlpha = alpha;
     ctx.drawImage(img, Math.round(s.x - img.width / 2), Math.round(s.y - img.height / 2));
     if (alpha < 1) ctx.globalAlpha = 1;
+    if (s.kind === 'mine') {
+      // A mine's fuse: a dotted ring that tightens as it nears going off.
+      const left = Math.max(0, s.life - s.age);
+      const rad = 6 + Math.min(10, left * 6);
+      dottedCircle(ctx, s.x, s.y, rad, 12, left < 0.5 || blink ? PALETTE.r : PALETTE.R);
+    }
   }
 
   // The wisp: a soft glow, the sprite (blinking pale after a hit), the hitbox when focusing.

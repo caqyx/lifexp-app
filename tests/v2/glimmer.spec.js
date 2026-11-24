@@ -1,8 +1,9 @@
 // Świetlik (docs/v2/PLAN.md 9.1, stage gl-1): LifeXP's own endless dodge game in
 // GameHost's frame, on the Firebase emulators. Opened from Gry; the test switches
-// (?test=1 with seed=, hp=, start=, speed=) make a run repeatable and short, and the stage
-// carries the run's state in data-* for the test to read. The rules, the patterns'
-// fairness and the pacing are tested headless in v2/tests/glimmer.test.ts.
+// (?test=1 with seed=, hp=, start=, speed=, and since gl-2 pattern=) make a run repeatable
+// and short, and the stage carries the run's state in data-* for the test to read. The
+// rules, the patterns' fairness and the pacing are tested headless in v2/tests/glimmer.test.ts
+// and (the second set of obstacles, gl-2) v2/tests/glimmer-obstacles.test.ts.
 const { devices } = require('@playwright/test');
 const { test, expect, openSignedIn } = require('../support/v2');
 
@@ -229,6 +230,20 @@ test.describe('on a computer', () => {
     await game.getByRole('region', { name: 'Pauza' }).getByRole('button', { name: 'Menu' }).click();
     await expect(game.locator('#menu-best')).toHaveText(new RegExp(`^Rekord: ${best.score} pkt`));
     await expect(game.locator('#menu-best')).toBeVisible();
+    expect(problems).toEqual([]);
+  });
+
+  test('gl-2: the new obstacles come in the frame (zone, comet, mines by the test switch), with no errors', async ({ page, account }) => {
+    test.setTimeout(60000);
+    const problems = await watchProblems(page);
+    const { host, game } = await openFromList(page, account);
+    for (const id of ['zone', 'comet', 'mines']) {
+      await reopenWith(page, host, `test=1&seed=4&hp=99&pattern=${id}`);
+      await game.getByRole('button', { name: 'Graj' }).click();
+      await expect.poll(async () => (await stateOf(game)).last, { timeout: 10000 }).toBe(id);
+      if (id === 'zone') await expect.poll(async () => (await stateOf(game)).zones).toBe(1);
+      else await expect.poll(async () => (await stateOf(game)).shots).toBeGreaterThan(5);
+    }
     expect(problems).toEqual([]);
   });
 });

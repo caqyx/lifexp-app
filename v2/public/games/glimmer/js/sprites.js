@@ -1,7 +1,8 @@
 // @ts-check
 // Świetlik (Glimmer): the pixel art, drawn in code once into small canvases — the wisp
 // (a round lantern-glow with eyes and tiny wings, two wing beats), the shots (spark, drop,
-// orb, petal, seeker, the flower that spins petals), the hearts and a 3 × 5 digit font for
+// orb, petal, seeker, the flower that spins petals; since gl-2 also bouncer, mine, comet,
+// ember, splitter, snake link), the hearts and a 3 × 5 digit font for
 // the score. A one-pixel ink outline is added round every sprite, so everything reads on
 // the dark meadow. Original art, this game's own palette.
 
@@ -136,7 +137,51 @@ export function shotSprites() {
   disc(node.ctx, 'y', 7, 7, 2.4);
   px(node.ctx, 'Y', 6, 6);
 
+  // gl-2: a bouncer (a ringed cyan orb), a mine (dark shell, red heart, studs), a comet's
+  // head (white-gold), an ember (orange), a splitter (a big cracked violet orb), a snake's
+  // link (gold-green bead).
+  const bouncer = canvas(9, 9);
+  disc(bouncer.ctx, 'c', 4, 4, 3.4);
+  disc(bouncer.ctx, 'n', 4, 4, 1.6);
+  px(bouncer.ctx, 'C', 2, 2, 2, 1);
+  px(bouncer.ctx, 'w', 4, 4);
+
+  const mine = canvas(11, 11);
+  disc(mine.ctx, 'm', 5, 5, 3.4);
+  disc(mine.ctx, 'r', 5, 5, 1.5);
+  px(mine.ctx, 'R', 5, 5);
+  for (const [x, y] of [[5, 0], [0, 5], [10, 5], [5, 10], [2, 2], [8, 2], [2, 8], [8, 8]]) px(mine.ctx, 'M', x ?? 0, y ?? 0);
+
+  const cometHead = canvas(9, 9);
+  disc(cometHead.ctx, 'o', 4, 4, 3.4);
+  disc(cometHead.ctx, 'y', 4, 4, 2.2);
+  disc(cometHead.ctx, 'w', 4, 4, 1);
+
+  const ember = canvas(5, 5);
+  px(ember.ctx, 'o', 1, 1, 3, 3);
+  px(ember.ctx, 'y', 2, 1);
+  px(ember.ctx, 'r', 1, 3, 3, 1);
+
+  const splitter = canvas(11, 11);
+  disc(splitter.ctx, 'v', 5, 5, 4.4);
+  disc(splitter.ctx, 'V', 4, 4, 2);
+  px(splitter.ctx, 'P', 3, 3);
+  px(splitter.ctx, 'm', 6, 3, 1, 3);
+  px(splitter.ctx, 'm', 7, 6, 2, 1);
+  px(splitter.ctx, 'm', 3, 7, 2, 1);
+
+  const link = canvas(7, 7);
+  disc(link.ctx, 'g', 3, 3, 2.4);
+  px(link.ctx, 'y', 2, 2, 2, 2);
+  px(link.ctx, 'Y', 2, 2);
+
   return {
+    bouncer: outline(bouncer.c),
+    mine: outline(mine.c),
+    comet: outline(cometHead.c),
+    ember: outline(ember.c),
+    splitter: outline(splitter.c),
+    link: outline(link.c),
     spark: outline(spark.c),
     drop: outline(drop.c),
     orb: outline(orb.c),

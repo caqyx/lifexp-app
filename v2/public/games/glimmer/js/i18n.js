@@ -30,6 +30,7 @@ const TEXTS = {
     again: 'Jeszcze raz',
     canvas: 'Polana: świetlik i przeszkody',
     grazeHint: 'Otarcie się o iskrę bez trafienia daje dodatkowe punkty.',
+    zoneHint: 'Pomarańczowa linia to droga komety. Czerwony krąg: zostań w środku, zanim się zamknie.',
   },
   en: {
     title: 'Glimmer',
@@ -58,6 +59,7 @@ const TEXTS = {
     again: 'Play again',
     canvas: 'The meadow: the glimmer and the obstacles',
     grazeHint: 'Brushing past a spark without being hit gives extra points.',
+    zoneHint: 'An orange line is a comet’s path. A red circle: stay inside before it closes.',
   },
 };
 
@@ -93,7 +95,7 @@ function intParam(params, name, min, max) {
 /**
  * The test switches, all only with ?test=1: seed=<n> (the run's seed), hp=<n> (lives),
  * start=<s> (the clock starts at s seconds: the harder minutes at once, for the perf
- * check), speed=<n> (the clock runs n times faster). With ?test=1 the stage carries its
+ * check), speed=<n> (the clock runs n times faster), pattern=<id> (only that pattern comes). With ?test=1 the stage carries its
  * state in data-* for the tests to read.
  * @param {string} search
  */
@@ -106,5 +108,6 @@ export function testParams(search) {
     hp: on ? intParam(params, 'hp', 1, 99) : null,
     start: on ? intParam(params, 'start', 0, 3600) : null,
     speed: on ? intParam(params, 'speed', 1, 20) : null,
+    pattern: on && /^[a-z]{3,12}$/.test(params.get('pattern') ?? '') ? params.get('pattern') : null,
   };
 }
