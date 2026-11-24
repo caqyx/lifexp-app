@@ -15,6 +15,7 @@ export const LATER_MODULES: readonly { pattern: RegExp; why: string }[] = [
   { pattern: /\/src\/i18n\/en\.json$/, why: 'English is its own chunk (i18n/index.ts loadLanguage)' },
   { pattern: /node_modules\/(?:marked|dompurify)\//, why: 'Markdown loads with the first note (dynamic import)' },
   { pattern: /node_modules\/(?:pdfjs-dist|jszip)\//, why: "the opt-in reader's libraries load with the reader" },
+  { pattern: /\/src\/ui\/glass\/(?:lens\.tsx|map\.ts)$/, why: 'the liquid glass lens loads only in refract mode (ui/glass/registry.ts)' },
 ];
 
 export interface BuiltChunk {

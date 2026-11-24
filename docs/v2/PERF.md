@@ -88,6 +88,39 @@ Czytnik 72 / 25 (+28 kB CSS). Firebase 395 / 117 kB. Precache Service Workera 18
   renderu; otwarcie menu bez odczytów układu wierszy listy; bezczynne Dziś bez zmian DOM przez 5 s. Liczy rzeczy
   niezależne od szybkości maszyny — testu z progami czasu w CI nie ma (byłby niestabilny).
 
+## Liquid glass (ios-2, 2026-11-24)
+
+Więcej szkła w motywie iOS (`PLAN.md` 9.1, wiersz ios-2) przy warunku „bez regresji ponad szum”. Pomiar jak wyżej
+(Pixel 7, CPU 4×, motyw iOS jasny, tryb z załamaniem), „przed” = `main` 239d249 i „po” naprzemiennie w jednym przebiegu,
+3 powtórzenia; podano zakres. Liczby klatek z `requestAnimationFrame`; GPU w piaskownicy to SwiftShader (programowy),
+więc koszt filtrów jest tu zawyżony względem telefonu.
+
+| Miara | Przed | Po | Po, samo rozmycie (słabe urządzenie) |
+|---|---|---|---|
+| Przewijanie Dziś (6 rzutów, baner powiadomienia na ekranie): p95 / klatki > 33 ms | 16,7–16,8 / 0 | 16,7 / 0 | 16,8 / 0 |
+| Menu otwarte i zamknięte ×3 (~610 klatek): klatki > 33 ms | 6–12 | 2–10 | 6–12 |
+| Arkusz „+” ×3 (~285 klatek): p95 / klatki > 33 ms | 33,3–33,4 / 6–10 | 33,4 / 7–10 | 16,8 / 4–12 |
+| Przełącznik widoków Pieniędzy, 6 przełączeń: p95 / klatki > 33 ms | 16,8 / 1–4 | 16,7–16,8 / 2–3 | 16,7–16,8 / 0–1 |
+| Filtry SVG zamontowane po całym przebiegu | 5 | 5 (limit 8) | 0 |
+| JS startu (wejście + modulepreload, surowe) | 230,8 kB | 230,3 kB (soczewka 2,7 kB we własnym chunku) | — |
+| CSS startu (surowe) | 52,4 kB | 54,5 kB (budżet 56 KiB) | — |
+
+Przy obciążonej maszynie (inny agent uruchamiał testy) pojedyncze przebiegi „po” dawały 1–2 długie klatki przy
+przewijaniu i do 34 przy arkuszu, a „przed” do 17 — rozrzut tej samej wielkości po obu stronach, więc to szum.
+Długie klatki arkusza są też bez szkła (natywne `showModal`, sekcja wyżej).
+
+Co trzyma koszt w miejscu, choć szkła jest więcej:
+
+- Nowe kontrolki na szkle (dzwonek, kciuk segmentów, przyciski arkusza i dialogu) nie mają własnego `backdrop-filter`:
+  połysk i krawędź są rysowane, koszt na klatkę zerowy. Soczewkę dostał tylko „Wyjdź” w pełnym ekranie czytnika.
+- Filtr w jednostkach elementu (`objectBoundingBox`) i kubełki rozmiaru: toasty, banery i arkusze różnej wysokości
+  dzielą filtry; najwyżej 8 żywych, 3 nieużywane czekają na ponowne otwarcie; mapy w pamięci.
+- Filtr tylko dla elementu na ekranie (`IntersectionObserver`); nowa mapa w bezczynności, nigdy w klatce animacji.
+- Kod soczewki ładuje się tylko w trybie z załamaniem; inne motywy, Safari, Firefox i słabe urządzenia go nie pobierają
+  (`tests/v2/glass.spec.js`, strażnik w `tools/bundle-budget.ts`).
+- Wstrzymywanie soczewki na czas przewijania sprawdzone i odrzucone: przewijanie z soczewką i z samym rozmyciem jest
+  takie samo (0 długich klatek), a podmiana filtra w ruchu mrugałaby.
+
 ## Co zostaje (świadomie nie ruszone)
 
 - Firebase (Auth + Firestore) to 395 kB surowo / 117 kB gzip — największy plik startu; przypięty do 10.12.x i

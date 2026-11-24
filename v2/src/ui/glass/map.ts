@@ -1,33 +1,14 @@
 // Liquid glass, the lens (iOS theme, docs/v2/PLAN.md 4.9): displacement maps for an
 // SVG feDisplacementMap that bends what is behind a floating bar near its rim, like
 // light through a convex glass edge. Pure functions only: the canvas encoding and
-// the <filter> elements live in registry.ts and GlassFilters.tsx.
+// the <filter> elements live in lens.ts; both load only in refract mode.
 //
 // The map is an RGBA image the size of the element: R moves the sampled point
 // horizontally, G vertically, 128 = no move (feDisplacementMap: P'(x) = P(x + scale ·
 // (C − 0.5))). Every point samples INWARD, towards the middle, so the filter never
 // reads outside the element's own backdrop, and the middle stays a clear window.
 
-/** Which sides of the element are glass edges; a bar glued to the screen edge has three off. */
-export interface GlassEdges {
-  top: boolean;
-  right: boolean;
-  bottom: boolean;
-  left: boolean;
-}
-
-export const ALL_EDGES: GlassEdges = { top: true, right: true, bottom: true, left: true };
-
-export interface GlassShape {
-  /** Element size in CSS px (whole pixels). */
-  width: number;
-  height: number;
-  /** Corner radius in CSS px; clamped to half the shorter side (a pill). */
-  radius: number;
-  /** How far in from the rim the glass curves, CSS px. Past it the glass is flat. */
-  bezel: number;
-  edges: GlassEdges;
-}
+import type { GlassShape } from './bucket';
 
 /** Index of refraction of the glass: 1.5 is window glass. */
 const IOR = 1.5;
@@ -125,26 +106,9 @@ export function displacementMap(
 }
 
 /** Map pixels kept under this many; bigger panels get a coarser map (it is smooth anyway). */
-const MAX_MAP_PIXELS = 160_000;
+const MAX_MAP_PIXELS = 80_000;
 
 export function mapStep(width: number, height: number): number {
   const area = width * height;
   return area <= MAX_MAP_PIXELS ? 1 : Math.ceil(Math.sqrt(area / MAX_MAP_PIXELS));
-}
-
-/** A computed radius ("12px", "999px", "50%", "16px 16px") → px for this element. */
-export function parseRadius(value: string, width: number, height: number): number {
-  const first = value.trim().split(/\s+/)[0] ?? '';
-  const n = Number.parseFloat(first);
-  if (!Number.isFinite(n) || n < 0) return 0;
-  const px = first.endsWith('%') ? (n / 100) * Math.min(width, height) : n;
-  return Math.min(px, Math.min(width, height) / 2);
-}
-
-/** One filter per distinct shape and strength: the id doubles as the cache key. */
-export function glassFilterId(shape: GlassShape, scale: number): string {
-  const e = shape.edges;
-  const mask = (e.top ? 1 : 0) | (e.right ? 2 : 0) | (e.bottom ? 4 : 0) | (e.left ? 8 : 0);
-  const r = Math.round(Math.min(shape.radius, shape.width / 2, shape.height / 2));
-  return `ui-glass-${shape.width}x${shape.height}-r${r}-b${Math.round(shape.bezel)}-e${mask}-s${Math.round(scale)}`;
 }

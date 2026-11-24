@@ -224,6 +224,12 @@
     inset calc(-1 * var(--glass-light-x)) calc(-1 * var(--glass-light-y)) 0 -0.5px var(--glass-rim-light-2),
     inset 0 0 0 0.5px var(--glass-edge),
     inset 0 0 18px var(--glass-glow);
+  /* Controls on glass (bell, segmented thumb, sheet and dialog buttons): the same light,
+     no inner glow (it would fill a small capsule). No backdrop filter of their own. */
+  --glass-rim-control:
+    inset var(--glass-light-x) var(--glass-light-y) 0 -0.5px var(--glass-rim-light),
+    inset calc(-1 * var(--glass-light-x)) calc(-1 * var(--glass-light-y)) 0 -0.5px var(--glass-rim-light-2),
+    inset 0 0 0 0.5px var(--glass-edge);
 }
 
 /* Fallback without the lens (Safari, Firefox): more blur and tint carry the separation. */
@@ -268,6 +274,9 @@
   --glass-edge: rgb(0 0 0 / 7%);
   --glass-glow: rgb(255 255 255 / 30%);
   --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 45%) 0%, rgb(255 255 255 / 0%) 55%);
+  /* Faded out before the middle, where a control's label sits. */
+  --glass-sheen-control: linear-gradient(180deg, rgb(255 255 255 / 28%) 0%, rgb(255 255 255 / 0%) 45%);
+  --glass-control: rgb(255 255 255 / 62%);
   --glass-shadow: 0 10px 30px rgb(0 0 0 / 12%), 0 1px 3px rgb(0 0 0 / 6%);
 }
 
@@ -311,6 +320,8 @@
   --glass-edge: rgb(255 255 255 / 9%);
   --glass-glow: rgb(255 255 255 / 5%);
   --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 10%) 0%, rgb(255 255 255 / 0%) 55%);
+  --glass-sheen-control: linear-gradient(180deg, rgb(255 255 255 / 14%) 0%, rgb(255 255 255 / 0%) 45%);
+  --glass-control: rgb(255 255 255 / 10%);
   --glass-shadow: 0 10px 30px rgb(0 0 0 / 50%), 0 1px 3px rgb(0 0 0 / 40%);
 }
 
