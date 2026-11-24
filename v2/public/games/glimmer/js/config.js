@@ -37,7 +37,7 @@ export const SAFE_RADIUS = 46;
  */
 export const SPAWN_CLEAR = 24;
 
-export const POOLS = { shots: 900, beams: 24, walls: 12 };
+export const POOLS = { shots: 1200, beams: 32, walls: 12, zones: 2 };
 
 /**
  * The director: a new pattern every `gap` seconds (shrinking with time down to minGap), a

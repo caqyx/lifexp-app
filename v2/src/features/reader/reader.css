@@ -1161,6 +1161,23 @@
   padding-top: max(6px, env(safe-area-inset-top));
 }
 
+/* Liquid glass (iOS theme): a glass capsule tinted with the page (Papier or Noc), fully
+   visible instead of see-through; the material and lens come from ui/glass. */
+:root[data-glass] .reader__fs-exit.ui-glass {
+  --glass-fill: color-mix(in srgb, var(--r-bg) 58%, transparent);
+  border: 0;
+  background-image: var(--glass-sheen-control);
+  color: var(--r-ink);
+  opacity: 1;
+  box-shadow:
+    var(--glass-rim-control),
+    0 4px 14px rgb(0 0 0 / 18%);
+}
+
+:root[data-glass='solid'] .reader__fs-exit.ui-glass {
+  --glass-fill: var(--r-bg);
+}
+
 /* The side buttons start below the exit button, so the two never overlap. */
 .reader[data-fullscreen='true'] .spread__side {
   padding-top: 48px;

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { ALL_EDGES, bevelShift, displacementMap, edgePoint, glassFilterId, mapStep, NEUTRAL, parseRadius, type GlassShape } from './map';
+import { ALL_EDGES, type GlassShape } from './bucket';
+import { bevelShift, displacementMap, edgePoint, mapStep, NEUTRAL } from './map';
 
 const pill: GlassShape = { width: 200, height: 60, radius: 30, bezel: 20, edges: ALL_EDGES };
 const px = (map: ReturnType<typeof displacementMap>, x: number, y: number) => {
@@ -81,22 +82,7 @@ describe('displacement map', () => {
     const step = mapStep(1000, 800);
     expect(step).toBeGreaterThan(1);
     const coarse = displacementMap({ ...pill, width: 1000, height: 800, radius: 28 }, step);
-    expect(coarse.width * coarse.height).toBeLessThanOrEqual(160_000);
+    expect(coarse.width * coarse.height).toBeLessThanOrEqual(80_000);
     expect(px(coarse, Math.floor(coarse.width / 2), 0)[1]).toBeGreaterThan(160);
-  });
-});
-
-describe('helpers', () => {
-  test('radius from computed style, clamped to a pill', () => {
-    expect(parseRadius('12px', 100, 50)).toBe(12);
-    expect(parseRadius('999px', 300, 64)).toBe(32);
-    expect(parseRadius('50%', 40, 40)).toBe(20);
-    expect(parseRadius('28px 28px 0px 0px', 300, 400)).toBe(28);
-    expect(parseRadius('', 10, 10)).toBe(0);
-  });
-
-  test('filter id names size, shape and strength (cache key)', () => {
-    expect(glassFilterId(pill, 18)).toBe('ui-glass-200x60-r30-b20-e15-s18');
-    expect(glassFilterId({ ...pill, edges: { top: false, right: false, bottom: true, left: false } }, 18)).toContain('-e4-');
   });
 });

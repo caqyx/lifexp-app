@@ -1,11 +1,12 @@
-// Gives a floating element (with class "ui-glass") its lens in refract mode: watches
-// its size, asks for the filter of exactly that size and points the CSS variable
-// --glass-refract at it (glass.css puts it first in backdrop-filter). Outside
-// refract mode it does nothing; the blur/solid material is pure CSS.
+// Gives a floating element (with class "ui-glass") its lens in refract mode. Only
+// while it is on screen (IntersectionObserver): it asks for the shared filter of its
+// size bucket and points --glass-refract at it once the filter exists (glass.css puts
+// it first in backdrop-filter). Off screen, hidden or closed, it gives the filter back
+// and keeps the blur material. Outside refract mode it does nothing.
 import type { RefObject } from 'preact';
 import { useLayoutEffect } from 'preact/hooks';
-import { ALL_EDGES, parseRadius, type GlassEdges } from './map';
-import { acquireGlassFilter, glassModeSignal, releaseGlassFilter } from './registry';
+import { ALL_EDGES, glassSpec, parseRadius, type GlassEdges } from './bucket';
+import { acquireGlass, glassModeSignal, type GlassHandle } from './registry';
 
 export interface LiquidGlassOptions {
   /** Glass sides; default all four. A bar along the screen edge bends only its free side. */
@@ -30,38 +31,51 @@ export function useLiquidGlass(ref: RefObject<HTMLElement>, options: LiquidGlass
   useLayoutEffect(() => {
     const el = ref.current;
     if (!refract || !el) return;
-    let current: string | null = null;
-    let lastKey = '';
+    let handle: GlassHandle | null = null;
+    let visible = false;
+
+    const drop = () => {
+      handle?.release();
+      handle = null;
+      el.style.removeProperty('--glass-refract');
+    };
+
     const update = () => {
       // Layout size: a transform (sheet sliding, press scale) never changes the map.
-      const width = Math.round(el.offsetWidth);
-      const height = Math.round(el.offsetHeight);
-      if (width < 4 || height < 4) {
-        // Hidden (a closed dialog): give the filter back until it shows again.
-        if (current) releaseGlassFilter(current);
-        current = null;
-        lastKey = '';
-        el.style.removeProperty('--glass-refract');
-        return;
-      }
+      const width = el.offsetWidth;
+      const height = el.offsetHeight;
+      if (!visible || width < 4 || height < 4) return drop();
       const radius = parseRadius(getComputedStyle(el).borderTopLeftRadius, width, height);
       const b = bezel ?? Math.max(6, Math.min(24, Math.min(width, height) / 3));
-      const s = scale ?? b * 1.8;
-      const key = `${width}x${height}r${radius}b${b}s${s}c${chroma}${edgeKey}`;
-      if (key === lastKey) return;
-      lastKey = key;
-      const id = acquireGlassFilter({ width, height, radius, bezel: b, edges }, s, chroma);
-      if (current) releaseGlassFilter(current);
-      current = id;
-      el.style.setProperty('--glass-refract', `url(#${id})`);
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
+      const spec = glassSpec({ width, height, radius, bezel: b, edges }, scale ?? b * 1.8, chroma);
+      if (handle?.id === spec.id) return; // same bucket: nothing to do
+      const previous = handle;
+      // Until the new filter exists: the blur material, never a url() to a filter that went.
       el.style.removeProperty('--glass-refract');
-      if (current) releaseGlassFilter(current);
+      const request = { live: true };
+      handle = acquireGlass(spec, () => {
+        if (request.live) el.style.setProperty('--glass-refract', `url(#${spec.id})`);
+      });
+      const release = handle?.release;
+      if (handle && release) handle.release = () => ((request.live = false), release());
+      previous?.release();
+    };
+
+    const resize = new ResizeObserver(update);
+    resize.observe(el);
+    const intersection = new IntersectionObserver(
+      (records) => {
+        const record = records[records.length - 1];
+        visible = record?.isIntersecting ?? false;
+        update();
+      },
+      { rootMargin: '64px' },
+    );
+    intersection.observe(el);
+    return () => {
+      resize.disconnect();
+      intersection.disconnect();
+      drop();
     };
   }, [refract, edgeKey, bezel, scale, chroma]);
 }

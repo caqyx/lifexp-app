@@ -1,6 +1,7 @@
 import '@fontsource-variable/manrope';
 import '@/ui/tokens.css';
 import '@/ui/base.css';
+import '@/ui/glass/glass.css';
 import '@/app/shell.css';
 import { effect } from '@preact/signals';
 import { render } from 'preact';

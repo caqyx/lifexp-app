@@ -177,7 +177,7 @@ function startRun() {
   state.screen = 'play';
   layout();
   const seed = test.seed ?? randomSeed();
-  state.game = createGame({ width: state.art.width, height: state.art.height, seed, hp: test.hp ?? undefined, start: test.start ?? 0 });
+  state.game = createGame({ width: state.art.width, height: state.art.height, seed, hp: test.hp ?? undefined, start: test.start ?? 0, pattern: test.pattern ?? undefined });
   resetRenderer(renderer, state.game);
   Object.assign(input, createInput());
   keys.clear();
@@ -337,6 +337,8 @@ function writeTestData() {
   d.y = g.player.y.toFixed(1);
   d.grazes = String(g.grazes);
   d.patterns = String(g.patternsStarted);
+  d.last = g.lastPattern;
+  d.zones = String(g.zones.filter((z) => z.alive).length);
   d.focus = String(g.player.focus);
 }
 

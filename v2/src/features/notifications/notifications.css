@@ -64,6 +64,22 @@
   animation: notice-count-in var(--duration-enter) var(--ease-spring);
 }
 
+/* Liquid glass (iOS theme): a glass capsule on the glass top bar, like an iOS 26 bar
+   button (material only, see ui/glass/glass.css "Controls on glass"). */
+:root[data-glass] .notice-bell {
+  background: var(--glass-sheen-control), var(--glass-control);
+  box-shadow: var(--glass-rim-control);
+}
+
+:root[data-glass] .notice-bell:hover {
+  background: var(--glass-sheen-control), var(--glass-selected);
+}
+
+:root[data-glass='solid'] .notice-bell {
+  background: transparent;
+  box-shadow: none;
+}
+
 /* A new unread reminder: the bell swings once (rotation is a transform). */
 @keyframes notice-bell-ring {
   20% {
@@ -171,4 +187,8 @@
 .notice-row__body {
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
+}
+
+:root[data-glass] .notice-bell:active {
+  transform: scale(1.06);
 }

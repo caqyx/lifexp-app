@@ -10,11 +10,17 @@
 // than the wisp; a sweep covers a wedge, never the whole arena.
 
 import { SAFE_RADIUS } from './config.js';
+import { OBSTACLES } from './obstacles.js';
+import { edgePoint, farPoint } from './places.js';
 import { int, next, pick, range } from './rng.js';
 import { addBeam, addShot, addWall, emit, speedFactor } from './sim.js';
 
 /** @typedef {import('./sim.js').Game} Game */
-/** @typedef {'aimed' | 'rain' | 'ring' | 'spiral' | 'beams' | 'sweep' | 'walls' | 'seekers'} PatternId */
+/**
+ * @typedef {'aimed' | 'rain' | 'ring' | 'spiral' | 'beams' | 'sweep' | 'walls' | 'seekers'
+ *   | 'snake' | 'bouncers' | 'splitters' | 'mines' | 'comet' | 'pinwheel' | 'grid' | 'zone'} PatternId
+ * @typedef {{ from: number, weight: number, run: (game: Game, level: number) => void, area?: boolean, exclusive?: boolean }} PatternDef
+ */
 
 const WARN = 0.95;
 const MIN_WARN = 0.65;
@@ -25,42 +31,6 @@ export const RING_GAP = 4;
 
 /** How long beams and walls warn at a level (shorter as it grows, never under MIN_WARN). @param {number} level */
 const warnFor = (level) => Math.max(MIN_WARN, WARN - level * 0.04);
-
-/**
- * A point just outside the arena, on a random side (shots aimed inward from it).
- * @param {Game} game @returns {{ x: number, y: number, side: number }}
- */
-function edgePoint(game) {
-  const w = game.width;
-  const h = game.height;
-  const p = game.player;
-  // A few tries for a point not beside the wisp (it may be hugging an edge).
-  for (let tries = 0; tries < 12; tries++) {
-    const side = int(game.rng, 0, 3);
-    const along = range(game.rng, 0, side % 2 === 0 ? w : h);
-    const point =
-      side === 0 ? { x: along, y: -8, side } : side === 1 ? { x: w + 8, y: along, side } : side === 2 ? { x: along, y: h + 8, side } : { x: -8, y: along, side };
-    if (Math.hypot(point.x - p.x, point.y - p.y) >= SAFE_RADIUS) return point;
-  }
-  // None far enough (the wisp in a corner, bad luck): the opposite corner, outside.
-  return { x: p.x < w / 2 ? w + 8 : -8, y: p.y < h / 2 ? h + 8 : -8, side: p.x < w / 2 ? 1 : 3 };
-}
-
-/**
- * A point inside the arena at least `away` from the wisp (from the corners inward if the
- * wisp is in the middle of a small arena), for emitters and ring centres.
- * @param {Game} game @param {number} away
- */
-export function farPoint(game, away) {
-  const p = game.player;
-  for (let tries = 0; tries < 24; tries++) {
-    const x = range(game.rng, 20, game.width - 20);
-    const y = range(game.rng, 20, game.height - 20);
-    if (Math.hypot(x - p.x, y - p.y) >= away) return { x, y };
-  }
-  // The corner farthest from the wisp.
-  return { x: p.x < game.width / 2 ? game.width - 16 : 16, y: p.y < game.height / 2 ? game.height - 16 : 16 };
-}
 
 /** A fan of sparks from an edge toward the wisp, in volleys. @param {Game} game @param {number} level */
 function aimed(game, level) {
@@ -189,17 +159,22 @@ function seekers(game, level) {
   }
 }
 
-/** The patterns by id, with the time from which each comes and its weight. */
-export const PATTERNS = /** @type {const} */ ({
+/**
+ * The patterns by id, with the time from which each comes and its weight (the first set
+ * here, the second from js/obstacles.js); `area`: beams, walls or a zone (see there).
+ * @type {Readonly<Record<PatternId, PatternDef>>}
+ */
+export const PATTERNS = {
   aimed: { from: 0, weight: 3, run: aimed },
   rain: { from: 0, weight: 2, run: rain },
   ring: { from: 0, weight: 2, run: ring },
   spiral: { from: 14, weight: 2, run: spiral },
   seekers: { from: 18, weight: 2, run: seekers },
-  beams: { from: 28, weight: 2, run: beams },
-  walls: { from: 36, weight: 2, run: walls },
-  sweep: { from: 50, weight: 2, run: sweep },
-});
+  beams: { from: 28, weight: 2, run: beams, area: true },
+  walls: { from: 36, weight: 2, run: walls, area: true },
+  sweep: { from: 50, weight: 2, run: sweep, area: true },
+  ...OBSTACLES,
+};
 
 /** @type {readonly PatternId[]} */
 export const PATTERN_IDS = /** @type {PatternId[]} */ (Object.keys(PATTERNS));

@@ -1,7 +1,11 @@
 /*
  * Liquid glass material (iOS theme; <html data-glass="refract|blur|solid">, set by
- * ui/glass/registry.ts). Only floating chrome carries the class "ui-glass": bars,
- * sheets, dialogs, toasts. Without data-glass the class does nothing.
+ * ui/glass/registry.ts). iOS 26 rule: glass is the layer of controls and navigation
+ * floating over content, never content cards or lists. Floating chrome carries the
+ * class "ui-glass" (filtered backdrop, lens in refract mode): top bar, tab bar, sheets,
+ * dialogs, toasts, banners, the reader's full-screen exit. Controls sitting on that
+ * glass (bell, segmented thumb, sheet and dialog buttons; below) get the material
+ * without a filter. Without data-glass none of this applies.
  *
  * refract: url(#filter) bends the backdrop at the rim (useLiquidGlass sets
  *          --glass-refract), then blur + saturation.
@@ -59,5 +63,57 @@
 
   :root[data-glass] .ui-glass--panel {
     --glass-fill: var(--color-surface);
+  }
+}
+
+/* ── Controls on glass (iOS 26): capsules with the same light, no backdrop filter ──
+   They sit on a glass bar or panel (whose backdrop-filter makes it the backdrop root of
+   everything inside), so a lens of their own would only bend the panel's tint: the
+   material is drawn, not filtered, and costs nothing per frame. */
+
+:root[data-glass] :is(.ui-sheet__footer, .ui-confirm__actions) .ui-button {
+  border-radius: var(--radius-pill);
+}
+
+:root[data-glass] :is(.ui-sheet__footer, .ui-confirm__actions) .ui-button--primary {
+  background: var(--glass-sheen-control), var(--color-accent);
+  box-shadow:
+    var(--glass-rim-control),
+    0 4px 14px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+:root[data-glass] :is(.ui-sheet__footer, .ui-confirm__actions) .ui-button--secondary {
+  border-color: transparent;
+  background: var(--glass-sheen-control), var(--glass-control);
+  box-shadow: var(--glass-rim-control);
+}
+
+:root[data-glass] :is(.ui-sheet__footer, .ui-confirm__actions) .ui-button:active:not(:disabled) {
+  transform: scale(1.04);
+}
+
+/* Segmented control and view switch: a capsule track, the thumb a piece of glass. */
+:root[data-glass] :is(.ui-segmented__track, .ui-view-switch) {
+  border-radius: var(--radius-pill);
+}
+
+:root[data-glass] :is(.ui-segmented__thumb, .ui-view-switch__thumb, .ui-segmented__label, .ui-view-switch__link) {
+  border-radius: var(--radius-pill);
+}
+
+:root[data-glass] :is(.ui-segmented__thumb, .ui-view-switch__thumb) {
+  background: var(--glass-sheen-control), var(--color-thumb);
+  box-shadow:
+    var(--glass-rim-control),
+    0 2px 8px rgb(0 0 0 / 12%);
+}
+
+:root[data-glass='solid'] :is(.ui-sheet__footer, .ui-confirm__actions) .ui-button--secondary {
+  background: var(--color-surface-raised);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-glass] :is(.ui-sheet__footer, .ui-confirm__actions) .ui-button--secondary {
+    background: var(--color-surface-raised);
   }
 }

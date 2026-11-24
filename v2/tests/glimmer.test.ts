@@ -1,7 +1,8 @@
 // Świetlik's pure parts (docs/v2/PLAN.md 9.1, stage gl-1): the game is plain ES modules in
 // public/games/glimmer (no build step, its own CSP), and these tests import the same files
 // the game runs: the seeded generator, the step (movement, hits, grazes, score), the
-// patterns' fairness, the director's pacing, the records and the texts.
+// patterns' fairness, the director's pacing, the records and the texts. The second set of
+// obstacles (gl-2) is in glimmer-obstacles.test.ts.
 import { describe, expect, test } from 'vitest';
 import { DIRECTOR, DT, PLAYER, SAFE_RADIUS, SCORE, SPAWN_CLEAR } from '../public/games/glimmer/js/config.js';
 import { createRng, int, next, range } from '../public/games/glimmer/js/rng.js';
@@ -277,12 +278,14 @@ describe('the patterns are fair', () => {
           game.player.y = y as number;
           runPattern(game, id as PatternId, 3);
           for (const s of game.shots) {
-            if (!s.alive || s.harmless) continue;
+            // A comet and its embers fly along a marked path instead (glimmer-obstacles.test.ts).
+            if (!s.alive || s.harmless || s.kind === 'comet' || s.kind === 'ember') continue;
             expect(Math.hypot(s.x - game.player.x, s.y - game.player.y)).toBeGreaterThanOrEqual(SAFE_RADIUS);
           }
-          // Beams and walls warn first, long enough to see.
+          // Beams, walls and zones warn first, long enough to see.
           for (const b of game.beams) if (b.alive) expect(b.warn).toBeGreaterThanOrEqual(0.65);
           for (const wall of game.walls) if (wall.alive) expect(wall.warn).toBeGreaterThanOrEqual(0.65);
+          for (const zone of game.zones) if (zone.alive) expect(zone.warn).toBeGreaterThanOrEqual(0.65);
         }
       }
     }
@@ -498,8 +501,9 @@ describe('texts and test switches', () => {
   });
 
   test('the switches work only with ?test=1, within bounds', () => {
-    expect(testParams('?seed=5&hp=1')).toEqual({ on: false, seed: null, hp: null, start: null, speed: null });
-    expect(testParams('?test=1&seed=5&hp=0&start=99999&speed=50')).toEqual({ on: true, seed: 5, hp: 1, start: 3600, speed: 20 });
+    expect(testParams('?seed=5&hp=1&pattern=zone')).toEqual({ on: false, seed: null, hp: null, start: null, speed: null, pattern: null });
+    expect(testParams('?test=1&seed=5&hp=0&start=99999&speed=50&pattern=comet')).toEqual({ on: true, seed: 5, hp: 1, start: 3600, speed: 20, pattern: 'comet' });
+    expect(testParams('?test=1&pattern=<b>').pattern).toBeNull();
     expect(testParams('?test=1&seed=abc').seed).toBeNull();
   });
 });

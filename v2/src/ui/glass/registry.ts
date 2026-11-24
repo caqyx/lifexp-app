@@ -1,92 +1,201 @@
 // Liquid glass state: the mode on <html data-glass> and the SVG filters in use.
-// Elements ask for a filter of their exact size (useLiquidGlass); equal sizes share
-// one, and encoded maps stay cached, so resizing back and forth costs nothing.
+//
+// Budget (owner: "more glass, but optimised"): elements share filters by size bucket
+// (bucket.ts), at most MAX_FILTERS live at once (an element past the cap keeps the
+// blur material), the last few unused ones stay mounted for the next opening, maps are
+// cached, and building a new map waits for an idle moment, never a frame of an
+// animation. The refracting code (lens.ts) loads only in refract mode.
 import { signal } from '@preact/signals';
-import { displacementMap, glassFilterId, mapStep, type GlassShape } from './map';
+import type { GlassSpec } from './bucket';
 import { glassMode, probeGlass, SOLID_GLASS_QUERIES, type GlassMode } from './support';
 
-export interface GlassFilter {
-  id: string;
-  width: number;
-  height: number;
+type Lens = typeof import('./lens');
+
+export interface MountedFilter {
+  spec: GlassSpec;
   /** PNG data URL of the displacement map. */
   map: string;
-  /** Strongest shift at the rim, CSS px. */
-  scale: number;
-  /** Extra shift of red over blue at the rim (chromatic edge), CSS px; 0 = none. */
-  chroma: number;
 }
 
 /** The current glass mode; 'off' outside the iOS theme. */
 export const glassModeSignal = signal<GlassMode>('off');
+/** Filters ready to use, rendered by GlassFilters. */
+export const glassFilters = signal<readonly MountedFilter[]>([]);
+/** lens.ts once loaded (refract mode only). */
+export const lensModule = signal<Lens | null>(null);
 
-/** Filters mounted by GlassFilters. */
-export const glassFilters = signal<readonly GlassFilter[]>([]);
+/** Distinct filters alive at once (in use + kept for reuse). */
+export const MAX_FILTERS = 8;
+/** Unused filters kept mounted (a sheet opened again reuses its own). */
+export const IDLE_FILTERS = 3;
+const MAP_CACHE_SIZE = 16;
 
-const users = new Map<string, number>();
-/** Filters nobody uses right now, oldest first; up to IDLE_FILTERS stay mounted. */
-const idle = new Set<string>();
-const IDLE_FILTERS = 4;
-/** Encoded maps, most recently used last. */
+interface Entry {
+  spec: GlassSpec;
+  users: number;
+  map: string | null;
+  waiting: Set<() => void>;
+}
+
+/** Least recently used first. */
+const entries = new Map<string, Entry>();
 const mapCache = new Map<string, string>();
-const MAP_CACHE_SIZE = 24;
+let lensLoading: Promise<Lens> | null = null;
 
-function encodeMap(shape: GlassShape): string {
-  const step = mapStep(shape.width, shape.height);
-  const { width, height, data } = displacementMap(shape, step);
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  canvas.getContext('2d')?.putImageData(new ImageData(data, width, height), 0, 0);
-  return canvas.toDataURL('image/png');
+function loadLens(): Promise<Lens> {
+  lensLoading ??= import('./lens').then((lens) => {
+    lensModule.value = lens;
+    return lens;
+  });
+  return lensLoading;
 }
 
-function cachedMap(key: string, shape: GlassShape): string {
-  let url = mapCache.get(key);
-  if (url) mapCache.delete(key);
-  else url = encodeMap(shape);
-  mapCache.set(key, url);
-  while (mapCache.size > MAP_CACHE_SIZE) mapCache.delete(mapCache.keys().next().value as string);
-  return url;
+function whenIdle(task: () => void) {
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(task, { timeout: 300 });
+  else setTimeout(task, 32);
 }
 
-/** A filter for this shape and strength; call releaseGlassFilter(id) when done with it. */
-export function acquireGlassFilter(shape: GlassShape, scale: number, chroma: number): string {
-  const id = `${glassFilterId(shape, scale)}-c${Math.round(chroma * 10)}`;
-  const count = users.get(id) ?? 0;
-  users.set(id, count + 1);
-  idle.delete(id);
-  if (count === 0 && !glassFilters.value.some((f) => f.id === id)) {
-    const filter: GlassFilter = { id, width: shape.width, height: shape.height, map: cachedMap(id, shape), scale, chroma };
-    glassFilters.value = [...glassFilters.value, filter];
+function publish() {
+  glassFilters.value = [...entries.values()].flatMap((e) => (e.map ? [{ spec: e.spec, map: e.map }] : []));
+}
+
+/** Drops unused filters past the idle allowance (and, if `room`, one more to make space). */
+function evict(room: boolean): boolean {
+  const unused = [...entries.values()].filter((e) => e.users === 0);
+  let changed = false;
+  while (unused.length > IDLE_FILTERS || (room && entries.size >= MAX_FILTERS && unused.length > 0)) {
+    const oldest = unused.shift();
+    if (!oldest) break;
+    entries.delete(oldest.spec.id);
+    changed = true;
   }
-  return id;
+  return changed;
 }
 
-export function releaseGlassFilter(id: string): void {
-  const count = users.get(id) ?? 0;
-  if (count > 1) {
-    users.set(id, count - 1);
-    return;
-  }
-  users.delete(id);
-  // Kept mounted for a while: a sheet opened again reuses its filter instead of
-  // building it (and decoding its map) during the opening animation.
-  idle.add(id);
-  if (idle.size <= IDLE_FILTERS) return;
-  const oldest = idle.values().next().value as string;
-  idle.delete(oldest);
-  glassFilters.value = glassFilters.value.filter((f) => f.id !== oldest);
+function build(entry: Entry) {
+  void loadLens().then((lens) =>
+    whenIdle(() => {
+      if (entries.get(entry.spec.id) !== entry) return; // evicted meanwhile
+      let map = mapCache.get(entry.spec.id);
+      if (map) mapCache.delete(entry.spec.id);
+      else map = lens.encodeMap(entry.spec);
+      mapCache.set(entry.spec.id, map);
+      while (mapCache.size > MAP_CACHE_SIZE) mapCache.delete(mapCache.keys().next().value as string);
+      entry.map = map;
+      publish();
+      // The <filter> is in the DOM by the next frame (Preact renders in a microtask).
+      requestAnimationFrame(() => {
+        for (const ready of entry.waiting) ready();
+        entry.waiting.clear();
+      });
+    }),
+  );
 }
+
+export interface GlassHandle {
+  id: string;
+  release(): void;
+}
+
+/**
+ * The shared filter for `spec`. `onReady` runs once its <filter> exists (at once if
+ * it already does). Null when MAX_FILTERS are all in use: stay with the blur material.
+ */
+export function acquireGlass(spec: GlassSpec, onReady: () => void): GlassHandle | null {
+  let entry = entries.get(spec.id);
+  if (!entry) {
+    if (entries.size >= MAX_FILTERS && evict(true)) publish();
+    if (entries.size >= MAX_FILTERS) return null;
+    entry = { spec, users: 0, map: null, waiting: new Set() };
+    build(entry);
+  }
+  entries.delete(spec.id);
+  entries.set(spec.id, entry); // most recently used
+  entry.users += 1;
+  const own = entry;
+  let waiter: (() => void) | null = null;
+  if (own.map) onReady();
+  else {
+    waiter = () => onReady(); // one per request, even for the same callback
+    own.waiting.add(waiter);
+  }
+  let released = false;
+  return {
+    id: spec.id,
+    release() {
+      if (released) return;
+      released = true;
+      if (waiter) own.waiting.delete(waiter);
+      own.users -= 1;
+      if (own.users === 0 && evict(false)) publish();
+    },
+  };
+}
+
+/** For tests: how many filters are alive (in use or kept). */
+export function liveGlassFilters(): number {
+  return entries.size;
+}
+
+/** For tests: forget every filter. */
+export function resetGlassForTests(): void {
+  entries.clear();
+  mapCache.clear();
+  glassFilters.value = [];
+}
+
+// ── Mode ──
 
 let themeWantsGlass = false;
 let watching = false;
+/** Measured once per session: the device cannot keep up (see probeFrames). */
+const SLOW_KEY = 'lifexp-v2-glass-slow';
+let slowDevice = readSlow();
+let probed = false;
+
+function readSlow(): boolean {
+  try {
+    return sessionStorage.getItem(SLOW_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Frame-time check before the lens is trusted: 30 frames of an idle page. A device
+ * that cannot hold ~45 fps even then gets the blur material for the session.
+ */
+function probeFrames(root: HTMLElement) {
+  if (probed || document.visibilityState !== 'visible') return;
+  probed = true;
+  const times: number[] = [];
+  let last = 0;
+  const tick = (t: number) => {
+    if (last) times.push(t - last);
+    last = t;
+    if (times.length < 30) return void requestAnimationFrame(tick);
+    times.sort((a, b) => a - b);
+    if ((times[15] ?? 0) <= 22) return;
+    slowDevice = true;
+    try {
+      sessionStorage.setItem(SLOW_KEY, '1');
+    } catch {
+      // the session still knows
+    }
+    apply(root);
+  };
+  whenIdle(() => requestAnimationFrame(tick));
+}
 
 function apply(root: HTMLElement) {
-  const mode = glassMode(themeWantsGlass, probeGlass());
+  const mode = glassMode(themeWantsGlass, { ...probeGlass(), slowDevice });
   if (mode === 'off') delete root.dataset.glass;
   else root.dataset.glass = mode;
   glassModeSignal.value = mode;
+  if (mode === 'refract') {
+    void loadLens();
+    probeFrames(root);
+  }
 }
 
 /**

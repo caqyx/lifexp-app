@@ -2,6 +2,6 @@
   "game": "glimmer",
   "source": "lifexp",
   "code": "v2/public/games/glimmer",
-  "note": "LifeXP's own game, written in this repo (docs/v2/PLAN.md 9.1, gl-1): an original endless dodge game (a little lantern wisp in one open arena; sparks, beams, rings, walls and seekers to avoid), not a vendored copy, so no VENDORED.json. Its CSP is in index.html; tests/vendor-game.spec.js checks it like a vendored game's.",
-  "tests": ["v2/tests/glimmer.test.ts", "tests/v2/glimmer.spec.js"]
+  "note": "LifeXP's own game, written in this repo (docs/v2/PLAN.md 9.1, gl-1): an original endless dodge game (a little lantern wisp in one open arena; sparks, beams, rings, walls, seekers and, since gl-2, snakes, bouncers, splitters, mines, comets, pinwheels, grids and shrinking zones to avoid), not a vendored copy, so no VENDORED.json. Its CSP is in index.html; tests/vendor-game.spec.js checks it like a vendored game's.",
+  "tests": ["v2/tests/glimmer.test.ts", "v2/tests/glimmer-obstacles.test.ts", "tests/v2/glimmer.spec.js"]
 }
