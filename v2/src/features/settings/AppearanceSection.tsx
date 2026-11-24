@@ -3,7 +3,7 @@
 // devices (core.js applyLang). v1's font choice does not come over: v2 ships one
 // font (PLAN.md 7.2).
 import type { Language, Profile } from '@/domain/profile';
-import { language, setLanguage, t, V1_LANG_STORAGE_KEY } from '@/i18n';
+import { language, languageChoice, setLanguage, t, V1_LANG_STORAGE_KEY } from '@/i18n';
 import { FAMILY_MODES, THEME_FAMILIES, type ModePreference, type ThemeFamily } from '@/lib/theme';
 import { saveLanguage } from '@/services/settings';
 import { setThemePreference, themePreference } from '@/stores/theme';
@@ -15,6 +15,9 @@ const LANGUAGES: readonly Language[] = ['pl', 'en'];
 
 export function AppearanceSection({ uid }: { uid: string; profile: Profile }) {
   const theme = themePreference.value;
+  // The texts follow the language in force (re-rendered once English's strings arrive);
+  // the language control shows the choice at once (languageChoice).
+  void language.value;
   const modes = FAMILY_MODES[theme.family];
 
   const chooseLanguage = (lang: Language) => {
@@ -57,7 +60,8 @@ export function AppearanceSection({ uid }: { uid: string; profile: Profile }) {
           <Stack gap="sm">
             <SegmentedControl<Language>
               label={t('settings.language')}
-              value={language.value}
+              // The choice at once: the strings of English arrive a moment later (their own chunk).
+              value={languageChoice.value}
               options={LANGUAGES.map((l) => ({ value: l, label: t(`settings.languages.${l}`) }))}
               onChange={chooseLanguage}
             />

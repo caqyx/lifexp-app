@@ -54,8 +54,13 @@ export function initI18n(lng: Language): Promise<void> {
   return setLanguage(lng);
 }
 
-/** The language asked for last: a slower earlier switch must not win over it. */
-let requested: Language = 'pl';
+/**
+ * The language asked for last, at once: a control showing the choice reads this, not
+ * `language`, which changes only once the strings are loaded (English is fetched on
+ * first use). A slower earlier switch must not win over it; if the strings cannot be
+ * loaded it goes back to the language in force.
+ */
+export const languageChoice = signal<Language>('pl');
 
 /**
  * Switch language at runtime (the profile's choice wins over the device's, as in v1).
@@ -63,16 +68,18 @@ let requested: Language = 'pl';
  * the chunk was ever cached), the current language stays.
  */
 export function setLanguage(lng: Language): Promise<void> {
-  requested = lng;
+  languageChoice.value = lng;
   // peek(): callable from an effect without subscribing it to the language.
   if (language.peek() === lng && i18next.language === lng) return Promise.resolve();
   return loadLanguage(lng).then(
     () => {
-      if (requested !== lng) return;
+      if (languageChoice.peek() !== lng) return;
       void i18next.changeLanguage(lng);
       language.value = lng;
     },
-    () => {},
+    () => {
+      if (languageChoice.peek() === lng) languageChoice.value = language.peek();
+    },
   );
 }
 
