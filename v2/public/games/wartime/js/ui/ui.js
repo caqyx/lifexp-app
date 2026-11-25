@@ -2499,6 +2499,7 @@
       '<span class="aggr-val" id="set-aggr-val">' + aggressionLabel(st.aiAggression) + '</span></div>' +
       '<div class="hint" style="margin-top:8px">Agresywność wpływa na to, jak często i przy jak słabych relacjach AI wypowiada wojny, jakiej przewagi potrzebuje do ataku i jak łatwo zgadza się na biały pokój. 0 = brak nowych wojen AI.</div>';
     openModal({ title: icon('sliders') + ' Ustawienia gry', body, onOpen: (el) => {
+      if (WT.lifexpEvents) WT.lifexpEvents.mountSettings(el.querySelector('.modal-body')); // [lifexp]
       el.querySelector('#set-nopacts').addEventListener('change', (e) => { settingsOf().autoRejectPacts = e.target.checked; });
       const ag = el.querySelector('#set-aggr');
       ag.addEventListener('input', () => { el.querySelector('#set-aggr-val').textContent = aggressionLabel(+ag.value); });

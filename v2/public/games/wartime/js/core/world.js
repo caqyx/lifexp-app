@@ -83,7 +83,7 @@ WT.world = (function () {
       if (p.owner === S.VOID) return;
       var t = unrestTarget(id), u = p.unrest || 0;
       p.unrest = Math.round(U.clamp(u + U.clamp(t - u, -UNREST_STEP, UNREST_STEP), 0, 100));
-      if (p.unrest >= REVOLT_AT && !S.armiesIn(id).some(function (a) { return a.owner === p.owner; }) && U.chance(REVOLT_CHANCE)) revolt(id);
+      if (p.unrest >= REVOLT_AT && !S.armiesIn(id).some(function (a) { return a.owner === p.owner; }) && U.chance(REVOLT_CHANCE * (WT.lifexpEvents ? WT.lifexpEvents.chance('revolt') : 1))) revolt(id); // [lifexp]
     });
   }
 
@@ -98,7 +98,7 @@ WT.world = (function () {
       })).filter(function (n) { return S.country(owner).capital !== n; });
       if (!provs.length) return;
       var pop = provs.reduce(function (s, n) { return s + S.provPop(n); }, 0);
-      var c = S.spawnCountry(nation, provs, { army: Math.round(U.clamp(pop * 5000, 8000, 60000)), tech: S.country(owner).tech * 0.9 });
+      var c = S.spawnCountry(nation, provs, { army: Math.round(U.clamp(pop * 5000, 8000, 60000) * (WT.lifexpEvents ? WT.lifexpEvents.strength('revolt') : 1)) /* [lifexp] */, tech: S.country(owner).tech * 0.9 });
       provs.forEach(function (n) { G().provinces[n].unrest = 0; });
       D().startWar([nation], [owner], true);
       S.addLog('Bunt! ' + c.name + ' ogłasza niepodległość (' + provs.map(function (n) { return S.provStatic(n).name; }).join(', ') + ') i walczy z: ' + name(owner) + '.', owner);
@@ -140,7 +140,7 @@ WT.world = (function () {
           if (D().relation(cc, n) > -60) D().changeRel(cc, n, -ae / 40);
         });
         if (ae >= AE_COALITION && turn() % 4 === 0) formCoalition(cc, nbs);
-        if (ae >= AE_WAR && U.chance(0.05)) coalitionWar(cc);
+        if (ae >= AE_WAR && U.chance(0.05 * (WT.lifexpEvents ? WT.lifexpEvents.chance('coalition') : 1))) coalitionWar(cc); // [lifexp]
       }
       c.ae = U.round(Math.max(0, ae - (D().enemiesOf(cc).length ? AE_DECAY_WAR : AE_DECAY_PEACE)), 1);
     });
@@ -323,6 +323,7 @@ WT.world = (function () {
     S.countriesAlive().forEach(function (cc) {
       var c = S.country(cc);
       if (isPlayer(cc)) {
+        if (WT.lifexpEvents && WT.lifexpEvents.rollFor(cc, PLAYER_EVENT_CHANCE, PLAYER_EVENT_GAP, AI_EVENT_CHANCE)) return; // [lifexp]
         if (pending().length || turn() - (G().lastEventTurn != null ? G().lastEventTurn : -99) < PLAYER_EVENT_GAP || !U.chance(PLAYER_EVENT_CHANCE)) return;
       } else if (!U.chance(AI_EVENT_CHANCE)) return;
       var ok = EVENTS.filter(function (ev) { return ev.cond(cc); });
@@ -332,6 +333,7 @@ WT.world = (function () {
     // wybory w demokracjach (co 4 lata, przesunięte per państwo)
     S.countriesAlive().forEach(function (cc, i) {
       var c = S.country(cc);
+      if (WT.lifexpEvents && !WT.lifexpEvents.enabled('election')) return; // [lifexp]
       if (c.ideology !== 'demokracja') return;
       if ((turn() + (cc.charCodeAt(0) * 7 + cc.charCodeAt(1) * 13) % ELECTION_EVERY) % ELECTION_EVERY === 0) fire(BY_ID.election, cc);
     });
@@ -341,6 +343,7 @@ WT.world = (function () {
     HISTORY.forEach(function (h) {
       if (done[h.id] || G().scenario !== h.scen || G().date < h.date) return;
       done[h.id] = true;
+      if (WT.lifexpEvents && !WT.lifexpEvents.enabled('history')) return; // [lifexp]
       if (!alive(h.who) || !h.cond()) return;
       fire(h, h.who);
     });

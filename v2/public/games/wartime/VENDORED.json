@@ -2,7 +2,7 @@
   "game": "wartime",
   "source": "https://github.com/szymonrogalski098-collab/Wartime",
   "commit": "4f2eef23f710c57b410974cab17a161b9ca2c0dc",
-  "vendoredAt": "2026-11-05T23:32:50.496Z",
+  "vendoredAt": "2026-11-25T15:46:05.316Z",
   "dirty": false,
   "include": [
     "index.html",
@@ -12,8 +12,20 @@
   ],
   "patches": [
     "css/mobile.css: Menu (arkusz u dołu) mieści się w ekranie i przewija: na telefonie w poziomie (360 px wysokości) górne pozycje wychodziły poza ekran i nie dało się ich stuknąć.",
-    "js/ui/render.js: Nazwy państw na mapie: szerokość każdej nazwy mierzona raz (na 100 px, potem skalowana), a czcionka ustawiana tylko dla nazw, które się rysują. Wcześniej każda klatka przesuwania mapy ustawiała czcionkę i mierzyła wszystkie nazwy, także poza ekranem — największy koszt JS klatki na telefonie."
+    "js/ui/render.js: Nazwy państw na mapie: szerokość każdej nazwy mierzona raz (na 100 px, potem skalowana), a czcionka ustawiana tylko dla nazw, które się rysują. Wcześniej każda klatka przesuwania mapy ustawiała czcionkę i mierzyła wszystkie nazwy, także poza ekranem — największy koszt JS klatki na telefonie.",
+    "js/core/goals.js: Udostępnia sprawdzenie misji (checkMissions) dla lifexp-patches.js, żeby misja zaliczała się od razu, a nie dopiero na końcu następnej tury.",
+    "js/core/world.js: Ustawienia wydarzeń: losowe wydarzenia gracza i AI przez WT.lifexpEvents.rollFor, gdy któreś nie jest domyślne (domyślnie kod gry bez zmian).",
+    "js/core/world.js: Ustawienia wydarzeń: bunt — wyłączenie i częstość (mnożnik szansy gry).",
+    "js/core/world.js: Ustawienia wydarzeń: bunt — siła (mnożnik armii powstańców).",
+    "js/core/world.js: Ustawienia wydarzeń: wojny koalicji — wyłączenie i częstość.",
+    "js/core/world.js: Ustawienia wydarzeń: wybory — wyłączenie.",
+    "js/core/world.js: Ustawienia wydarzeń: wydarzenia historyczne — wyłączenie (pominięte nie wracają po włączeniu, jak w grze).",
+    "js/ui/ui.js: Ustawienia wydarzeń w oknie „Ustawienia gry”.",
+    "lifexp-patches.js: Łatki LifeXP (skrypt): misje zaliczane od razu (zmiana właściciela prowincji, pokój, aneksja, wasal, wczytanie zapisu) i ustawienia wydarzeń losowych (WT.lifexpEvents).",
+    "lifexp-patches.css: Łatki LifeXP (styl): sekcja ustawień wydarzeń, wygodna na telefonie.",
+    "index.html: Wpina lifexp-patches.css po stylach gry.",
+    "index.html: Wpina lifexp-patches.js po skryptach gry, przed js/main.js (start)."
   ],
   "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'",
-  "files": 27
+  "files": 29
 }
