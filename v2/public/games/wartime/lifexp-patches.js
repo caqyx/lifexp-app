@@ -4,7 +4,7 @@
  * scripts (before js/main.js). Plain script on `window`, like the game; it also runs in node
  * (v2/tests/wartime.test.ts).
  *
- *  1. Missions complete the moment they are met. The game checked them only in the end-of-turn
+ *  1. Missions (and achievements) complete the moment they are met. The game checked them only in the end-of-turn
  *     step (WT.goals.processTurn), so provinces won in a peace treaty or a land deal showed
  *     "7 / 6" until the next end of turn. Now every change of ownership, peace, annexation and
  *     vassalage re-checks them, and so does loading a save (a save that is already past a target
@@ -28,17 +28,26 @@
   // ===========================================================================
   // 1. Missions checked as soon as their inputs change
   // ===========================================================================
-  var checking = false;
+  var checking = false, settingUp = false;
   function checkMissionsNow() {
     var g = WT.G;
-    if (!P.missionsLive || checking || !g || !g.missions || g.gameOver || typeof WT.goals.checkMissions !== 'function') return;
+    if (!P.missionsLive || checking || settingUp || !g || g.gameOver || typeof WT.goals.checkMissions !== 'function') return;
     var c = g.countries && g.countries[g.player];
     if (!c || !c.alive) return;
     checking = true;
-    try { WT.goals.checkMissions(); } finally { checking = false; }
+    try {
+      // Missions are made on first use (goals panel or the first end of turn); never invent them mid-action.
+      if (g.missions) WT.goals.checkMissions();
+      if (typeof WT.goals.checkAchievements === 'function') WT.goals.checkAchievements();
+    } finally { checking = false; }
   }
   P.checkMissionsNow = checkMissionsNow;
 
+  var newGame = WT.state.newGame;
+  WT.state.newGame = function lifexpNewGame() {
+    settingUp = true;
+    try { return newGame.apply(this, arguments); } finally { settingUp = false; }
+  };
   var setOwner = WT.state.setOwner;
   WT.state.setOwner = function lifexpSetOwner() {
     var result = setOwner.apply(this, arguments);
@@ -138,7 +147,7 @@
   var EN = {
     title: 'Random events', hint: 'For every country, from now on, also in this game; remembered in this browser.',
     reset: 'Restore defaults', on: 'On', freq: 'How often', strength: 'Strength',
-    rare: 'Rarely', normal: 'Normal', often: 'Often', mild: 'Mild', harsh: 'Harsh',
+    rare: 'Rarely', normal: 'Normal', often: 'Often', mild: 'Mild', medium: 'Normal', harsh: 'Harsh',
     names: { crisis: 'Financial crisis', boom: 'Economic boom', strike: 'General strike', disaster: 'Natural disaster', epidemic: 'Epidemic',
       deposits: 'Mineral discovery', science: 'Scientific breakthrough', volunteers: 'Wave of volunteers', desertion: 'Desertion at the front',
       scandal: 'Corruption scandal', revolution: 'Revolution', revolt: 'Rebellions in restless provinces', coalition: 'Coalition wars against aggressors',
@@ -147,7 +156,7 @@
   var PL = {
     title: 'Wydarzenia losowe', hint: 'Dla wszystkich państw, od razu, także w tej grze; zapamiętane w tej przeglądarce.',
     reset: 'Przywróć domyślne', on: 'Włączone', freq: 'Jak często', strength: 'Siła',
-    rare: 'Rzadko', normal: 'Normalnie', often: 'Często', mild: 'Łagodny', harsh: 'Ostry',
+    rare: 'Rzadko', normal: 'Normalnie', often: 'Często', mild: 'Łagodny', medium: 'Normalny', harsh: 'Ostry',
     names: { revolt: 'Bunty w niespokojnych prowincjach', coalition: 'Wojny koalicji przeciw agresorom', election: 'Wybory w demokracjach', history: 'Wydarzenia historyczne (scenariusze)' }
   };
   function lang() {
@@ -160,8 +169,9 @@
   }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; }); }
   function segHtml(id, kind, values, current, t) {
+    var label = function (v) { return kind === 'strength' && v === 'normal' ? t.medium : t[v]; };
     return '<div class="seg lx-ev-seg" role="radiogroup" aria-label="' + esc(t[kind] + ': ' + nameOf(id, t)) + '">' + values.map(function (v) {
-      return '<button type="button" class="seg-btn' + (v === current ? ' on' : '') + '" role="radio" aria-checked="' + (v === current) + '" data-ev="' + id + '" data-kind="' + kind + '" data-val="' + v + '">' + esc(t[v]) + '</button>';
+      return '<button type="button" class="seg-btn' + (v === current ? ' on' : '') + '" role="radio" aria-checked="' + (v === current) + '" data-ev="' + id + '" data-kind="' + kind + '" data-val="' + v + '">' + esc(label(v)) + '</button>';
     }).join('') + '</div>';
   }
   function rowHtml(id, t) {

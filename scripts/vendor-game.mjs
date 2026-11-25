@@ -106,9 +106,9 @@ export const GAMES = {
       },
       {
         file: 'js/core/goals.js',
-        why: 'Udostępnia sprawdzenie misji (checkMissions) dla lifexp-patches.js, żeby misja zaliczała się od razu, a nie dopiero na końcu następnej tury.',
+        why: 'Udostępnia sprawdzenie misji i osiągnięć (checkMissions, checkAchievements) dla lifexp-patches.js, żeby zaliczały się od razu, a nie dopiero na końcu następnej tury.',
         find: /missions: missions, progress: progress, score: score,/,
-        replace: 'missions: missions, progress: progress, checkMissions: checkMissions /* [lifexp] */, score: score,',
+        replace: 'missions: missions, progress: progress, checkMissions: checkMissions, checkAchievements: checkAchievements /* [lifexp] */, score: score,',
       },
       {
         file: 'js/core/world.js',
@@ -145,6 +145,12 @@ export const GAMES = {
         why: 'Ustawienia wydarzeń: wydarzenia historyczne — wyłączenie (pominięte nie wracają po włączeniu, jak w grze).',
         find: /( {6})if \(!alive\(h\.who\) \|\| !h\.cond\(\)\) return;/,
         replace: "$1if (WT.lifexpEvents && !WT.lifexpEvents.enabled('history')) return; // [lifexp]\n$&",
+      },
+      {
+        file: 'js/ui/ui.js',
+        why: 'Błąd: po wczytaniu zapisu wydarzenie czekające na decyzję nie pokazywało się aż do końca następnej tury (i do tego czasu blokowało nowe). Wejście do gry sprawdza teraz wydarzenia (checkEvents, które potem sprawdza propozycje), a nie tylko propozycje.',
+        find: /( {4})setTimeout\(checkProposals, 300\);\n( {2})\}\n( {2})UI\.enterGame = enterGame;/,
+        replace: '$1setTimeout(checkEvents, 300); // [lifexp] was checkProposals; checkEvents ends with checkProposals\n$2}\n$3UI.enterGame = enterGame;',
       },
       {
         file: 'js/ui/ui.js',

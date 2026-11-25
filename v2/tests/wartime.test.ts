@@ -86,6 +86,21 @@ describe('missions complete the moment they are met (not at the next end of turn
     expect(WT.goals.missions().find((m: Root) => m.id === 'provs').done).toBe(true);
   });
 
+  test('an achievement unlocks the moment it is met too (Imperium: 100 provinces)', () => {
+    newGame();
+    const S = WT.state;
+    expect(WT.goals.unlocked().empire).toBeFalsy();
+    const others = ['RUS', 'UKR', 'BLR', 'DEU', 'CZE', 'SVK', 'LTU', 'LVA', 'EST', 'ROU', 'HUN', 'KAZ'];
+    for (const cc of others) {
+      for (const id of S.provincesOf(cc)) {
+        if (S.provincesOf('POL').length >= 100) break;
+        S.setOwner(id, 'POL');
+      }
+    }
+    expect(S.provincesOf('POL').length).toBeGreaterThanOrEqual(100);
+    expect(WT.goals.unlocked().empire).toBeTruthy();
+  });
+
   test('a new game does not complete anything while it is being set up', () => {
     newGame();
     expect(WT.goals.missions().every((m: Root) => !m.done)).toBe(true);

@@ -746,7 +746,7 @@
     $('minimap').classList.remove('hidden'); $('turn-summary').classList.add('hidden');
     setTimeout(() => startTutorial(false), 600);
     refreshAll();
-    setTimeout(checkProposals, 300);
+    setTimeout(checkEvents, 300); // [lifexp] was checkProposals; checkEvents ends with checkProposals
   }
   UI.enterGame = enterGame;
   function refreshAll() {
