@@ -7,8 +7,9 @@
  *  1. Missions (and achievements) complete the moment they are met. The game checked them only in the end-of-turn
  *     step (WT.goals.processTurn), so provinces won in a peace treaty or a land deal showed
  *     "7 / 6" until the next end of turn. Now every change of ownership, peace, annexation and
- *     vassalage re-checks them, and so does loading a save (a save that is already past a target
- *     completes on load). The end-of-turn check stays as a safety net.
+ *     vassalage re-checks them at once, every player input (tap, click, key) right after it is
+ *     handled (God Mode buildings, research, answered events), and so does loading a save (a save
+ *     already past a target completes on load). The end-of-turn check stays as a safety net.
  *  2. Random-event settings (WT.lifexpEvents): each random event, elections, historical events,
  *     rebellions and coalition wars can be switched off; the random ones, rebellions and
  *     coalitions also get a frequency (rare ×0.5 / normal ×1 / often ×2 of the game's own
@@ -68,6 +69,19 @@
     if (RECHECK_ON[name]) checkMissionsNow();
     return result;
   };
+
+  // Anything else the player does (God Mode instant buildings, research, answering an event,
+  // a deal…) is followed by a check right after the input is handled.
+  var queued = false;
+  function afterInput() {
+    if (queued) return;
+    queued = true;
+    setTimeout(function () { queued = false; checkMissionsNow(); }, 0);
+  }
+  P.afterInput = afterInput;
+  if (typeof root.addEventListener === 'function') {
+    ['click', 'change', 'keyup', 'pointerup'].forEach(function (type) { root.addEventListener(type, afterInput, true); });
+  }
 
   // ===========================================================================
   // 2. Random-event settings

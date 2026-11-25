@@ -101,6 +101,18 @@ describe('missions complete the moment they are met (not at the next end of turn
     expect(WT.goals.unlocked().empire).toBeTruthy();
   });
 
+  test('after any player input: six university levels built at once in God Mode complete their mission', async () => {
+    newGame('POL', { god: true });
+    const mission = WT.goals.missions().find((m: Root) => m.id === 'uni');
+    expect(mission).toBeTruthy();
+    const [a, b] = WT.state.provincesOf('POL');
+    for (let i = 0; i < 3; i++) for (const id of [a, b]) expect(WT.economy.build('POL', id, 'university')).toBe(true);
+    expect(WT.goals.progress(mission).have).toBe(6);
+    WT.lifexpPatches.afterInput(); // what a tap or click does
+    await new Promise((r) => setTimeout(r, 5));
+    expect(mission.done).toBe(true);
+  });
+
   test('a new game does not complete anything while it is being set up', () => {
     newGame();
     expect(WT.goals.missions().every((m: Root) => !m.done)).toBe(true);
@@ -184,7 +196,7 @@ describe('random-event settings', () => {
     const armyOf = (strength: string) => {
       const lands = lithuaniaUnderPoland();
       WT.lifexpEvents.set('revolt', { on: true, freq: 'often', strength });
-      return rebellions(40, lands)[0];
+      return rebellions(40, lands)[0] ?? 0;
     };
     const normal = armyOf('normal');
     expect(normal).toBeGreaterThan(0);
