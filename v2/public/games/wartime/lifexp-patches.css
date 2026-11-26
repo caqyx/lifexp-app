@@ -1,0 +1,15 @@
+/* LifeXP patches for War Time (docs/v2/VENDOR-PATCHES.md): the random-event settings in the
+   "Ustawienia gry" window (lifexp-patches.js). Built from the game's own .check / .seg styles. */
+.lx-ev { margin-top: 18px; }
+.lx-ev-hint { margin: 0 0 8px; font-size: var(--fs-xs); color: var(--text-3); }
+.lx-ev-row { padding: 2px 0 8px; border-bottom: 1px solid var(--stroke-1); }
+.lx-ev-row:last-of-type { border-bottom: 0; }
+.lx-ev-opt { display: flex; align-items: center; gap: 8px; padding: 2px 8px; transition: opacity var(--dur-1); }
+.lx-ev-lbl { width: 84px; flex: none; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
+.lx-ev-row.off .lx-ev-opt { opacity: 0.4; pointer-events: none; }
+.lx-ev-seg .seg-btn { height: 32px; }
+.lx-ev-reset { margin-top: 12px; width: 100%; justify-content: center; }
+@media (max-width: 900px), (max-height: 500px) {
+  .lx-ev-seg .seg-btn { height: 40px; }
+  .lx-ev-lbl { width: 64px; }
+}

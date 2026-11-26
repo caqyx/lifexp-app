@@ -392,6 +392,70 @@ test.describe('Wartime', () => {
     expect(problems).toEqual([]);
   });
 
+  // LifeXP's patches (docs/v2/VENDOR-PATCHES.md): random-event settings, and a decision
+  // waiting in a save comes up as soon as the save is loaded.
+  test.describe('on a touch phone held sideways', () => {
+    test.use({ viewport: { width: 915, height: 412 }, isMobile: true, hasTouch: true });
+
+    test('random-event settings save and survive a reload; a decision waiting in a save comes up on load', async ({ page, account }) => {
+      test.setTimeout(120000);
+      const problems = await watchProblems(page);
+      const { game } = await playFromList(page, account, 'Wartime');
+      const startPoland = async () => {
+        await game.locator('#start-search').fill('Polska');
+        await game.locator('#start-results .country-item[data-cc="POL"]').tap();
+        await game.locator('#btn-start').tap();
+        await expect(game.locator('#topbar')).toBeVisible({ timeout: 30000 });
+      };
+      const openSettings = async () => {
+        if (!(await game.locator('#btn-menu').isVisible())) await game.locator('#btn-more').tap();
+        await game.locator('#btn-menu').tap();
+        await game.locator('#menu [data-act="settings"]').tap();
+        await expect(game.locator('#lx-events')).toBeVisible();
+      };
+      await startPoland();
+      await game.locator('#tut-skip').tap();
+      await openSettings();
+      const events = game.locator('#lx-events');
+      await expect(events.getByText('Wydarzenia losowe')).toBeVisible();
+      await events.locator('[data-ev="revolt"][data-val="harsh"]').tap();
+      await events.locator('[data-row="revolt"] label').tap(); // the switch: off
+      await expect(events.locator('[data-row="revolt"]')).toHaveClass(/off/);
+      await events.locator('[data-ev="crisis"][data-val="often"]').tap();
+      await expect(events.locator('[data-ev="crisis"][data-val="often"]')).toHaveAttribute('aria-checked', 'true');
+      const stored = JSON.parse(await page.evaluate(() => localStorage.getItem('wartime_lifexp_events')));
+      expect(stored).toMatchObject({ v: 1, events: { revolt: { on: false, strength: 'harsh' }, crisis: { on: true, freq: 'often' } } });
+      await page.keyboard.press('Escape');
+
+      // A decision the player has not answered yet, saved in slot 1.
+      const frame = page.frames().find((f) => f.url().includes('/games/wartime/'));
+      await frame.evaluate(() => {
+        /* global WT */
+        WT.world.fire(WT.world.EVENTS.find((e) => e.id === 'boom'), WT.G.player);
+        WT.save.save(1);
+      });
+
+      await page.reload();
+      await expect(game.locator('#btn-load')).toBeVisible({ timeout: 30000 });
+      await game.locator('#btn-load').tap();
+      await game.locator('[data-load="1"]').tap();
+      const decision = game.locator('#modal-root .modal-backdrop').filter({ hasText: 'Boom gospodarczy' });
+      await expect(decision).toBeVisible({ timeout: 10000 });
+      await decision.locator('.event-opt').first().tap();
+      await expect(decision).toHaveCount(0);
+
+      await openSettings();
+      await expect(events.locator('[data-row="revolt"] input')).not.toBeChecked();
+      await expect(events.locator('[data-ev="revolt"][data-val="harsh"]')).toHaveAttribute('aria-checked', 'true');
+      await expect(events.locator('[data-ev="crisis"][data-val="often"]')).toHaveAttribute('aria-checked', 'true');
+      await expect(events.locator('[data-ev="boom"][data-val="normal"]')).toHaveAttribute('aria-checked', 'true');
+      // Nothing in the section reaches past the screen's edge.
+      const box = await events.boundingBox();
+      expect(box.x + box.width).toBeLessThanOrEqual(915);
+      expect(problems).toEqual([]);
+    });
+  });
+
   test.describe('on a touch phone held upright', () => {
     test.use({ viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true });
 

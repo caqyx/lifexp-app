@@ -104,6 +104,82 @@ export const GAMES = {
           "$3ctx.font = '700 ' + px.toFixed(1) + 'px ' + FONT_SANS;\n" +
           '$3setLetterSpacing(track);\n',
       },
+      {
+        file: 'js/core/goals.js',
+        why: 'Udostępnia sprawdzenie misji i osiągnięć (checkMissions, checkAchievements) dla lifexp-patches.js, żeby zaliczały się od razu, a nie dopiero na końcu następnej tury.',
+        find: /missions: missions, progress: progress, score: score,/,
+        replace: 'missions: missions, progress: progress, checkMissions: checkMissions, checkAchievements: checkAchievements /* [lifexp] */, score: score,',
+      },
+      {
+        file: 'js/core/world.js',
+        why: 'Ustawienia wydarzeń: losowe wydarzenia gracza i AI przez WT.lifexpEvents.rollFor, gdy któreś nie jest domyślne (domyślnie kod gry bez zmian).',
+        find: /( {6})var c = S\.country\(cc\);\n( {6})if \(isPlayer\(cc\)\) \{\n/,
+        replace: '$&$1  if (WT.lifexpEvents && WT.lifexpEvents.rollFor(cc, PLAYER_EVENT_CHANCE, PLAYER_EVENT_GAP, AI_EVENT_CHANCE)) return; // [lifexp]\n',
+      },
+      {
+        file: 'js/core/world.js',
+        why: 'Ustawienia wydarzeń: bunt — wyłączenie i częstość (mnożnik szansy gry).',
+        find: /U\.chance\(REVOLT_CHANCE\)\) revolt\(id\);/,
+        replace: "U.chance(REVOLT_CHANCE * (WT.lifexpEvents ? WT.lifexpEvents.chance('revolt') : 1))) revolt(id); // [lifexp]",
+      },
+      {
+        file: 'js/core/world.js',
+        why: 'Ustawienia wydarzeń: bunt — siła (mnożnik armii powstańców).',
+        find: /army: Math\.round\(U\.clamp\(pop \* 5000, 8000, 60000\)\)/,
+        replace: "army: Math.round(U.clamp(pop * 5000, 8000, 60000) * (WT.lifexpEvents ? WT.lifexpEvents.strength('revolt') : 1)) /* [lifexp] */",
+      },
+      {
+        file: 'js/core/world.js',
+        why: 'Ustawienia wydarzeń: wojny koalicji — wyłączenie i częstość.',
+        find: /if \(ae >= AE_WAR && U\.chance\(0\.05\)\) coalitionWar\(cc\);/,
+        replace: "if (ae >= AE_WAR && U.chance(0.05 * (WT.lifexpEvents ? WT.lifexpEvents.chance('coalition') : 1))) coalitionWar(cc); // [lifexp]",
+      },
+      {
+        file: 'js/core/world.js',
+        why: 'Ustawienia wydarzeń: wybory — wyłączenie.',
+        find: /( {6})if \(c\.ideology !== 'demokracja'\) return;/,
+        replace: "$1if (WT.lifexpEvents && !WT.lifexpEvents.enabled('election')) return; // [lifexp]\n$&",
+      },
+      {
+        file: 'js/core/world.js',
+        why: 'Ustawienia wydarzeń: wydarzenia historyczne — wyłączenie (pominięte nie wracają po włączeniu, jak w grze).',
+        find: /( {6})if \(!alive\(h\.who\) \|\| !h\.cond\(\)\) return;/,
+        replace: "$1if (WT.lifexpEvents && !WT.lifexpEvents.enabled('history')) return; // [lifexp]\n$&",
+      },
+      {
+        file: 'js/ui/ui.js',
+        why: 'Błąd: po wczytaniu zapisu wydarzenie czekające na decyzję nie pokazywało się aż do końca następnej tury (i do tego czasu blokowało nowe). Wejście do gry sprawdza teraz wydarzenia (checkEvents, które potem sprawdza propozycje), a nie tylko propozycje.',
+        find: /( {4})setTimeout\(checkProposals, 300\);\n( {2})\}\n( {2})UI\.enterGame = enterGame;/,
+        replace: '$1setTimeout(checkEvents, 300); // [lifexp] was checkProposals; checkEvents ends with checkProposals\n$2}\n$3UI.enterGame = enterGame;',
+      },
+      {
+        file: 'js/ui/ui.js',
+        why: 'Ustawienia wydarzeń w oknie „Ustawienia gry”.',
+        find: /openModal\(\{ title: icon\('sliders'\) \+ ' Ustawienia gry', body, onOpen: \(el\) => \{\n/,
+        replace: "$&      if (WT.lifexpEvents) WT.lifexpEvents.mountSettings(el.querySelector('.modal-body')); // [lifexp]\n",
+      },
+      {
+        file: 'lifexp-patches.js',
+        why: 'Łatki LifeXP (skrypt): misje zaliczane od razu (zmiana właściciela prowincji, pokój, aneksja, wasal, wczytanie zapisu) i ustawienia wydarzeń losowych (WT.lifexpEvents).',
+        add: 'scripts/vendor-patches/wartime/lifexp-patches.js',
+      },
+      {
+        file: 'lifexp-patches.css',
+        why: 'Łatki LifeXP (styl): sekcja ustawień wydarzeń, wygodna na telefonie.',
+        add: 'scripts/vendor-patches/wartime/lifexp-patches.css',
+      },
+      {
+        file: 'index.html',
+        why: 'Wpina lifexp-patches.css po stylach gry.',
+        find: /<link rel="stylesheet" href="css\/mobile\.css">/,
+        replace: '$&\n  <link rel="stylesheet" href="lifexp-patches.css">',
+      },
+      {
+        file: 'index.html',
+        why: 'Wpina lifexp-patches.js po skryptach gry, przed js/main.js (start).',
+        find: /<script src="js\/main\.js"><\/script>/,
+        replace: '<script src="lifexp-patches.js"></script>\n  $&',
+      },
     ],
   },
   gridlock: {

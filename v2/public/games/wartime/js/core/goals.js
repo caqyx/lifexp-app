@@ -192,7 +192,7 @@ WT.goals = (function () {
   return {
     DIFFICULTY: DIFFICULTY, difficulty: difficulty, incomeMult: incomeMult,
     stats: stats, attach: attach, ACHIEVEMENTS: ACHIEVEMENTS, unlocked: unlocked, unlock: unlock,
-    missions: missions, progress: progress, score: score, summary: summary, processTurn: processTurn
+    missions: missions, progress: progress, checkMissions: checkMissions, checkAchievements: checkAchievements /* [lifexp] */, score: score, summary: summary, processTurn: processTurn
   };
 })();
 
